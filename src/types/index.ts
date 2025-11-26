@@ -27,6 +27,7 @@ export interface Article {
 // RSS源类型
 export interface RSSSource {
   id: number;
+  sortOrder: number; // 用于自定义排序
   name: string;
   url: string;
   category: string;
