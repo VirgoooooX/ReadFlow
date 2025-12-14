@@ -2,8 +2,11 @@ import { DatabaseService } from '../database/DatabaseService';
 import { RSSSource, Article, AppError } from '../types';
 import { imageExtractionService } from './ImageExtractionService';
 import { rsshubService } from './RSShubService';
+// @ts-ignore - 第三方库没有类型定义
 import { parse as parseRSS } from 'react-native-rss-parser';
 import { parseEnhancedRSS, extractBestImageUrlFromItem } from './EnhancedRSSParser';
+// 移除图片预缓存，改为打开文章时按需加载
+// import { imageCacheService } from './ImageCacheService';
 // React Native环境下的HTML清理方案
 
 // 添加cloudscraper-like功能的简单实现
@@ -92,6 +95,7 @@ export class RSSService {
       const feedInfo = await this.validateRSSFeed(url);
       
       const rssSource: Omit<RSSSource, 'id'> = {
+        sortOrder: 0,
         name: title || feedInfo.title || 'Unknown Feed',
         url,
         category,
@@ -112,12 +116,12 @@ export class RSSService {
           rssSource.category,
           rssSource.contentType,
           rssSource.isActive ? 1 : 0,
-          rssSource.lastFetchAt.toISOString(),
+          rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
         ]
       );
 
       const newSource: RSSSource = {
-        id: result.insertId.toString(),
+        id: Number(result.insertId),
         ...rssSource,
       };
 
@@ -142,27 +146,16 @@ export class RSSService {
   public async getAllRSSSources(): Promise<RSSSource[]> {
     try {
       logger.info('Fetching RSS sources from database');
+      // 使用简化查询，避免复杂的LEFT JOIN在数据库初始化阶段出错
       const results = await this.databaseService.executeQuery(`
-        SELECT 
-          rs.*,
-          COALESCE(article_stats.total_articles, 0) as calculated_article_count,
-          COALESCE(article_stats.unread_articles, 0) as calculated_unread_count
-        FROM rss_sources rs
-        LEFT JOIN (
-          SELECT 
-            rss_source_id,
-            COUNT(*) as total_articles,
-            SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread_articles
-          FROM articles 
-          GROUP BY rss_source_id
-        ) article_stats ON rs.id = article_stats.rss_source_id
-        ORDER BY rs.title
+        SELECT * FROM rss_sources ORDER BY title
       `);
       
       logger.info(`Found ${results.length} RSS sources`);
-      return results.map(this.mapRSSSourceRowWithStats);
+      return results.map(this.mapRSSSourceRow);
     } catch (error) {
       logger.error('Error getting RSS sources:', error);
+      // 数据库初始化时返回空数组，而不是抛出错误
       return [];
     }
   }
@@ -209,7 +202,7 @@ export class RSSService {
    */
   public async updateRSSSource(id: number, updates: Partial<RSSSource>): Promise<void> {
     try {
-      logger.info(`Updating RSS source ${id}:`, updates);
+      logger.info(`Updating RSS source ${id}`);
       
       const setClause = [];
       const values = [];
@@ -364,7 +357,10 @@ export class RSSService {
         // 使用CORS代理服务
         finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(actualUrl)}`;
         // 移除可能冲突的请求头
-        delete fetchOptions.headers['User-Agent'];
+        if (fetchOptions.headers && typeof fetchOptions.headers === 'object' && !Array.isArray(fetchOptions.headers)) {
+          const headers = fetchOptions.headers as Record<string, string>;
+          delete headers['User-Agent'];
+        }
       }
       
       const response = await fetchWithRetry(finalUrl, {
@@ -385,34 +381,38 @@ export class RSSService {
         throw new Error('响应内容不是有效的XML格式');
       }
       
-      const articles = await this.parseRSSFeed(xmlText, source);
+      // 解析RSS，内部已实现增量解析（只解析新文章）
+      const newArticles = await this.parseRSSFeed(xmlText, source);
+      
+      if (!newArticles || newArticles.length === 0) {
+        logger.info(`RSS源 ${source.name} 没有新文章`);
+        await this.updateSourceStats(source.id!.toString());
+        return [];
+      }
       
       // 保存新文章到数据库
       const savedArticles = [];
-      const existingUrls = new Set<string>(); // 用于去重
       
-      for (const article of articles) {
-        if (!existingUrls.has(article.url)) {
-          // 检查文章是否已存在于数据库
-          const existing = await this.databaseService.executeQuery(
-            'SELECT id FROM articles WHERE url = ? OR (title = ? AND rss_source_id = ?)',
-            [article.url, article.title, article.sourceId]
-          );
-          
-          if (existing.length === 0) {
-            existingUrls.add(article.url);
-            const saved = await this.saveArticle(article);
-            if (saved) {
-              savedArticles.push(saved);
-            }
+      for (const article of newArticles) {
+        // 再次检查文章是否已存在（防止并发刷新时重复插入）
+        const existing = await this.databaseService.executeQuery(
+          'SELECT id FROM articles WHERE url = ?',
+          [article.url]
+        );
+        
+        if (existing.length === 0) {
+          const saved = await this.saveArticle(article);
+          if (saved) {
+            savedArticles.push(saved);
+            // 图片不再预缓存，改为打开文章时按需加载，节省流量
           }
         }
       }
       
       // 更新RSS源的最后更新时间
-      await this.updateSourceStats(source.id!);
+      await this.updateSourceStats(source.id!.toString());
       
-      logger.info(`成功解析 ${savedArticles.length} 篇新文章`);
+      logger.info(`成功保存 ${savedArticles.length} 篇新文章`);
       return savedArticles;
     } catch (error) {
       logger.error(`Error fetching articles from ${source.url}:`, error);
@@ -608,7 +608,7 @@ export class RSSService {
       // 处理RSSHUB协议
       if (rsshubService.isRSSHubUrl(url)) {
         if (!rsshubService.validateRSSHubPath(url)) {
-          throw new Error('Invalid RSSHUB URL format');
+          throw new Error('Invalid RSSHUB URL format: rsshub状技需要至少包含一个路径，如 rsshub://cnbeta/news');
         }
         
         // 获取最佳RSSHUB实例并转换URL
@@ -629,6 +629,11 @@ export class RSSService {
       
       const xmlText = await response.text();
       
+      // 检查是否是有效的RSS XML
+      if (!xmlText.trim() || !xmlText.includes('<?xml') && !xmlText.includes('<rss') && !xmlText.includes('<feed')) {
+        throw new Error('响应不是有效的RSS/Atom格式，也许轮改新罗不RSS转换');
+      }
+      
       // 简单的XML解析来提取基本信息
       const titleMatch = xmlText.match(/<title[^>]*>([^<]+)<\/title>/i);
       const descMatch = xmlText.match(/<description[^>]*>([^<]+)<\/description>/i);
@@ -640,7 +645,8 @@ export class RSSService {
         language: langMatch ? langMatch[1].trim() : undefined,
       };
     } catch (error) {
-      throw new Error(`Invalid RSS feed: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(`与RSS源不兼容: ${errorMsg}`);
     }
   }
 
@@ -657,31 +663,86 @@ export class RSSService {
       return []; // 返回空数组以防止后续代码崩溃
     }
 
-    const articles: Omit<Article, 'id'>[] = [];
-    
-    // 从传入的source对象直接获取信息，不再二次查询数据库
-    const sourceInfo = source;
-    const sourceId = parseInt(source.id, 10);
-    const sourceName = sourceInfo?.name || 'Unknown Source';
-    const shouldExtractImages = sourceInfo?.contentType === 'image_text';
+    const sourceId = typeof source.id === 'string' ? parseInt(source.id, 10) : source.id;
+    const sourceName = source.name || 'Unknown Source';
+    const shouldExtractImages = source.contentType === 'image_text';
     
     try {
       logger.info(`开始解析RSS Feed，源: ${sourceName}`);
       
       // 使用增强的RSS解析器解析RSS，支持media:content标签
       const rss = await parseEnhancedRSS(xmlText);
-      let skippedInvalid = 0;
+      
+      // ============ 第一步：快速解析基本信息，用于找分界点 ============
+      const basicItems: { url: string; title: string; publishedAt: Date; index: number }[] = [];
       
       for (let i = 0; i < rss.items.length; i++) {
         const item = rss.items[i];
-        
-        // 获取链接，优先使用links数组中的第一个链接，其次使用id
         const itemLink = item.links?.[0]?.url || item.id || '';
         
-        // 验证必需字段
+        if (!item.title || !itemLink) {
+          continue;
+        }
+        
+        let publishedAt = new Date();
+        if (item.published) {
+          publishedAt = this.parsePublishedDate(item.published);
+        }
+        
+        basicItems.push({
+          url: itemLink,
+          title: this.cleanTextContent(item.title),
+          publishedAt,
+          index: i
+        });
+      }
+      
+      // ============ 第二步：找分界点，识别新旧文章 ============
+      const latestArticles = await this.databaseService.executeQuery(
+        'SELECT url, title, published_at FROM articles WHERE rss_source_id = ? ORDER BY published_at DESC LIMIT 20',
+        [sourceId]
+      );
+      
+      let newArticlesEndIndex = basicItems.length; // 默认所有都是新文章
+      
+      if (latestArticles && latestArticles.length > 0) {
+        for (let i = 0; i < basicItems.length; i++) {
+          const basicItem = basicItems[i];
+          const existing = latestArticles.find(
+            db => db.url === basicItem.url || (
+              db.title === basicItem.title && 
+              Math.abs(new Date(db.published_at).getTime() - basicItem.publishedAt.getTime()) < 60000
+            )
+          );
+          
+          if (existing) {
+            newArticlesEndIndex = i;
+            logger.info(`✅ 检测到 ${i} 篇新文章，${basicItems.length - i} 篇是旧内容，跳过解析旧部分`);
+            break;
+          }
+        }
+      }
+      
+      // 如果没有新文章，直接返回
+      if (newArticlesEndIndex === 0) {
+        logger.info(`RSS源 ${sourceName} 没有新文章，跳过完整解析`);
+        return [];
+      }
+      
+      // 只取新文章的索引
+      const newItemIndices = basicItems.slice(0, newArticlesEndIndex).map(item => item.index);
+      logger.info(`仅对 ${newItemIndices.length} 篇新文章执行完整解析`);
+      
+      // ============ 第三步：只对新文章执行完整解析 ============
+      const articles: Omit<Article, 'id'>[] = [];
+      let skippedInvalid = 0;
+      
+      for (const idx of newItemIndices) {
+        const item = rss.items[idx];
+        const itemLink = item.links?.[0]?.url || item.id || '';
+        
         if (!item.title || !itemLink) {
           skippedInvalid++;
-          logger.warn(`跳过无效RSS项目 ${i + 1}: 缺少标题或链接 - title: ${item.title}, id: ${item.id}, link: ${itemLink}`);
           continue;
         }
         
@@ -689,7 +750,7 @@ export class RSSService {
         const rawContent = item.content || item.description || '';
         
         // 提取和清理内容
-        const content = await this.extractContent(rawContent, itemLink, sourceInfo?.contentType || 'image_text');
+        const content = await this.extractContent(rawContent, itemLink, source.contentType || 'image_text');
         const wordCount = this.countWords(content);
         
         // 解析发布时间
@@ -710,30 +771,25 @@ export class RSSService {
           category: 'General',
           wordCount: wordCount,
           readingTime: Math.ceil(wordCount / 200),
-          difficulty: 'medium',
+          difficulty: 'intermediate',
           isRead: false,
           isFavorite: false,
           readProgress: 0,
           tags: [],
-          guid: item.id || itemLink,
         };
         
         // 根据RSS源类型决定是否提取图片
         if (shouldExtractImages) {
-          // 优先使用RSS项目中的图片
           let imageUrl = null;
           
-          // 1. 首先尝试从增强解析器提取的media:content中获取图片
+          // 1. 首先尝试从media:content中获取图片
           try {
             imageUrl = extractBestImageUrlFromItem(item);
-            if (imageUrl) {
-              logger.info(`✅ 从media:content标签提取到图片: ${imageUrl}`);
-            }
           } catch (error) {
-            logger.warn('从media:content提取图片失败:', error);
+            // 忽略
           }
           
-          // 2. 如果没有从media:content获取到图片，检查enclosure
+          // 2. 检查enclosure
           if (!imageUrl && item.enclosures && item.enclosures.length > 0) {
             const imageEnclosure = item.enclosures.find(enc => 
               enc.mimeType && enc.mimeType.startsWith('image/')
@@ -743,22 +799,12 @@ export class RSSService {
             }
           }
           
-          // 3. 如果仍然没有图片，使用ImageExtractionService来处理内容中的图片
-          // 修改：只在没有从RSS元数据中提取到图片时才使用ImageExtractionService
-          // 避免对已经包含media:content图片的项目重复处理
+          // 3. 从内容中提取图片
           if (!imageUrl && rawContent) {
             try {
-              logger.info('🔍 开始使用ImageExtractionService处理内容中的图片');
-              logger.info('📄 原始内容长度:', rawContent.length);
-              logger.info('📄 原始内容预览:', rawContent.substring(0, 200) + '...');
               imageUrl = await imageExtractionService.extractImageFromContent(rawContent);
-              if (imageUrl) {
-                logger.info(`✅ 从内容中提取到图片: ${imageUrl}`);
-              } else {
-                logger.info('❌ 未从内容中找到图片');
-              }
             } catch (error) {
-              logger.warn('使用ImageExtractionService提取图片失败:', error);
+              // 忽略
             }
           }
           
@@ -770,48 +816,7 @@ export class RSSService {
         articles.push(article);
       }
       
-      // 并发处理需要从内容中提取图片的文章
-      // 修改：只处理那些完全没有图片URL的文章，避免重复处理
-      const articlesNeedingImages = articles.filter(article => !article.imageUrl);
-      if (articlesNeedingImages.length > 0) {
-        logger.info(`开始并发提取 ${articlesNeedingImages.length} 篇文章的图片`);
-        
-        // 并发处理图片提取，限制并发数为3
-        const concurrencyLimit = 3;
-        const imageExtractionPromises = [];
-        
-        for (let i = 0; i < articlesNeedingImages.length; i += concurrencyLimit) {
-          const batch = articlesNeedingImages.slice(i, i + concurrencyLimit);
-          const batchPromises = batch.map(async (article) => {
-            try {
-              logger.info(`🔍 开始提取文章图片: ${article.title}`);
-              const imageUrl = await imageExtractionService.extractImageFromContent(
-                article.content, 
-                article.url,
-                undefined // existingImageUrl
-              );
-              if (imageUrl) {
-                logger.info(`✅ 成功提取文章图片: ${article.title} -> ${imageUrl}`);
-                article.imageUrl = imageUrl;
-              } else {
-                logger.info(`❌ 未找到文章图片: ${article.title}`);
-              }
-            } catch (error) {
-              logger.warn(`图片提取失败 (文章: ${article.title}):`, error);
-            }
-          });
-          
-          imageExtractionPromises.push(Promise.all(batchPromises));
-        }
-        
-        // 等待所有批次完成
-        await Promise.all(imageExtractionPromises);
-        
-        const extractedCount = articles.filter(article => article.imageUrl).length;
-        logger.info(`图片提取完成，成功提取 ${extractedCount} 篇文章的图片`);
-      }
-      
-      logger.info(`RSS解析完成，源: ${sourceName}，解析 ${articles.length} 篇文章，跳过 ${skippedInvalid} 个无效项目`);
+      logger.info(`RSS解析完成，源: ${sourceName}，解析 ${articles.length} 篇新文章，跳过 ${skippedInvalid} 个无效项目`);
       return articles;
     } catch (error) {
       logger.error(`RSS解析失败，源: ${sourceName}:`, error);
@@ -905,6 +910,9 @@ export class RSSService {
       // 移除所有属性中的事件处理器
       cleaned = cleaned.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
       
+      // 修复双等号问题（referrerpolicy=="no-referrer" -> referrerpolicy="no-referrer"）
+      cleaned = cleaned.replace(/(\w+)==(["'])/g, '$1=$2');
+      
       // 根据内容类型处理标签
       if (contentType === 'text') {
         // 纯文本模式：移除图片和其他媒体标签，保留文本格式标签
@@ -913,6 +921,7 @@ export class RSSService {
         cleaned = cleaned.replace(/<video[^>]*>[\s\S]*?<\/video>/gi, '');
         cleaned = cleaned.replace(/<audio[^>]*>[\s\S]*?<\/audio>/gi, '');
       }
+      // image_text 模式：保留图片和视频标签，用于多媒体内容渲染
       
       // 保留基本的HTML结构标签
       // 不再将HTML标签转换为纯文本，而是保留结构
@@ -999,13 +1008,13 @@ export class RSSService {
           article.isFavorite ? 1 : 0,
           article.readProgress,
           JSON.stringify(article.tags),
-          article.guid,
+          article.url,
           article.imageUrl || null,
         ]
       );
 
       return {
-        id: result.insertId.toString(),
+        id: Number(result.insertId),
         ...article,
       };
     } catch (error) {
@@ -1114,7 +1123,8 @@ export class RSSService {
    */
   private mapRSSSourceRow(row: any): RSSSource {
     return {
-      id: row.id.toString(),
+      id: Number(row.id),
+      sortOrder: row.sort_order || 0,
       name: row.title,
       url: row.url,
       description: row.description,
@@ -1135,7 +1145,8 @@ export class RSSService {
    */
   private mapRSSSourceRowWithStats(row: any): RSSSource {
     return {
-      id: row.id.toString(),
+      id: Number(row.id),
+      sortOrder: row.sort_order || 0,
       name: row.title,
       url: row.url,
       description: row.description,
@@ -1152,7 +1163,21 @@ export class RSSService {
   }
 
   /**
-   * 判断是否需要使用代理访问RSS源
+   * 生成闽值(hash)来检查RSS内容是否更新
+   */
+  private simpleHash(str: string): number {
+    let hash = 0;
+    if (str.length === 0) return hash;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  }
+  
+  /**
+   * 判断是否需要使用代理访関RSS源
    * @param url RSS源URL
    * @returns 是否需要使用代理
    */

@@ -207,7 +207,7 @@ const AddRSSSourceScreen: React.FC = () => {
                     styles.contentTypeText,
                     contentType === 'image_text' && styles.contentTypeTextSelected
                   ]}>
-                    图文内容
+                    多媒体内容
                   </Text>
                 </TouchableOpacity>
                 
@@ -236,8 +236,8 @@ const AddRSSSourceScreen: React.FC = () => {
               </View>
               <Text style={styles.contentTypeHint}>
                 {contentType === 'image_text' 
-                  ? '将提取文章中的图片，适合图文并茂的内容源' 
-                  : '不提取图片，适合纯文本内容源，加载更快'}
+                  ? '将提取图片和视频，适合多媒体内容源' 
+                  : '不提取图片和视频，适合纯文本内容源，加载更快'}
               </Text>
             </View>
 

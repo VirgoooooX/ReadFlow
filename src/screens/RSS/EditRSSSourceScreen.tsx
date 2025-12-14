@@ -17,7 +17,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/RSSService';
-import { RSSSource } from '../../types/rss';
+import type { RSSSource } from '../../types';
 
 type RootStackParamList = {
   EditRSSSource: { sourceId: number };
@@ -58,6 +58,7 @@ const EditRSSSourceScreen: React.FC = () => {
     url: '',
     description: '',
     category: '技术',
+    contentType: 'image_text',
     updateFrequency: 3600,
     isActive: true,
   });
@@ -97,7 +98,7 @@ const EditRSSSourceScreen: React.FC = () => {
         description: source.description || '',
         category: source.category || '技术',
         contentType: source.contentType || 'image_text',
-        updateFrequency: source.update_frequency || 3600,
+        updateFrequency: source.updateFrequency || 3600,
         isActive: source.isActive,
       });
     } catch (error) {
@@ -227,12 +228,15 @@ const EditRSSSourceScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color={theme?.colors?.primary || '#6750A4'} />
-          <Text style={styles.loadingText}>加载中...</Text>
+          <Text style={{ marginTop: 16, fontSize: 16, color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F') }}>\u52a0载\u4e2d...</Text>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -337,7 +341,7 @@ const EditRSSSourceScreen: React.FC = () => {
                     styles.contentTypeText,
                     formData.contentType === 'image_text' && styles.contentTypeTextSelected
                   ]}>
-                    图文内容
+                    多媒体内容
                   </Text>
                 </TouchableOpacity>
                 
@@ -366,8 +370,8 @@ const EditRSSSourceScreen: React.FC = () => {
               </View>
               <Text style={styles.contentTypeHint}>
                 {formData.contentType === 'image_text' 
-                  ? '将提取文章中的图片，适合图文并茂的内容源' 
-                  : '不提取图片，适合纯文本内容源，加载更快'}
+                  ? '将提取图片和视频，适合多媒体内容源' 
+                  : '不提取图片和视频，适合纯文本内容源，加载更快'}
               </Text>
             </View>
 

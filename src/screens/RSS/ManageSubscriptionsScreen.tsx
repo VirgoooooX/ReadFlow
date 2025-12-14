@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/RSSService';
-import { RSSSource } from '../../types/rss';
+import type { RSSSource } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
 
@@ -54,7 +54,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const activeSources = rssSources.filter(s => s.isActive).length;
   const totalArticles = rssSources.reduce((sum, s) => sum + (s.article_count || 0), 0);
   const totalUnread = rssSources.reduce((sum, s) => sum + (s.unread_count || 0), 0);
-  const errorSources = rssSources.filter(s => (s.error_count || 0) > 0).length;
+  const errorSources = rssSources.filter(s => (s.errorCount || 0) > 0).length;
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -223,7 +223,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
                           color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')} 
                         />
                         <Text style={styles.contentTypeText}>
-                          {source.contentType === 'text' ? '纯文本' : '图文'}
+                          {source.contentType === 'text' ? '纯文本' : '多媒体'}
                         </Text>
                       </View>
                     </View>
@@ -245,11 +245,11 @@ const ManageSubscriptionsScreen: React.FC = () => {
                     <Text style={styles.sourceDescription}>{source.description}</Text>
                   )}
                   
-                  {(source.error_count || 0) > 0 && (
+                  {(source.errorCount || 0) > 0 && (
                     <View style={styles.sourceMetaRow}>
                       <View style={styles.errorBadge}>
                         <MaterialIcons name="error" size={12} color={theme?.colors?.error} />
-                        <Text style={styles.errorBadgeText}>{source.error_count} 错误</Text>
+                        <Text style={styles.errorBadgeText}>{source.errorCount} 错误</Text>
                       </View>
                     </View>
                   )}

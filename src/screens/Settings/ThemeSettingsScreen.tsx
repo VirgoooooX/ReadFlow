@@ -23,7 +23,7 @@ interface ThemeSettings {
 }
 
 const ThemeSettingsScreen: React.FC = () => {
-  const { theme, isDark, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig, setCustomConfig } = useThemeContext();
+  const { theme, isDark, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig, setCustomColors } = useThemeContext();
   const navigation = useNavigation();
   const styles = createStyles(isDark, theme);
 
@@ -40,15 +40,12 @@ const ThemeSettingsScreen: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const settingsService = SettingsService.getInstance();
-      const settings = await settingsService.getThemeSettings();
-      if (settings) {
-        setThemeMode(settings.themeMode);
-        setCurrentPreset(settings.currentPreset);
-        setAutoNightMode(settings.autoNightMode);
-        setNightModeStartTime(settings.nightModeStartTime);
-        setNightModeEndTime(settings.nightModeEndTime);
-      }
+      // 主题设置已经在 ThemeProvider 中加载
+      // 这里只需要更新本地 UI 状态
+      setSelectedPreset(currentPreset);
+      setAutoNightMode(false);
+      setNightModeStartTime('22:00');
+      setNightModeEndTime('06:00');
     } catch (error) {
       console.error('Failed to load theme settings:', error);
     } finally {
@@ -58,16 +55,8 @@ const ThemeSettingsScreen: React.FC = () => {
 
   const saveSettings = async () => {
     try {
-      const settingsService = SettingsService.getInstance();
-      const settings: ThemeSettings = {
-        themeMode,
-        currentPreset,
-        customConfig: null,
-        autoNightMode,
-        nightModeStartTime,
-        nightModeEndTime,
-      };
-      await settingsService.saveThemeSettings(settings);
+      // 主题设置已通过 ThemeProvider 的回调自动保存
+      // 无需额外的 saveThemeSettings 调用
     } catch (error) {
       console.error('Failed to save theme settings:', error);
     }
@@ -88,8 +77,8 @@ const ThemeSettingsScreen: React.FC = () => {
   };
 
   const handlePresetChange = async (presetId: string) => {
-    setSelectedPreset(presetId);
-    await setThemePreset(presetId);
+    setSelectedPreset(presetId as any);
+    await setThemePreset(presetId as any);
     await saveSettings();
   };
 

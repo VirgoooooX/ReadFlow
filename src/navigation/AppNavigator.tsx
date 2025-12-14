@@ -2,7 +2,6 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator } from '@react-navigation/drawer';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../theme';
 import { useUser } from '../contexts/UserContext';
@@ -152,17 +151,10 @@ const darkTheme = {
 
 // 认证堆栈导航
 function AuthStackNavigator() {
-  const { theme } = useThemeContext();
-  
   return (
     <AuthStack.Navigator
        screenOptions={{
-         headerStyle: {
-           backgroundColor: theme?.colors?.primary || '#3B82F6',
-           height: HEADER_HEIGHT,
-         },
-         headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
-         headerTitleStyle: HEADER_TITLE_STYLE,
+         headerShown: false,
        }}
      >
        <AuthStack.Screen 
@@ -206,7 +198,7 @@ function HomeStackNavigator() {
          name="ArticleDetail" 
          options={{ title: '文章详情' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="文章详情"
              showBackButton={true}
@@ -219,9 +211,9 @@ function HomeStackNavigator() {
          name="Search" 
          options={{ title: '搜索' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
-             title="搜索"
+             title="\u641c\u7d22"
              showBackButton={true}
            >
              <HomeScreen {...props} />
@@ -261,7 +253,7 @@ function VocabularyStackNavigator() {
          name="VocabularyDetail" 
          options={{ title: '单词详情' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="单词详情"
              showBackButton={true}
@@ -274,7 +266,7 @@ function VocabularyStackNavigator() {
          name="AddWord" 
          options={{ title: '添加单词' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="添加单词"
              showBackButton={true}
@@ -287,7 +279,7 @@ function VocabularyStackNavigator() {
          name="ReviewSession" 
          options={{ title: '复习模式' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="复习模式"
              showBackButton={true}
@@ -300,9 +292,9 @@ function VocabularyStackNavigator() {
          name="VocabularyStats" 
          options={{ title: '学习统计' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
-             title="学习统计"
+             title="\u5b66\u4e60\u7edf\u8ba1"
              showBackButton={true}
            >
              <VocabularyScreen {...props} />
@@ -340,7 +332,7 @@ function RSSStackNavigator() {
          name="RSSSourceDetail" 
          options={{ title: 'RSS源详情' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="RSS源详情"
              showBackButton={true}
@@ -353,7 +345,7 @@ function RSSStackNavigator() {
          name="AddRSSSource" 
          options={{ title: '添加RSS源' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="添加RSS源"
              showBackButton={true}
@@ -366,7 +358,7 @@ function RSSStackNavigator() {
          name="ManageSubscriptions" 
          options={{ title: '管理订阅源' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="管理订阅源"
              showBackButton={true}
@@ -379,7 +371,7 @@ function RSSStackNavigator() {
          name="EditRSSSource" 
          options={{ title: '编辑RSS源' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="编辑RSS源"
              showBackButton={true}
@@ -403,10 +395,10 @@ function UserStackNavigator() {
        }}
      >
        <UserStack.Screen 
-         name="UserProfile" 
+         name="UserMain" 
          options={{ title: '我的' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="我的"
              showBackButton={false}
@@ -419,7 +411,7 @@ function UserStackNavigator() {
          name="EditProfile" 
          options={{ title: '编辑资料' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="编辑资料"
              showBackButton={true}
@@ -432,7 +424,7 @@ function UserStackNavigator() {
          name="Settings" 
          options={{ title: '设置' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="设置"
              showBackButton={true}
@@ -445,7 +437,7 @@ function UserStackNavigator() {
          name="AppSettings" 
          options={{ title: '应用设置' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="应用设置"
              showBackButton={true}
@@ -458,7 +450,7 @@ function UserStackNavigator() {
          name="ReadingSettings" 
          options={{ title: '阅读偏好' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="阅读偏好"
              showBackButton={true}
@@ -471,7 +463,7 @@ function UserStackNavigator() {
          name="LLMSettings" 
          options={{ title: 'LLM设置' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="LLM设置"
              showBackButton={true}
@@ -484,7 +476,7 @@ function UserStackNavigator() {
          name="ThemeSettings" 
          options={{ title: '主题设置' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="主题设置"
              showBackButton={true}
@@ -497,7 +489,7 @@ function UserStackNavigator() {
          name="About" 
          options={{ title: '关于' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="关于"
              showBackButton={true}
@@ -510,7 +502,7 @@ function UserStackNavigator() {
          name="Export" 
          options={{ title: '导出数据' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="导出数据"
              showBackButton={true}
@@ -523,7 +515,7 @@ function UserStackNavigator() {
          name="Import" 
          options={{ title: '导入数据' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="导入数据"
              showBackButton={true}
@@ -536,7 +528,7 @@ function UserStackNavigator() {
          name="StorageManagement" 
          options={{ title: '存储管理' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="存储管理"
              showBackButton={true}
@@ -549,7 +541,7 @@ function UserStackNavigator() {
          name="AddRSSSource" 
          options={{ title: '添加RSS源' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="添加RSS源"
              showBackButton={true}
@@ -562,7 +554,7 @@ function UserStackNavigator() {
          name="ManageSubscriptions" 
          options={{ title: '管理订阅源' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="管理订阅源"
              showBackButton={true}
@@ -575,7 +567,7 @@ function UserStackNavigator() {
          name="EditRSSSource" 
          options={{ title: '编辑RSS源' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="编辑RSS源"
              showBackButton={true}
@@ -588,7 +580,7 @@ function UserStackNavigator() {
          name="Debug" 
          options={{ title: '调试信息' }}
        >
-         {(props) => (
+         {(props: any) => (
            <ScreenWithCustomHeader
              title="调试信息"
              showBackButton={true}
@@ -611,7 +603,6 @@ function SettingsStackNavigator() {
        screenOptions={{
          headerStyle: {
            backgroundColor: theme?.colors?.primary || '#3B82F6',
-           height: HEADER_HEIGHT,
          },
          headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
          headerTitleStyle: HEADER_TITLE_STYLE,
@@ -763,40 +754,38 @@ function RootNavigator() {
       <RootStack.Screen 
         name="ArticleDetail" 
         component={ArticleDetailScreen}
-        options={{
+        options={({ navigation }) => ({
           headerShown: true,
           title: '文章详情',
           headerStyle: {
             backgroundColor: theme?.colors?.primary || '#6750A4',
-            height: HEADER_HEIGHT,
           },
           headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
-        }}
+        })}
       />
       <RootStack.Screen 
         name="VocabularyDetail" 
-        component={VocabularyScreen}
-        options={{
+        component={ArticleDetailScreen}
+        options={({ navigation }) => ({
           headerShown: true,
           title: '单词详情',
           headerStyle: {
             backgroundColor: theme?.colors?.primary || '#6750A4',
-            height: HEADER_HEIGHT,
           },
           headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
-        }}
+        })}
       />
       <RootStack.Screen 
         name="RSSSourceDetail" 
-        component={RSSScreen}
-        options={{
+        component={ArticleDetailScreen}
+        options={({ navigation }) => ({
           headerShown: true,
           title: 'RSS源详情',
           headerStyle: {
             backgroundColor: theme?.colors?.primary || '#6750A4',
           },
           headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
-        }}
+        })}
       />
       <RootStack.Screen 
         name="AddRSSSource" 

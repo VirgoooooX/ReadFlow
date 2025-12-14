@@ -5,8 +5,8 @@ import * as FileSystem from 'expo-file-system';
 export class DatabaseService {
   private static instance: DatabaseService;
   private db: SQLite.SQLiteDatabase | null = null;
-  private dictionaryDb: SQLite.SQLiteDatabase | null = null;
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   private readonly config: DatabaseConfig = {
     name: 'techflow.db',
@@ -28,74 +28,52 @@ export class DatabaseService {
    * 初始化数据库
    */
   public async initializeDatabase(): Promise<void> {
-    try {
-      if (this.isInitialized) {
-        return;
-      }
+    // 如果已经在初始化，等待初始化完成
+    if (this.initPromise) {
+      return this.initPromise;
+    }
 
+    // 如果已经初始化完成，直接返回
+    if (this.isInitialized && this.db) {
+      return;
+    }
+
+    this.initPromise = this.doInitialize();
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async doInitialize(): Promise<void> {
+    try {
+      console.log('🔧 开始初始化数据库...');
+      
       // 初始化主数据库
       this.db = await SQLite.openDatabaseAsync(this.config.name);
+      console.log('✅ 数据库打开成功:', this.config.name);
       
       // 创建表结构
       await this.createTables();
+      console.log('✅ 表创建成功');
       
       // 执行数据库迁移
       await this.migrateDatabase();
-      
-      // 初始化词典数据库
-      await this.initializeDictionaryDatabase();
-      
-      // 插入示例RSS源数据（仅在首次初始化时）
-      await this.insertSampleRSSData();
+      console.log('✅ 数据库迁移成功');
       
       this.isInitialized = true;
-      console.log('Database initialized successfully');
+      console.log('✅ 数据库初始化完成');
     } catch (error) {
-      console.error('Failed to initialize database:', error);
+      console.error('❌ 数据库初始化失败:', error);
+      this.isInitialized = false;
+      this.db = null;
       throw new AppError({
         code: 'DB_INIT_ERROR',
         message: 'Failed to initialize database',
         details: error,
         timestamp: new Date(),
       });
-    }
-  }
-
-  /**
-   * 初始化词典数据库
-   */
-  private async initializeDictionaryDatabase(): Promise<void> {
-    try {
-      const dictionaryDbPath = `${FileSystem.documentDirectory}dictionary.db`;
-      const assetDbPath = FileSystem.bundleDirectory + 'assets/dictionary_optimized.db';
-      
-      // 检查assets中的词典文件是否存在
-      const assetExists = await FileSystem.getInfoAsync(assetDbPath);
-      if (!assetExists.exists) {
-        console.log('Dictionary database file not found in assets, skipping dictionary initialization');
-        return;
-      }
-      
-      // 检查词典数据库是否已存在
-      const dbExists = await FileSystem.getInfoAsync(dictionaryDbPath);
-      
-      if (!dbExists.exists) {
-        console.log('Copying dictionary database from assets...');
-        // 从assets复制词典数据库到文档目录
-        await FileSystem.copyAsync({
-          from: assetDbPath,
-          to: dictionaryDbPath,
-        });
-        console.log('Dictionary database copied successfully');
-      }
-      
-      // 打开词典数据库
-      this.dictionaryDb = await SQLite.openDatabaseAsync(dictionaryDbPath);
-      console.log('Dictionary database opened successfully');
-    } catch (error) {
-      console.error('Failed to initialize dictionary database:', error);
-      // 不抛出错误，让应用继续运行
-      console.log('Dictionary functionality will be disabled');
     }
   }
 
@@ -157,6 +135,52 @@ export class DatabaseService {
         console.log('Adding last_reviewed_at column to vocabulary table...');
         await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN last_reviewed_at INTEGER');
         console.log('last_reviewed_at column added successfully');
+      }
+
+      // 检查vocabulary表是否存在新增的字段
+      const hasContext = vocabularyTableInfo.some((column: any) => column.name === 'context');
+      const hasArticleId = vocabularyTableInfo.some((column: any) => column.name === 'article_id');
+      const hasCorrectCount = vocabularyTableInfo.some((column: any) => column.name === 'correct_count');
+      const hasDifficulty = vocabularyTableInfo.some((column: any) => column.name === 'difficulty');
+      const hasNotes = vocabularyTableInfo.some((column: any) => column.name === 'notes');
+
+      if (!hasContext) {
+        console.log('Adding context column to vocabulary table...');
+        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN context TEXT');
+        console.log('context column added successfully');
+      }
+
+      if (!hasArticleId) {
+        console.log('Adding article_id column to vocabulary table...');
+        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN article_id INTEGER');
+        console.log('article_id column added successfully');
+      }
+
+      if (!hasCorrectCount) {
+        console.log('Adding correct_count column to vocabulary table...');
+        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN correct_count INTEGER DEFAULT 0');
+        console.log('correct_count column added successfully');
+      }
+
+      if (!hasDifficulty) {
+        console.log('Adding difficulty column to vocabulary table...');
+        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN difficulty TEXT DEFAULT "medium"');
+        console.log('difficulty column added successfully');
+      }
+
+      if (!hasNotes) {
+        console.log('Adding notes column to vocabulary table...');
+        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN notes TEXT DEFAULT ""');
+        console.log('notes column added successfully');
+      }
+
+      // 清理旧数据：删除 id 为 NULL 或空字符串的单词记录
+      try {
+        console.log('Cleaning up invalid vocabulary entries with null/empty IDs...');
+        await this.db.execAsync("DELETE FROM vocabulary WHERE id IS NULL OR id = ''");
+        console.log('✅ Invalid vocabulary entries cleaned up successfully');
+      } catch (cleanupError) {
+        console.warn('Warning: Could not clean up invalid entries:', cleanupError);
       }
     } catch (error) {
       console.error('Database migration failed:', error);
@@ -263,6 +287,41 @@ export class DatabaseService {
         progress INTEGER NOT NULL, -- 0-100
         created_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
+      
+      // 词典缓存表 - 存储LLM查询结果
+      `CREATE TABLE IF NOT EXISTS dictionary_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word TEXT NOT NULL,
+        base_word TEXT,
+        word_form TEXT,
+        phonetic TEXT,
+        definitions TEXT NOT NULL,
+        source TEXT DEFAULT 'llm',
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+      )`,
+      
+      // 翻译缓存表 - 存储整句翻译结果
+      `CREATE TABLE IF NOT EXISTS translation_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        original_text TEXT NOT NULL,
+        translated_text TEXT NOT NULL,
+        source_lang TEXT DEFAULT 'en',
+        target_lang TEXT DEFAULT 'zh',
+        source TEXT DEFAULT 'llm',
+        created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      )`,
+      
+      // LLM使用统计表
+      `CREATE TABLE IF NOT EXISTS llm_usage_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_type TEXT NOT NULL,
+        tokens_used INTEGER DEFAULT 0,
+        provider TEXT,
+        model TEXT,
+        success INTEGER DEFAULT 1,
+        created_at INTEGER DEFAULT (strftime('%s', 'now'))
+      )`,
     ];
 
     // 创建索引
@@ -275,6 +334,11 @@ export class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_vocabulary_word ON vocabulary(word)',
       'CREATE INDEX IF NOT EXISTS idx_vocabulary_added_at ON vocabulary(added_at)',
       'CREATE INDEX IF NOT EXISTS idx_reading_history_article_id ON reading_history(article_id)',
+      'CREATE INDEX IF NOT EXISTS idx_dictionary_cache_word ON dictionary_cache(word)',
+      'CREATE INDEX IF NOT EXISTS idx_dictionary_cache_base_word ON dictionary_cache(base_word)',
+      'CREATE INDEX IF NOT EXISTS idx_translation_cache_text ON translation_cache(original_text)',
+      'CREATE INDEX IF NOT EXISTS idx_llm_usage_stats_type ON llm_usage_stats(request_type)',
+      'CREATE INDEX IF NOT EXISTS idx_llm_usage_stats_created ON llm_usage_stats(created_at)',
     ];
 
     // 执行创建表语句
@@ -299,10 +363,18 @@ export class DatabaseService {
     }
 
     try {
-      // 清空所有现有RSS源和相关文章
-      await this.db.runAsync('DELETE FROM articles');
-      await this.db.runAsync('DELETE FROM rss_sources');
-      console.log('Cleared all existing RSS sources and articles');
+      // 检查是RSS源是否存在
+      const existingSources = await this.db.getAllAsync('SELECT COUNT(*) as count FROM rss_sources');
+      if (existingSources && Array.isArray(existingSources) && existingSources.length > 0) {
+        const row = existingSources[0] as any;
+        if (row.count > 0) {
+          console.log('RSS sources already exist, skipping sample data insertion');
+          return;
+        }
+      }
+      
+      // 使用事务来防止数据库锁定
+      await this.db.execAsync('BEGIN TRANSACTION');
 
       // 插入指定的默认RSS源
       const defaultSources = [
@@ -369,7 +441,16 @@ export class DatabaseService {
       }
 
       console.log('Default RSS sources inserted successfully');
+      
+      // 提交事务
+      await this.db.execAsync('COMMIT');
     } catch (error) {
+      // 回滚事务
+      try {
+        await this.db.execAsync('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Error rolling back transaction:', rollbackError);
+      }
       console.error('Error inserting default RSS data:', error);
       // 不抛出错误，因为这不是关键功能
     }
@@ -378,26 +459,35 @@ export class DatabaseService {
   /**
    * 获取用户偏好设置
    */
-  public async getUserPreferences(): Promise<any> {
+  public async getUserPreferences(): Promise<{
+    readingSettings: any;
+    translationProvider: string;
+    enableAutoTranslation: boolean;
+    enableTitleTranslation: boolean;
+    maxConcurrentTranslations: number;
+    translationTimeout: number;
+    defaultCategory: string;
+    enableNotifications: boolean;
+  } | null> {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
 
     try {
-      const result = await this.db.getFirstAsync(
+      const result: any = await this.db.getAllAsync(
         'SELECT * FROM user_preferences WHERE id = 1'
       );
       
-      if (result) {
+      if (result && result.length > 0) {
         return {
-          readingSettings: JSON.parse(result.reading_settings),
-          translationProvider: result.translation_provider,
-          enableAutoTranslation: result.enable_auto_translation === 1,
-          enableTitleTranslation: result.enable_title_translation === 1,
-          maxConcurrentTranslations: result.max_concurrent_translations,
-          translationTimeout: result.translation_timeout,
-          defaultCategory: result.default_category,
-          enableNotifications: result.enable_notifications === 1,
+          readingSettings: JSON.parse(result[0].reading_settings),
+          translationProvider: result[0].translation_provider,
+          enableAutoTranslation: result[0].enable_auto_translation === 1,
+          enableTitleTranslation: result[0].enable_title_translation === 1,
+          maxConcurrentTranslations: result[0].max_concurrent_translations,
+          translationTimeout: result[0].translation_timeout,
+          defaultCategory: result[0].default_category,
+          enableNotifications: result[0].enable_notifications === 1,
         };
       }
       
@@ -488,18 +578,31 @@ export class DatabaseService {
    * 执行SQL查询
    */
   public async executeQuery(sql: string, params: any[] = []): Promise<any[]> {
-    if (!this.db) {
-      throw new Error('Database not initialized');
-    }
+    // 确保数据库已初始化
+    await this.ensureInitialized();
 
     try {
+      if (!this.db) {
+        console.error('❌ 数据库未初始化，状态:', this.getStatus());
+        throw new Error('Database not available');
+      }
       const result = await this.db.getAllAsync(sql, params);
       return result;
     } catch (error) {
       console.error('SQL Query Error:', error);
       console.error('SQL:', sql);
       console.error('Params:', params);
+      console.error('数据库状态:', this.getStatus());
       throw error;
+    }
+  }
+
+  /**
+   * 确保数据库已初始化
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized || !this.db) {
+      await this.initializeDatabase();
     }
   }
 
@@ -507,11 +610,12 @@ export class DatabaseService {
    * 执行SQL语句（无返回结果）
    */
   public async executeStatement(sql: string, params: any[] = []): Promise<void> {
-    if (!this.db) {
-      throw new Error('Database not initialized');
-    }
+    await this.ensureInitialized();
 
     try {
+      if (!this.db) {
+        throw new Error('Database not available');
+      }
       await this.db.runAsync(sql, params);
     } catch (error) {
       console.error('SQL Statement Error:', error);
@@ -525,11 +629,12 @@ export class DatabaseService {
    * 执行INSERT语句并返回插入的ID
    */
   public async executeInsert(sql: string, params: any[] = []): Promise<{ insertId: number; changes: number }> {
-    if (!this.db) {
-      throw new Error('Database not initialized');
-    }
+    await this.ensureInitialized();
 
     try {
+      if (!this.db) {
+        throw new Error('Database not available');
+      }
       const result = await this.db.runAsync(sql, params);
       return {
         insertId: result.lastInsertRowId,
@@ -537,25 +642,6 @@ export class DatabaseService {
       };
     } catch (error) {
       console.error('SQL Insert Error:', error);
-      console.error('SQL:', sql);
-      console.error('Params:', params);
-      throw error;
-    }
-  }
-
-  /**
-   * 查询词典数据库
-   */
-  public async queryDictionary(sql: string, params: any[] = []): Promise<any[]> {
-    if (!this.dictionaryDb) {
-      throw new Error('Dictionary database not initialized');
-    }
-
-    try {
-      const result = await this.dictionaryDb.getAllAsync(sql, params);
-      return result;
-    } catch (error) {
-      console.error('Dictionary Query Error:', error);
       console.error('SQL:', sql);
       console.error('Params:', params);
       throw error;
@@ -601,10 +687,6 @@ export class DatabaseService {
         await this.db.closeAsync();
         this.db = null;
       }
-      if (this.dictionaryDb) {
-        await this.dictionaryDb.closeAsync();
-        this.dictionaryDb = null;
-      }
       this.isInitialized = false;
       console.log('Database connections closed');
     } catch (error) {
@@ -615,11 +697,10 @@ export class DatabaseService {
   /**
    * 获取数据库状态
    */
-  public getStatus(): { isInitialized: boolean; hasMainDb: boolean; hasDictionaryDb: boolean } {
+  public getStatus(): { isInitialized: boolean; hasMainDb: boolean } {
     return {
       isInitialized: this.isInitialized,
       hasMainDb: this.db !== null,
-      hasDictionaryDb: this.dictionaryDb !== null,
     };
   }
 
@@ -631,10 +712,9 @@ export class DatabaseService {
       // 关闭现有连接
       await this.closeDatabase();
       
-      // 删除数据库文件
       const dbPath = `${FileSystem.documentDirectory}SQLite/${this.config.name}`;
-      const dbExists = await FileSystem.getInfoAsync(dbPath);
-      if (dbExists.exists) {
+      const dbInfo = await FileSystem.getInfoAsync(dbPath);
+      if (dbInfo.exists) {
         await FileSystem.deleteAsync(dbPath);
         console.log('Database file deleted');
       }

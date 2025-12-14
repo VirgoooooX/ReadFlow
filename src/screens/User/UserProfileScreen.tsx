@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useThemeContext } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
 import { useNavigation } from '@react-navigation/native';
@@ -42,7 +43,7 @@ const UserProfileScreen: React.FC = () => {
     name: 'TechFlow用户',
     email: 'user@techflow.com',
     joinDate: new Date('2024-01-15'),
-    level: '中级学习者',
+    level: '',
     experience: 2350,
     nextLevelExp: 3000,
   });
@@ -55,11 +56,19 @@ const UserProfileScreen: React.FC = () => {
   useEffect(() => {
     loadUserStats();
   }, []);
+  
+  // 屏幕获得焦点时实时刷新数据
+  useFocusEffect(
+    React.useCallback(() => {
+      loadUserStats();
+    }, [])
+  );
 
   const loadUserStats = async () => {
     try {
       setLoading(true);
       const stats = await userStatsService.getUserStats();
+      console.log('📊 用户统计数据已更新:', stats);
       setUserStats(stats);
     } catch (error) {
       console.error('Failed to load user stats:', error);
@@ -74,10 +83,6 @@ const UserProfileScreen: React.FC = () => {
 
   const handleSettings = () => {
     navigation.navigate('Settings');
-  };
-
-  const handleAchievements = () => {
-    Alert.alert('成就系统', '成就系统功能开发中...');
   };
 
   const handleLogout = () => {
@@ -98,26 +103,10 @@ const UserProfileScreen: React.FC = () => {
     );
   };
 
-  const handleBackup = () => {
-    Alert.alert('数据备份', '数据备份功能开发中...');
-  };
-
   // 添加调试信息处理函数
   const handleDebugInfo = () => {
     navigation.navigate('Debug');
   };
-
-  const formatReadingTime = (minutes: number | undefined): string => {
-    if (!minutes) return '0h';
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h${remainingMinutes > 0 ? ` ${remainingMinutes}m` : ''}`;
-    }
-    return `${remainingMinutes}m`;
-  };
-
-
 
   const getDaysJoined = (): number => {
     const now = new Date();
@@ -157,8 +146,6 @@ const UserProfileScreen: React.FC = () => {
         <View style={styles.profileInfo}>
           <Text style={styles.userName}>{user?.username || userProfile.name}</Text>
           <Text style={styles.userEmail}>{user?.email || userProfile.email}</Text>
-          <Text style={styles.userLevel}>{userProfile.level}</Text>
-          <Text style={styles.joinDate}>加入 {getDaysJoined()} 天</Text>
         </View>
         
         <TouchableOpacity style={styles.settingsButton} onPress={handleSettings}>
@@ -172,25 +159,24 @@ const UserProfileScreen: React.FC = () => {
 
 
 
-      {/* 统计数据网格 */}
+      {/* 内容概览 */}
       <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>学习统计</Text>
+        <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
+          <Text style={styles.sectionTitle}>内容概览</Text>
+          <TouchableOpacity onPress={() => loadUserStats()} disabled={loading}>
+            <MaterialIcons 
+              name="refresh" 
+              size={24} 
+              color={loading ? (isDark ? '#938F99' : '#79747E') : theme?.colors?.primary || '#6750A4'} 
+            />
+          </TouchableOpacity>
+        </View>
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>加载中...</Text>
           </View>
         ) : (
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <MaterialIcons 
-                name="article" 
-                size={32} 
-                color={theme?.colors?.primary || '#6750A4'} 
-              />
-              <Text style={styles.statValue}>{userStats?.articlesRead || 0}</Text>
-              <Text style={styles.statLabel}>已读文章</Text>
-            </View>
-            
             <View style={styles.statCard}>
               <MaterialIcons 
                 name="book" 
@@ -209,16 +195,6 @@ const UserProfileScreen: React.FC = () => {
               />
               <Text style={styles.statValue}>{userStats?.rssSources || 0}</Text>
               <Text style={styles.statLabel}>RSS源</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <MaterialIcons 
-                name="schedule" 
-                size={32} 
-                color={theme?.colors?.primary || '#6750A4'} 
-              />
-              <Text style={styles.statValue}>{userStats ? formatReadingTime(userStats.readingTime) : '0h'}</Text>
-              <Text style={styles.statLabel}>阅读时长</Text>
             </View>
             
             <View style={styles.statCard}>
@@ -266,39 +242,7 @@ const UserProfileScreen: React.FC = () => {
           />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionItem} onPress={handleAchievements}>
-          <View style={styles.actionLeft}>
-            <MaterialIcons 
-              name="emoji-events" 
-              size={24} 
-              color={theme?.colors?.primary || '#6750A4'} 
-            />
-            <Text style={styles.actionText}>成就与徽章</Text>
-          </View>
-          <MaterialIcons 
-            name="chevron-right" 
-            size={24} 
-            color={theme?.colors?.onSurfaceVariant || '#79747E'} 
-          />
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionItem} onPress={handleBackup}>
-          <View style={styles.actionLeft}>
-            <MaterialIcons 
-              name="backup" 
-              size={24} 
-              color={theme?.colors?.primary || '#6750A4'} 
-            />
-            <Text style={styles.actionText}>数据备份</Text>
-          </View>
-          <MaterialIcons 
-            name="chevron-right" 
-            size={24} 
-            color={theme?.colors?.onSurfaceVariant || '#79747E'} 
-          />
-        </TouchableOpacity>
-        
-        {/* 添加调试信息选项 */}
+        {/* 调试信息选项 */}
         <TouchableOpacity style={styles.actionItem} onPress={handleDebugInfo}>
           <View style={styles.actionLeft}>
             <MaterialIcons 
@@ -411,6 +355,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   statsSection: {
     marginHorizontal: 16,
     marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 18,

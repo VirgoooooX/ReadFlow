@@ -1,7 +1,8 @@
 // 数据库服务
-export { DatabaseService } from '../database/DatabaseService';
+import { DatabaseService } from '../database/DatabaseService';
+export { DatabaseService };
 
-// 词典服务
+// 詞典服务
 export { DictionaryService, dictionaryService } from './DictionaryService';
 
 // RSS服务
@@ -13,15 +14,8 @@ export { ArticleService, articleService } from './ArticleService';
 // 单词本服务
 export { VocabularyService, vocabularyService } from './VocabularyService';
 
-// 设置服务
+// 设\u7f6e服务
 export { SettingsService, settingsService } from './SettingsService';
 
-// 服务类型定义
-export type {
-  DatabaseService as IDatabaseService,
-  DictionaryService as IDictionaryService,
-  RSSService as IRSSService,
-  ArticleService as IArticleService,
-  VocabularyService as IVocabularyService,
-  SettingsService as ISettingsService,
-} from '../types';
+// 图\u7247缓存服务
+export { imageCacheService } from './ImageCacheService';

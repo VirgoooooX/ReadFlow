@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
@@ -131,13 +132,13 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <MaterialIcons 
-              name="article" 
+              name="auto-stories" 
               size={64} 
               color={theme?.colors?.primary || '#6750A4'} 
             />
           </View>
           <Text style={styles.title}>创建账户</Text>
-          <Text style={styles.subtitle}>加入TechFlow社区</Text>
+          <Text style={styles.subtitle}>加入ReadFlow社区</Text>
         </View>
 
         {/* 注册表单 */}

@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '../../navigation/AppNavigator';
 import BrandIcon from '../../components/BrandIcon';
 import { SettingsService } from '../../services/SettingsService';
+import { translationService } from '../../services/TranslationService';
 
 type NavigationProp = NativeStackNavigationProp<SettingsStackParamList, 'LLMSettings'>;
 
@@ -41,17 +42,21 @@ const LLMSettingsScreen: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [temperature, setTemperature] = useState(0.7);
+  const [temperatureText, setTemperatureText] = useState('0.7');
   const [maxTokens, setMaxTokens] = useState(2048);
   const [topP, setTopP] = useState(1.0);
+  const [topPText, setTopPText] = useState('1.0');
   const [isActive, setIsActive] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showBaseUrl, setShowBaseUrl] = useState(false);
   const [customModelName, setCustomModelName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [usageStats, setUsageStats] = useState({ monthly: 0, total: 0 });
 
   // 加载设置
   useEffect(() => {
     loadSettings();
+    loadUsageStats();
   }, []);
 
   const loadSettings = async () => {
@@ -64,8 +69,10 @@ const LLMSettingsScreen: React.FC = () => {
         setApiKey(settings.apiKey);
         setBaseUrl(settings.baseUrl);
         setTemperature(settings.temperature);
+        setTemperatureText(settings.temperature.toString());
         setMaxTokens(settings.maxTokens);
         setTopP(settings.topP);
+        setTopPText(settings.topP.toString());
         setIsActive(settings.isActive);
         setCustomModelName(settings.customModelName);
       }
@@ -73,6 +80,17 @@ const LLMSettingsScreen: React.FC = () => {
       console.error('Failed to load LLM settings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUsageStats = async () => {
+    try {
+      const stats = await translationService.getUsageStats();
+      setUsageStats({ monthly: stats.monthly, total: stats.total });
+    } catch (error) {
+      console.error('Failed to load usage stats:', error);
+      // 设置默认值，防止页面崩溃
+      setUsageStats({ monthly: 0, total: 0 });
     }
   };
 
@@ -166,29 +184,33 @@ const LLMSettingsScreen: React.FC = () => {
 
   // 参数输入处理函数
   const handleTemperatureChange = (text: string) => {
+    if (text === '' || text === '.' || text === '0.') {
+      // 允许中间状态
+      return;
+    }
     const value = parseFloat(text);
     if (!isNaN(value) && value >= 0 && value <= 2) {
       setTemperature(value);
-    } else if (text === '') {
-      setTemperature(0);
     }
   };
 
   const handleMaxTokensChange = (text: string) => {
+    if (text === '') {
+      return;
+    }
     const value = parseInt(text);
     if (!isNaN(value) && value > 0) {
       setMaxTokens(value);
-    } else if (text === '') {
-      setMaxTokens(0);
     }
   };
 
   const handleTopPChange = (text: string) => {
+    if (text === '' || text === '.' || text === '0.' || text === '1.') {
+      return;
+    }
     const value = parseFloat(text);
     if (!isNaN(value) && value >= 0 && value <= 1) {
       setTopP(value);
-    } else if (text === '') {
-      setTopP(0);
     }
   };
 
@@ -202,14 +224,27 @@ const LLMSettingsScreen: React.FC = () => {
   
 
 
-  const handleTestConnection = () => {
+  const handleTestConnection = async () => {
     if (!apiKey) {
       Alert.alert('提示', '请先配置API密钥');
       return;
     }
-    Alert.alert('测试连接', '正在测试API连接...', [
-      { text: '取消', style: 'cancel' },
-    ]);
+    
+    Alert.alert('测试连接', '正在测试API连接...');
+    
+    try {
+      // 使用简单的翻译请求测试
+      const testText = 'Hello';
+      const result = await translationService.translateSentence(testText, 'en', 'zh');
+      
+      if (result) {
+        Alert.alert('成功', `API连接正常！\n测试结果: ${result}`);
+      } else {
+        Alert.alert('失败', 'API返回空结果，请检查配置');
+      }
+    } catch (error: any) {
+      Alert.alert('失败', `API请求失败: ${error.message || '未知错误'}`);
+    }
   };
 
   const handleSave = async () => {
@@ -452,11 +487,27 @@ const LLMSettingsScreen: React.FC = () => {
               </View>
               <TextInput
                 style={styles.textInput}
-                value={temperature.toString()}
-                onChangeText={handleTemperatureChange}
+                value={temperatureText}
+                onChangeText={(text) => {
+                  setTemperatureText(text);
+                  const value = parseFloat(text);
+                  if (!isNaN(value) && value >= 0 && value <= 2) {
+                    setTemperature(value);
+                  }
+                }}
+                onBlur={() => {
+                  // 失去焦点时校验和格式化
+                  const value = parseFloat(temperatureText);
+                  if (isNaN(value) || value < 0 || value > 2) {
+                    setTemperatureText(temperature.toString());
+                  } else {
+                    setTemperature(value);
+                    setTemperatureText(value.toString());
+                  }
+                }}
                 placeholder="0.7"
                 placeholderTextColor={theme?.colors?.onSurfaceVariant}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
               />
               <Text style={styles.inputHint}>控制输出随机性，范围: 0-2，推荐: 0.7</Text>
             </View>
@@ -484,11 +535,26 @@ const LLMSettingsScreen: React.FC = () => {
               </View>
               <TextInput
                 style={styles.textInput}
-                value={topP.toString()}
-                onChangeText={handleTopPChange}
+                value={topPText}
+                onChangeText={(text) => {
+                  setTopPText(text);
+                  const value = parseFloat(text);
+                  if (!isNaN(value) && value >= 0 && value <= 1) {
+                    setTopP(value);
+                  }
+                }}
+                onBlur={() => {
+                  const value = parseFloat(topPText);
+                  if (isNaN(value) || value < 0 || value > 1) {
+                    setTopPText(topP.toString());
+                  } else {
+                    setTopP(value);
+                    setTopPText(value.toString());
+                  }
+                }}
                 placeholder="1.0"
                 placeholderTextColor={theme?.colors?.onSurfaceVariant}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
               />
               <Text style={styles.inputHint}>核采样参数，范围: 0-1，推荐: 1.0</Text>
             </View>
@@ -505,14 +571,14 @@ const LLMSettingsScreen: React.FC = () => {
               <MaterialIcons name="analytics" size={24} color={theme?.colors?.primary} />
               <View style={styles.statContent}>
                 <Text style={styles.statLabel}>本月请求</Text>
-                <Text style={styles.statValue}>1,234次</Text>
+                <Text style={styles.statValue}>{usageStats.monthly}次</Text>
               </View>
             </View>
             <View style={[styles.statItem, styles.lastStatItem]}>
               <MaterialIcons name="account-balance" size={24} color={theme?.colors?.primary} />
               <View style={styles.statContent}>
-                <Text style={styles.statLabel}>剩余额度</Text>
-                <Text style={styles.statValue}>8,766次</Text>
+                <Text style={styles.statLabel}>总请求数</Text>
+                <Text style={styles.statValue}>{usageStats.total}次</Text>
               </View>
             </View>
           </View>

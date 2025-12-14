@@ -1,5 +1,5 @@
 import { DatabaseService } from '../database/DatabaseService';
-import { Article, ReadingSettings, AppError } from '../types';
+import { Article, ReadingSettings } from '../types';
 import { RSSService } from './RSSService';
 
 export class ArticleService {
@@ -31,6 +31,9 @@ export class ArticleService {
     sortOrder?: 'ASC' | 'DESC';
   } = {}): Promise<Article[]> {
     try {
+      // 确保数据库已初始化
+      await this.databaseService.initializeDatabase();
+      
       const {
         limit = 20,
         offset = 0,
@@ -75,17 +78,12 @@ export class ArticleService {
          ORDER BY a.${sortBy} ${sortOrder} 
          LIMIT ? OFFSET ?`,
         params
-      );
+      ).catch(() => []);
 
       return results.map(this.mapArticleRow);
     } catch (error) {
       console.error('Error getting articles:', error);
-      throw new AppError({
-        code: 'ARTICLE_FETCH_ERROR',
-        message: 'Failed to fetch articles',
-        details: error,
-        timestamp: new Date(),
-      });
+      return [];
     }
   }
 
@@ -94,13 +92,19 @@ export class ArticleService {
    */
   public async getArticleById(id: number): Promise<Article | null> {
     try {
+      // 确保数据库已初始化
+      await this.databaseService.initializeDatabase();
+      
       const results = await this.databaseService.executeQuery(
         `SELECT a.*, r.title as source_title, r.url as source_url 
          FROM articles a 
          LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
          WHERE a.id = ?`,
         [id]
-      );
+      ).catch((err) => {
+        console.error('Error getting article by ID:', err);
+        return [];
+      });
 
       if (results.length === 0) {
         return null;
@@ -122,10 +126,12 @@ export class ArticleService {
     rssSourceId?: number;
   } = {}): Promise<Article[]> {
     try {
+      await this.databaseService.initializeDatabase();
+      
       const { limit = 20, offset = 0, rssSourceId } = options;
       
       let whereClause = '(a.title LIKE ? OR a.content LIKE ? OR a.summary LIKE ?)';
-      const params = [`%${query}%`, `%${query}%`, `%${query}%`];
+      const params: any[] = [`%${query}%`, `%${query}%`, `%${query}%`];
 
       if (rssSourceId !== undefined) {
         whereClause += ' AND a.rss_source_id = ?';
@@ -142,7 +148,7 @@ export class ArticleService {
          ORDER BY a.published_at DESC 
          LIMIT ? OFFSET ?`,
         params
-      );
+      ).catch(() => []);
 
       return results.map(this.mapArticleRow);
     } catch (error) {
@@ -156,18 +162,13 @@ export class ArticleService {
    */
   public async markAsRead(id: number, progress: number = 100): Promise<void> {
     try {
+      await this.databaseService.initializeDatabase();
       await this.databaseService.executeStatement(
         'UPDATE articles SET is_read = 1, read_progress = ?, read_at = ? WHERE id = ?',
         [progress, new Date().toISOString(), id]
       );
     } catch (error) {
       console.error('Error marking article as read:', error);
-      throw new AppError({
-        code: 'ARTICLE_UPDATE_ERROR',
-        message: 'Failed to mark article as read',
-        details: error,
-        timestamp: new Date(),
-      });
     }
   }
 
@@ -176,18 +177,13 @@ export class ArticleService {
    */
   public async markAsUnread(id: number): Promise<void> {
     try {
+      await this.databaseService.initializeDatabase();
       await this.databaseService.executeStatement(
         'UPDATE articles SET is_read = 0, read_progress = 0, read_at = NULL WHERE id = ?',
         [id]
       );
     } catch (error) {
       console.error('Error marking article as unread:', error);
-      throw new AppError({
-        code: 'ARTICLE_UPDATE_ERROR',
-        message: 'Failed to mark article as unread',
-        details: error,
-        timestamp: new Date(),
-      });
     }
   }
 
@@ -196,9 +192,10 @@ export class ArticleService {
    */
   public async toggleFavorite(id: number): Promise<boolean> {
     try {
+      await this.databaseService.initializeDatabase();
       const article = await this.getArticleById(id);
       if (!article) {
-        throw new Error('Article not found');
+        return false;
       }
 
       const newFavoriteStatus = !article.isFavorite;
@@ -211,12 +208,7 @@ export class ArticleService {
       return newFavoriteStatus;
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      throw new AppError({
-        code: 'ARTICLE_UPDATE_ERROR',
-        message: 'Failed to toggle favorite status',
-        details: error,
-        timestamp: new Date(),
-      });
+      return false;
     }
   }
 
@@ -225,6 +217,7 @@ export class ArticleService {
    */
   public async updateReadingProgress(id: number, progress: number): Promise<void> {
     try {
+      await this.databaseService.initializeDatabase();
       const clampedProgress = Math.max(0, Math.min(100, progress));
       
       await this.databaseService.executeStatement(
@@ -238,12 +231,6 @@ export class ArticleService {
       }
     } catch (error) {
       console.error('Error updating reading progress:', error);
-      throw new AppError({
-        code: 'ARTICLE_UPDATE_ERROR',
-        message: 'Failed to update reading progress',
-        details: error,
-        timestamp: new Date(),
-      });
     }
   }
 
@@ -252,9 +239,10 @@ export class ArticleService {
    */
   public async addTag(id: number, tag: string): Promise<void> {
     try {
+      await this.databaseService.initializeDatabase();
       const article = await this.getArticleById(id);
       if (!article) {
-        throw new Error('Article not found');
+        return;
       }
 
       const tags = [...article.tags];
@@ -268,12 +256,6 @@ export class ArticleService {
       }
     } catch (error) {
       console.error('Error adding tag:', error);
-      throw new AppError({
-        code: 'ARTICLE_UPDATE_ERROR',
-        message: 'Failed to add tag',
-        details: error,
-        timestamp: new Date(),
-      });
     }
   }
 
@@ -282,9 +264,10 @@ export class ArticleService {
    */
   public async removeTag(id: number, tag: string): Promise<void> {
     try {
+      await this.databaseService.initializeDatabase();
       const article = await this.getArticleById(id);
       if (!article) {
-        throw new Error('Article not found');
+        return;
       }
 
       const tags = article.tags.filter(t => t !== tag);
@@ -295,12 +278,6 @@ export class ArticleService {
       );
     } catch (error) {
       console.error('Error removing tag:', error);
-      throw new AppError({
-        code: 'ARTICLE_UPDATE_ERROR',
-        message: 'Failed to remove tag',
-        details: error,
-        timestamp: new Date(),
-      });
     }
   }
 
@@ -409,18 +386,13 @@ export class ArticleService {
    */
   public async deleteArticle(id: number): Promise<void> {
     try {
+      await this.databaseService.initializeDatabase();
       await this.databaseService.executeStatement(
         'DELETE FROM articles WHERE id = ?',
         [id]
       );
     } catch (error) {
       console.error('Error deleting article:', error);
-      throw new AppError({
-        code: 'ARTICLE_DELETE_ERROR',
-        message: 'Failed to delete article',
-        details: error,
-        timestamp: new Date(),
-      });
     }
   }
 
@@ -429,10 +401,11 @@ export class ArticleService {
    */
   public async deleteOldArticles(daysOld: number = 30): Promise<number> {
     try {
+      await this.databaseService.initializeDatabase();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
       
-      const result = await this.databaseService.executeStatement(
+      const result = await this.databaseService.executeInsert(
         'DELETE FROM articles WHERE published_at < ? AND is_favorite = 0',
         [cutoffDate.toISOString()]
       );

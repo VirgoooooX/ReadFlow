@@ -90,10 +90,15 @@ export class RSShubService {
    */
   public async testInstance(instanceUrl: string): Promise<boolean> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(`${instanceUrl}/`, {
         method: 'HEAD',
-        timeout: 5000,
+        // @ts-ignore - AbortSignal 可能在某些环境不支持
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
       console.warn(`RSSHUB instance ${instanceUrl} is not available:`, error);
@@ -147,9 +152,10 @@ export class RSShubService {
       'bilibili': 'B站UP主动态',
       'zhihu': '知乎专栏/用户动态',
       'juejin': '掘金用户文章',
-      'v2ex': 'V2EX 论坛',
+      'v2ex': 'V2EX 论坫',
       'sspai': '少数派文章',
       'coolapk': '酷安应用市场',
+      'cnbeta': 'CnBeta 科技资讯',
     };
 
     const description = descriptions[platform] || `${platform} RSS源`;

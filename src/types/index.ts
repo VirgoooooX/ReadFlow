@@ -31,7 +31,7 @@ export interface RSSSource {
   name: string;
   url: string;
   category: string;
-  contentType: 'text' | 'image_text'; // RSS源内容类型：纯文本或图文
+  contentType: 'text' | 'image_text'; // RSS源内容类型：纯文本或多媒体(图文视频)
   isActive: boolean;
   lastFetchAt?: Date;
   errorCount: number;
@@ -43,44 +43,60 @@ export interface RSSSource {
 }
 
 // 词典相关类型
-export interface LocalDictionaryEntry {
-  id: number;
-  word: string;              // 单词
-  sw: string;                // 搜索词（小写，用于索引）
-  phonetic?: string;         // 音标
-  definition?: string;       // 英文释义
-  translation?: string;      // 中文翻译
-  pos?: string;              // 词性
-  exchange?: string;         // 词形变化（复数、过去式等）
-}
-
 export interface WordDefinition {
-  word: string;
+  word: string;              // 当前词形
+  baseWord?: string;         // 原始单词（如 running -> run）
+  wordForm?: string;         // 词形说明（如 "过去式", "现在分词"）
   phonetic?: string;
   definitions: {
     partOfSpeech: string;    // 词性
-    definition: string;      // 释义
+    definition: string;      // 英文释义
     example?: string;        // 例句
     synonyms?: string[];     // 同义词
     translation?: string;    // 中文翻译
   }[];
-  source: 'local' | 'llm' | 'online';
+  baseWordDefinitions?: {    // 原始单词的释义
+    partOfSpeech: string;
+    definition: string;
+    translation?: string;
+  }[];
+  source: 'llm' | 'cache';   // 来源：LLM或本地缓存
+}
+
+// 词典缓存条目
+export interface DictionaryCacheEntry {
+  id?: number;
+  word: string;              // 查询的单词
+  baseWord?: string;         // 原始单词
+  wordForm?: string;         // 词形说明
+  phonetic?: string;         // 音标
+  definitions: string;       // JSON字符串存储释义
+  source: string;            // 来源
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // 单词本类型
 export interface VocabularyEntry {
-  id: string;
+  id?: number;
   word: string;
-  definition: string;
+  definition?: WordDefinition | string;
   translation?: string;
   example?: string;
+  context?: string;
+  articleId?: number;
   sourceArticleId?: number;
   sourceArticleTitle?: string;
   addedAt: Date;
   reviewCount: number;
+  correctCount?: number;
   lastReviewAt?: Date;
+  lastReviewedAt?: Date;
+  nextReviewAt?: Date;
   masteryLevel: number;    // 0-5 掌握程度
+  difficulty?: string;
   tags: string[];
+  notes?: string;
 }
 
 // 阅读设置类型
@@ -257,9 +273,21 @@ export interface ReadingStats {
 }
 
 // 错误类型
-export interface AppError {
+export class AppError extends Error {
   code: string;
-  message: string;
   details?: any;
   timestamp: Date;
+
+  constructor(data: {
+    code: string;
+    message: string;
+    details?: any;
+    timestamp: Date;
+  }) {
+    super(data.message);
+    this.code = data.code;
+    this.details = data.details;
+    this.timestamp = data.timestamp;
+    this.name = 'AppError';
+  }
 }

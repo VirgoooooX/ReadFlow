@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,51 +10,86 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
+import { imageCacheService, DatabaseService } from '../../services';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '../../navigation/AppNavigator';
-import { ArticleService } from '../../services/ArticleService';
 
 type SettingsScreenNavigationProp = NativeStackNavigationProp<SettingsStackParamList>;
 
 const SettingsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<SettingsScreenNavigationProp>();
+  const [cacheSize, setCacheSize] = useState<string>('计算中...');
   const styles = createStyles(isDark, theme);
 
-  const handleStorageManagement = () => {
-    Alert.alert('存储管理', '清理缓存功能开发中...');
+  // 初始化时获取缓存大小
+  useEffect(() => {
+    updateCacheSize();
+  }, []);
+
+  const updateCacheSize = async () => {
+    try {
+      const size = await imageCacheService.getCacheSize();
+      const sizeInMB = (size / (1024 * 1024)).toFixed(2);
+      setCacheSize(`${sizeInMB} MB`);
+    } catch (error) {
+      setCacheSize('未知');
+    }
   };
 
-  const handleExport = () => {
-    Alert.alert('导出数据', '数据导出功能开发中...');
-  };
-
-  const handleImport = () => {
-    Alert.alert('导入数据', '数据导入功能开发中...');
-  };
-
-  const handleReprocessArticles = async () => {
+  const handleClearCache = () => {
     Alert.alert(
-      '重新处理文章',
-      '这将使用新的RSS清理程序重新处理数据库中的所有文章内容，可能需要一些时间。是否继续？',
+      '清除缓存',
+      `确定要清除所有文章数据和图片缓存吗？
+
+当前图片缓存: ${cacheSize}
+
+清除后需要重新刷新RSS源来获取文章。`,
       [
-        { text: '取消', style: 'cancel' },
         {
-          text: '确定',
+          text: '取消',
+          style: 'cancel',
+        },
+        {
+          text: '清除',
           onPress: async () => {
             try {
-              const articleService = ArticleService.getInstance();
-              const result = await articleService.reprocessAllArticles();
+              const db = DatabaseService.getInstance();
+              
+              // 1. 清除所有文章数据
+              await db.executeStatement('DELETE FROM articles');
+              console.log('✅ 文章数据已清除');
+              
+              // 2. 清除图片缓存
+              await imageCacheService.cleanCache(0);
+              console.log('✅ 图片缓存已清除');
+              
+              // 3. 重置 RSS 源的文章计数
+              await db.executeStatement('UPDATE rss_sources SET article_count = 0, unread_count = 0');
+              console.log('✅ RSS源计数已重置');
+              
+              await updateCacheSize();
+              
               Alert.alert(
-                '处理完成',
-                `成功重新处理了 ${result.updated} 篇文章（共检查 ${result.processed} 篇）`
+                '成功',
+                '所有文章数据和图片缓存已清除\n\n请到首页下拉刷新RSS源来获取文章。',
+                [
+                  {
+                    text: '好的',
+                    onPress: () => {
+                      // 跳转到首页
+                      navigation.navigate('Articles' as any);
+                    },
+                  },
+                ]
               );
             } catch (error) {
-              console.error('重新处理文章失败:', error);
-              Alert.alert('处理失败', '重新处理文章时发生错误，请稍后重试');
+              console.error('清除缓存失败:', error);
+              Alert.alert('失败', '清除缓存时出错');
             }
-          }
-        }
+          },
+          style: 'destructive',
+        },
       ]
     );
   };
@@ -124,51 +159,21 @@ const SettingsScreen: React.FC = () => {
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={handleStorageManagement}
-          >
-            <View style={styles.settingItemLeft}>
-              <MaterialIcons name="storage" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>存储管理</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
-          </TouchableOpacity>
         </View>
 
-        {/* 数据管理 */}
+        {/* 存储管理 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>数据管理</Text>
+          <Text style={styles.sectionTitle}>存储管理</Text>
           <TouchableOpacity
             style={styles.settingItem}
-            onPress={handleExport}
+            onPress={handleClearCache}
           >
             <View style={styles.settingItemLeft}>
-              <MaterialIcons name="file-upload" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>导出数据</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={handleImport}
-          >
-            <View style={styles.settingItemLeft}>
-              <MaterialIcons name="file-download" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>导入数据</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={handleReprocessArticles}
-          >
-            <View style={styles.settingItemLeft}>
-              <MaterialIcons name="refresh" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>重新处理文章</Text>
+              <MaterialIcons name="delete" size={24} color={theme?.colors?.primary || '#3B82F6'} />
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>清除所有数据</Text>
+                <Text style={styles.settingItemDesc}>图片: {cacheSize}</Text>
+              </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
@@ -187,29 +192,6 @@ const SettingsScreen: React.FC = () => {
             </View>
             <Text style={styles.versionText}>v1.0.0</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* 使用统计 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>使用统计</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>128</Text>
-              <Text style={styles.statLabel}>已读文章</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>45</Text>
-              <Text style={styles.statLabel}>收藏单词</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>RSS源</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>30</Text>
-              <Text style={styles.statLabel}>学习天数</Text>
-            </View>
-          </View>
         </View>
       </View>
     </ScrollView>
@@ -248,35 +230,22 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  settingItemContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
   settingItemText: {
     fontSize: 16,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginLeft: 12,
+  },
+  settingItemDesc: {
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    marginTop: 4,
   },
   versionText: {
     fontSize: 14,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    paddingVertical: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme?.colors?.primary || '#3B82F6',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    textAlign: 'center',
   },
 });
 

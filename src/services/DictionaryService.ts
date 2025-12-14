@@ -1,12 +1,19 @@
 import { DatabaseService } from '../database/DatabaseService';
-import { LocalDictionaryEntry, WordDefinition, AppError } from '../types';
+import { WordDefinition, DictionaryCacheEntry } from '../types';
+import { SettingsService } from './SettingsService';
 
+/**
+ * 词典服务 - 使用LLM查询单词释义，并缓存到本地数据库
+ * 支持词形识别（如 running -> run）
+ */
 export class DictionaryService {
   private static instance: DictionaryService;
   private databaseService: DatabaseService;
+  private settingsService: SettingsService;
 
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
+    this.settingsService = SettingsService.getInstance();
   }
 
   public static getInstance(): DictionaryService {
@@ -17,103 +24,358 @@ export class DictionaryService {
   }
 
   /**
-   * 查询单词定义（优先本地词典，后备LLM）
+   * 查询单词定义（优先本地缓存，后备LLM）
    */
   public async lookupWord(word: string, context?: string): Promise<WordDefinition | null> {
     try {
-      // 1. 首先尝试本地词典查询
-      const localResult = await this.searchLocal(word);
+      const searchWord = word.toLowerCase().trim();
       
-      if (localResult.length > 0) {
-        return this.formatLocalResult(localResult[0]);
+      // 1. 首先尝试从本地缓存查询
+      const cachedResult = await this.getCachedDefinition(searchWord);
+      if (cachedResult) {
+        console.log(`✅ 从缓存获取单词: ${searchWord}`);
+        return cachedResult;
       }
 
-      // 2. 尝试词形变化查询
-      const stemResult = await this.searchByStem(word);
-      if (stemResult.length > 0) {
-        return this.formatLocalResult(stemResult[0]);
+      // 2. 本地缓存没有，调用LLM查询
+      console.log(`🔍 调用LLM查询单词: ${searchWord}`);
+      const llmResult = await this.queryLLM(searchWord, context);
+      
+      if (llmResult) {
+        // 3. 将LLM结果存入本地缓存
+        await this.cacheDefinition(llmResult);
+        
+        // 4. 如果有原始单词且与当前词不同，也缓存原始单词
+        if (llmResult.baseWord && llmResult.baseWord !== searchWord) {
+          await this.cacheBaseWord(llmResult);
+        }
+        
+        return llmResult;
       }
 
-      // 3. 如果本地词典没有找到，返回null（后续可以集成LLM查询）
-      console.log(`Word '${word}' not found in local dictionary`);
       return null;
-      
     } catch (error) {
       console.error('Error looking up word:', error);
-      throw new AppError({
-        code: 'DICTIONARY_LOOKUP_ERROR',
-        message: `Failed to lookup word: ${word}`,
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error(`Failed to lookup word: ${word}`);
     }
   }
 
   /**
-   * 本地词典搜索
+   * 从本地缓存获取单词定义
    */
-  public async searchLocal(word: string): Promise<LocalDictionaryEntry[]> {
+  private async getCachedDefinition(word: string): Promise<WordDefinition | null> {
     try {
-      const searchWord = word.toLowerCase().trim();
-      
-      // 精确匹配查询
-      const exactMatch = await this.databaseService.queryDictionary(
-        'SELECT * FROM stardict WHERE word = ? OR sw = ? LIMIT 1',
-        [word, searchWord]
+      const results = await this.databaseService.executeQuery(
+        'SELECT * FROM dictionary_cache WHERE word = ? LIMIT 1',
+        [word]
       );
-      
-      if (exactMatch.length > 0) {
-        return exactMatch.map(this.mapDictionaryRow);
+
+      if (results.length > 0) {
+        return this.mapCacheRowToDefinition(results[0]);
       }
 
-      // 前缀匹配查询（用于自动完成）
-      const prefixMatch = await this.databaseService.queryDictionary(
-        'SELECT * FROM stardict WHERE sw LIKE ? LIMIT 10',
-        [`${searchWord}%`]
-      );
-      
-      return prefixMatch.map(this.mapDictionaryRow);
-      
+      return null;
     } catch (error) {
-      console.error('Error searching local dictionary:', error);
-      return [];
+      console.error('Error getting cached definition:', error);
+      return null;
     }
   }
 
   /**
-   * 通过词干搜索（处理词形变化）
+   * 缓存单词定义
    */
-  private async searchByStem(word: string): Promise<LocalDictionaryEntry[]> {
+  private async cacheDefinition(definition: WordDefinition): Promise<void> {
     try {
-      const searchWord = word.toLowerCase().trim();
-      
-      // 查找包含该词形变化的词条
-      const stemResults = await this.databaseService.queryDictionary(
-        'SELECT * FROM stardict WHERE exchange LIKE ? LIMIT 5',
-        [`%${searchWord}%`]
-      );
-      
-      // 过滤出真正匹配的词形变化
-      const filteredResults = stemResults.filter(row => {
-        if (!row.exchange) return false;
-        
-        const exchanges = row.exchange.split('/');
-        return exchanges.some(exchange => {
-          const parts = exchange.split(':');
-          return parts.length > 1 && parts[1].split(',').includes(searchWord);
-        });
+      const now = Math.floor(Date.now() / 1000);
+      const definitionsJson = JSON.stringify({
+        definitions: definition.definitions,
+        baseWordDefinitions: definition.baseWordDefinitions
       });
+
+      // 检查是否已存在
+      const existing = await this.databaseService.executeQuery(
+        'SELECT id FROM dictionary_cache WHERE word = ?',
+        [definition.word]
+      );
+
+      if (existing.length > 0) {
+        // 更新现有记录
+        await this.databaseService.executeStatement(
+          `UPDATE dictionary_cache SET 
+           base_word = ?, word_form = ?, phonetic = ?, definitions = ?, updated_at = ?
+           WHERE word = ?`,
+          [definition.baseWord || null, definition.wordForm || null, definition.phonetic || null, definitionsJson, now, definition.word]
+        );
+      } else {
+        // 插入新记录
+        await this.databaseService.executeStatement(
+          `INSERT INTO dictionary_cache (word, base_word, word_form, phonetic, definitions, source, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [definition.word, definition.baseWord || null, definition.wordForm || null, definition.phonetic || null, definitionsJson, 'llm', now, now]
+        );
+      }
       
-      return filteredResults.map(this.mapDictionaryRow);
-      
+      console.log(`💾 已缓存单词: ${definition.word}`);
     } catch (error) {
-      console.error('Error searching by stem:', error);
-      return [];
+      console.error('Error caching definition:', error);
     }
   }
 
   /**
-   * 获取单词建议（自动完成）
+   * 缓存原始单词（当查询的是变形词时）
+   */
+  private async cacheBaseWord(definition: WordDefinition): Promise<void> {
+    if (!definition.baseWord || !definition.baseWordDefinitions) return;
+
+    try {
+      const baseWord = definition.baseWord.toLowerCase();
+      
+      // 检查原始单词是否已缓存
+      const existing = await this.databaseService.executeQuery(
+        'SELECT id FROM dictionary_cache WHERE word = ?',
+        [baseWord]
+      );
+
+      if (existing.length === 0) {
+        const now = Math.floor(Date.now() / 1000);
+        const definitionsJson = JSON.stringify({
+          definitions: definition.baseWordDefinitions
+        });
+
+        await this.databaseService.executeStatement(
+          `INSERT INTO dictionary_cache (word, base_word, word_form, phonetic, definitions, source, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [baseWord, null, null, definition.phonetic || null, definitionsJson, 'llm', now, now]
+        );
+        
+        console.log(`💾 已缓存原始单词: ${baseWord}`);
+      }
+    } catch (error) {
+      console.error('Error caching base word:', error);
+    }
+  }
+
+  /**
+   * 调用LLM查询单词
+   */
+  private async queryLLM(word: string, context?: string): Promise<WordDefinition | null> {
+    try {
+      const llmSettings = await this.settingsService.getLLMSettings();
+      
+      if (!llmSettings?.apiKey) {
+        console.warn('LLM API key not configured');
+        return null;
+      }
+
+      const prompt = this.buildPrompt(word, context);
+      
+      // 根据提供商构建请求
+      const response = await this.callLLMAPI(llmSettings, prompt);
+      
+      if (response) {
+        // 记录使用统计
+        await this.logUsage('dictionary', llmSettings.provider, llmSettings.model);
+        return this.parseLLMResponse(response, word);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error querying LLM:', error);
+      // 记录失败统计
+      const llmSettings = await this.settingsService.getLLMSettings();
+      if (llmSettings) {
+        await this.logUsage('dictionary', llmSettings.provider, llmSettings.model, false);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * 构建查询提示词
+   */
+  private buildPrompt(word: string, context?: string): string {
+    let prompt = `请分析英语单词 "${word}"`;
+    
+    if (context) {
+      prompt += `，它在以下句子中出现："${context}"`;
+    }
+    
+    prompt += `
+
+请用JSON格式返回，包含以下字段：
+{
+  "word": "当前单词",
+  "baseWord": "原始形式（如果当前是变形词，否则为null）",
+  "wordForm": "词形说明（如'过去式','现在分词','复数'等，如果是原形则为null）",
+  "phonetic": "音标",
+  "definitions": [
+    {
+      "partOfSpeech": "词性",
+      "definition": "英文释义",
+      "translation": "中文翻译",
+      "example": "例句"
+    }
+  ],
+  "baseWordDefinitions": [
+    {
+      "partOfSpeech": "词性",
+      "definition": "原始单词的英文释义",
+      "translation": "中文翻译"
+    }
+  ]
+}
+
+注意：
+1. 如果单词是变形词（如 running, went, dogs），请提供原始单词（run, go, dog）及其释义
+2. 如果单词已经是原形，baseWord和wordForm为null，baseWordDefinitions为空数组
+3. 只返回JSON，不要其他说明文字`;
+
+    return prompt;
+  }
+
+  /**
+   * 调用LLM API
+   */
+  private async callLLMAPI(settings: any, prompt: string): Promise<string | null> {
+    try {
+      const { provider, apiKey, baseUrl, model, customModelName, temperature, maxTokens } = settings;
+      
+      let apiEndpoint = baseUrl || 'https://api.openai.com/v1';
+      let actualModel = customModelName || model || 'gpt-3.5-turbo';
+      
+      // 根据提供商调整请求格式
+      if (provider === 'anthropic') {
+        return await this.callAnthropicAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
+      } else {
+        // OpenAI 兼容格式（包括OpenAI、本地模型、自定义API）
+        return await this.callOpenAICompatibleAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
+      }
+    } catch (error) {
+      console.error('Error calling LLM API:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 调用OpenAI兼容API
+   */
+  private async callOpenAICompatibleAPI(
+    baseUrl: string, 
+    apiKey: string, 
+    model: string, 
+    prompt: string,
+    temperature: number = 0.3,
+    maxTokens: number = 1024
+  ): Promise<string | null> {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: '你是一个英语词典助手，专门帮助用户查询单词释义。请始终用JSON格式回复。' },
+          { role: 'user', content: prompt }
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || null;
+  }
+
+  /**
+   * 调用Anthropic API
+   */
+  private async callAnthropicAPI(
+    baseUrl: string,
+    apiKey: string,
+    model: string,
+    prompt: string,
+    temperature: number = 0.3,
+    maxTokens: number = 1024
+  ): Promise<string | null> {
+    const response = await fetch(`${baseUrl}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text || null;
+  }
+
+  /**
+   * 解析LLM响应
+   */
+  private parseLLMResponse(response: string, originalWord: string): WordDefinition | null {
+    try {
+      // 尝试提取JSON
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('No JSON found in LLM response');
+        return null;
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      return {
+        word: parsed.word || originalWord,
+        baseWord: parsed.baseWord || undefined,
+        wordForm: parsed.wordForm || undefined,
+        phonetic: parsed.phonetic || undefined,
+        definitions: parsed.definitions || [],
+        baseWordDefinitions: parsed.baseWordDefinitions || undefined,
+        source: 'llm',
+      };
+    } catch (error) {
+      console.error('Error parsing LLM response:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 将缓存行映射为WordDefinition
+   */
+  private mapCacheRowToDefinition(row: any): WordDefinition {
+    const parsedDefinitions = JSON.parse(row.definitions);
+    
+    return {
+      word: row.word,
+      baseWord: row.base_word || undefined,
+      wordForm: row.word_form || undefined,
+      phonetic: row.phonetic || undefined,
+      definitions: parsedDefinitions.definitions || [],
+      baseWordDefinitions: parsedDefinitions.baseWordDefinitions || undefined,
+      source: 'cache',
+    };
+  }
+
+  /**
+   * 获取单词建议（从缓存中搜索）
    */
   public async getSuggestions(prefix: string, limit: number = 10): Promise<string[]> {
     try {
@@ -123,13 +385,12 @@ export class DictionaryService {
         return [];
       }
       
-      const results = await this.databaseService.queryDictionary(
-        'SELECT word FROM stardict WHERE sw LIKE ? ORDER BY LENGTH(word) LIMIT ?',
+      const results = await this.databaseService.executeQuery(
+        'SELECT DISTINCT word FROM dictionary_cache WHERE word LIKE ? ORDER BY LENGTH(word) LIMIT ?',
         [`${searchPrefix}%`, limit]
       );
       
       return results.map(row => row.word);
-      
     } catch (error) {
       console.error('Error getting suggestions:', error);
       return [];
@@ -137,35 +398,14 @@ export class DictionaryService {
   }
 
   /**
-   * 批量查询单词
-   */
-  public async batchLookup(words: string[]): Promise<Map<string, WordDefinition | null>> {
-    const results = new Map<string, WordDefinition | null>();
-    
-    // 并发查询，但限制并发数量
-    const batchSize = 5;
-    for (let i = 0; i < words.length; i += batchSize) {
-      const batch = words.slice(i, i + batchSize);
-      const promises = batch.map(async word => {
-        const definition = await this.lookupWord(word);
-        return { word, definition };
-      });
-      
-      const batchResults = await Promise.all(promises);
-      batchResults.forEach(({ word, definition }) => {
-        results.set(word, definition);
-      });
-    }
-    
-    return results;
-  }
-
-  /**
-   * 检查单词是否存在于词典中
+   * 检查单词是否已缓存
    */
   public async wordExists(word: string): Promise<boolean> {
     try {
-      const results = await this.searchLocal(word);
+      const results = await this.databaseService.executeQuery(
+        'SELECT 1 FROM dictionary_cache WHERE word = ? LIMIT 1',
+        [word.toLowerCase().trim()]
+      );
       return results.length > 0;
     } catch (error) {
       console.error('Error checking word existence:', error);
@@ -174,97 +414,58 @@ export class DictionaryService {
   }
 
   /**
-   * 获取词典统计信息
+   * 获取缓存统计信息
    */
-  public async getDictionaryStats(): Promise<{ totalWords: number; lastUpdated?: Date }> {
+  public async getCacheStats(): Promise<{ totalWords: number; lastUpdated?: Date }> {
     try {
-      const countResult = await this.databaseService.queryDictionary(
-        'SELECT COUNT(*) as count FROM stardict'
+      const countResult = await this.databaseService.executeQuery(
+        'SELECT COUNT(*) as count FROM dictionary_cache'
+      );
+      
+      const lastResult = await this.databaseService.executeQuery(
+        'SELECT MAX(updated_at) as last_updated FROM dictionary_cache'
       );
       
       return {
         totalWords: countResult[0]?.count || 0,
-        lastUpdated: undefined, // 可以从数据库元信息获取
+        lastUpdated: lastResult[0]?.last_updated ? new Date(lastResult[0].last_updated * 1000) : undefined,
       };
     } catch (error) {
-      console.error('Error getting dictionary stats:', error);
+      console.error('Error getting cache stats:', error);
       return { totalWords: 0 };
     }
   }
 
   /**
-   * 映射数据库行到LocalDictionaryEntry
+   * 记录LLM使用统计
    */
-  private mapDictionaryRow(row: any): LocalDictionaryEntry {
-    return {
-      id: row.id,
-      word: row.word,
-      sw: row.sw,
-      phonetic: row.phonetic,
-      definition: row.definition,
-      translation: row.translation,
-      pos: row.pos,
-      exchange: row.exchange,
-    };
-  }
-
-  /**
-   * 格式化本地查询结果为WordDefinition
-   */
-  private formatLocalResult(entry: LocalDictionaryEntry): WordDefinition {
-    const definitions = [];
-    
-    // 解析词性和释义
-    if (entry.definition || entry.translation) {
-      definitions.push({
-        partOfSpeech: entry.pos || 'unknown',
-        definition: entry.definition || '',
-        translation: entry.translation,
-        example: undefined,
-        synonyms: undefined,
-      });
-    }
-    
-    return {
-      word: entry.word,
-      phonetic: entry.phonetic,
-      definitions,
-      source: 'local',
-    };
-  }
-
-  /**
-   * 解析词形变化信息
-   */
-  private parseExchange(exchange: string): { [key: string]: string[] } {
-    const result: { [key: string]: string[] } = {};
-    
-    if (!exchange) return result;
-    
-    const parts = exchange.split('/');
-    parts.forEach(part => {
-      const [type, forms] = part.split(':');
-      if (type && forms) {
-        result[type] = forms.split(',');
-      }
-    });
-    
-    return result;
-  }
-
-  /**
-   * 获取单词的词形变化
-   */
-  public async getWordForms(word: string): Promise<{ [key: string]: string[] }> {
+  private async logUsage(
+    requestType: string,
+    provider: string,
+    model: string,
+    success: boolean = true
+  ): Promise<void> {
     try {
-      const results = await this.searchLocal(word);
-      if (results.length > 0 && results[0].exchange) {
-        return this.parseExchange(results[0].exchange);
-      }
-      return {};
+      const now = Math.floor(Date.now() / 1000);
+      await this.databaseService.executeStatement(
+        `INSERT INTO llm_usage_stats (request_type, provider, model, success, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [requestType, provider, model, success ? 1 : 0, now]
+      );
     } catch (error) {
-      console.error('Error getting word forms:', error);
-      return {};
+      console.error('Error logging usage:', error);
+    }
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  public async clearCache(): Promise<void> {
+    try {
+      await this.databaseService.executeStatement('DELETE FROM dictionary_cache');
+      console.log('词典缓存已清除');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
     }
   }
 }

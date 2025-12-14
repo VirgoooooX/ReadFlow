@@ -41,13 +41,13 @@ class ThemeStorageService {
   }
 
   // 保存主题模式
-  async setThemeMode(mode: ThemeMode): Promise<void> {
+  async setThemeMode(mode: ThemeMode | undefined | null): Promise<void> {
     try {
-      if (!mode) {
+      const validMode = mode || 'system';
+      if (!validMode) {
         console.warn('setThemeMode called with undefined/null value, using default');
-        mode = 'system';
       }
-      await AsyncStorage.setItem(STORAGE_KEYS.THEME_MODE, mode);
+      await AsyncStorage.setItem(STORAGE_KEYS.THEME_MODE, validMode);
     } catch (error) {
       console.error('Failed to set theme mode:', error);
       throw error;
@@ -66,13 +66,13 @@ class ThemeStorageService {
   }
 
   // 保存主题预设
-  async setThemePreset(preset: ThemePreset): Promise<void> {
+  async setThemePreset(preset: ThemePreset | undefined | null): Promise<void> {
     try {
-      if (!preset) {
+      const validPreset = preset || 'default';
+      if (!validPreset) {
         console.warn('setThemePreset called with undefined/null value, using default');
-        preset = 'default';
       }
-      await AsyncStorage.setItem(STORAGE_KEYS.THEME_PRESET, preset);
+      await AsyncStorage.setItem(STORAGE_KEYS.THEME_PRESET, validPreset);
     } catch (error) {
       console.error('Failed to set theme preset:', error);
       throw error;

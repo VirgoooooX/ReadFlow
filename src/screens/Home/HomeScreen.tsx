@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
@@ -49,6 +50,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     loadInitialData();
   }, []);
+  
+  // 屏幕获得焦点时刷新数据（显示最新的已读/未读状态）
+  useFocusEffect(
+    useCallback(() => {
+      loadInitialData();
+    }, [])
+  );
 
   const loadInitialData = async () => {
     try {
@@ -176,10 +184,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
              onPress={() => handleNavigateToArticle(item.id)}
            >
              <View style={styles.articleContent}>
-               {/* 英文原标题 */}
-               <Text style={styles.articleTitle}>
-                 {item.title}
-               </Text>
+               {/* 标题容器 - 用于相对定位未读点 */}
+               <View style={styles.titleContainer}>
+                 {/* 英文原标题 */}
+                 <Text style={styles.articleTitle}>
+                   {item.title}
+                 </Text>
+                 
+                 {/* 未读标记 - 小绿点 */}
+                 {!item.isRead && (
+                   <View style={styles.unreadDot} />
+                 )}
+               </View>
                
                {/* 中文翻译标题 */}
                {item.titleCn && (
@@ -276,6 +292,19 @@ const createStyles = (isDark: boolean, theme: any) =>
       alignItems: 'center',
       gap: 12,
       marginTop: 0, // 确保文章项没有顶部外边距
+    },
+    titleContainer: {
+      position: 'relative',
+      marginBottom: 6,
+    },
+    unreadDot: {
+      position: 'absolute',
+      left: -8,
+      top: -8,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#22C55E',
     },
     articleImage: {
       width: 60,

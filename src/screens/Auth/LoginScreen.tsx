@@ -99,12 +99,12 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <MaterialIcons 
-              name="article" 
+              name="auto-stories" 
               size={64} 
               color={theme?.colors?.primary || '#6750A4'} 
             />
           </View>
-          <Text style={styles.title}>TechFlow</Text>
+          <Text style={styles.title}>ReadFlow</Text>
           <Text style={styles.subtitle}>登录您的账户</Text>
         </View>
 

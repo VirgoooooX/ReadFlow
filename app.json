@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "TechFlowMobile",
-    "slug": "TechFlowMobile",
+    "name": "ReadFlow",
+    "slug": "ReadFlow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,12 +16,7 @@
       "supportsTablet": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "package": "com.virgoooooox.TechFlowMobile"
+      "package": "com.virgoooooox.ReadFlow"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +25,9 @@
       "eas": {
         "projectId": "19329e18-a996-4df1-b5c6-a54963e829ab"
       }
-    }
+    },
+    "plugins": [
+      "expo-sqlite"
+    ]
   }
 }

@@ -57,41 +57,43 @@ export class VocabularyService {
         notes: '',
       };
 
-      const result = await this.databaseService.executeQuery(
+      // 生成唯一ID（基于timestamp和随机数，转换为数字）
+      const uniqueId = Math.floor(Date.now() + Math.random() * 10000);
+
+      await this.databaseService.executeStatement(
         `INSERT INTO vocabulary (
-          word, definition, context, article_id, added_at, review_count, 
+          id, word, definition, context, article_id, added_at, review_count, 
           correct_count, last_reviewed_at, next_review_at, mastery_level, 
           difficulty, tags, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+          String(uniqueId),
           vocabularyEntry.word,
           vocabularyEntry.definition ? JSON.stringify(vocabularyEntry.definition) : null,
-          vocabularyEntry.context,
-          vocabularyEntry.articleId,
+          vocabularyEntry.context || null,
+          vocabularyEntry.articleId || null,
           vocabularyEntry.addedAt.toISOString(),
           vocabularyEntry.reviewCount,
           vocabularyEntry.correctCount,
-          vocabularyEntry.lastReviewedAt?.toISOString(),
-          vocabularyEntry.nextReviewAt.toISOString(),
+          vocabularyEntry.lastReviewedAt?.toISOString() || null,
+          vocabularyEntry.nextReviewAt?.toISOString() || new Date().toISOString(),
           vocabularyEntry.masteryLevel,
           vocabularyEntry.difficulty,
           JSON.stringify(vocabularyEntry.tags),
-          vocabularyEntry.notes,
+          vocabularyEntry.notes || '',
         ]
       );
 
-      return {
-        id: result.insertId,
+      // 查询刚插入的记录获取完整数据
+      const inserted = await this.getWordEntry(vocabularyEntry.word);
+      
+      return inserted || {
+        id: uniqueId,
         ...vocabularyEntry,
       };
     } catch (error) {
       console.error('Error adding word to vocabulary:', error);
-      throw new AppError({
-        code: 'VOCABULARY_ADD_ERROR',
-        message: `Failed to add word: ${word}`,
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error(`Failed to add word: ${word}`);
     }
   }
 
@@ -228,7 +230,7 @@ export class VocabularyService {
 
       const now = new Date();
       const newReviewCount = entry.reviewCount + 1;
-      const newCorrectCount = entry.correctCount + (isCorrect ? 1 : 0);
+      const newCorrectCount = (entry.correctCount || 0) + (isCorrect ? 1 : 0);
       
       // 计算新的掌握程度
       const newMasteryLevel = this.calculateMasteryLevel(
@@ -241,7 +243,7 @@ export class VocabularyService {
       // 计算下次复习时间
       const nextReviewAt = this.calculateNextReview(now, newMasteryLevel);
 
-      await this.databaseService.executeQuery(
+      await this.databaseService.executeStatement(
         `UPDATE vocabulary SET 
          review_count = ?, correct_count = ?, last_reviewed_at = ?, 
          next_review_at = ?, mastery_level = ? 
@@ -261,12 +263,7 @@ export class VocabularyService {
       return updatedEntry!;
     } catch (error) {
       console.error('Error recording review:', error);
-      throw new AppError({
-        code: 'VOCABULARY_REVIEW_ERROR',
-        message: 'Failed to record review',
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error('Failed to record review');
     }
   }
 
@@ -275,18 +272,13 @@ export class VocabularyService {
    */
   public async updateNotes(id: number, notes: string): Promise<void> {
     try {
-      await this.databaseService.executeQuery(
+      await this.databaseService.executeStatement(
         'UPDATE vocabulary SET notes = ? WHERE id = ?',
         [notes, id]
       );
     } catch (error) {
       console.error('Error updating notes:', error);
-      throw new AppError({
-        code: 'VOCABULARY_UPDATE_ERROR',
-        message: 'Failed to update notes',
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error('Failed to update notes');
     }
   }
 
@@ -304,19 +296,14 @@ export class VocabularyService {
       if (!tags.includes(tag)) {
         tags.push(tag);
         
-        await this.databaseService.executeQuery(
+        await this.databaseService.executeStatement(
           'UPDATE vocabulary SET tags = ? WHERE id = ?',
           [JSON.stringify(tags), id]
         );
       }
     } catch (error) {
       console.error('Error adding tag:', error);
-      throw new AppError({
-        code: 'VOCABULARY_UPDATE_ERROR',
-        message: 'Failed to add tag',
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error('Failed to add tag');
     }
   }
 
@@ -332,18 +319,13 @@ export class VocabularyService {
 
       const tags = entry.tags.filter(t => t !== tag);
       
-      await this.databaseService.executeQuery(
+      await this.databaseService.executeStatement(
         'UPDATE vocabulary SET tags = ? WHERE id = ?',
         [JSON.stringify(tags), id]
       );
     } catch (error) {
       console.error('Error removing tag:', error);
-      throw new AppError({
-        code: 'VOCABULARY_UPDATE_ERROR',
-        message: 'Failed to remove tag',
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error('Failed to remove tag');
     }
   }
 
@@ -352,18 +334,14 @@ export class VocabularyService {
    */
   public async deleteWord(id: number): Promise<void> {
     try {
-      await this.databaseService.executeQuery(
+      await this.databaseService.executeStatement(
         'DELETE FROM vocabulary WHERE id = ?',
         [id]
       );
+      console.log(`✅ 已删除单词 ID: ${id}`);
     } catch (error) {
       console.error('Error deleting word:', error);
-      throw new AppError({
-        code: 'VOCABULARY_DELETE_ERROR',
-        message: 'Failed to delete word',
-        details: error,
-        timestamp: new Date(),
-      });
+      throw new Error('Failed to delete word');
     }
   }
 
@@ -518,7 +496,7 @@ export class VocabularyService {
 
       if (updates.length > 0) {
         params.push(id);
-        await this.databaseService.executeQuery(
+        await this.databaseService.executeStatement(
           `UPDATE vocabulary SET ${updates.join(', ')} WHERE id = ?`,
           params
         );

@@ -1,21 +1,132 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { VocabularyStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
+import { DatabaseService } from '../../database/DatabaseService';
+import { translationService } from '../../services/TranslationService';
+import { vocabularyService } from '../../services/VocabularyService';
+import { VocabularyEntry } from '../../types';
+import { useFocusEffect } from '@react-navigation/native';
 
 type Props = VocabularyStackScreenProps<'VocabularyMain'>;
 
 const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'vocabulary' | 'dictionary' | 'translation'>('vocabulary');
+  const [stats, setStats] = useState({ vocabulary: 0, dictionary: 0, translation: 0, needReview: 0 });
+  const [vocabularyWords, setVocabularyWords] = useState<VocabularyEntry[]>([]);
+  const [dictionaryWords, setDictionaryWords] = useState<any[]>([]);
+  const [translations, setTranslations] = useState<any[]>([]);
 
   const styles = createStyles(isDark, theme);
+
+  // 使用 useFocusEffect 在页面获得焦点时重新加载
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [activeTab])
+  );
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const db = DatabaseService.getInstance();
+      
+      // 确保数据库已初始化
+      await db.initializeDatabase();
+      
+      // 加载统计数据
+      const vocabCount = await db.executeQuery('SELECT COUNT(*) as count FROM vocabulary').catch(() => [{ count: 0 }]);
+      const dictCount = await db.executeQuery('SELECT COUNT(*) as count FROM dictionary_cache').catch(() => [{ count: 0 }]);
+      const transCount = await db.executeQuery('SELECT COUNT(*) as count FROM translation_cache').catch(() => [{ count: 0 }]);
+      const needReviewCount = await db.executeQuery(
+        'SELECT COUNT(*) as count FROM vocabulary WHERE next_review_at <= ? AND mastery_level < 5',
+        [new Date().toISOString()]
+      ).catch(() => [{ count: 0 }]);
+      
+      setStats({
+        vocabulary: vocabCount[0]?.count || 0,
+        dictionary: dictCount[0]?.count || 0,
+        translation: transCount[0]?.count || 0,
+        needReview: needReviewCount[0]?.count || 0,
+      });
+      
+      // 根据当前标签页加载数据
+      if (activeTab === 'vocabulary') {
+        const entries = await vocabularyService.getAllWords({ limit: 50, sortBy: 'added_at', sortOrder: 'DESC' });
+        console.log('加载单词本:', entries.map(e => ({ id: e.id, word: e.word })));
+        setVocabularyWords(entries);
+      } else if (activeTab === 'dictionary') {
+        const words = await db.executeQuery(
+          'SELECT * FROM dictionary_cache ORDER BY created_at DESC LIMIT 50'
+        ).catch(() => []);
+        setDictionaryWords(words.map((row: any) => ({
+          word: row.word,
+          baseWord: row.base_word,
+          wordForm: row.word_form,
+          definitions: JSON.parse(row.definitions || '{}'),
+          createdAt: new Date(row.created_at * 1000),
+        })));
+      } else if (activeTab === 'translation') {
+        const trans = await translationService.getTranslationHistory(50);
+        setTranslations(trans);
+      }
+    } catch (error) {
+      console.error('Failed to load vocabulary data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartReview = () => {
+    if (stats.needReview === 0) {
+      Alert.alert('暂无复习', '当前没有需要复习的单词');
+      return;
+    }
+    navigation.navigate('ReviewSession');
+  };
+
+  const handleDeleteWord = async (id: number, word: string) => {
+    console.log(`调用 handleDeleteWord: id=${id}, word=${word}`);
+    Alert.alert(
+      '删除单词',
+      `确定要从单词本中删除 "${word}" 吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log(`执行删除: id=${id}`);
+              await vocabularyService.deleteWord(id);
+              console.log(`删除成功，重新加载数据`);
+              loadData(); // 重新加载
+            } catch (error) {
+              console.error('Failed to delete word:', error);
+              Alert.alert('删除失败', String(error));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getMasteryLabel = (level: number): { text: string; style: string } => {
+    if (level >= 5) return { text: '已掌握', style: 'mastered' };
+    if (level >= 2) return { text: '学习中', style: 'learning' };
+    return { text: '新单词', style: 'new' };
+  };
 
   const handleAddWord = () => {
     navigation.navigate('AddWord', {});
@@ -36,101 +147,156 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.content}>
+        {/* 统计卡片 */}
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>89</Text>
-            <Text style={styles.statLabel}>总单词数</Text>
+            <Text style={styles.statNumber}>{stats.vocabulary}</Text>
+            <Text style={styles.statLabel}>单词本</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>23</Text>
-            <Text style={styles.statLabel}>今日复习</Text>
+            <Text style={styles.statNumber}>{stats.dictionary}</Text>
+            <Text style={styles.statLabel}>查询记录</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>76%</Text>
-            <Text style={styles.statLabel}>掌握率</Text>
+            <Text style={styles.statNumber}>{stats.translation}</Text>
+            <Text style={styles.statLabel}>翻译记录</Text>
           </View>
         </View>
 
-        <View style={styles.actionSection}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleAddWord}>
-            <MaterialIcons name="add" size={24} color={theme?.colors?.onPrimary || '#FFFFFF'} />
-            <Text style={styles.primaryButtonText}>添加单词</Text>
+        {/* 标签页切换 */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'vocabulary' && styles.activeTab]}
+            onPress={() => setActiveTab('vocabulary')}
+          >
+            <Text style={[styles.tabText, activeTab === 'vocabulary' && styles.activeTabText]}>
+              单词本
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleReviewSession}>
-            <MaterialIcons name="quiz" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-            <Text style={styles.secondaryButtonText}>开始复习</Text>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'dictionary' && styles.activeTab]}
+            onPress={() => setActiveTab('dictionary')}
+          >
+            <Text style={[styles.tabText, activeTab === 'dictionary' && styles.activeTabText]}>
+              查询记录
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'translation' && styles.activeTab]}
+            onPress={() => setActiveTab('translation')}
+          >
+            <Text style={[styles.tabText, activeTab === 'translation' && styles.activeTabText]}>
+              翻译记录
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>最近添加</Text>
-            <TouchableOpacity onPress={handleViewStats}>
-              <Text style={styles.viewAllText}>查看统计</Text>
-            </TouchableOpacity>
+        {/* 内容区域 */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme?.colors?.primary} />
+            <Text style={styles.loadingText}>加载中...</Text>
           </View>
-          
-          <View style={styles.wordList}>
-            {[
-              { id: 1, word: 'algorithm', meaning: '算法', level: 'mastered' },
-              { id: 2, word: 'implementation', meaning: '实现', level: 'learning' },
-              { id: 3, word: 'optimization', meaning: '优化', level: 'new' },
-              { id: 4, word: 'architecture', meaning: '架构', level: 'learning' },
-              { id: 5, word: 'scalability', meaning: '可扩展性', level: 'new' },
-            ].map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.wordItem}
-                onPress={() => handleWordDetail(item.id)}
-              >
-                <View style={styles.wordContent}>
-                  <Text style={styles.wordText}>{item.word}</Text>
-                  <Text style={styles.meaningText}>{item.meaning}</Text>
-                </View>
-                <View style={styles.wordMeta}>
-                  <View style={[styles.levelBadge, styles[`level_${item.level}`]]}>
-                    <Text style={[styles.levelText, styles[`levelText_${item.level}`]]}>
-                      {item.level === 'mastered' ? '已掌握' : 
-                       item.level === 'learning' ? '学习中' : '新单词'}
+        ) : (
+          <View style={styles.section}>
+            {activeTab === 'vocabulary' && (
+              <View style={styles.wordList}>
+                {/* 复习按钮 */}
+                {stats.vocabulary > 0 && (
+                  <TouchableOpacity style={styles.reviewButton} onPress={handleStartReview}>
+                    <MaterialIcons name="school" size={20} color="#FFFFFF" />
+                    <Text style={styles.reviewButtonText}>
+                      开始复习 {stats.needReview > 0 ? `(${stats.needReview})` : ''}
                     </Text>
-                  </View>
-                  <MaterialIcons 
-                    name="chevron-right" 
-                    size={20} 
-                    color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')} 
-                  />
-                </View>
-              </TouchableOpacity>
-            ))}
+                  </TouchableOpacity>
+                )}
+                
+                {vocabularyWords.length === 0 ? (
+                  <Text style={styles.emptyText}>单词本还是空的，在文章中点击单词可以添加哦</Text>
+                ) : (
+                  vocabularyWords.map((item: any, index) => {
+                    const mastery = getMasteryLabel(item.masteryLevel || item.mastery_level || 0);
+                    const translation = typeof item.definition === 'object' 
+                      ? item.definition?.definitions?.[0]?.translation 
+                      : item.translation;
+                    return (
+                      <View key={item.id || index} style={styles.wordItem}>
+                        <View style={styles.wordContent}>
+                          <View style={styles.wordHeader}>
+                            <Text style={styles.wordText}>{item.word}</Text>
+                            <View style={[styles.levelBadge, mastery.style === 'mastered' ? styles.level_mastered : mastery.style === 'learning' ? styles.level_learning : styles.level_new]}>
+                              <Text style={[styles.levelText, mastery.style === 'mastered' ? styles.levelText_mastered : mastery.style === 'learning' ? styles.levelText_learning : styles.levelText_new]}>
+                                {mastery.text}
+                              </Text>
+                            </View>
+                          </View>
+                          {translation && (
+                            <Text style={styles.meaningText}>
+                              {translation}
+                            </Text>
+                          )}
+                        </View>
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => {
+                            console.log('Delete pressed, item:', item);
+                            if (item.id !== undefined && item.id !== null) {
+                              handleDeleteWord(item.id, item.word);
+                            } else {
+                              console.error('No id found for item:', item);
+                              Alert.alert('错误', '无法删除该单词，缺少ID');
+                            }
+                          }}
+                        >
+                          <MaterialIcons name="delete-outline" size={20} color={theme?.colors?.error || '#B3261E'} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            )}
+            
+            {activeTab === 'dictionary' && (
+              <View style={styles.wordList}>
+                {dictionaryWords.length === 0 ? (
+                  <Text style={styles.emptyText}>暂无查询记录</Text>
+                ) : (
+                  dictionaryWords.map((item, index) => (
+                    <View key={index} style={styles.wordItem}>
+                      <View style={styles.wordContent}>
+                        <Text style={styles.wordText}>{item.word}</Text>
+                        {item.wordForm && (
+                          <Text style={styles.wordFormText}>({item.wordForm})</Text>
+                        )}
+                        {item.definitions.definitions?.[0]?.translation && (
+                          <Text style={styles.meaningText}>
+                            {item.definitions.definitions[0].translation}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+            
+            {activeTab === 'translation' && (
+              <View style={styles.wordList}>
+                {translations.length === 0 ? (
+                  <Text style={styles.emptyText}>暂无翻译记录</Text>
+                ) : (
+                  translations.map((item, index) => (
+                    <View key={index} style={styles.translationItem}>
+                      <Text style={styles.originalText}>{item.originalText}</Text>
+                      <Text style={styles.translatedText}>{item.translatedText}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, styles.learningToolsTitle]}>学习工具</Text>
-          <View style={styles.toolsList}>
-            <TouchableOpacity style={styles.toolItem}>
-              <MaterialIcons name="spellcheck" size={32} color={theme?.colors?.primary || '#3B82F6'} />
-              <View style={styles.toolContent}>
-                <Text style={styles.toolTitle}>拼写练习</Text>
-                <Text style={styles.toolDescription}>通过拼写加深记忆</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolItem}>
-              <MaterialIcons name="hearing" size={32} color={theme?.colors?.primary || '#3B82F6'} />
-              <View style={styles.toolContent}>
-                <Text style={styles.toolTitle}>听力练习</Text>
-                <Text style={styles.toolDescription}>提升听音辨词能力</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolItem}>
-              <MaterialIcons name="quiz" size={32} color={theme?.colors?.primary || '#3B82F6'} />
-              <View style={styles.toolContent}>
-                <Text style={styles.toolTitle}>选择题</Text>
-                <Text style={styles.toolDescription}>多选题巩固理解</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -168,6 +334,69 @@ const createStyles = (isDark: boolean, theme: any) =>
     statLabel: {
       fontSize: 12,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+    },
+    tabsContainer: {
+      flexDirection: 'row',
+      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+      borderRadius: 24,
+      padding: 4,
+      marginBottom: 24,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      alignItems: 'center',
+    },
+    activeTab: {
+      backgroundColor: theme?.colors?.primary || '#3B82F6',
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+    },
+    activeTabText: {
+      color: '#FFFFFF',
+    },
+    loadingContainer: {
+      paddingVertical: 40,
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 14,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    },
+    emptyText: {
+      textAlign: 'center',
+      fontSize: 14,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      paddingVertical: 32,
+    },
+    wordFormText: {
+      fontSize: 12,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      marginTop: 2,
+    },
+    translationItem: {
+      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 8,
+    },
+    originalText: {
+      fontSize: 14,
+      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      marginBottom: 8,
+      lineHeight: 20,
+    },
+    translatedText: {
+      fontSize: 15,
+      fontWeight: '500',
+      color: theme?.colors?.primary || '#3B82F6',
+      lineHeight: 22,
     },
     actionSection: {
       flexDirection: 'row',
@@ -221,9 +450,6 @@ const createStyles = (isDark: boolean, theme: any) =>
       fontWeight: '600',
       color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
     },
-    learningToolsTitle: {
-      marginBottom: 24,
-    },
     viewAllText: {
       fontSize: 14,
       color: theme?.colors?.primary || '#3B82F6',
@@ -231,6 +457,32 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     wordList: {
       gap: 8,
+    },
+    reviewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      borderRadius: 24,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      marginBottom: 16,
+    },
+    reviewButtonText: {
+      marginLeft: 8,
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    wordHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    deleteButton: {
+      padding: 8,
+      marginLeft: 8,
     },
     wordItem: {
       flexDirection: 'row',
@@ -283,31 +535,6 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     levelText_new: {
       color: theme?.colors?.onInfoContainer || (isDark ? '#90CAF9' : '#1976D2'),
-    },
-    toolsList: {
-      gap: 12,
-    },
-    toolItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
-
-    },
-    toolContent: {
-      marginLeft: 16,
-      flex: 1,
-    },
-    toolTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      marginBottom: 2,
-    },
-    toolDescription: {
-      fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
     },
   });
 

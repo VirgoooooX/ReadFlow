@@ -63,7 +63,7 @@ interface ThemeContextType {
   toggleTheme: () => void;
   setTheme: (isDark: boolean) => void;
   setThemeMode: (mode: 'light' | 'dark' | 'system') => Promise<void>;
-  setThemePreset: (preset: ThemePreset) => void;
+  setThemePreset: (preset: ThemePreset | null | undefined) => void;
   setCustomColors: (config: CustomColorConfig) => void;
   resetToDefault: () => void;
 }
@@ -141,19 +141,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     }
   };
 
-  const setThemeModeAsync = async (mode: 'light' | 'dark' | 'system') => {
-    setThemeMode(mode);
+  const setThemeModeAsync = async (mode: 'light' | 'dark' | 'system' | undefined | null) => {
+    const validMode = mode || 'system';
+    setThemeMode(validMode);
     try {
-      await themeStorageService.setThemeMode(mode);
+      await themeStorageService.setThemeMode(validMode);
     } catch (error) {
       console.error('Failed to save theme mode:', error);
     }
   };
   
-  const setThemePreset = async (preset: ThemePreset) => {
-    setCurrentPreset(preset);
+  const setThemePreset = async (preset: ThemePreset | undefined | null) => {
+    const validPreset = preset || 'default';
+    setCurrentPreset(validPreset);
     try {
-      await themeStorageService.setThemePreset(preset);
+      await themeStorageService.setThemePreset(validPreset);
     } catch (error) {
       console.error('Failed to save theme preset:', error);
     }
@@ -182,9 +184,26 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     }
   };
 
-  // 如果还在加载中，返回加载状态
+  // 如果还在加载中，使用默认主题而不是返回 null
   if (isLoading) {
-    return null; // 或者返回一个加载组件
+    const defaultTheme = createTheme(systemColorScheme === 'dark');
+    return (
+      <ThemeContext.Provider value={{ 
+        theme: defaultTheme, 
+        isDark: systemColorScheme === 'dark', 
+        themeMode: 'system',
+        currentPreset: 'default',
+        customConfig: undefined,
+        toggleTheme: async () => {}, 
+        setTheme: () => {},
+        setThemeMode: async () => {},
+        setThemePreset: async () => {},
+        setCustomColors: async () => {},
+        resetToDefault: async () => {},
+      }}>
+        {children}
+      </ThemeContext.Provider>
+    );
   }
   
   return (

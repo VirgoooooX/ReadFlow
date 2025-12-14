@@ -1,6 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
-import { Platform } from 'react-native';
 
 export interface AvatarInfo {
   userId: string;
@@ -9,13 +7,16 @@ export interface AvatarInfo {
   timestamp: number;
 }
 
+/**
+ * 头像存储服务 - 简化版本，仅使用 AsyncStorage
+ * 不进行实际的文件系统操作，避免触发 React Native 本地代码问题
+ */
 export class AvatarStorageService {
   private static instance: AvatarStorageService;
   private static readonly AVATAR_STORAGE_KEY = 'user_avatars';
-  private static readonly AVATAR_DIR = `${FileSystem.documentDirectory}avatars/`;
 
   private constructor() {
-    this.ensureAvatarDirectory();
+    // 不做任何初始化操作
   }
 
   public static getInstance(): AvatarStorageService {
@@ -26,52 +27,23 @@ export class AvatarStorageService {
   }
 
   /**
-   * 确保头像目录存在
-   */
-  private async ensureAvatarDirectory(): Promise<void> {
-    try {
-      const dirInfo = await FileSystem.getInfoAsync(AvatarStorageService.AVATAR_DIR);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(AvatarStorageService.AVATAR_DIR, { intermediates: true });
-      }
-    } catch (error) {
-      console.error('创建头像目录失败:', error);
-    }
-  }
-
-  /**
-   * 保存用户头像
+   * 保存用户头像路径信息
    */
   public async saveAvatar(userId: string, imageUri: string): Promise<string | null> {
     try {
-      await this.ensureAvatarDirectory();
-      
-      // 生成唯一的文件名
       const timestamp = Date.now();
-      const extension = this.getFileExtension(imageUri) || 'jpg';
-      const fileName = `avatar_${userId}_${timestamp}.${extension}`;
-      const localPath = `${AvatarStorageService.AVATAR_DIR}${fileName}`;
-
-      // 复制文件到应用目录
-      await FileSystem.copyAsync({
-        from: imageUri,
-        to: localPath
-      });
-
-      // 删除旧头像文件
-      await this.deleteOldAvatar(userId);
-
-      // 保存头像信息到AsyncStorage
       const avatarInfo: AvatarInfo = {
         userId,
         uri: imageUri,
-        localPath,
+        localPath: imageUri, // 直接使用原始 URI
         timestamp
       };
 
-      await this.saveAvatarInfo(userId, avatarInfo);
+      const allAvatars = await this.getAllAvatarInfos();
+      allAvatars[userId] = avatarInfo;
+      await AsyncStorage.setItem(AvatarStorageService.AVATAR_STORAGE_KEY, JSON.stringify(allAvatars));
       
-      return localPath;
+      return imageUri;
     } catch (error) {
       console.error('保存头像失败:', error);
       return null;
@@ -87,16 +59,7 @@ export class AvatarStorageService {
       if (!avatarInfo) {
         return null;
       }
-
-      // 检查文件是否存在
-      const fileInfo = await FileSystem.getInfoAsync(avatarInfo.localPath);
-      if (fileInfo.exists) {
-        return avatarInfo.localPath;
-      } else {
-        // 文件不存在，清理记录
-        await this.deleteAvatarInfo(userId);
-        return null;
-      }
+      return avatarInfo.uri;
     } catch (error) {
       console.error('获取头像路径失败:', error);
       return null;
@@ -108,17 +71,7 @@ export class AvatarStorageService {
    */
   public async deleteAvatar(userId: string): Promise<boolean> {
     try {
-      const avatarInfo = await this.getAvatarInfo(userId);
-      if (avatarInfo) {
-        // 删除文件
-        const fileInfo = await FileSystem.getInfoAsync(avatarInfo.localPath);
-        if (fileInfo.exists) {
-          await FileSystem.deleteAsync(avatarInfo.localPath);
-        }
-        
-        // 删除记录
-        await this.deleteAvatarInfo(userId);
-      }
+      await this.deleteAvatarInfo(userId);
       return true;
     } catch (error) {
       console.error('删除头像失败:', error);
@@ -127,24 +80,7 @@ export class AvatarStorageService {
   }
 
   /**
-   * 删除旧头像文件
-   */
-  private async deleteOldAvatar(userId: string): Promise<void> {
-    try {
-      const oldAvatarInfo = await this.getAvatarInfo(userId);
-      if (oldAvatarInfo) {
-        const fileInfo = await FileSystem.getInfoAsync(oldAvatarInfo.localPath);
-        if (fileInfo.exists) {
-          await FileSystem.deleteAsync(oldAvatarInfo.localPath);
-        }
-      }
-    } catch (error) {
-      console.error('删除旧头像失败:', error);
-    }
-  }
-
-  /**
-   * 保存头像信息到AsyncStorage
+   * 保存头像信息到 AsyncStorage
    */
   private async saveAvatarInfo(userId: string, avatarInfo: AvatarInfo): Promise<void> {
     try {
@@ -196,26 +132,10 @@ export class AvatarStorageService {
   }
 
   /**
-   * 获取文件扩展名
-   */
-  private getFileExtension(uri: string): string | null {
-    const match = uri.match(/\.([^.]+)$/);
-    return match ? match[1] : null;
-  }
-
-  /**
-   * 清理所有头像数据（用于测试或重置）
+   * 清理所有头像数据
    */
   public async clearAllAvatars(): Promise<void> {
     try {
-      // 删除所有头像文件
-      const dirInfo = await FileSystem.getInfoAsync(AvatarStorageService.AVATAR_DIR);
-      if (dirInfo.exists) {
-        await FileSystem.deleteAsync(AvatarStorageService.AVATAR_DIR);
-        await this.ensureAvatarDirectory();
-      }
-      
-      // 清空AsyncStorage记录
       await AsyncStorage.removeItem(AvatarStorageService.AVATAR_STORAGE_KEY);
     } catch (error) {
       console.error('清理头像数据失败:', error);
@@ -227,25 +147,11 @@ export class AvatarStorageService {
    */
   public async getStorageUsage(): Promise<{ totalSize: number; fileCount: number }> {
     try {
-      const dirInfo = await FileSystem.getInfoAsync(AvatarStorageService.AVATAR_DIR);
-      if (!dirInfo.exists) {
-        return { totalSize: 0, fileCount: 0 };
-      }
-
-      const files = await FileSystem.readDirectoryAsync(AvatarStorageService.AVATAR_DIR);
-      let totalSize = 0;
-      
-      for (const file of files) {
-        const filePath = `${AvatarStorageService.AVATAR_DIR}${file}`;
-        const fileInfo = await FileSystem.getInfoAsync(filePath);
-        if (fileInfo.exists && !fileInfo.isDirectory) {
-          totalSize += fileInfo.size || 0;
-        }
-      }
-
+      const allAvatars = await this.getAllAvatarInfos();
+      const fileCount = Object.keys(allAvatars).length;
       return {
-        totalSize,
-        fileCount: files.length
+        totalSize: 0, // 简化版本不计算大小
+        fileCount
       };
     } catch (error) {
       console.error('获取存储使用情况失败:', error);
