@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeContext } from '../theme';
 import { HEADER_HEIGHT } from '../constants/navigation';
 
@@ -40,6 +41,11 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 }) => {
   const navigation = useNavigation();
   const { theme, isDark } = useThemeContext();
+  const insets = useSafeAreaInsets();
+  
+  // 计算实际的header高度（包含状态栏）
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : insets.top;
+  const totalHeaderHeight = HEADER_HEIGHT + statusBarHeight;
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -59,6 +65,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
       fontWeight: 'bold' as const,
       textAlign: 'center' as const,
       color: headerTextColor,
+      marginTop: 5, // 文字下移 10px
     };
 
     // 添加自定义属性
@@ -84,27 +91,9 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
       flex: 1,
       alignItems: 'center' as const,
       paddingHorizontal: 16,
+      justifyContent: 'flex-start', // 改为顶部对齐
+      paddingTop: 0, // 文字紧贴顶部
     };
-
-    // 根据垂直对齐方式调整
-    switch (titleVerticalAlign) {
-      case 'top':
-        baseStyle.justifyContent = 'flex-start';
-        baseStyle.paddingTop = 8 + (titleMarginTop || 0);
-        break;
-      case 'bottom':
-        baseStyle.justifyContent = 'flex-end';
-        baseStyle.paddingBottom = 8 - (titleMarginTop || 0); // 底部对齐时反向偏移
-        break;
-      case 'center':
-      default:
-        baseStyle.justifyContent = 'center';
-        // 居中模式下使用transform来实现偏移
-        if (titleMarginTop && titleMarginTop !== 0) {
-          baseStyle.transform = [{ translateY: titleMarginTop }];
-        }
-        break;
-    }
 
     return baseStyle;
   };
@@ -114,26 +103,9 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     const baseStyle: any = {
       width: 40,
       alignItems: 'flex-start' as const,
+      justifyContent: 'flex-start', // 改为顶部对齐
+      paddingTop: 0, // 按钮紧贴顶部
     };
-
-    // 根据垂直对齐方式调整，与文字保持一致
-    switch (titleVerticalAlign) {
-      case 'top':
-        baseStyle.justifyContent = 'flex-start';
-        baseStyle.paddingTop = 8 + (titleMarginTop || 0);
-        break;
-      case 'bottom':
-        baseStyle.justifyContent = 'flex-end';
-        baseStyle.paddingBottom = 8 - (titleMarginTop || 0);
-        break;
-      case 'center':
-      default:
-        baseStyle.justifyContent = 'center';
-        if (titleMarginTop && titleMarginTop !== 0) {
-          baseStyle.transform = [{ translateY: titleMarginTop }];
-        }
-        break;
-    }
 
     return baseStyle;
   };
@@ -143,26 +115,9 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     const baseStyle: any = {
       width: 40,
       alignItems: 'flex-end' as const,
+      justifyContent: 'flex-start', // 改为顶部对齐
+      paddingTop: 0, // 按钮紧贴顶部
     };
-
-    // 根据垂直对齐方式调整，与文字保持一致
-    switch (titleVerticalAlign) {
-      case 'top':
-        baseStyle.justifyContent = 'flex-start';
-        baseStyle.paddingTop = 8 + (titleMarginTop || 0);
-        break;
-      case 'bottom':
-        baseStyle.justifyContent = 'flex-end';
-        baseStyle.paddingBottom = 8 - (titleMarginTop || 0);
-        break;
-      case 'center':
-      default:
-        baseStyle.justifyContent = 'center';
-        if (titleMarginTop && titleMarginTop !== 0) {
-          baseStyle.transform = [{ translateY: titleMarginTop }];
-        }
-        break;
-    }
 
     return baseStyle;
   };
@@ -171,12 +126,13 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     <>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={headerBackgroundColor}
-        translucent={false}
+        backgroundColor="transparent"
+        translucent={true}
       />
       <View style={[styles.container, { 
         backgroundColor: headerBackgroundColor,
-        height: HEADER_HEIGHT,
+        height: totalHeaderHeight,
+        paddingTop: statusBarHeight,
       }]}>
         <View style={styles.content}>
           {/* 左侧返回按钮 */}

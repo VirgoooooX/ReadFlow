@@ -148,7 +148,7 @@ export class RSSService {
       logger.info('Fetching RSS sources from database');
       // 使用简化查询，避免复杂的LEFT JOIN在数据库初始化阶段出错
       const results = await this.databaseService.executeQuery(`
-        SELECT * FROM rss_sources ORDER BY title
+        SELECT * FROM rss_sources ORDER BY sort_order ASC, id ASC
       `);
       
       logger.info(`Found ${results.length} RSS sources`);
@@ -187,13 +187,31 @@ export class RSSService {
   public async getActiveRSSSources(): Promise<RSSSource[]> {
     try {
       const results = await this.databaseService.executeQuery(
-        'SELECT * FROM rss_sources WHERE is_active = 1 ORDER BY title'
+        'SELECT * FROM rss_sources WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
       );
       
       return results.map(this.mapRSSSourceRow);
     } catch (error) {
       logger.error('Error getting active RSS sources:', error);
       return [];
+    }
+  }
+
+  /**
+   * 更新RSS源排序
+   */
+  public async updateSourcesOrder(sourceOrder: { id: number; sortOrder: number }[]): Promise<void> {
+    try {
+      for (const item of sourceOrder) {
+        await this.databaseService.executeStatement(
+          'UPDATE rss_sources SET sort_order = ? WHERE id = ?',
+          [item.sortOrder, item.id]
+        );
+      }
+      logger.info('RSS sources order updated successfully');
+    } catch (error) {
+      logger.error('Error updating RSS sources order:', error);
+      throw error;
     }
   }
 

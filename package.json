@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:apk": "node scripts/build-apk.js",
+    "build:apk:version": "node scripts/build-apk.js --version"
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",

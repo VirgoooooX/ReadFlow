@@ -1,7 +1,7 @@
 // 导航相关常量配置
 export const NAVIGATION_CONSTANTS = {
   // 导航栏高度 - 自定义导航栏高度
-  HEADER_HEIGHT: 70,
+  HEADER_HEIGHT: 40,
   // 底部标签栏高度
   TAB_BAR_HEIGHT: 70,
   // 标签栏垂直内边距

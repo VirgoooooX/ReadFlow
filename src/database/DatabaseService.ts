@@ -86,11 +86,11 @@ export class DatabaseService {
     }
 
     try {
-      // 检查rss_sources表是否存在content_type字段
       const tableInfo = await this.db.getAllAsync('PRAGMA table_info(rss_sources)');
       const hasContentType = tableInfo.some((column: any) => column.name === 'content_type');
       const hasUnreadCount = tableInfo.some((column: any) => column.name === 'unread_count');
       const hasErrorCount = tableInfo.some((column: any) => column.name === 'error_count');
+      const hasSortOrder = tableInfo.some((column: any) => column.name === 'sort_order');
       
       if (!hasContentType) {
         console.log('Adding content_type column to rss_sources table...');
@@ -118,6 +118,12 @@ export class DatabaseService {
         console.log('Adding error_count column to rss_sources table...');
         await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN error_count INTEGER DEFAULT 0');
         console.log('error_count column added successfully');
+      }
+      
+      if (!hasSortOrder) {
+        console.log('Adding sort_order column to rss_sources table...');
+        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN sort_order INTEGER DEFAULT 0');
+        console.log('sort_order column added successfully');
       }
 
       // 检查vocabulary表是否存在缺失的字段

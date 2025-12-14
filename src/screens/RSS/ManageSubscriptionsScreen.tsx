@@ -52,8 +52,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
   const totalSources = rssSources.length;
   const activeSources = rssSources.filter(s => s.isActive).length;
-  const totalArticles = rssSources.reduce((sum, s) => sum + (s.article_count || 0), 0);
-  const totalUnread = rssSources.reduce((sum, s) => sum + (s.unread_count || 0), 0);
   const errorSources = rssSources.filter(s => (s.errorCount || 0) > 0).length;
 
   const onRefresh = async () => {
@@ -110,6 +108,33 @@ const ManageSubscriptionsScreen: React.FC = () => {
     navigation.navigate('EditRSSSource', { sourceId });
   };
 
+  const handleMoveSource = async (sourceId: number, direction: 'up' | 'down') => {
+    try {
+      const currentIndex = filteredSources.findIndex(s => s.id === sourceId);
+      if ((direction === 'up' && currentIndex === 0) || 
+          (direction === 'down' && currentIndex === filteredSources.length - 1)) {
+        return; // 已经是首/尾
+      }
+      
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      const sortedSources = [...filteredSources];
+      [sortedSources[currentIndex], sortedSources[newIndex]] = 
+        [sortedSources[newIndex], sortedSources[currentIndex]];
+      
+      // 更新排序
+      const updates = sortedSources.map((s, idx) => ({
+        id: s.id,
+        sortOrder: idx,
+      }));
+      
+      await rssService.updateSourcesOrder(updates);
+      await refreshRSSSources();
+    } catch (error) {
+      console.error('Error moving source:', error);
+      Alert.alert('排序失败', '无法调整顺序');
+    }
+  };
+
   const formatLastUpdated = (date: Date) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -136,43 +161,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* 统计信息 */}
-      <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>订阅统计</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{totalSources}</Text>
-            <Text style={styles.statLabel}>总订阅源</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: theme?.colors?.primary }]}>{activeSources}</Text>
-            <Text style={styles.statLabel}>活跃源</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{totalArticles}</Text>
-            <Text style={styles.statLabel}>总文章</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: theme?.colors?.tertiary }]}>{totalUnread}</Text>
-            <Text style={styles.statLabel}>未读</Text>
-          </View>
-        </View>
-        
-        {errorSources > 0 && (
-          <View style={styles.errorAlert}>
-            <MaterialIcons 
-              name="warning" 
-              size={20} 
-              color={theme?.colors?.error || '#B3261E'} 
-            />
-            <Text style={styles.errorText}>
-              {errorSources} 个RSS源存在获取错误
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* 分类筛选 */}
       <View style={styles.filterSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {categories.map((category) => (
@@ -209,7 +197,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
         </View>
 
         <View style={styles.sourcesList}>
-          {filteredSources.map((source) => (
+          {filteredSources.map((source, index) => (
             <View key={source.id} style={styles.sourceItem}>
               <View style={styles.sourceHeader}>
                 <View style={styles.sourceInfo}>
@@ -263,6 +251,31 @@ const ManageSubscriptionsScreen: React.FC = () => {
               </View>
 
               <View style={styles.sourceActions}>
+                <View style={styles.sortMoveContainer}>
+                  <TouchableOpacity
+                    style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
+                    onPress={() => handleMoveSource(source.id, 'up')}
+                    disabled={index === 0}
+                  >
+                    <MaterialIcons 
+                      name="arrow-upward" 
+                      size={18} 
+                      color={index === 0 ? theme?.colors?.outline : theme?.colors?.primary} 
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.moveButton, index === filteredSources.length - 1 && styles.moveButtonDisabled]}
+                    onPress={() => handleMoveSource(source.id, 'down')}
+                    disabled={index === filteredSources.length - 1}
+                  >
+                    <MaterialIcons 
+                      name="arrow-downward" 
+                      size={18} 
+                      color={index === filteredSources.length - 1 ? theme?.colors?.outline : theme?.colors?.primary} 
+                    />
+                  </TouchableOpacity>
+                </View>
+                
                 <View style={styles.switchContainer}>
                   <Text style={styles.switchLabel}>启用</Text>
                   <Switch
@@ -333,53 +346,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#FFFFFF'),
   },
-  statsSection: {
-    padding: 16,
-    paddingBottom: 8,
-  },
+  statsSection: {},
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
     marginBottom: 16,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '22%',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-  },
-  statLabel: {
-    fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  errorAlert: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme?.colors?.errorContainer || (isDark ? '#601410' : '#F9DEDC'),
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    color: theme?.colors?.onErrorContainer || (isDark ? '#F2B8B5' : '#601410'),
-    marginLeft: 8,
-  },
+  statsGrid: {},
+  statCard: {},
+  statNumber: {},
+  statLabel: {},
+  errorAlert: {},
+  errorText: {},
   filterSection: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -410,6 +389,41 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF'),
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  sortButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme?.colors?.primary || '#3B82F6',
+  },
+  sortButtonDisabled: {
+    opacity: 0.3,
+  },
+  sortMoveContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  moveButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F5F5F5'),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moveButtonDisabled: {
+    opacity: 0.3,
   },
   addButton: {
     flexDirection: 'row',
