@@ -1,11 +1,11 @@
 // 导航相关常量配置
 export const NAVIGATION_CONSTANTS = {
   // 导航栏高度 - 自定义导航栏高度
-  HEADER_HEIGHT: 40,
+  HEADER_HEIGHT: 35,
   // 底部标签栏高度
-  TAB_BAR_HEIGHT: 60,
+  TAB_BAR_HEIGHT: 65,
   // 标签栏垂直内边距
-  TAB_BAR_PADDING_VERTICAL: 4,
+  TAB_BAR_PADDING_VERTICAL: 2,
   // 导航栏标题样式
   HEADER_TITLE_STYLE: {
     fontWeight: 'bold' as const,

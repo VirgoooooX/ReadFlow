@@ -192,7 +192,7 @@ const UserProfileScreen: React.FC = () => {
             
             <TouchableOpacity 
               style={styles.statCard}
-              onPress={() => navigation.navigate('Settings')}
+              onPress={() => navigation.navigate('ManageSubscriptions' as any)}
             >
               <MaterialIcons 
                 name="rss-feed" 

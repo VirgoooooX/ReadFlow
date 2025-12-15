@@ -455,9 +455,12 @@ export class VocabularyService {
     return { success, failed };
   }
 
-  // 私有辅助方法
+  // 公开辅助方法
 
-  private async getWordById(id: number): Promise<VocabularyEntry | null> {
+  /**
+   * 通过ID获取单词
+   */
+  public async getWordById(id: number): Promise<VocabularyEntry | null> {
     try {
       const results = await this.databaseService.executeQuery(
         'SELECT * FROM vocabulary WHERE id = ?',
@@ -474,6 +477,8 @@ export class VocabularyService {
       return null;
     }
   }
+
+  // 私有辅助方法
 
   private async updateWordContext(
     id: number,

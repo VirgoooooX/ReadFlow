@@ -14,6 +14,7 @@ import HomeScreen from '../screens/Home/HomeScreen';
 import ArticleDetailScreen from '../screens/Article/ArticleDetailScreen';
 import VocabularyScreen from '../screens/Vocabulary/VocabularyScreen';
 import ReviewSessionScreen from '../screens/Vocabulary/ReviewSessionScreen';
+import VocabularyDetailScreen from '../screens/Vocabulary/VocabularyDetailScreen';
 import RSSScreen from '../screens/RSS/RSSScreen';
 import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
@@ -259,7 +260,7 @@ function VocabularyStackNavigator() {
              title="单词详情"
              showBackButton={true}
            >
-             <VocabularyScreen {...props} />
+             <VocabularyDetailScreen {...props} />
            </ScreenWithCustomHeader>
          )}
        </VocabularyStack.Screen>

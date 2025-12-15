@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Speech from 'expo-speech';
 import type { VocabularyStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { DatabaseService } from '../../database/DatabaseService';
@@ -64,7 +65,6 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
       // 根据当前标签页加载数据
       if (activeTab === 'vocabulary') {
         const entries = await vocabularyService.getAllWords({ limit: 50, sortBy: 'added_at', sortOrder: 'DESC' });
-        console.log('加载单词本:', entries.map(e => ({ id: e.id, word: e.word })));
         setVocabularyWords(entries);
       } else if (activeTab === 'dictionary') {
         const words = await db.executeQuery(
@@ -97,7 +97,6 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleDeleteWord = async (id: number, word: string) => {
-    console.log(`调用 handleDeleteWord: id=${id}, word=${word}`);
     Alert.alert(
       '删除单词',
       `确定要从单词本中删除 "${word}" 吗？`,
@@ -108,9 +107,7 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log(`执行删除: id=${id}`);
               await vocabularyService.deleteWord(id);
-              console.log(`删除成功，重新加载数据`);
               loadData(); // 重新加载
             } catch (error) {
               console.error('Failed to delete word:', error);
@@ -143,6 +140,27 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
   const handleWordDetail = (entryId: number) => {
     navigation.navigate('VocabularyDetail', { entryId });
   };
+
+  // 发音功能
+  const handleSpeak = useCallback(async (word: string) => {
+    try {
+      const isSpeaking = await Speech.isSpeakingAsync();
+      if (isSpeaking) {
+        await Speech.stop();
+      }
+      
+      Speech.speak(word, {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.9,
+        onError: () => {
+          Alert.alert('发音失败', '请检查设备设置中的"文字转语音"服务是否已启用');
+        },
+      });
+    } catch (error) {
+      Alert.alert('发音错误', String(error));
+    }
+  }, []);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -223,42 +241,47 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
                       ? item.definition?.phonetic
                       : null;
                     return (
-                      <View key={item.id || index} style={styles.wordItem}>
+                      <TouchableOpacity 
+                        key={item.id || index} 
+                        style={styles.wordItem}
+                        onPress={() => item.id && handleWordDetail(item.id)}
+                        activeOpacity={0.7}
+                      >
+                        {/* 左侧内容区 */}
                         <View style={styles.wordContent}>
-                          <View style={styles.wordHeader}>
-                            <View style={styles.wordTitleContainer}>
-                              <Text style={styles.wordText}>{item.word}</Text>
-                              {phonetic && (
+                          {/* 第一行：单词 + 音标 + 发音按钮 */}
+                          <View style={styles.wordMainRow}>
+                            <Text style={styles.wordText}>{item.word}</Text>
+                            {phonetic && (
+                              <View style={styles.phoneticContainer}>
                                 <Text style={styles.phoneticText}>/{phonetic}/</Text>
-                              )}
-                            </View>
-                            <View style={[styles.levelBadge, mastery.style === 'mastered' ? styles.level_mastered : mastery.style === 'learning' ? styles.level_learning : styles.level_new]}>
-                              <Text style={[styles.levelText, mastery.style === 'mastered' ? styles.levelText_mastered : mastery.style === 'learning' ? styles.levelText_learning : styles.levelText_new]}>
-                                {mastery.text}
-                              </Text>
-                            </View>
+                              </View>
+                            )}
+                            <TouchableOpacity
+                              style={styles.speakButton}
+                              onPress={() => handleSpeak(item.word)}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <MaterialIcons name="volume-up" size={18} color={theme?.colors?.primary || '#3B82F6'} />
+                            </TouchableOpacity>
                           </View>
+                          {/* 第二行：释义 */}
                           {translation && (
-                            <Text style={styles.meaningText}>
+                            <Text style={styles.meaningText} numberOfLines={2}>
                               {translation}
                             </Text>
                           )}
                         </View>
-                        <TouchableOpacity 
-                          style={styles.deleteButton}
-                          onPress={() => {
-                            console.log('Delete pressed, item:', item);
-                            if (item.id !== undefined && item.id !== null) {
-                              handleDeleteWord(item.id, item.word);
-                            } else {
-                              console.error('No id found for item:', item);
-                              Alert.alert('错误', '无法删除该单词，缺少ID');
-                            }
-                          }}
-                        >
-                          <MaterialIcons name="delete-outline" size={20} color={theme?.colors?.error || '#B3261E'} />
-                        </TouchableOpacity>
-                      </View>
+                        {/* 右侧：状态标签 + 箭头 */}
+                        <View style={styles.wordActions}>
+                          <View style={[styles.levelBadge, mastery.style === 'mastered' ? styles.level_mastered : mastery.style === 'learning' ? styles.level_learning : styles.level_new]}>
+                            <Text style={[styles.levelText, mastery.style === 'mastered' ? styles.levelText_mastered : mastery.style === 'learning' ? styles.levelText_learning : styles.levelText_new]}>
+                              {mastery.text}
+                            </Text>
+                          </View>
+                          <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.onSurfaceVariant || '#79747E'} />
+                        </View>
+                      </TouchableOpacity>
                     );
                   })
                 )}
@@ -492,35 +515,59 @@ const createStyles = (isDark: boolean, theme: any) =>
       flexDirection: 'column',
       flex: 1,
     },
-    deleteButton: {
-      padding: 8,
+    wordMainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    phoneticContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    speakButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    wordActions: {
+      alignItems: 'center',
+      justifyContent: 'center',
       marginLeft: 8,
+      gap: 6,
+    },
+    deleteButton: {
+      padding: 4,
+      marginTop: 4,
     },
     wordItem: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
     },
     wordContent: {
       flex: 1,
     },
     wordText: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize:20,
+      fontWeight: '800',
       color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      marginBottom: 2,
     },
     phoneticText: {
-      fontSize: 13,
+      fontSize: 12,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-      fontStyle: 'italic',
-      marginTop: 2,
     },
     meaningText: {
-      fontSize: 14,
+      fontSize: 13,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      lineHeight: 18,
     },
     wordMeta: {
       flexDirection: 'row',
@@ -528,9 +575,9 @@ const createStyles = (isDark: boolean, theme: any) =>
       gap: 8,
     },
     levelBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 8,
     },
     level_mastered: {
       backgroundColor: theme?.colors?.successContainer || (isDark ? '#1B5E20' : '#E8F5E8'),
@@ -542,8 +589,8 @@ const createStyles = (isDark: boolean, theme: any) =>
       backgroundColor: theme?.colors?.infoContainer || (isDark ? '#0D47A1' : '#E3F2FD'),
     },
     levelText: {
-      fontSize: 10,
-      fontWeight: '500',
+      fontSize: 9,
+      fontWeight: '600',
     },
     levelText_mastered: {
       color: theme?.colors?.onSuccessContainer || (isDark ? '#A5D6A7' : '#2E7D32'),

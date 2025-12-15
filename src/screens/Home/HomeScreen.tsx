@@ -1,109 +1,330 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, memo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   FlatList,
   RefreshControl,
   Alert,
   Image,
+  useWindowDimensions,
+  TouchableOpacity,
+  Animated,
+  ScrollView,
+  LayoutChangeEvent,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { TabView } from 'react-native-tab-view';
 import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
-import { articleService, DatabaseService, RSSService } from '../../services';
-import type { Article, RSSSource } from '../../types';
+import { articleService, RSSService } from '../../services';
+import type { Article } from '../../types';
 
 type Props = HomeStackScreenProps<'HomeMain'>;
+
+// 文章列表场景组件的 Props
+interface ArticleListSceneProps {
+  sourceName: string;
+  articles: Article[];
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  onArticlePress: (articleId: number) => void;
+  isDark: boolean;
+  theme: any;
+  isActive: boolean;
+}
+
+// 文章列表场景组件 - 使用 memo 优化性能
+const ArticleListScene = memo(({ 
+  sourceName, 
+  articles, 
+  isRefreshing, 
+  onRefresh, 
+  onArticlePress, 
+  isDark, 
+  theme,
+  isActive 
+}: ArticleListSceneProps) => {
+  const styles = createStyles(isDark, theme);
+  
+  // 懒加载：如果不是当前激活的 Tab，返回空视图
+  if (!isActive) {
+    return <View style={styles.lazyPlaceholder} />;
+  }
+
+  return (
+    <FlatList
+      data={articles}
+      keyExtractor={(item) => item.id.toString()}
+      contentContainerStyle={styles.articleListContainer}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          title={sourceName === '全部' ? '下拉刷新所有文章' : `下拉刷新${sourceName}`}
+          titleColor={isDark ? '#938F99' : '#79747E'}
+          tintColor={theme?.colors?.primary || '#3B82F6'}
+        />
+      }
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={styles.articleItem}
+          onPress={() => onArticlePress(item.id)}
+        >
+          <View style={styles.articleContent}>
+            <View style={styles.titleContainer}>
+              <Text style={styles.articleTitle}>
+                {item.title}
+              </Text>
+              {!item.isRead && (
+                <View style={styles.unreadDot} />
+              )}
+            </View>
+            
+            {item.titleCn && (
+              <Text style={styles.articleSubtitle}>
+                {item.titleCn}
+              </Text>
+            )}
+            
+            <View style={styles.articleMeta}>
+              <Text style={styles.metaText}>{item.sourceName}</Text>
+              <Text style={styles.metaText}>•</Text>
+              <Text style={styles.metaText}>{item.wordCount || 0} 词</Text>
+              <Text style={styles.metaText}>•</Text>
+              <Text style={styles.metaText}>
+                {item.publishedAt.toLocaleDateString('zh-CN', {
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </Text>
+            </View>
+          </View>
+          
+          {item.imageUrl && (
+            <Image
+              source={{ uri: item.imageUrl }}
+              style={styles.articleImage}
+              resizeMode="cover"
+            />
+          )}
+        </TouchableOpacity>
+      )}
+      ListEmptyComponent={() => (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons 
+            name="article" 
+            size={48} 
+            color={isDark ? '#938F99' : '#79747E'} 
+          />
+          <Text style={styles.emptyText}>
+            {sourceName === '全部' ? '暂无文章，下拉刷新获取最新内容' : `${sourceName} 暂无文章`}
+          </Text>
+        </View>
+      )}
+    />
+  );
+});
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const { rssSources } = useRSSSource();
-  const [selectedSource, setSelectedSource] = useState('全部');
+  const layout = useWindowDimensions();
+  
+  const [index, setIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
-  const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0, sourceName: '' });
+  const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
 
   const styles = createStyles(isDark, theme);
   const rssService = RSSService.getInstance();
-
-  // 获取RSS源列表（包含"全部"选项）
-  const sourceOptions = ['全部', ...rssSources.map(source => source.name)];
   
-  // 根据选中的订阅源过滤文章
-  const filteredArticles = selectedSource === '全部' 
-    ? articles 
-    : articles.filter(article => {
-        // 通过sourceName匹配，因为Article接口中有sourceName字段
-        return article.sourceName === selectedSource;
-      });
+  // 标签栏滚动引用和标签位置记录
+  const tabScrollRef = useRef<ScrollView>(null);
+  const tabLayouts = useRef<{ x: number; width: number }[]>([]);
+  const screenWidth = layout.width;
 
+  // 动态生成 routes
+  const routes = useMemo(() => {
+    const baseRoutes = [{ key: 'all', title: '全部' }];
+    const sourceRoutes = rssSources.map(source => ({
+      key: `source-${source.id}`,
+      title: source.name
+    }));
+    return [...baseRoutes, ...sourceRoutes];
+  }, [rssSources]);
 
+  // 根据当前 Tab 获取对应的源名称
+  const getCurrentSourceName = useCallback((tabIndex: number) => {
+    if (tabIndex === 0) return '全部';
+    return rssSources[tabIndex - 1]?.name || '全部';
+  }, [rssSources]);
 
+  // 根据 Tab 索引过滤文章
+  const getFilteredArticles = useCallback((tabIndex: number) => {
+    if (tabIndex === 0) return articles;
+    const sourceName = rssSources[tabIndex - 1]?.name;
+    return articles.filter(article => article.sourceName === sourceName);
+  }, [articles, rssSources]);
 
-
-  // 初始化加载数据
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-  
-  // 屏幕获得焦点时刷新数据（显示最新的已读/未读状态）
-  useFocusEffect(
-    useCallback(() => {
-      loadInitialData();
-    }, [])
-  );
-
-  const loadInitialData = async () => {
+  // 加载文章数据
+  const loadArticles = async () => {
     try {
       const allArticles = await articleService.getArticles({ limit: 500 });
       setArticles(allArticles);
     } catch (error) {
-      console.error('Failed to load initial data:', error);
+      console.error('Failed to load articles:', error);
     }
   };
+
+  // 初始化加载
+  useEffect(() => {
+    loadArticles();
+  }, []);
+  
+  // 屏幕获得焦点时刷新数据
+  useFocusEffect(
+    useCallback(() => {
+      loadArticles();
+    }, [])
+  );
+
+  // 滚动到指定标签
+  const scrollToTab = useCallback((tabIndex: number) => {
+    if (!tabScrollRef.current || !tabLayouts.current[tabIndex]) return;
+    
+    const tabLayout = tabLayouts.current[tabIndex];
+    const padding = 12; // tabBarContent 的 paddingHorizontal
+    const tabCenter = tabLayout.x + tabLayout.width / 2;
+    const scrollOffset = Math.max(0, tabCenter - screenWidth / 2 + padding);
+    
+    tabScrollRef.current.scrollTo({
+      x: scrollOffset,
+      animated: true,
+    });
+  }, [screenWidth]);
+
+  // 当 Tab 切换时，标记该 Tab 已加载，并自动滚动标签栏
+  const handleIndexChange = useCallback((newIndex: number) => {
+    setIndex(newIndex);
+    setLoadedTabs(prev => new Set(prev).add(newIndex));
+    
+    // 自动滚动标签栏使当前标签可见
+    scrollToTab(newIndex);
+  }, [scrollToTab]);
+  
+  // 记录标签布局
+  const handleTabLayout = useCallback((index: number, event: LayoutChangeEvent) => {
+    const { x, width } = event.nativeEvent.layout;
+    tabLayouts.current[index] = { x, width };
+  }, []);
+
+  // 自定义胶囊样式 TabBar - 平滑过渡动画
+  const renderTabBar = useCallback((props: any) => {
+    const { position, navigationState } = props;
+    const currentIndex = navigationState.index;
+    const routeCount = navigationState.routes.length;
+    
+    return (
+      <View style={styles.tabBarContainer}>
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBarContent}
+          bounces={false}
+        >
+          {navigationState.routes.map((route: any, i: number) => {
+            // 判断是否为当前选中的标签
+            const isActive = i === currentIndex;
+            
+            // 背景透明度动画 - 平滑过渡
+            const bgOpacity = position.interpolate({
+              inputRange: [i - 1, i, i + 1],
+              outputRange: [0, 1, 0],
+              extrapolate: 'clamp',
+            });
+            
+            return (
+              <TouchableOpacity
+                key={route.key}
+                style={styles.tabItem}
+                onPress={() => handleIndexChange(i)}
+                onLayout={(e) => handleTabLayout(i, e)}
+                activeOpacity={0.7}
+              >
+                {/* 非活跃背景 - 灰色底色 */}
+                <View style={styles.tabItemInactiveBg} />
+                
+                {/* 活跃背景 - 蓝色 */}
+                {/* 使用 isActive 确保当前标签始终显示正确 */}
+                {isActive ? (
+                  <View style={styles.tabItemActiveBg} />
+                ) : (
+                  <Animated.View
+                    style={[
+                      styles.tabItemActiveBg,
+                      { opacity: bgOpacity }
+                    ]}
+                  />
+                )}
+                
+                {/* 文字层 */}
+                <View style={styles.tabLabelContainer}>
+                  {/* 非活跃文字 - 深色，始终显示 */}
+                  <Text style={styles.tabLabelInactive}>
+                    {route.title}
+                  </Text>
+                  {/* 活跃文字 - 白色，只在当前标签时显示 */}
+                  {isActive && (
+                    <Text style={styles.tabLabelActive}>
+                      {route.title}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    );
+  }, [isDark, theme, styles, handleIndexChange, handleTabLayout]);
 
   // 处理下拉刷新
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setRefreshProgress({ current: 0, total: 0, sourceName: '' });
+    const currentSourceName = getCurrentSourceName(index);
 
     try {
       let result;
       
-      if (selectedSource === '全部') {
-        // 使用后台刷新所有活跃的RSS源
+      if (currentSourceName === '全部') {
         result = await rssService.refreshAllSourcesBackground({
           maxConcurrent: 3,
           onProgress: (current, total, sourceName) => {
-            setRefreshProgress({ current, total, sourceName });
+            // 可以添加进度显示
           },
           onError: (error, sourceName) => {
             console.warn(`Failed to refresh ${sourceName}:`, error.message);
           },
           onArticlesReady: async (newArticles, sourceName) => {
-            // 立即更新文章列表，展示已获取的内容
             const updatedArticles = await articleService.getArticles({ limit: 500 });
             setArticles(updatedArticles);
-            console.log(`${sourceName} 的文章已更新，共 ${newArticles.length} 篇`);
           }
         });
       } else {
-        // 刷新特定RSS源
-        const source = rssSources.find(s => s.name === selectedSource);
+        const source = rssSources.find(s => s.name === currentSourceName);
         if (source) {
-          const articles = await rssService.fetchArticlesFromSource(source);
+          const fetchedArticles = await rssService.fetchArticlesFromSource(source);
           result = {
             success: 1,
             failed: 0,
-            totalArticles: articles.length,
+            totalArticles: fetchedArticles.length,
             errors: []
           };
-          // 刷新完成后重新加载文章数据
           const updatedArticles = await articleService.getArticles({ limit: 500 });
           setArticles(updatedArticles);
         }
@@ -120,127 +341,42 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert('刷新失败', error instanceof Error ? error.message : '未知错误');
     } finally {
       setIsRefreshing(false);
-      setRefreshProgress({ current: 0, total: 0, sourceName: '' });
     }
-  }, [selectedSource, rssSources, rssService]);
-
-  const handleNavigateToSearch = () => {
-    navigation.navigate('Search', { query: '' });
-  };
+  }, [index, rssSources, rssService, getCurrentSourceName]);
 
   const handleNavigateToArticle = (articleId: number) => {
     navigation.navigate('ArticleDetail', { articleId });
   };
 
+  // 渲染每个 Tab 的场景
+  const renderScene = useCallback(({ route }: { route: { key: string; title: string } }) => {
+    const tabIndex = routes.findIndex(r => r.key === route.key);
+    const isActive = loadedTabs.has(tabIndex);
+    
+    return (
+      <ArticleListScene
+        sourceName={route.title}
+        articles={getFilteredArticles(tabIndex)}
+        isRefreshing={isRefreshing && index === tabIndex}
+        onRefresh={handleRefresh}
+        onArticlePress={handleNavigateToArticle}
+        isDark={isDark}
+        theme={theme}
+        isActive={isActive}
+      />
+    );
+  }, [routes, loadedTabs, getFilteredArticles, isRefreshing, index, handleRefresh, isDark, theme]);
+
   return (
     <View style={styles.container}>
-      {/* 订阅源标签 */}
-      <View style={styles.sourceTabsContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sourceTabsContent}
-        >
-          {sourceOptions.map((source) => (
-            <TouchableOpacity
-              key={source}
-              style={[
-                styles.sourceTab,
-                selectedSource === source && styles.sourceTabActive
-              ]}
-              onPress={() => setSelectedSource(source)}
-            >
-              <Text style={[
-                styles.sourceTabText,
-                selectedSource === source && styles.sourceTabTextActive
-              ]}>
-                {source}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-
-
-      {/* 文章列表 */}
-      <FlatList
-        data={filteredArticles}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.articleListContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            title={selectedSource === '全部' ? '下拉刷新所有文章' : `下拉刷新${selectedSource}`}
-            titleColor={isDark ? '#938F99' : '#79747E'}
-            tintColor={theme?.colors?.primary || '#3B82F6'}
-          />
-        }
-        renderItem={({ item }) => (
-           <TouchableOpacity
-             style={styles.articleItem}
-             onPress={() => handleNavigateToArticle(item.id)}
-           >
-             <View style={styles.articleContent}>
-               {/* 标题容器 - 用于相对定位未读点 */}
-               <View style={styles.titleContainer}>
-                 {/* 英文原标题 */}
-                 <Text style={styles.articleTitle}>
-                   {item.title}
-                 </Text>
-                 
-                 {/* 未读标记 - 小绿点 */}
-                 {!item.isRead && (
-                   <View style={styles.unreadDot} />
-                 )}
-               </View>
-               
-               {/* 中文翻译标题 */}
-               {item.titleCn && (
-                 <Text style={styles.articleSubtitle}>
-                   {item.titleCn}
-                 </Text>
-               )}
-               
-               {/* 文章元信息 */}
-               <View style={styles.articleMeta}>
-                 <Text style={styles.metaText}>{item.sourceName}</Text>
-                 <Text style={styles.metaText}>•</Text>
-                 <Text style={styles.metaText}>{item.wordCount || 0} 词</Text>
-                 <Text style={styles.metaText}>•</Text>
-                 <Text style={styles.metaText}>
-                   {item.publishedAt.toLocaleDateString('zh-CN', {
-                     month: 'short',
-                     day: 'numeric'
-                   })}
-                 </Text>
-               </View>
-             </View>
-             
-             {/* 文章缩略图 */}
-             {item.imageUrl && (
-               <Image
-                 source={{ uri: item.imageUrl }}
-                 style={styles.articleImage}
-                 resizeMode="cover" // 使用cover模式裁剪图片以填充正方形区域
-               />
-             )}
-           </TouchableOpacity>
-         )}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <MaterialIcons 
-              name="article" 
-              size={48} 
-              color={isDark ? '#938F99' : '#79747E'} 
-            />
-            <Text style={styles.emptyText}>
-              {selectedSource === '全部' ? '暂无文章，下拉刷新获取最新内容' : `${selectedSource} 暂无文章`}
-            </Text>
-          </View>
-        )}
+      <TabView
+        navigationState={{ index, routes }}
+        renderScene={renderScene}
+        onIndexChange={handleIndexChange}
+        initialLayout={{ width: layout.width }}
+        renderTabBar={renderTabBar}
+        lazy
+        lazyPreloadDistance={0}
       />
     </View>
   );
@@ -252,50 +388,81 @@ const createStyles = (isDark: boolean, theme: any) =>
       flex: 1,
       backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
-    sourceTabsContainer: {
-      paddingVertical: 4,
-      marginBottom: 0, // 确保标签栏容器没有底部外边距
+    // TabBar 样式
+    tabBarContainer: {
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      paddingVertical: 3,  // 上下留白减少为 3px，上下对称
+      // 添加阴影效果分离文章列表
+      elevation: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+      zIndex: 10,
     },
-    sourceTabsContent: {
-      paddingHorizontal: 16,
-      gap: 2,
+    tabBarContent: {
+      paddingHorizontal: 12,
+      gap: 8,
+      // 稍平衡预步推身的空间
+      paddingVertical: 2,
     },
-
-    sourceTab: {
+    tabItem: {
+      position: 'relative',
       paddingHorizontal: 16,
-      paddingVertical: 8,
+      paddingVertical: 6,  // 上下留白渐递减少为 6px，上下对称
       borderRadius: 20,
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      marginRight: 4,
+      overflow: 'hidden',
     },
-    sourceTabActive: {
+    tabItemInactiveBg: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F3F3F3'),
+      borderRadius: 20,
+    },
+    tabItemActiveBg: {
+      ...StyleSheet.absoluteFillObject,
       backgroundColor: theme?.colors?.primary || '#3B82F6',
+      borderRadius: 20,
+      zIndex: 1,
     },
-    sourceTabText: {
+    tabLabelContainer: {
+      position: 'relative',
+      zIndex: 2,
+    },
+    tabLabelInactive: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
       fontWeight: '500',
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
     },
-    sourceTabTextActive: {
-      color: theme?.colors?.onPrimary || '#FFFFFF',
+    tabLabelActive: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      fontSize: 14,
+      fontWeight: '500',
+      color: '#FFFFFF',
     },
+    // 懒加载占位
+    lazyPlaceholder: {
+      flex: 1,
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    },
+    // 文章列表样式
     articleListContainer: {
-      padding: 16,
-      paddingTop: 0, // 移除顶部内边距，使第一条文章直接靠在标签栏下方
-      gap: 12,
+      padding: 12,
+      paddingTop: 6,
+      gap: 8,
     },
     articleItem: {
       backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
       borderRadius: 12,
-      padding: 16,
+      padding: 12,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      marginTop: 0, // 确保文章项没有顶部外边距
+      gap: 10,
     },
     titleContainer: {
       position: 'relative',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     unreadDot: {
       position: 'absolute',
@@ -307,11 +474,10 @@ const createStyles = (isDark: boolean, theme: any) =>
       backgroundColor: '#22C55E',
     },
     articleImage: {
-      width: 60,
-      height: 60,
+      width: 56,
+      height: 56,
       borderRadius: 6,
       backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
-      resizeMode: 'cover', // 使用cover模式裁剪图片以填充正方形区域
     },
     articleContent: {
       flex: 1,
@@ -320,13 +486,13 @@ const createStyles = (isDark: boolean, theme: any) =>
       fontSize: 17,
       fontWeight: '600',
       color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      marginBottom: 6,
+      marginBottom: 3,
       lineHeight: 24,
     },
     articleSubtitle: {
       fontSize: 15,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-      marginBottom: 10,
+      marginBottom: 6,
       lineHeight: 22,
       fontStyle: 'italic',
     },
@@ -334,13 +500,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      marginTop: 4,
+      marginTop: 2,
     },
     metaText: {
       fontSize: 13,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
     },
-
     emptyContainer: {
       flex: 1,
       justifyContent: 'center',

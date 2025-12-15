@@ -110,7 +110,9 @@ const SettingsScreen: React.FC = () => {
           >
             <View style={styles.settingItemLeft}>
               <MaterialIcons name="chrome-reader-mode" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>阅读偏好</Text>
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>阅读偏好</Text>
+              </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
@@ -125,7 +127,9 @@ const SettingsScreen: React.FC = () => {
           >
             <View style={styles.settingItemLeft}>
               <MaterialIcons name="rss-feed" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>RSS源管理</Text>
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>RSS源管理</Text>
+              </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
@@ -140,7 +144,9 @@ const SettingsScreen: React.FC = () => {
           >
             <View style={styles.settingItemLeft}>
               <MaterialIcons name="psychology" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>AI助手配置</Text>
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>AI助手配置</Text>
+              </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
@@ -155,7 +161,9 @@ const SettingsScreen: React.FC = () => {
           >
             <View style={styles.settingItemLeft}>
               <MaterialIcons name="palette" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>主题自定义</Text>
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>主题自定义</Text>
+              </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
@@ -182,15 +190,17 @@ const SettingsScreen: React.FC = () => {
         {/* 应用信息 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>应用信息</Text>
-          <TouchableOpacity
+                  <TouchableOpacity
             style={styles.settingItem}
             onPress={handleAbout}
           >
             <View style={styles.settingItemLeft}>
               <MaterialIcons name="info" size={24} color={theme?.colors?.primary || '#3B82F6'} />
-              <Text style={styles.settingItemText}>关于应用</Text>
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>关于应用</Text>
+              </View>
             </View>
-            <Text style={styles.versionText}>v1.0.0</Text>
+            <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -237,16 +247,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   settingItemText: {
     fontSize: 16,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginLeft: 16,
   },
   settingItemDesc: {
     fontSize: 13,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
     marginTop: 4,
-  },
-  versionText: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
   },
 });
 
