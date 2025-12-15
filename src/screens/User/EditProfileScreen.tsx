@@ -19,6 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { UserStackParamList } from '../../navigation/AppNavigator';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AvatarStorageService from '../../services/AvatarStorageService';
+import AuthService from '../../services/AuthService';
 
 type EditProfileScreenNavigationProp = NativeStackNavigationProp<UserStackParamList, 'EditProfile'>;
 
@@ -93,7 +94,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
         bio: profile.bio,
         phone: profile.phone,
         location: profile.location,
-        avatar: profile.avatar,
+        avatar: profile.avatar || undefined,
       });
       
       if (response.success) {
@@ -178,6 +179,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
         setProfile(prev => ({ ...prev, avatar: manipulatedImage.uri }));
       }
     } catch (error) {
+      console.error('处理图片失败:', error);
       Alert.alert('错误', '处理图片时出现错误');
     }
   };
@@ -199,9 +201,9 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               pickImageFromLibrary();
               break;
             case 3:
-              const currentUser = AuthService.getCurrentUser();
-              if (currentUser) {
-                await AvatarStorageService.deleteAvatar(currentUser.id);
+              const currentUser1 = AuthService.getCurrentUser();
+              if (currentUser1) {
+                await AvatarStorageService.deleteAvatar(currentUser1.id);
               }
               setProfile(prev => ({ ...prev, avatar: null }));
               break;

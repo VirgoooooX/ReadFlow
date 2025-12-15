@@ -13,6 +13,7 @@ import ScreenWithCustomHeader from '../components/ScreenWithCustomHeader';
 import HomeScreen from '../screens/Home/HomeScreen';
 import ArticleDetailScreen from '../screens/Article/ArticleDetailScreen';
 import VocabularyScreen from '../screens/Vocabulary/VocabularyScreen';
+import ReviewSessionScreen from '../screens/Vocabulary/ReviewSessionScreen';
 import RSSScreen from '../screens/RSS/RSSScreen';
 import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
@@ -284,7 +285,7 @@ function VocabularyStackNavigator() {
              title="复习模式"
              showBackButton={true}
            >
-             <VocabularyScreen {...props} />
+             <ReviewSessionScreen {...props} />
            </ScreenWithCustomHeader>
          )}
        </VocabularyStack.Screen>

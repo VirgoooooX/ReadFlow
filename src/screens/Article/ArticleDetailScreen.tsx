@@ -38,18 +38,22 @@ interface RenderedImageProps {
   maxWidth: number;
   theme: any;
   isDark: boolean;
+  priority?: 'low' | 'normal' | 'high';
 }
 
-const RenderedImage = ({ src, maxWidth, theme, isDark }: RenderedImageProps) => {
-  const [aspectRatio, setAspectRatio] = useState(16 / 9);
+const RenderedImage = ({ src, maxWidth, theme, isDark, priority = 'normal' }: RenderedImageProps) => {
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // 计算显示尺寸：宽度固定，高度等比例缩放
   const displayWidth = maxWidth;
-  const displayHeight = isLoaded ? displayWidth / aspectRatio : 200;
+  const displayHeight = imageSize 
+    ? (imageSize.height / imageSize.width) * displayWidth
+    : 200; // 默认占位高度
 
   if (hasError) {
-    return null; // 加载失败直接隐藏，不显示占位符
+    return null;
   }
 
   return (
@@ -57,7 +61,7 @@ const RenderedImage = ({ src, maxWidth, theme, isDark }: RenderedImageProps) => 
       style={{
         marginVertical: 8,
         width: displayWidth,
-        height: displayHeight,
+        height: isLoaded ? displayHeight : 200,
         borderRadius: 12,
         overflow: 'hidden',
         alignSelf: 'center',
@@ -67,15 +71,16 @@ const RenderedImage = ({ src, maxWidth, theme, isDark }: RenderedImageProps) => 
       <Image
         source={{ uri: src }}
         style={{ width: '100%', height: '100%' }}
-        contentFit="cover"
+        contentFit="contain"
         transition={200}
         cachePolicy="memory-disk"
-        priority="high"
+        priority={priority}
         recyclingKey={src}
+        placeholderContentFit="cover"
         onLoad={(e) => {
           const { width, height } = e.source;
           if (width > 0 && height > 0) {
-            setAspectRatio(width / height);
+            setImageSize({ width, height });
           }
           setIsLoaded(true);
         }}
@@ -374,7 +379,7 @@ const ArticleDetailScreen: React.FC = () => {
   };
 
   const customRenderers = {
-    // 自定义图片渲染器 - 使用 expo-image 优化加载
+    // 自定义图片渲染器 - 使用 RenderedImage 组件实现等比例缩放
     img: (props: any) => {
       const { src } = props.tnode.attributes || {};
       if (!src) return null;
@@ -389,16 +394,13 @@ const ArticleDetailScreen: React.FC = () => {
       const maxWidth = screenWidth - 32;
       
       return (
-        <View style={{ marginVertical: 8, width: maxWidth, borderRadius: 8, overflow: 'hidden', alignSelf: 'center', backgroundColor: '#f0f0f0' }}>
-          <Image
-            source={{ uri: imageUrl }}
-            style={{ width: maxWidth, height: maxWidth * 0.6 }}
-            contentFit="cover"
-            transition={100}
-            cachePolicy="memory-disk"
-            priority="normal"
-          />
-        </View>
+        <RenderedImage
+          key={imageUrl}
+          src={imageUrl}
+          maxWidth={maxWidth}
+          theme={theme}
+          isDark={isDark}
+        />
       );
     },
     // 自定义文本渲染器 - 支持单词点击
@@ -459,23 +461,23 @@ const ArticleDetailScreen: React.FC = () => {
         return null;
       }
       
-      // 如果是图片标签
+      // 如果是图片标签，使用 RenderedImage 组件等比例缩放，根据位置设置优先级
       if (part.match(/^<img[^>]*>$/i)) {
         const srcMatch = part.match(/src=["']([^"']+)["']/i);
         const src = srcMatch?.[1];
         
         if (src) {
+          // 前3张图片高优先级，其他低优先级
+          const imgPriority = index < 6 ? 'high' : 'low';
           return (
-            <View key={index} style={{ marginVertical: 8, width: maxWidth, borderRadius: 8, overflow: 'hidden', alignSelf: 'center', backgroundColor: isDark ? '#333' : '#f0f0f0' }}>
-              <Image
-                source={{ uri: src }}
-                style={{ width: maxWidth, height: maxWidth * 0.6 }}
-                contentFit="cover"
-                transition={100}
-                cachePolicy="memory-disk"
-                priority="normal"
-              />
-            </View>
+            <RenderedImage
+              key={index}
+              src={src}
+              maxWidth={maxWidth}
+              theme={theme}
+              isDark={isDark}
+              priority={imgPriority}
+            />
           );
         }
         return null;
@@ -541,17 +543,13 @@ const ArticleDetailScreen: React.FC = () => {
           </View>
         </View>
         
-        {shouldShowHeaderImage() && (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: article.imageUrl }}
-              style={styles.articleImage}
-              contentFit="cover"
-              transition={100}
-              cachePolicy="memory-disk"
-              priority="normal"
-            />
-          </View>
+        {shouldShowHeaderImage() && article?.imageUrl && (
+          <RenderedImage
+            src={article.imageUrl}
+            maxWidth={screenWidth - 32}
+            theme={theme}
+            isDark={isDark}
+          />
         )}
         
         <View style={styles.divider} />

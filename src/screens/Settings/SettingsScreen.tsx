@@ -95,7 +95,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleAbout = () => {
-    Alert.alert('关于应用', 'TechFlow Mobile v1.0.0\n\n一个专注于技术文章阅读的RSS应用');
+    navigation.navigate('About');
   };
 
   return (
@@ -231,12 +231,13 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
   },
   settingItemContent: {
-    marginLeft: 12,
+    marginLeft: 16,
     flex: 1,
   },
   settingItemText: {
     fontSize: 16,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    marginLeft: 16,
   },
   settingItemDesc: {
     fontSize: 13,

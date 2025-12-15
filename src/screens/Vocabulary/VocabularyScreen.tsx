@@ -219,11 +219,19 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
                     const translation = typeof item.definition === 'object' 
                       ? item.definition?.definitions?.[0]?.translation 
                       : item.translation;
+                    const phonetic = typeof item.definition === 'object'
+                      ? item.definition?.phonetic
+                      : null;
                     return (
                       <View key={item.id || index} style={styles.wordItem}>
                         <View style={styles.wordContent}>
                           <View style={styles.wordHeader}>
-                            <Text style={styles.wordText}>{item.word}</Text>
+                            <View style={styles.wordTitleContainer}>
+                              <Text style={styles.wordText}>{item.word}</Text>
+                              {phonetic && (
+                                <Text style={styles.phoneticText}>/{phonetic}/</Text>
+                              )}
+                            </View>
                             <View style={[styles.levelBadge, mastery.style === 'mastered' ? styles.level_mastered : mastery.style === 'learning' ? styles.level_learning : styles.level_new]}>
                               <Text style={[styles.levelText, mastery.style === 'mastered' ? styles.levelText_mastered : mastery.style === 'learning' ? styles.levelText_learning : styles.levelText_new]}>
                                 {mastery.text}
@@ -480,6 +488,10 @@ const createStyles = (isDark: boolean, theme: any) =>
       justifyContent: 'space-between',
       marginBottom: 4,
     },
+    wordTitleContainer: {
+      flexDirection: 'column',
+      flex: 1,
+    },
     deleteButton: {
       padding: 8,
       marginLeft: 8,
@@ -499,6 +511,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       fontWeight: '600',
       color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
       marginBottom: 2,
+    },
+    phoneticText: {
+      fontSize: 13,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      fontStyle: 'italic',
+      marginTop: 2,
     },
     meaningText: {
       fontSize: 14,

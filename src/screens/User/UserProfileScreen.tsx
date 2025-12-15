@@ -177,7 +177,10 @@ const UserProfileScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => navigation.navigate('Vocabulary' as any)}
+            >
               <MaterialIcons 
                 name="book" 
                 size={32} 
@@ -185,9 +188,12 @@ const UserProfileScreen: React.FC = () => {
               />
               <Text style={styles.statValue}>{userStats?.vocabularyWords || 0}</Text>
               <Text style={styles.statLabel}>收藏单词</Text>
-            </View>
+            </TouchableOpacity>
             
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => navigation.navigate('Settings')}
+            >
               <MaterialIcons 
                 name="rss-feed" 
                 size={32} 
@@ -195,9 +201,12 @@ const UserProfileScreen: React.FC = () => {
               />
               <Text style={styles.statValue}>{userStats?.rssSources || 0}</Text>
               <Text style={styles.statLabel}>RSS源</Text>
-            </View>
+            </TouchableOpacity>
             
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => navigation.navigate('Articles' as any)}
+            >
               <MaterialIcons 
                 name="folder" 
                 size={32} 
@@ -205,9 +214,12 @@ const UserProfileScreen: React.FC = () => {
               />
               <Text style={styles.statValue}>{userStats?.totalArticles || 0}</Text>
               <Text style={styles.statLabel}>总文章数</Text>
-            </View>
+            </TouchableOpacity>
             
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => navigation.navigate('Articles' as any)}
+            >
               <MaterialIcons 
                 name="favorite" 
                 size={32} 
@@ -215,7 +227,7 @@ const UserProfileScreen: React.FC = () => {
               />
               <Text style={styles.statValue}>{userStats?.favoriteArticles || 0}</Text>
               <Text style={styles.statLabel}>收藏文章</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         )}
       </View>

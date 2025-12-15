@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/RSSService';
+import { DatabaseService } from '../../database/DatabaseService';
 import type { RSSSource } from '../../types';
 
 type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
@@ -97,6 +98,37 @@ const ManageSubscriptionsScreen: React.FC = () => {
             } catch (error) {
               console.error('Error deleting source:', error);
               Alert.alert('删除失败', '无法删除RSS源');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const clearSourceArticles = (sourceId: number) => {
+    const source = rssSources.find(s => s.id === sourceId);
+    Alert.alert(
+      '清除文章',
+      `确定要清除 "${source?.name}" 的所有文章和图片缓存吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '清除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const db = DatabaseService.getInstance();
+              await db.executeStatement('DELETE FROM articles WHERE rss_source_id = ?', [sourceId]);
+              // 更新计数
+              await db.executeStatement(
+                'UPDATE rss_sources SET article_count = 0, unread_count = 0 WHERE id = ?',
+                [sourceId]
+              );
+              await refreshRSSSources();
+              Alert.alert('成功', `已清除 "${source?.name}" 的所有文章`);
+            } catch (error) {
+              console.error('Error clearing source articles:', error);
+              Alert.alert('清除失败', '无法清除文章');
             }
           },
         },
@@ -290,6 +322,17 @@ const ManageSubscriptionsScreen: React.FC = () => {
                 </View>
                 
                 <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => clearSourceArticles(source.id)}
+                  >
+                    <MaterialIcons 
+                      name="clear-all" 
+                      size={20} 
+                      color={theme?.colors?.onSurfaceVariant} 
+                    />
+                  </TouchableOpacity>
+                  
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => editSource(source.id)}

@@ -24,6 +24,7 @@ const description = descIndex !== -1 ? args[descIndex + 1] : null;
 
 const appJsonPath = path.join(__dirname, '..', 'app.json');
 const androidBuildGradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
+const androidBuildDir = path.join(__dirname, '..', 'android', 'app', 'build');
 
 try {
   // 读取 app.json
@@ -60,6 +61,21 @@ try {
     
     fs.writeFileSync(appDescriptionPath, appDescriptionContent, 'utf-8');
     console.log('✅ 应用描述已更新');
+  }
+  
+  // 清理 Android 构建目录，避免文件锁定问题
+  console.log('\n🧹 清理 Android 构建目录...');
+  try {
+    if (fs.existsSync(androidBuildDir)) {
+      // 在 Windows 上使用 rimraf 或 rd 命令清理
+      execSync('rd /s /q android\\app\\build', { 
+        stdio: 'inherit',
+        cwd: path.join(__dirname, '..')
+      });
+      console.log('✅ Android 构建目录已清理');
+    }
+  } catch (cleanError) {
+    console.warn('⚠️  清理构建目录时出错（可忽略）:', cleanError.message);
   }
   
   // 执行 expo prebuild

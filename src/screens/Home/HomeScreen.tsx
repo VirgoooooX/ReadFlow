@@ -60,7 +60,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const loadInitialData = async () => {
     try {
-      const allArticles = await articleService.getArticles({ limit: 100 });
+      const allArticles = await articleService.getArticles({ limit: 500 });
       setArticles(allArticles);
     } catch (error) {
       console.error('Failed to load initial data:', error);
@@ -87,7 +87,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           },
           onArticlesReady: async (newArticles, sourceName) => {
             // 立即更新文章列表，展示已获取的内容
-            const updatedArticles = await articleService.getArticles({ limit: 100 });
+            const updatedArticles = await articleService.getArticles({ limit: 500 });
             setArticles(updatedArticles);
             console.log(`${sourceName} 的文章已更新，共 ${newArticles.length} 篇`);
           }
@@ -104,7 +104,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             errors: []
           };
           // 刷新完成后重新加载文章数据
-          const updatedArticles = await articleService.getArticles({ limit: 100 });
+          const updatedArticles = await articleService.getArticles({ limit: 500 });
           setArticles(updatedArticles);
         }
       }

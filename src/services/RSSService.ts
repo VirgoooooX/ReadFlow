@@ -1046,9 +1046,24 @@ export class RSSService {
    */
   private async updateSourceStats(sourceId: string): Promise<void> {
     try {
+      // 获取该RSS源的文章数量
+      const articleCountResult = await this.databaseService.executeQuery(
+        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
+        [sourceId]
+      );
+      const articleCount = articleCountResult[0]?.count || 0;
+      
+      // 获取该RSS源的未读文章数量
+      const unreadCountResult = await this.databaseService.executeQuery(
+        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0',
+        [sourceId]
+      );
+      const unreadCount = unreadCountResult[0]?.count || 0;
+      
+      // 更新RSS源的统计信息
       await this.databaseService.executeStatement(
-        'UPDATE rss_sources SET last_updated = ? WHERE id = ?',
-        [new Date().toISOString(), sourceId]
+        'UPDATE rss_sources SET last_updated = ?, article_count = ?, unread_count = ? WHERE id = ?',
+        [new Date().toISOString(), articleCount, unreadCount, sourceId]
       );
     } catch (error) {
       logger.error('Error updating source stats:', error);
