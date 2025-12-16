@@ -62,7 +62,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   const getTitleStyle = (): any => {
     const baseStyle: any = {
       fontSize: 18,
-      fontWeight: 'bold' as const,
+      fontWeight: '900' as const,
       textAlign: 'center' as const,
       color: headerTextColor,
       marginTop: 5, // 文字下移 10px
@@ -105,6 +105,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
       alignItems: 'flex-start' as const,
       justifyContent: 'flex-start', // 改为顶部对齐
       paddingTop: 0, // 按钮紧贴顶部
+      marginTop: -2, // 与标题文字对齐
     };
 
     return baseStyle;
@@ -145,7 +146,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
               >
                 <MaterialIcons
                   name="arrow-back"
-                  size={24}
+                  size={22}
                   color={headerTextColor}
                 />
               </TouchableOpacity>

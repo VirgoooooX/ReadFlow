@@ -34,14 +34,32 @@ const WordTappableText: React.FC<WordTappableTextProps> = memo(({
 
   /**
    * 提取包含单词的句子
+   * 优化了小数点、缩写等特殊情况的识别
    */
   const extractSentence = (fullText: string, word: string): string => {
-    const sentences = fullText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    // 优化的句子分隔正则：
+    // 1. 不在数字之间的点 (避免 "26.2" 被分割)
+    // 2. 不在缩写之间的点 (避免 "U.S." 被分割)
+    // 3. 句子结束符（. ! ?）后跟空格或结束
+    const sentencePattern = /(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])$/g;
+    
+    // 先尝试用优化后的正则分割
+    let sentences = fullText.split(sentencePattern).filter(s => s && s.trim().length > 0);
+    
+    // 如果优化后的分割失败（可能是整段都是小写），使用备用方案
+    if (sentences.length === 0) {
+      // 备用方案：仅在非数字后的句子结束符分割
+      sentences = fullText.split(/(?<![0-9])[.!?]+(?=\s|$)/).filter(s => s && s.trim().length > 0);
+    }
+    
+    // 查找包含目标单词的句子
     for (const sentence of sentences) {
       if (sentence.toLowerCase().includes(word.toLowerCase())) {
         return sentence.trim();
       }
     }
+    
+    // 如果找不到，返回第一句或前100个字符
     return sentences[0]?.trim() || fullText.substring(0, 100);
   };
 

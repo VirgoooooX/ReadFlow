@@ -239,24 +239,6 @@ const ThemeSettingsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* 预览区域 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>主题预览</Text>
-          <View style={styles.previewCard}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewTitle}>示例界面</Text>
-              <MaterialIcons name="more-vert" size={20} color={theme?.colors?.onSurface} />
-            </View>
-            <View style={styles.previewContent}>
-              <Text style={styles.previewText}>这是主要文本内容的示例</Text>
-              <Text style={styles.previewSecondaryText}>这是次要文本内容的示例</Text>
-              <TouchableOpacity style={styles.previewButton}>
-                <Text style={styles.previewButtonText}>示例按钮</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
       </View>
     </ScrollView>
   );
@@ -355,48 +337,6 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontSize: 16,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
     marginLeft: 12,
-  },
-  previewCard: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    padding: 16,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  previewTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-  },
-  previewContent: {
-    gap: 12,
-  },
-  previewText: {
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    lineHeight: 24,
-  },
-  previewSecondaryText: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    lineHeight: 20,
-  },
-  previewButton: {
-    backgroundColor: theme?.colors?.primary || '#6750A4',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-  },
-  previewButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
   },
 });
 

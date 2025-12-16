@@ -1,11 +1,13 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../theme';
 import { useUser } from '../contexts/UserContext';
-import { HEADER_HEIGHT, TAB_BAR_HEIGHT, TAB_BAR_PADDING_VERTICAL, HEADER_TITLE_STYLE } from '../constants/navigation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getTabBarHeight, getTabBarPaddingVertical, getHeaderHeight, HEADER_TITLE_STYLE } from '../constants/navigation';
 import CustomHeader from '../components/CustomHeader';
 import ScreenWithCustomHeader from '../components/ScreenWithCustomHeader';
 
@@ -678,6 +680,13 @@ function SettingsStackNavigator() {
 // 底部标签导航 - 符合设计规范的3个标签页
 function MainTabNavigator() {
   const { theme, isDark } = useThemeContext();
+  const insets = useSafeAreaInsets();
+  
+  // 计算实际的标签栏高度，包含底部安全区域
+  const tabBarHeight = getTabBarHeight();
+  const bottomInset = insets.bottom;
+  // 总高度 = 标签栏高度 + 底部安全区域
+  const totalTabBarHeight = tabBarHeight + bottomInset;
 
   return (
     <MainTab.Navigator
@@ -707,16 +716,22 @@ function MainTabNavigator() {
           backgroundColor: isDark ? '#1C1B1F' : '#FFFBFE',
           borderTopColor: isDark ? '#938F99' : '#79747E',
           borderTopWidth: 1,
-          paddingBottom: TAB_BAR_PADDING_VERTICAL,
-          paddingTop: TAB_BAR_PADDING_VERTICAL,
-          height: TAB_BAR_HEIGHT,
+          // 显式设置底部内边距，包含安全区域
+          paddingBottom: getTabBarPaddingVertical() + bottomInset,
+          paddingTop: getTabBarPaddingVertical(),
+          // 总高度包含底部安全区域
+          height: totalTabBarHeight,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
         },
         headerShown: false,
+        // 禁用自动安全区域处理，我们手动控制
+        tabBarHideOnKeyboard: true,
       })}
+      // 禁用 React Navigation 默认的安全区域处理
+      safeAreaInsets={{ bottom: 0 }}
     >
       <MainTab.Screen 
         name="Articles" 

@@ -3,9 +3,9 @@
 
 export const APP_VERSION = {
   // 版本号
-  version: '1.3.0',
+  version: '1.4.3',
   // 构建号
-  buildNumber: 10300,
+  buildNumber: 10403,
   // 更新时间
   updateTime: '2025-12-15',
   // 更新内容

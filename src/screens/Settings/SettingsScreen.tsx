@@ -19,7 +19,9 @@ type SettingsScreenNavigationProp = NativeStackNavigationProp<SettingsStackParam
 const SettingsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<SettingsScreenNavigationProp>();
-  const [cacheSize, setCacheSize] = useState<string>('计算中...');
+  const [imageCacheSize, setImageCacheSize] = useState<string>('计算中...');
+  const [articleDataSize, setArticleDataSize] = useState<string>('计算中...');
+  const [totalCacheSize, setTotalCacheSize] = useState<string>('计算中...');
   const styles = createStyles(isDark, theme);
 
   // 初始化时获取缓存大小
@@ -29,11 +31,29 @@ const SettingsScreen: React.FC = () => {
 
   const updateCacheSize = async () => {
     try {
-      const size = await imageCacheService.getCacheSize();
-      const sizeInMB = (size / (1024 * 1024)).toFixed(2);
-      setCacheSize(`${sizeInMB} MB`);
+      // 获取图片缓存大小
+      const imageSize = await imageCacheService.getCacheSize();
+      const imageSizeInMB = (imageSize / (1024 * 1024)).toFixed(2);
+      setImageCacheSize(`${imageSizeInMB} MB`);
+      
+      // 获取文章数据大小（估算）
+      const db = DatabaseService.getInstance();
+      const articlesResult = await db.executeQuery(
+        'SELECT SUM(LENGTH(content) + LENGTH(title) + LENGTH(summary)) as total_size FROM articles'
+      );
+      const articleSize = articlesResult[0]?.total_size || 0;
+      const articleSizeInMB = (articleSize / (1024 * 1024)).toFixed(2);
+      setArticleDataSize(`${articleSizeInMB} MB`);
+      
+      // 计算总大小
+      const totalSize = imageSize + articleSize;
+      const totalSizeInMB = (totalSize / (1024 * 1024)).toFixed(2);
+      setTotalCacheSize(`${totalSizeInMB} MB`);
     } catch (error) {
-      setCacheSize('未知');
+      console.error('更新缓存大小失败:', error);
+      setImageCacheSize('未知');
+      setArticleDataSize('未知');
+      setTotalCacheSize('未知');
     }
   };
 
@@ -42,7 +62,9 @@ const SettingsScreen: React.FC = () => {
       '清除缓存',
       `确定要清除所有文章数据和图片缓存吗？
 
-当前图片缓存: ${cacheSize}
+当前文章数据: ${articleDataSize}
+当前图片缓存: ${imageCacheSize}
+总计: ${totalCacheSize}
 
 清除后需要重新刷新RSS源来获取文章。`,
       [
@@ -71,8 +93,14 @@ const SettingsScreen: React.FC = () => {
               await updateCacheSize();
               
               Alert.alert(
-                '成功',
-                '所有文章数据和图片缓存已清除\n\n请到首页下拉刷新RSS源来获取文章。',
+                '清除成功',
+                `已成功清除：
+
+• 文章数据
+• 图片缓存
+• RSS源计数
+
+请到首页下拉刷新RSS源来获取文章。`,
                 [
                   {
                     text: '好的',
@@ -180,7 +208,7 @@ const SettingsScreen: React.FC = () => {
               <MaterialIcons name="delete" size={24} color={theme?.colors?.primary || '#3B82F6'} />
               <View style={styles.settingItemContent}>
                 <Text style={styles.settingItemText}>清除所有数据</Text>
-                <Text style={styles.settingItemDesc}>图片: {cacheSize}</Text>
+                <Text style={styles.settingItemDesc}>文章: {articleDataSize} • 图片: {imageCacheSize}</Text>
               </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />

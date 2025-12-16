@@ -121,6 +121,20 @@ const VocabularyDetailScreen: React.FC = () => {
     return { text: '新单词', color: '#3B82F6', bg: '#E3F2FD' };
   };
 
+  // 清除HTML标签，保留纯文本
+  const stripHtmlTags = (html: string | undefined): string => {
+    if (!html) return '';
+    return html
+      .replace(/<[^>]+>/g, '') // 移除HTML标签
+      .replace(/&nbsp;/g, ' ') // 替换&nbsp;
+      .replace(/&amp;/g, '&') // 替换&amp;
+      .replace(/&lt;/g, '<') // 替换&lt;
+      .replace(/&gt;/g, '>') // 替换&gt;
+      .replace(/&quot;/g, '"') // 替换&quot;
+      .replace(/&#39;/g, "'") // 替换&#39;
+      .trim();
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -245,7 +259,7 @@ const VocabularyDetailScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>上下文</Text>
             <View style={styles.contextCard}>
-              <Text style={styles.contextText}>{entry.context}</Text>
+              <Text style={styles.contextText}>{stripHtmlTags(entry.context)}</Text>
             </View>
           </View>
         )}

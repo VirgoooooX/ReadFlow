@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Dimensions,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useThemeContext } from '../../theme';
@@ -122,6 +124,7 @@ const ArticleDetailScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [enableWordTapping, setEnableWordTapping] = useState(false); // 延迟启用取词
   const [vocabularyWords, setVocabularyWords] = useState<Set<string>>(new Set()); // 单词本单词
+  const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
   
   // 词典查询状态
   const [showDictModal, setShowDictModal] = useState(false);
@@ -144,6 +147,7 @@ const ArticleDetailScreen: React.FC = () => {
         setEnableWordTapping(false); // 重置取词状态
         const articleData = await articleService.getArticleById(articleId);
         setArticle(articleData);
+        setIsFavorite(articleData?.isFavorite || false); // 设置收藏状态
         
         // 加载单词本中的所有单词（仅有单词本）
         try {
@@ -185,6 +189,54 @@ const ArticleDetailScreen: React.FC = () => {
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  /**
+   * 处理收藏/取消收藏
+   */
+  const handleToggleFavorite = async () => {
+    try {
+      const newFavoriteStatus = await articleService.toggleFavorite(articleId);
+      setIsFavorite(newFavoriteStatus);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
+  };
+
+  /**
+   * 复制标题到剪贴板
+   */
+  const handleCopyTitle = async () => {
+    if (!article) return;
+    try {
+      await Clipboard.setStringAsync(article.title);
+      Alert.alert('复制成功', '标题已复制到剪贴板');
+    } catch (error) {
+      Alert.alert('复制失败', '无法复制标题');
+    }
+  };
+
+  /**
+   * 复制全文到剪贴板
+   */
+  const handleCopyContent = async () => {
+    if (!article) return;
+    try {
+      // 清除HTML标签，只复制纯文本
+      const plainText = article.content
+        .replace(/<[^>]+>/g, '') // 移除HTML标签
+        .replace(/&nbsp;/g, ' ') // 替换&nbsp;
+        .replace(/&amp;/g, '&') // 替换&amp;
+        .replace(/&lt;/g, '<') // 替换&lt;
+        .replace(/&gt;/g, '>') // 替换&gt;
+        .replace(/&quot;/g, '\"') // 替换&quot;
+        .replace(/&#39;/g, "'") // 替换&#39;
+        .trim();
+      await Clipboard.setStringAsync(plainText);
+      Alert.alert('复制成功', '全文已复制到剪贴板');
+    } catch (error) {
+      Alert.alert('复制失败', '无法复制内容');
+    }
   };
 
   /**
@@ -307,8 +359,11 @@ const ArticleDetailScreen: React.FC = () => {
   const processHtmlContent = useCallback((html: string): string => {
     // 移除链接标签（保留内容）
     let processed = html.replace(/<a\s+[^>]*href=["'][^"']*["'][^>]*>(.*?)<\/a>/gi, '$1');
-    // 为段落添加首行缩进
-    processed = processed.replace(/<p([^>]*)>/gi, '<p$1>\u3000\u3000');
+    // 处理引用块中的换行 - 将<br>转换为实际换行
+    processed = processed.replace(/<blockquote([^>]*)>(.*?)<\/blockquote>/gis, (match, attrs, content) => {
+      const processedContent = content.replace(/<br\s*\/?>|<br>/gi, '\n');
+      return `<blockquote${attrs}>${processedContent}</blockquote>`;
+    });
     return processed;
   }, []);
 
@@ -340,35 +395,128 @@ const ArticleDetailScreen: React.FC = () => {
     );
   }
 
-  // HTML渲染配置
+  // HTML渲染配置 - 优化排版
   const htmlStyles = {
     body: {
       ...getTextStyles(),
       fontSize: readingSettings?.fontSize || 16,
-      lineHeight: (readingSettings?.lineHeight || 1.5) * (readingSettings?.fontSize || 16),
+      lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高至1.8
       color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
     },
     p: {
-      marginBottom: 4,
+      marginBottom: 16, // 段落之间增加间距
       marginTop: 0,
       textAlign: 'left' as const,
+      textIndent: 0, // 明确设置无缩进
+      lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
+      fontWeight: '400' as const, // 正文使用正常字重
     },
-    h1: { fontSize: 24, fontWeight: 'bold' as const, marginVertical: 8 },
-    h2: { fontSize: 22, fontWeight: 'bold' as const, marginVertical: 6 },
-    h3: { fontSize: 20, fontWeight: 'bold' as const, marginVertical: 4 },
-    h4: { fontSize: 18, fontWeight: 'bold' as const, marginVertical: 3 },
-    h5: { fontSize: 16, fontWeight: 'bold' as const, marginVertical: 2 },
-    h6: { fontSize: 14, fontWeight: 'bold' as const, marginVertical: 1 },
+    // 优化标题系统，增加区分度和字重层次
+    h1: { 
+      fontSize: 28, 
+      fontWeight: '700' as const, // 最重要标题使用700
+      marginTop: 24,
+      marginBottom: 16,
+      lineHeight: 36,
+      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    },
+    h2: { 
+      fontSize: 24, 
+      fontWeight: '700' as const, // 次级标题使用700
+      marginTop: 20,
+      marginBottom: 12,
+      lineHeight: 32,
+      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    },
+    h3: { 
+      fontSize: 22, 
+      fontWeight: '600' as const, // 三级标题使用600
+      marginTop: 18,
+      marginBottom: 10,
+      lineHeight: 30,
+      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    },
+    h4: { 
+      fontSize: 20, 
+      fontWeight: '600' as const, // 四级标题使用600
+      marginTop: 16,
+      marginBottom: 8,
+      lineHeight: 28,
+      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    },
+    h5: { 
+      fontSize: 18, 
+      fontWeight: '500' as const, // 五级标题使用500
+      marginTop: 14,
+      marginBottom: 8,
+      lineHeight: 26,
+      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    },
+    h6: { 
+      fontSize: 16, 
+      fontWeight: '500' as const, // 六级标题使用500
+      marginTop: 12,
+      marginBottom: 6,
+      lineHeight: 24,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+    },
     a: {
       color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
       textDecorationLine: 'none' as const,
     },
-    ul: { marginVertical: 4, marginTop: 2, marginBottom: 2, paddingLeft: 16 },
-    ol: { marginVertical: 4, marginTop: 2, marginBottom: 2, paddingLeft: 16 },
-    li: { marginVertical: 1, marginTop: 0, marginBottom: 0 },
+    ul: { 
+      marginVertical: 12, 
+      marginTop: 8, 
+      marginBottom: 16, 
+      paddingLeft: 20,
+    },
+    ol: { 
+      marginVertical: 12, 
+      marginTop: 8, 
+      marginBottom: 16, 
+      paddingLeft: 20,
+    },
+    li: { 
+      marginVertical: 6, 
+      marginTop: 0, 
+      marginBottom: 0,
+      lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
+    },
     img: {
-      marginTop: 4,
-      marginBottom: 4,
+      marginTop: 20, // 增加图片上间距
+      marginBottom: 20, // 增加图片下间距
+    },
+    // 添加代码块支持
+    pre: {
+      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#2B2930' : '#F3EDF7'),
+      borderRadius: 8,
+      padding: 16,
+      marginVertical: 16,
+      overflow: 'scroll' as const,
+    },
+    code: {
+      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#2B2930' : '#F3EDF7'),
+      borderRadius: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      fontFamily: 'monospace',
+      fontSize: (readingSettings?.fontSize || 16) - 2,
+      color: theme?.colors?.primary || '#3B82F6',
+    },
+    // 添加引用块支持 - 优化换行显示
+    blockquote: {
+      borderLeftWidth: 4,
+      borderLeftColor: theme?.colors?.primary || '#3B82F6',
+      paddingLeft: 16,
+      paddingRight: 12,
+      paddingVertical: 12,
+      marginVertical: 16,
+      marginLeft: 0,
+      fontStyle: 'italic' as const,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      backgroundColor: theme?.colors?.surfaceContainerHighest || (isDark ? '#36343B' : '#E6E0E9'),
+      borderRadius: 8,
+      whiteSpace: 'pre-wrap' as const, // 保留换行和空格
     },
   };
 
@@ -425,11 +573,11 @@ const ArticleDetailScreen: React.FC = () => {
           <WordTappableText
             text={textContent}
             style={{
-              marginBottom: 4,
+              marginBottom: 16, // 与 htmlStyles.p 保持一致
               marginTop: 0,
               textAlign: 'left' as const,
               fontSize: readingSettings?.fontSize || 16,
-              lineHeight: (readingSettings?.lineHeight || 1.5) * (readingSettings?.fontSize || 16),
+              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高
               color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
             }}
             onWordPress={handleWordPress}
@@ -494,7 +642,7 @@ const ArticleDetailScreen: React.FC = () => {
             baseStyle={{
               ...getTextStyles(),
               fontSize: readingSettings?.fontSize || 16,
-              lineHeight: (readingSettings?.lineHeight || 1.5) * (readingSettings?.fontSize || 16),
+              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高
               color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
             }}
             renderers={{ p: customRenderers.p }}
@@ -513,11 +661,21 @@ const ArticleDetailScreen: React.FC = () => {
     <ScrollView style={[styles.container, readingSettings && { backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE') }]} showsVerticalScrollIndicator={false}>
       <View style={[styles.content, getContainerStyles()]}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.articleTitle, getTitleStyles(1.3)]}>
-            {article.title}
-          </Text>
-          <TouchableOpacity style={styles.favoriteButton}>
-            <MaterialIcons name="bookmark-border" size={24} color={theme?.colors?.primary || '#3B82F6'} />
+          <TouchableOpacity 
+            style={{ flex: 1, marginRight: 12 }} 
+            onLongPress={handleCopyTitle}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.articleTitle, getTitleStyles(1.3)]}>
+              {article.title}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.favoriteButton} onPress={handleToggleFavorite}>
+            <MaterialIcons 
+              name={isFavorite ? "bookmark" : "bookmark-border"} 
+              size={24} 
+              color={theme?.colors?.primary || '#3B82F6'} 
+            />
           </TouchableOpacity>
         </View>
         
@@ -554,10 +712,14 @@ const ArticleDetailScreen: React.FC = () => {
         
         <View style={styles.divider} />
 
-        <View style={styles.contentContainer}>
+        <TouchableOpacity 
+          style={styles.contentContainer} 
+          onLongPress={handleCopyContent}
+          activeOpacity={1}
+        >
           {/* 直接手动渲染图片和文本 */}
           {renderContent()}
-        </View>
+        </TouchableOpacity>
       </View>
       
       {/* 词典弹窗 */}
