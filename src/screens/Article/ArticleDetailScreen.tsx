@@ -361,18 +361,16 @@ const ArticleDetailScreen: React.FC = () => {
     let processed = html.replace(/<a\s+[^>]*href=["'][^"']*["'][^>]*>(.*?)<\/a>/gi, '$1');
     // 处理引用块中的换行 - 将<br>转换为实际换行
     processed = processed.replace(/<blockquote([^>]*)>(.*?)<\/blockquote>/gis, (match, attrs, content) => {
-      const processedContent = content.replace(/<br\s*\/?>|<br>/gi, '\n');
+      const processedContent = content.replace(/<br\s*\/>|<br>/gi, '\n');
       return `<blockquote${attrs}>${processedContent}</blockquote>`;
     });
     return processed;
   }, []);
 
-  // 缓存处理后的HTML内容和分割结果
-  const processedParts = useMemo(() => {
-    if (!article?.content) return [];
-    const processed = processHtmlContent(article.content);
-    // 同时匹配 img 和 video 标签
-    return processed.split(/(<img[^>]*>|<video[^>]*>.*?<\/video>)/gi);
+  // 只需要简单的清洗，不再分割（必须在条件检查之前定义hooks）
+  const cleanHtml = useMemo(() => {
+    if (!article?.content) return '';
+    return processHtmlContent(article.content);
   }, [article?.content, processHtmlContent]);
 
   if (loading || settingsLoading) {
@@ -481,6 +479,7 @@ const ArticleDetailScreen: React.FC = () => {
       marginTop: 0, 
       marginBottom: 0,
       lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
+      flexDirection: 'column' as const,
     },
     img: {
       marginTop: 20, // 增加图片上间距
@@ -527,7 +526,7 @@ const ArticleDetailScreen: React.FC = () => {
   };
 
   const customRenderers = {
-    // 自定义图片渲染器 - 使用 RenderedImage 组件实现等比例缩放
+    // 图片渲染器：直接在 HTML流 中替换 img 标签
     img: (props: any) => {
       const { src } = props.tnode.attributes || {};
       if (!src) return null;
@@ -548,10 +547,21 @@ const ArticleDetailScreen: React.FC = () => {
           maxWidth={maxWidth}
           theme={theme}
           isDark={isDark}
+          priority="normal"
         />
       );
     },
-    // 自定义文本渲染器 - 支持单词点击
+    
+    // 视频渲染器：增加对 video 标签的支持
+    video: (props: any) => {
+      const { src } = props.tnode.attributes || {};
+      if (!src) return null;
+      
+      const maxWidth = screenWidth - 32;
+      return <VideoPlayer src={src} maxWidth={maxWidth} />;
+    },
+    
+    // 段落文本渲染器 - 支持单词点击
     p: (props: any) => {
       // 获取段落的所有文本内容，包括嵌套的文本节点
       const extractText = (node: any): string => {
@@ -573,11 +583,11 @@ const ArticleDetailScreen: React.FC = () => {
           <WordTappableText
             text={textContent}
             style={{
-              marginBottom: 16, // 与 htmlStyles.p 保持一致
+              marginBottom: 16,
               marginTop: 0,
               textAlign: 'left' as const,
               fontSize: readingSettings?.fontSize || 16,
-              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高
+              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
               color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
             }}
             onWordPress={handleWordPress}
@@ -591,71 +601,7 @@ const ArticleDetailScreen: React.FC = () => {
     },
   };
 
-  // 手动解析和渲染HTML内容
-  const renderContent = () => {
-    if (!processedParts.length) return null;
-    
-    const maxWidth = screenWidth - 32;
-    
-    return processedParts.map((part: string, index: number) => {
-      // 如果是视频标签
-      if (part.match(/^<video[^>]*>/i)) {
-        const srcMatch = part.match(/src=["']([^"']+)["']|<source[^>]*src=["']([^"']+)["'][^>]*>/i);
-        const src = srcMatch?.[1] || srcMatch?.[2];
-        
-        if (src) {
-          return <VideoPlayer key={index} src={src} maxWidth={maxWidth} />;
-        }
-        return null;
-      }
-      
-      // 如果是图片标签，使用 RenderedImage 组件等比例缩放，根据位置设置优先级
-      if (part.match(/^<img[^>]*>$/i)) {
-        const srcMatch = part.match(/src=["']([^"']+)["']/i);
-        const src = srcMatch?.[1];
-        
-        if (src) {
-          // 前3张图片高优先级，其他低优先级
-          const imgPriority = index < 6 ? 'high' : 'low';
-          return (
-            <RenderedImage
-              key={index}
-              src={src}
-              maxWidth={maxWidth}
-              theme={theme}
-              isDark={isDark}
-              priority={imgPriority}
-            />
-          );
-        }
-        return null;
-      }
-      
-      // 如果是HTML段落，使用RenderHtml渲染
-      if (part.trim()) {
-        return (
-          <RenderHtml
-            key={index}
-            contentWidth={maxWidth}
-            source={{ html: part }}
-            tagsStyles={htmlStyles}
-            baseStyle={{
-              ...getTextStyles(),
-              fontSize: readingSettings?.fontSize || 16,
-              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高
-              color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-            }}
-            renderers={{ p: customRenderers.p }}
-            defaultTextProps={{
-              selectable: true,
-            }}
-          />
-        );
-      }
-      
-      return null;
-    });
-  };
+
 
   return (
     <ScrollView style={[styles.container, readingSettings && { backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE') }]} showsVerticalScrollIndicator={false}>
@@ -717,8 +663,24 @@ const ArticleDetailScreen: React.FC = () => {
           onLongPress={handleCopyContent}
           activeOpacity={1}
         >
-          {/* 直接手动渲染图片和文本 */}
-          {renderContent()}
+          {/* 直接渲染完整 HTML，结构会自动正确 */}
+          {cleanHtml ? (
+            <RenderHtml
+              contentWidth={screenWidth - 32}
+              source={{ html: cleanHtml }}
+              tagsStyles={htmlStyles}
+              renderers={customRenderers}
+              baseStyle={{
+                ...getTextStyles(),
+                fontSize: readingSettings?.fontSize || 16,
+                lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
+                color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
+              }}
+              defaultTextProps={{
+                selectable: true,
+              }}
+            />
+          ) : null}
         </TouchableOpacity>
       </View>
       

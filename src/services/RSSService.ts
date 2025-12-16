@@ -931,6 +931,9 @@ export class RSSService {
       // 修复双等号问题（referrerpolicy=="no-referrer" -> referrerpolicy="no-referrer"）
       cleaned = cleaned.replace(/(\w+)==(["'])/g, '$1=$2');
       
+      // 修复列表中的图片结构问题
+      cleaned = this.fixListImages(cleaned);
+      
       // 根据内容类型处理标签
       if (contentType === 'text') {
         // 纯文本模式：移除图片和其他媒体标签，保留文本格式标签
@@ -978,6 +981,37 @@ export class RSSService {
       logger.error('文本清理失败:', error);
       return text.replace(/<[^>]*>/g, '').trim();
     }
+  }
+
+  /**
+   * 修复列表中的图片结构问题
+   */
+  private fixListImages(html: string): string {
+    if (!html) return html;
+    let fixedHtml = html;
+
+    // ---原有逻辑（针对不合规结构）---
+    // 1. 处理紧跟在 </li> 后面的 <img>
+    fixedHtml = fixedHtml.replace(
+      /(<\/li>\s*)(<img[^>]+>)(?=\s*<li)/gi, 
+      '$1<li style="list-style: none; margin: 8px 0;">$2</li>'
+    );
+    // 2. 处理被 <p> 包裹但夹在列表项中间的 <img>
+    fixedHtml = fixedHtml.replace(
+      /(<\/li>\s*)<p>([\s\S]*?<img[^>]+>[\s\S]*?)<\/p>(?=\s*<li)/gi,
+      '$1<li style="list-style: none; margin: 8px 0;">$2</li>'
+    );
+
+    // ---新增逻辑（针对 RSS 结构）---
+    // 3. 移除 li 内部的 p 标签，减少嵌套
+    // 你的 RSS 是 <li><p>...<img/></p></li>
+    // 我们把它变成 <li>...<img/></li>，这样渲染器更容易处理
+    fixedHtml = fixedHtml.replace(
+      /(<li[^>]*)>\s*<p[^>]*>([\s\S]*?)<\/p>\s*(<\/li>)/gi,
+      '$1>$2$3'
+    );
+
+    return fixedHtml;
   }
 
   /**
