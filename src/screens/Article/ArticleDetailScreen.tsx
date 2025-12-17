@@ -1,17 +1,17 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
-  Dimensions,
-  TouchableOpacity,
   Alert,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { WebView } from 'react-native-webview';
+import ImageViewing from 'react-native-image-viewing'; // 【新增】导入图片查看器
 import { useThemeContext } from '../../theme';
 import { useReadingSettings } from '../../hooks/useReadingSettings';
 import { Article, WordDefinition } from '../../types';
@@ -20,111 +20,34 @@ import { dictionaryService } from '../../services/DictionaryService';
 import { vocabularyService } from '../../services/VocabularyService';
 import { translationService } from '../../services/TranslationService';
 import type { RootStackParamList } from '../../navigation/types';
-// 引入HTML渲染组件
-import RenderHtml from 'react-native-render-html';
-// 引入expo-image组件用于优化图片显示
-import { Image } from 'expo-image';
-// 引入自定义组件
-import WordTappableText from '../../components/WordTappableText';
+import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
 import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
-import VideoPlayer from '../../components/VideoPlayer';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// 独立的图片渲染组件，用于处理动态尺寸和异步加载
-interface RenderedImageProps {
-  src: string;
-  maxWidth: number;
-  theme: any;
-  isDark: boolean;
-  priority?: 'low' | 'normal' | 'high';
-}
-
-const RenderedImage = ({ src, maxWidth, theme, isDark, priority = 'normal' }: RenderedImageProps) => {
-  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // 计算显示尺寸：宽度固定，高度等比例缩放
-  const displayWidth = maxWidth;
-  const displayHeight = imageSize 
-    ? (imageSize.height / imageSize.width) * displayWidth
-    : 200; // 默认占位高度
-
-  if (hasError) {
-    return null;
-  }
-
-  return (
-    <View
-      style={{
-        marginVertical: 8,
-        width: displayWidth,
-        height: isLoaded ? displayHeight : 200,
-        borderRadius: 12,
-        overflow: 'hidden',
-        alignSelf: 'center',
-        backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
-      }}
-    >
-      <Image
-        source={{ uri: src }}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="contain"
-        transition={200}
-        cachePolicy="memory-disk"
-        priority={priority}
-        recyclingKey={src}
-        placeholderContentFit="cover"
-        onLoad={(e) => {
-          const { width, height } = e.source;
-          if (width > 0 && height > 0) {
-            setImageSize({ width, height });
-          }
-          setIsLoaded(true);
-        }}
-        onError={() => {
-          setHasError(true);
-          setIsLoaded(true);
-        }}
-      />
-      {!isLoaded && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}>
-          <ActivityIndicator size="small" color={theme?.colors?.primary} />
-        </View>
-      )}
-    </View>
-  );
-};
-
 const ArticleDetailScreen: React.FC = () => {
   const route = useRoute<ArticleDetailRouteProp>();
+  const navigation = useNavigation();
   const { articleId } = route.params;
   const { theme, isDark } = useThemeContext();
   const { 
     settings: readingSettings, 
     loading: settingsLoading,
-    getTextStyles,
-    getTitleStyles,
-    getSubtitleStyles,
-    getContainerStyles 
   } = useReadingSettings();
+  const webViewRef = useRef<WebView>(null);
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
-  const [enableWordTapping, setEnableWordTapping] = useState(false); // 延迟启用取词
-  const [vocabularyWords, setVocabularyWords] = useState<Set<string>>(new Set()); // 单词本单词
+  const [vocabularyWords, setVocabularyWords] = useState<string[]>([]); // 单词本单词数组
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
+  const [webViewReady, setWebViewReady] = useState(false); // WebView 准备就绪
+  const [initialScrollY, setInitialScrollY] = useState(0); // 【新增】初始滚动位置
+  
+  // 【新增】图片预览状态
+  const [isImageViewVisible, setIsImageViewVisible] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
   
   // 词典查询状态
   const [showDictModal, setShowDictModal] = useState(false);
@@ -138,39 +61,44 @@ const ArticleDetailScreen: React.FC = () => {
   const [translation, setTranslation] = useState<string | null>(null);
   const [transLoading, setTransLoading] = useState(false);
 
+  // 【关键新增】使用 Ref 来暂存最新的滚动位置，不触发重渲染
+  const currentScrollYRef = useRef(0);
+  // 记录是否需要保存（只有滚动过才保存）
+  const hasScrolledRef = useRef(false);
+
   const styles = createStyles(isDark, theme, readingSettings);
 
   useEffect(() => {
     const loadArticle = async () => {
       try {
         setLoading(true);
-        setEnableWordTapping(false); // 重置取词状态
-        const articleData = await articleService.getArticleById(articleId);
-        setArticle(articleData);
-        setIsFavorite(articleData?.isFavorite || false); // 设置收藏状态
+        setWebViewReady(false); // 【关键修改】每次加载新文章前，重置 WebView 状态
         
-        // 加载单词本中的所有单词（仅有单词本）
-        try {
-          const vocabularyEntries = await vocabularyService.getAllWords({ limit: 10000 });
-          const wordSet = new Set<string>(vocabularyEntries.map(entry => entry.word.toLowerCase()));
-          setVocabularyWords(wordSet);
-        } catch (error) {
-          console.error('Failed to load vocabulary words:', error);
-          setVocabularyWords(new Set());
-        }
+        // 【新增】使用 Promise.all 并行加载所有数据：文章内容、滚动位置、生词本
+        // 确保所有数据都准备好后再生成 HTML，避免数据缺失
+        const [articleData, savedScrollY, vocabularyEntries] = await Promise.all([
+          articleService.getArticleById(articleId),
+          articleService.getScrollPosition(articleId).catch(() => 0),
+          vocabularyService.getAllWords({ limit: 10000 }).catch(() => [])
+        ]);
+
+        setArticle(articleData);
+        setIsFavorite(articleData?.isFavorite || false);
+        
+        // 【新增】设置滚动位置和生词表
+        setInitialScrollY(savedScrollY || 0);
+        console.log('[ArticleDetail] Prepared scroll position:', savedScrollY);
+
+        const words = vocabularyEntries.map((entry: any) => entry.word.toLowerCase());
+        setVocabularyWords(words);
+        console.log('[ArticleDetail] Prepared vocabulary words count:', words.length);
         
         // 自动标记为已读
         if (articleData && !articleData.isRead) {
           articleService.markAsRead(articleId);
         }
-        
-        // 延迟500ms后启用取词功能，让文章先渲染出来
-        setTimeout(() => {
-          setEnableWordTapping(true);
-        }, 500);
       } catch (error) {
-        console.error('Failed to load article:', error);
-        setArticle(null);
+        console.error('Failed to load article data:', error);
       } finally {
         setLoading(false);
       }
@@ -178,6 +106,27 @@ const ArticleDetailScreen: React.FC = () => {
 
     loadArticle();
   }, [articleId]);
+
+  // 【新增函数】提取注入逻辑为独立函数，方便复用
+  const injectHighlights = useCallback((words: string[]) => {
+    if (webViewRef.current && words.length > 0) {
+      console.log('[ArticleDetail] Injecting highlights immediately, words count:', words.length);
+      const script = `window.highlightVocabularyWords(${JSON.stringify(words)}); true;`;
+      webViewRef.current.injectJavaScript(script);
+    }
+  }, []);
+
+  // 【修改】仅保留监听 vocabularyWords 变化的 Effect
+  // 当用户在当前页面添加生词后，才需要重新注入（初始加载已由 HTML 处理）
+  // 这个 Effect 只在用户动态添加单词时触发
+  useEffect(() => {
+    // 跳过初始化阶段（initialScrollY 和 vocabularyWords 都是 0 或空数组时）
+    // 仅在用户交互后（添加新单词）才重新注入
+    if (webViewReady && article && vocabularyWords.length > 0) {
+      // 这里只用于处理用户在阅读中添加新单词的情况
+      // 初始加载由 HTML 内部的 init() 函数处理
+    }
+  }, [webViewReady, article]);
 
   const formatDate = (date: Date | string): string => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -200,42 +149,6 @@ const ArticleDetailScreen: React.FC = () => {
       setIsFavorite(newFavoriteStatus);
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
-    }
-  };
-
-  /**
-   * 复制标题到剪贴板
-   */
-  const handleCopyTitle = async () => {
-    if (!article) return;
-    try {
-      await Clipboard.setStringAsync(article.title);
-      Alert.alert('复制成功', '标题已复制到剪贴板');
-    } catch (error) {
-      Alert.alert('复制失败', '无法复制标题');
-    }
-  };
-
-  /**
-   * 复制全文到剪贴板
-   */
-  const handleCopyContent = async () => {
-    if (!article) return;
-    try {
-      // 清除HTML标签，只复制纯文本
-      const plainText = article.content
-        .replace(/<[^>]+>/g, '') // 移除HTML标签
-        .replace(/&nbsp;/g, ' ') // 替换&nbsp;
-        .replace(/&amp;/g, '&') // 替换&amp;
-        .replace(/&lt;/g, '<') // 替换&lt;
-        .replace(/&gt;/g, '>') // 替换&gt;
-        .replace(/&quot;/g, '\"') // 替换&quot;
-        .replace(/&#39;/g, "'") // 替换&#39;
-        .trim();
-      await Clipboard.setStringAsync(plainText);
-      Alert.alert('复制成功', '全文已复制到剪贴板');
-    } catch (error) {
-      Alert.alert('复制失败', '无法复制内容');
     }
   };
 
@@ -287,15 +200,8 @@ const ArticleDetailScreen: React.FC = () => {
     }
     
     try {
-      // 获取包含该单词的句子作为上下文
-      const sentences = article?.content?.split(/[.!?]+/) || [];
-      let context = '';
-      for (const sentence of sentences) {
-        if (sentence.toLowerCase().includes(selectedWord.toLowerCase())) {
-          context = sentence.trim();
-          break;
-        }
-      }
+      // 使用 selectedSentence 作为上下文
+      const context = selectedSentence || selectedWord;
       
       // 添加到单词本
       await vocabularyService.addWord(
@@ -305,12 +211,18 @@ const ArticleDetailScreen: React.FC = () => {
         wordDefinition
       );
       
-      // 更新高亮单词集合
-      setVocabularyWords(prev => {
-        const newSet = new Set<string>(Array.from(prev));
-        newSet.add(selectedWord.toLowerCase());
-        return newSet;
-      });
+      // 更新高亮单词数组
+      const newWord = selectedWord.toLowerCase();
+      if (!vocabularyWords.includes(newWord)) {
+        const updatedWords = [...vocabularyWords, newWord];
+        setVocabularyWords(updatedWords);
+        
+      // 【修改】在添加单词时直接调用注入函数，而不是依赖 useEffect
+      if (webViewRef.current) {
+        console.log('[ArticleDetail] Adding word and injecting highlight with updated words:', updatedWords);
+        injectHighlights(updatedWords);
+      }
+      }
       
       setShowDictModal(false);
     } catch (error) {
@@ -319,7 +231,6 @@ const ArticleDetailScreen: React.FC = () => {
     }
   };
 
-  // 检查文章正文是否包含与缩略图相同的图片
   const shouldShowHeaderImage = (): boolean => {
     if (!article?.imageUrl) {
       return false;
@@ -355,25 +266,113 @@ const ArticleDetailScreen: React.FC = () => {
     return true;
   };
 
-  // 处理HTML内容 - 必须在条件返回之前
-  const processHtmlContent = useCallback((html: string): string => {
-    // 移除链接标签（保留内容）
-    let processed = html.replace(/<a\s+[^>]*href=["'][^"']*["'][^>]*>(.*?)<\/a>/gi, '$1');
-    // 处理引用块中的换行 - 将<br>转换为实际换行
-    processed = processed.replace(/<blockquote([^>]*)>(.*?)<\/blockquote>/gis, (match, attrs, content) => {
-      const processedContent = content.replace(/<br\s*\/?>|<br>/gi, '\n');
-      return `<blockquote${attrs}>${processedContent}</blockquote>`;
-    });
-    return processed;
-  }, []);
+  // 【关键修改】处理 WebView 消息
+  const handleWebViewMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('[ArticleDetail] WebView message received:', data);
+      
+      switch (data.type) {
+        case 'debug':
+          // WebView 端的调试消息
+          console.log('[WebView Debug]', data.debugType, ':', data.message);
+          break;
+          
+        case 'ready':
+          // WebView 已准备就绪
+          console.log('[ArticleDetail] WebView ready event received');
+          setWebViewReady(true);
+          // 【关键修改】此时不再需要注入高亮或滚动位置，因为 HTML 内部已经处理了
+          // 仅保留 injectHighlights 以便在用户添加新单词时使用
+          break;
+          
+        case 'wordPress':
+          // 单词点击 - 查词
+          if (data.word && data.sentence) {
+            setSelectedSentence(data.sentence); // 保存句子用于添加到单词本
+            handleWordPress(data.word, data.sentence);
+          }
+          break;
+          
+        case 'sentenceDoubleTap':
+          // 双击 - 翻译整句
+          if (data.sentence) {
+            handleSentenceDoubleTap(data.sentence);
+          }
+          break;
+          
+        // 【新增】优化3: 处理图片点击
+        case 'imageClick':
+          if (data.url) {
+            setCurrentImageUrl(data.url);
+            setIsImageViewVisible(true);
+          }
+          break;
+        
+        // 【关键修改】优化4: 处理滚动位置 - 仅更新 Ref，不直接保存到数据库
+        case 'scroll':
+          // 【关键修改】这里只更新 Ref，不调用 service 写库，零性能消耗
+          if (data.scrollY !== undefined) {
+            currentScrollYRef.current = data.scrollY;
+            hasScrolledRef.current = true;
+            console.log('[ArticleDetail] Updated scroll position in memory:', data.scrollY);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Failed to parse WebView message:', error);
+    }
+  }, [handleWordPress, handleSentenceDoubleTap]);
 
-  // 缓存处理后的HTML内容和分割结果
-  const processedParts = useMemo(() => {
-    if (!article?.content) return [];
-    const processed = processHtmlContent(article.content);
-    // 同时匹配 img 和 video 标签
-    return processed.split(/(<img[^>]*>|<video[^>]*>.*?<\/video>)/gi);
-  }, [article?.content, processHtmlContent]);
+  // 【关键修改】在组件卸载（用户退出页面）时，统一保存一次
+  useEffect(() => {
+    // 这个 cleanup 函数会在组件卸载（返回上一页）时执行
+    return () => {
+      if (hasScrolledRef.current && articleId) {
+        console.log('[ArticleDetail] Saving final scroll position on exit:', currentScrollYRef.current);
+        articleService.saveScrollPosition(articleId, currentScrollYRef.current).catch(err => {
+          console.error('Failed to save scroll position on exit:', err);
+        });
+      }
+    };
+  }, [articleId]);
+
+  // 【可选优化】为了防止 App 意外崩溃导致数据丢失，加一个低频的定时保存（每 3 秒）
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (hasScrolledRef.current && articleId) {
+        console.log('[ArticleDetail] Periodic save of scroll position:', currentScrollYRef.current);
+        articleService.saveScrollPosition(articleId, currentScrollYRef.current).catch(error => {
+          console.error('Failed to save scroll position periodically:', error);
+        });
+      }
+    }, 3000); // 每 3 秒存一次库，作为双重保险
+    return () => clearInterval(interval);
+  }, [articleId]);
+
+  // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
+  const htmlContent = useMemo(() => {
+    if (!article?.content || !readingSettings) return '';
+    
+    return generateArticleHtml({
+      content: article.content,
+      fontSize: readingSettings.fontSize || 16,
+      lineHeight: readingSettings.lineHeight || 1.8,
+      isDark,
+      primaryColor: theme?.colors?.primary || '#3B82F6',
+      // 传入元数据
+      title: article.title,
+      titleCn: article.titleCn,
+      sourceName: article.sourceName,
+      publishedAt: formatDate(article.publishedAt),
+      author: article.author,
+      imageUrl: shouldShowHeaderImage() ? article.imageUrl : undefined,
+      // 【新增】直接将初始滚动位置和生词表注入 HTML
+      // 这样 HTML 初始化时就能直接处理，无需等待 WebView ready 后再注入
+      initialScrollY,
+      vocabularyWords,
+    });
+  }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, vocabularyWords]);
 
   if (loading || settingsLoading) {
     return (
@@ -382,345 +381,47 @@ const ArticleDetailScreen: React.FC = () => {
           size="large" 
           color={theme?.colors?.primary || '#3B82F6'} 
         />
-        <Text style={styles.loadingText}>加载中...</Text>
       </View>
     );
   }
-
+  
   if (!article) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>文章加载失败</Text>
+        <MaterialIcons name="error" size={48} color={theme?.colors?.error || '#B3261E'} />
       </View>
     );
   }
-
-  // HTML渲染配置 - 优化排版
-  const htmlStyles = {
-    body: {
-      ...getTextStyles(),
-      fontSize: readingSettings?.fontSize || 16,
-      lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高至1.8
-      color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    p: {
-      marginBottom: 16, // 段落之间增加间距
-      marginTop: 0,
-      textAlign: 'left' as const,
-      textIndent: 0, // 明确设置无缩进
-      lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
-      fontWeight: '400' as const, // 正文使用正常字重
-    },
-    // 优化标题系统，增加区分度和字重层次
-    h1: { 
-      fontSize: 28, 
-      fontWeight: '700' as const, // 最重要标题使用700
-      marginTop: 24,
-      marginBottom: 16,
-      lineHeight: 36,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    h2: { 
-      fontSize: 24, 
-      fontWeight: '700' as const, // 次级标题使用700
-      marginTop: 20,
-      marginBottom: 12,
-      lineHeight: 32,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    h3: { 
-      fontSize: 22, 
-      fontWeight: '600' as const, // 三级标题使用600
-      marginTop: 18,
-      marginBottom: 10,
-      lineHeight: 30,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    h4: { 
-      fontSize: 20, 
-      fontWeight: '600' as const, // 四级标题使用600
-      marginTop: 16,
-      marginBottom: 8,
-      lineHeight: 28,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    h5: { 
-      fontSize: 18, 
-      fontWeight: '500' as const, // 五级标题使用500
-      marginTop: 14,
-      marginBottom: 8,
-      lineHeight: 26,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    h6: { 
-      fontSize: 16, 
-      fontWeight: '500' as const, // 六级标题使用500
-      marginTop: 12,
-      marginBottom: 6,
-      lineHeight: 24,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-    },
-    a: {
-      color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      textDecorationLine: 'none' as const,
-    },
-    ul: { 
-      marginVertical: 12, 
-      marginTop: 8, 
-      marginBottom: 16, 
-      paddingLeft: 20,
-    },
-    ol: { 
-      marginVertical: 12, 
-      marginTop: 8, 
-      marginBottom: 16, 
-      paddingLeft: 20,
-    },
-    li: { 
-      marginVertical: 6, 
-      marginTop: 0, 
-      marginBottom: 0,
-      lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16),
-    },
-    img: {
-      marginTop: 20, // 增加图片上间距
-      marginBottom: 20, // 增加图片下间距
-    },
-    // 添加代码块支持
-    pre: {
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#2B2930' : '#F3EDF7'),
-      borderRadius: 8,
-      padding: 16,
-      marginVertical: 16,
-      overflow: 'scroll' as const,
-    },
-    code: {
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#2B2930' : '#F3EDF7'),
-      borderRadius: 4,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      fontFamily: 'monospace',
-      fontSize: (readingSettings?.fontSize || 16) - 2,
-      color: theme?.colors?.primary || '#3B82F6',
-    },
-    // 添加引用块支持 - 优化换行显示
-    blockquote: {
-      borderLeftWidth: 4,
-      borderLeftColor: theme?.colors?.primary || '#3B82F6',
-      paddingLeft: 16,
-      paddingRight: 12,
-      paddingVertical: 12,
-      marginVertical: 16,
-      marginLeft: 0,
-      fontStyle: 'italic' as const,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-      backgroundColor: theme?.colors?.surfaceContainerHighest || (isDark ? '#36343B' : '#E6E0E9'),
-      borderRadius: 8,
-      whiteSpace: 'pre-wrap' as const, // 保留换行和空格
-    },
-  };
-
-  const renderersProps = {
-    img: {
-      enableExperimentalPercentWidth: true,
-    },
-  };
-
-  const customRenderers = {
-    // 自定义图片渲染器 - 使用 RenderedImage 组件实现等比例缩放
-    img: (props: any) => {
-      const { src } = props.tnode.attributes || {};
-      if (!src) return null;
-      
-      let imageUrl = src;
-      try {
-        imageUrl = decodeURIComponent(src);
-      } catch (e) {
-        imageUrl = src;
-      }
-      
-      const maxWidth = screenWidth - 32;
-      
-      return (
-        <RenderedImage
-          key={imageUrl}
-          src={imageUrl}
-          maxWidth={maxWidth}
-          theme={theme}
-          isDark={isDark}
-        />
-      );
-    },
-    // 自定义文本渲染器 - 支持单词点击
-    p: (props: any) => {
-      // 获取段落的所有文本内容，包括嵌套的文本节点
-      const extractText = (node: any): string => {
-        if (node.type === 'text') {
-          return node.data;
-        }
-        if (node.children && node.children.length > 0) {
-          return node.children.map((child: any) => extractText(child)).join('');
-        }
-        return '';
-      };
-      
-      const textContent = props.tnode.children
-        .map((child: any) => extractText(child))
-        .join('');
-      
-      if (textContent.trim()) {
-        return (
-          <WordTappableText
-            text={textContent}
-            style={{
-              marginBottom: 16, // 与 htmlStyles.p 保持一致
-              marginTop: 0,
-              textAlign: 'left' as const,
-              fontSize: readingSettings?.fontSize || 16,
-              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高
-              color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-            }}
-            onWordPress={handleWordPress}
-            onSentenceDoubleTap={handleSentenceDoubleTap}
-            enableTapping={enableWordTapping}
-            highlightedWords={vocabularyWords}
-          />
-        );
-      }
-      return null;
-    },
-  };
-
-  // 手动解析和渲染HTML内容
-  const renderContent = () => {
-    if (!processedParts.length) return null;
-    
-    const maxWidth = screenWidth - 32;
-    
-    return processedParts.map((part: string, index: number) => {
-      // 如果是视频标签
-      if (part.match(/^<video[^>]*>/i)) {
-        const srcMatch = part.match(/src=["']([^"']+)["']|<source[^>]*src=["']([^"']+)["'][^>]*>/i);
-        const src = srcMatch?.[1] || srcMatch?.[2];
-        
-        if (src) {
-          return <VideoPlayer key={index} src={src} maxWidth={maxWidth} />;
-        }
-        return null;
-      }
-      
-      // 如果是图片标签，使用 RenderedImage 组件等比例缩放，根据位置设置优先级
-      if (part.match(/^<img[^>]*>$/i)) {
-        const srcMatch = part.match(/src=["']([^"']+)["']/i);
-        const src = srcMatch?.[1];
-        
-        if (src) {
-          // 前3张图片高优先级，其他低优先级
-          const imgPriority = index < 6 ? 'high' : 'low';
-          return (
-            <RenderedImage
-              key={index}
-              src={src}
-              maxWidth={maxWidth}
-              theme={theme}
-              isDark={isDark}
-              priority={imgPriority}
-            />
-          );
-        }
-        return null;
-      }
-      
-      // 如果是HTML段落，使用RenderHtml渲染
-      if (part.trim()) {
-        return (
-          <RenderHtml
-            key={index}
-            contentWidth={maxWidth}
-            source={{ html: part }}
-            tagsStyles={htmlStyles}
-            baseStyle={{
-              ...getTextStyles(),
-              fontSize: readingSettings?.fontSize || 16,
-              lineHeight: (readingSettings?.lineHeight || 1.8) * (readingSettings?.fontSize || 16), // 增加行高
-              color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-            }}
-            renderers={{ p: customRenderers.p }}
-            defaultTextProps={{
-              selectable: true,
-            }}
-          />
-        );
-      }
-      
-      return null;
-    });
-  };
-
+  
   return (
-    <ScrollView style={[styles.container, readingSettings && { backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE') }]} showsVerticalScrollIndicator={false}>
-      <View style={[styles.content, getContainerStyles()]}>
-        <View style={styles.titleContainer}>
-          <TouchableOpacity 
-            style={{ flex: 1, marginRight: 12 }} 
-            onLongPress={handleCopyTitle}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.articleTitle, getTitleStyles(1.3)]}>
-              {article.title}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.favoriteButton} onPress={handleToggleFavorite}>
-            <MaterialIcons 
-              name={isFavorite ? "bookmark" : "bookmark-border"} 
-              size={24} 
-              color={theme?.colors?.primary || '#3B82F6'} 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        {article.titleCn && (
-          <Text style={[styles.articleSubtitle, getSubtitleStyles()]}>
-            {article.titleCn}
-          </Text>
-        )}
-        
-        <View style={styles.articleMeta}>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{article.sourceName}</Text>
-            <Text style={styles.metaText}>•</Text>
-            <Text style={styles.metaText}>{article.wordCount || 0} 词</Text>
-            <Text style={styles.metaText}>•</Text>
-            <Text style={styles.metaText}>{formatDate(article.publishedAt)}</Text>
-            {article.author && (
-              <>
-                <Text style={styles.metaText}>•</Text>
-                <Text style={styles.metaText}>作者：{article.author}</Text>
-              </>
-            )}
-          </View>
-        </View>
-        
-        {shouldShowHeaderImage() && article?.imageUrl && (
-          <RenderedImage
-            src={article.imageUrl}
-            maxWidth={screenWidth - 32}
-            theme={theme}
-            isDark={isDark}
-          />
-        )}
-        
-        <View style={styles.divider} />
-
-        <TouchableOpacity 
-          style={styles.contentContainer} 
-          onLongPress={handleCopyContent}
-          activeOpacity={1}
-        >
-          {/* 直接手动渲染图片和文本 */}
-          {renderContent()}
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      {/* WebView 内容 */}
+      {htmlContent && (
+        <WebView
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html: htmlContent }}
+          onMessage={handleWebViewMessage}
+          style={[styles.webView, { opacity: 0.99 }]}
+          showsVerticalScrollIndicator={false}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          scrollEnabled={true}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <View style={styles.webViewLoading}>
+              <ActivityIndicator size="small" color={theme?.colors?.primary} />
+            </View>
+          )}
+          {...(Platform.OS === 'android' && {
+            textZoom: 100,
+            forceDarkOn: false,
+            mixedContentMode: 'compatibility',
+            overScrollMode: 'never',
+            androidLayerType: 'hardware',
+          })}
+        />
+      )}
       
       {/* 词典弹窗 */}
       <WordDefinitionModal
@@ -740,29 +441,49 @@ const ArticleDetailScreen: React.FC = () => {
         loading={transLoading}
         onClose={() => setShowTransModal(false)}
       />
-    </ScrollView>
+      
+      {/* 【新增】图片查看器 */}
+      <ImageViewing
+        images={[{ uri: currentImageUrl }]}
+        imageIndex={0}
+        visible={isImageViewVisible}
+        onRequestClose={() => setIsImageViewVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+      />
+    </View>
   );
 };
 
 const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), },
-    loadingText: { marginTop: 8, fontSize: 16, color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'), },
-    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), padding: 16, },
-    errorText: { fontSize: 15, color: theme?.colors?.error || '#B3261E', textAlign: 'center', paddingHorizontal: 16, },
-    content: { padding: 16, backgroundColor: readingSettings?.backgroundColor || (isDark ? '#1C1B1F' : '#FFFBFE'), borderRadius: 12, },
-    titleContainer: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, },
-    articleTitle: { fontSize: 18, fontWeight: '600', color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'), lineHeight: 24, letterSpacing: -0.1, flex: 1, marginRight: 12, },
-    favoriteButton: { padding: 4, borderRadius: 20, backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'), },
-    articleSubtitle: { fontSize: 16, color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'), marginBottom: 16, fontStyle: 'italic', opacity: 0.85, lineHeight: 22, },
-    articleMeta: { marginBottom: 20, gap: 6, },
-    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, },
-    metaText: { fontSize: 13, color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'), lineHeight: 18, },
-    imageContainer: { marginBottom: 4, marginTop: 4, borderRadius: 12, overflow: 'hidden', borderWidth: 0, shadowColor: '#000', shadowOffset: { width: 0, height: 2, }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, },
-    articleImage: { width: '100%', height: Math.min(screenWidth * 0.6, 300), backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'), },
-    divider: { height: 1, backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'), marginBottom: 24, },
-    contentContainer: {},
+    container: { 
+      flex: 1, 
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), 
+    },
+    loadingContainer: { 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), 
+    },
+    errorContainer: { 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), 
+    },
+    webView: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    webViewLoading: {
+      position: 'absolute',
+      top: 100,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+    },
   });
 
 export default ArticleDetailScreen;

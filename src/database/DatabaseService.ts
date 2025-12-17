@@ -126,6 +126,16 @@ export class DatabaseService {
         console.log('sort_order column added successfully');
       }
 
+      // 【新增】检查articles表是否存在scroll_position列
+      const articlesTableInfo = await this.db.getAllAsync('PRAGMA table_info(articles)');
+      const hasScrollPosition = articlesTableInfo.some((column: any) => column.name === 'scroll_position');
+      
+      if (!hasScrollPosition) {
+        console.log('Adding scroll_position column to articles table...');
+        await this.db.execAsync('ALTER TABLE articles ADD COLUMN scroll_position INTEGER DEFAULT 0');
+        console.log('scroll_position column added successfully');
+      }
+
       // 检查vocabulary表是否存在缺失的字段
       const vocabularyTableInfo = await this.db.getAllAsync('PRAGMA table_info(vocabulary)');
       const hasNextReviewAt = vocabularyTableInfo.some((column: any) => column.name === 'next_review_at');

@@ -468,6 +468,44 @@ export class ArticleService {
   }
 
   /**
+   * 【新增】保存滚动位置
+   */
+  public async saveScrollPosition(id: number, scrollY: number): Promise<void> {
+    try {
+      await this.databaseService.initializeDatabase();
+      await this.databaseService.executeStatement(
+        'UPDATE articles SET scroll_position = ? WHERE id = ?',
+        [Math.round(scrollY), id]
+      );
+    } catch (error) {
+      console.error('Error saving scroll position:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 【新增】获取保存的滚动位置
+   */
+  public async getScrollPosition(id: number): Promise<number> {
+    try {
+      await this.databaseService.initializeDatabase();
+      const results = await this.databaseService.executeQuery(
+        'SELECT scroll_position FROM articles WHERE id = ?',
+        [id]
+      );
+      
+      if (results.length === 0) {
+        return 0;
+      }
+      
+      return results[0].scroll_position || 0;
+    } catch (error) {
+      console.error('Error getting scroll position:', error);
+      return 0;
+    }
+  }
+
+  /**
    * 获取正在阅读的文章
    */
   public async getCurrentlyReading(limit: number = 5): Promise<Article[]> {
