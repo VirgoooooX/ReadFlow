@@ -105,9 +105,65 @@ export interface ReadingSettings {
   lineHeight: number;      // 1.2-2.0
   theme: 'light' | 'dark' | 'sepia';
   fontFamily: string;
+  backgroundColor: string; // 背景颜色
+  textColor: string;       // 文字颜色
+  highlightColor: string;  // 高亮颜色
   margin: number;          // 页边距
   autoScroll: boolean;
   scrollSpeed: number;
+  showTranslation: boolean;
+  translationPosition: 'top' | 'bottom' | 'inline';
+  enableTTS: boolean;
+  ttsSpeed: number;
+  ttsVoice: string;
+  wordClickAction: 'translate' | 'copy' | 'none';
+  showProgress: boolean;
+  nightMode: boolean;
+  sepia: boolean;
+  brightness: number;
+  showAllTab: boolean;     // 是否显示"全部"标签
+}
+
+export interface AppSettings {
+  language: string;
+  theme: 'light' | 'dark' | 'system' | 'sepia';
+  notifications: {
+    enabled: boolean;
+    newArticles: boolean;
+    vocabularyReview: boolean;
+    dailyGoal: boolean;
+    sound: boolean;
+    vibration: boolean;
+  };
+  sync: {
+    enabled: boolean;
+    autoSync: boolean;
+    syncInterval: number;
+    wifiOnly: boolean;
+  };
+  privacy: {
+    analytics: boolean;
+    crashReporting: boolean;
+    dataCollection: boolean;
+  };
+  performance: {
+    cacheSize: number;
+    preloadImages: boolean;
+    offlineMode: boolean;
+    backgroundSync: boolean;
+  };
+  accessibility: {
+    highContrast: boolean;
+    largeText: boolean;
+    reduceMotion: boolean;
+    screenReader: boolean;
+  };
+  backup: {
+    autoBackup: boolean;
+    backupInterval: number;
+    includeImages: boolean;
+    cloudProvider: string;
+  };
 }
 
 // 用户偏好设置

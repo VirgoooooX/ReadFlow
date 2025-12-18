@@ -12,7 +12,7 @@ import { useThemeContext } from '../../theme';
 import { vocabularyService } from '../../services/VocabularyService';
 import { VocabularyEntry } from '../../types';
 import { useNavigation } from '@react-navigation/native';
-
+import { stripHtmlTags } from '../../utils/stringUtils';
 const ReviewSessionScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation();
@@ -144,10 +144,12 @@ const ReviewSessionScreen: React.FC = () => {
           {currentWord.context && (
             <View style={styles.contextContainer}>
               <Text style={styles.contextLabel}>例句:</Text>
-              <Text style={styles.contextText}>{currentWord.context}</Text>
+              {/* 【修改】在这里调用 stripHtmlTags 函数 */}
+              <Text style={styles.contextText}>
+                {stripHtmlTags(currentWord.context)}
+              </Text>
             </View>
           )}
-
           {/* 释义区域 - 默认隐藏 */}
           {showDefinition ? (
             <View style={styles.definitionContainer}>

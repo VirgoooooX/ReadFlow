@@ -157,20 +157,20 @@ const darkTheme = {
 function AuthStackNavigator() {
   return (
     <AuthStack.Navigator
-       screenOptions={{
-         headerShown: false,
-       }}
-     >
-       <AuthStack.Screen 
-         name="Login" 
-         component={LoginScreen}
-         options={{ headerShown: false }}
-       />
-       <AuthStack.Screen 
-         name="Register" 
-         component={RegisterScreen}
-         options={{ headerShown: false }}
-       />
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <AuthStack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ headerShown: false }}
+      />
+      <AuthStack.Screen
+        name="Register"
+        component={RegisterScreen}
+        options={{ headerShown: false }}
+      />
     </AuthStack.Navigator>
   );
 }
@@ -178,52 +178,40 @@ function AuthStackNavigator() {
 // 首页堆栈导航
 function HomeStackNavigator() {
   const { theme } = useThemeContext();
-  
+
   return (
     <HomeStack.Navigator
-       screenOptions={{
-         headerShown: false, // 隐藏原生导航栏
-       }}
-     >
-       <HomeStack.Screen 
-         name="HomeMain" 
-         options={{ title: '文章' }}
-       >
-         {(props) => (
-           <ScreenWithCustomHeader
-             title="文章"
-             showBackButton={false}
-           >
-             <HomeScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </HomeStack.Screen>
-       <HomeStack.Screen 
-         name="ArticleDetail" 
-         options={{ title: '文章详情' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="文章详情"
-             showBackButton={true}
-           >
-             <ArticleDetailScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </HomeStack.Screen>
-       <HomeStack.Screen 
-         name="Search" 
-         options={{ title: '搜索' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="\u641c\u7d22"
-             showBackButton={true}
-           >
-             <HomeScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </HomeStack.Screen>
+      screenOptions={{
+        headerShown: false, // 隐藏原生导航栏
+      }}
+    >
+      <HomeStack.Screen
+        name="HomeMain"
+        options={{ title: '文章' }}
+      >
+        {(props) => (
+          <ScreenWithCustomHeader
+            title="文章"
+            showBackButton={false}
+          >
+            <HomeScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </HomeStack.Screen>
+
+      <HomeStack.Screen
+        name="Search"
+        options={{ title: '搜索' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="\u641c\u7d22"
+            showBackButton={true}
+          >
+            <HomeScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </HomeStack.Screen>
     </HomeStack.Navigator>
   );
 }
@@ -233,78 +221,78 @@ function HomeStackNavigator() {
 // 单词本堆栈导航
 function VocabularyStackNavigator() {
   const { theme } = useThemeContext();
-  
+
   return (
     <VocabularyStack.Navigator
-       screenOptions={{
-         headerShown: false, // 隐藏原生导航栏
-       }}
-     >
-       <VocabularyStack.Screen 
-         name="VocabularyMain" 
-         options={{ title: '词汇本' }}
-       >
-         {(props) => (
-           <ScreenWithCustomHeader
-             title="词汇本"
-             showBackButton={false}
-           >
-             <VocabularyScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </VocabularyStack.Screen>
-       <VocabularyStack.Screen 
-         name="VocabularyDetail" 
-         options={{ title: '单词详情' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="单词详情"
-             showBackButton={true}
-           >
-             <VocabularyDetailScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </VocabularyStack.Screen>
-       <VocabularyStack.Screen 
-         name="AddWord" 
-         options={{ title: '添加单词' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="添加单词"
-             showBackButton={true}
-           >
-             <VocabularyScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </VocabularyStack.Screen>
-       <VocabularyStack.Screen 
-         name="ReviewSession" 
-         options={{ title: '复习模式' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="复习模式"
-             showBackButton={true}
-           >
-             <ReviewSessionScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </VocabularyStack.Screen>
-       <VocabularyStack.Screen 
-         name="VocabularyStats" 
-         options={{ title: '学习统计' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="\u5b66\u4e60\u7edf\u8ba1"
-             showBackButton={true}
-           >
-             <VocabularyScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </VocabularyStack.Screen>
+      screenOptions={{
+        headerShown: false, // 隐藏原生导航栏
+      }}
+    >
+      <VocabularyStack.Screen
+        name="VocabularyMain"
+        options={{ title: '词汇本' }}
+      >
+        {(props) => (
+          <ScreenWithCustomHeader
+            title="词汇本"
+            showBackButton={false}
+          >
+            <VocabularyScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </VocabularyStack.Screen>
+      <VocabularyStack.Screen
+        name="VocabularyDetail"
+        options={{ title: '单词详情' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="单词详情"
+            showBackButton={true}
+          >
+            <VocabularyDetailScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </VocabularyStack.Screen>
+      <VocabularyStack.Screen
+        name="AddWord"
+        options={{ title: '添加单词' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="添加单词"
+            showBackButton={true}
+          >
+            <VocabularyScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </VocabularyStack.Screen>
+      <VocabularyStack.Screen
+        name="ReviewSession"
+        options={{ title: '复习模式' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="复习模式"
+            showBackButton={true}
+          >
+            <ReviewSessionScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </VocabularyStack.Screen>
+      <VocabularyStack.Screen
+        name="VocabularyStats"
+        options={{ title: '学习统计' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="\u5b66\u4e60\u7edf\u8ba1"
+            showBackButton={true}
+          >
+            <VocabularyScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </VocabularyStack.Screen>
     </VocabularyStack.Navigator>
   );
 }
@@ -312,78 +300,78 @@ function VocabularyStackNavigator() {
 // RSS堆栈导航
 function RSSStackNavigator() {
   const { theme } = useThemeContext();
-  
+
   return (
     <RSSStack.Navigator
-       screenOptions={{
-         headerShown: false, // 隐藏原生导航栏
-       }}
-     >
-       <RSSStack.Screen 
-         name="RSSMain" 
-         options={{ title: 'RSS订阅' }}
-       >
-         {(props) => (
-           <ScreenWithCustomHeader
-             title="RSS订阅"
-             showBackButton={false}
-           >
-             <RSSScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </RSSStack.Screen>
-       <RSSStack.Screen 
-         name="RSSSourceDetail" 
-         options={{ title: 'RSS源详情' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="RSS源详情"
-             showBackButton={true}
-           >
-             <RSSScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </RSSStack.Screen>
-       <RSSStack.Screen 
-         name="AddRSSSource" 
-         options={{ title: '添加RSS源' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="添加RSS源"
-             showBackButton={true}
-           >
-             <AddRSSSourceScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </RSSStack.Screen>
-       <RSSStack.Screen 
-         name="ManageSubscriptions" 
-         options={{ title: '管理订阅源' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="管理订阅源"
-             showBackButton={true}
-           >
-             <ManageSubscriptionsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </RSSStack.Screen>
-       <RSSStack.Screen 
-         name="EditRSSSource" 
-         options={{ title: '编辑RSS源' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="编辑RSS源"
-             showBackButton={true}
-           >
-             <EditRSSSourceScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </RSSStack.Screen>
+      screenOptions={{
+        headerShown: false, // 隐藏原生导航栏
+      }}
+    >
+      <RSSStack.Screen
+        name="RSSMain"
+        options={{ title: 'RSS订阅' }}
+      >
+        {(props) => (
+          <ScreenWithCustomHeader
+            title="RSS订阅"
+            showBackButton={false}
+          >
+            <RSSScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="RSSSourceDetail"
+        options={{ title: 'RSS源详情' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="RSS源详情"
+            showBackButton={true}
+          >
+            <RSSScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="AddRSSSource"
+        options={{ title: '添加RSS源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="添加RSS源"
+            showBackButton={true}
+          >
+            <AddRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="ManageSubscriptions"
+        options={{ title: '管理订阅源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="管理订阅源"
+            showBackButton={true}
+          >
+            <ManageSubscriptionsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="EditRSSSource"
+        options={{ title: '编辑RSS源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="编辑RSS源"
+            showBackButton={true}
+          >
+            <EditRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
     </RSSStack.Navigator>
   );
 }
@@ -391,208 +379,208 @@ function RSSStackNavigator() {
 // 用户堆栈导航
 function UserStackNavigator() {
   const { theme } = useThemeContext();
-  
+
   return (
     <UserStack.Navigator
-       screenOptions={{
-         headerShown: false, // 隐藏原生导航栏
-       }}
-     >
-       <UserStack.Screen 
-         name="UserMain" 
-         options={{ title: '我的' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="我的"
-             showBackButton={false}
-           >
-             <UserProfileScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="EditProfile" 
-         options={{ title: '编辑资料' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="编辑资料"
-             showBackButton={true}
-           >
-             <EditProfileScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="Settings" 
-         options={{ title: '设置' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="设置"
-             showBackButton={true}
-           >
-             <SettingsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="AppSettings" 
-         options={{ title: '应用设置' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="应用设置"
-             showBackButton={true}
-           >
-             <SettingsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="ReadingSettings" 
-         options={{ title: '阅读偏好' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="阅读偏好"
-             showBackButton={true}
-           >
-             <ReadingSettingsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="LLMSettings" 
-         options={{ title: 'LLM设置' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="LLM设置"
-             showBackButton={true}
-           >
-             <LLMSettingsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="ThemeSettings" 
-         options={{ title: '主题设置' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="主题设置"
-             showBackButton={true}
-           >
-             <ThemeSettingsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="About" 
-         options={{ title: '关于' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="关于"
-             showBackButton={true}
-           >
-             <AboutScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="Export" 
-         options={{ title: '导出数据' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="导出数据"
-             showBackButton={true}
-           >
-             <ExportScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="Import" 
-         options={{ title: '导入数据' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="导入数据"
-             showBackButton={true}
-           >
-             <ImportScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="StorageManagement" 
-         options={{ title: '存储管理' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="存储管理"
-             showBackButton={true}
-           >
-             <SettingsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="AddRSSSource" 
-         options={{ title: '添加RSS源' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="添加RSS源"
-             showBackButton={true}
-           >
-             <AddRSSSourceScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="ManageSubscriptions" 
-         options={{ title: '管理订阅源' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="管理订阅源"
-             showBackButton={true}
-           >
-             <ManageSubscriptionsScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="EditRSSSource" 
-         options={{ title: '编辑RSS源' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="编辑RSS源"
-             showBackButton={true}
-           >
-             <EditRSSSourceScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
-       <UserStack.Screen 
-         name="Debug" 
-         options={{ title: '调试信息' }}
-       >
-         {(props: any) => (
-           <ScreenWithCustomHeader
-             title="调试信息"
-             showBackButton={true}
-           >
-             <DebugScreen {...props} />
-           </ScreenWithCustomHeader>
-         )}
-       </UserStack.Screen>
+      screenOptions={{
+        headerShown: false, // 隐藏原生导航栏
+      }}
+    >
+      <UserStack.Screen
+        name="UserMain"
+        options={{ title: '我的' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="我的"
+            showBackButton={false}
+          >
+            <UserProfileScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="EditProfile"
+        options={{ title: '编辑资料' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="编辑资料"
+            showBackButton={true}
+          >
+            <EditProfileScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="Settings"
+        options={{ title: '设置' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="设置"
+            showBackButton={true}
+          >
+            <SettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="AppSettings"
+        options={{ title: '应用设置' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="应用设置"
+            showBackButton={true}
+          >
+            <SettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="ReadingSettings"
+        options={{ title: '阅读偏好' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="阅读偏好"
+            showBackButton={true}
+          >
+            <ReadingSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="LLMSettings"
+        options={{ title: 'LLM设置' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="LLM设置"
+            showBackButton={true}
+          >
+            <LLMSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="ThemeSettings"
+        options={{ title: '主题设置' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="主题设置"
+            showBackButton={true}
+          >
+            <ThemeSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="About"
+        options={{ title: '关于' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="关于"
+            showBackButton={true}
+          >
+            <AboutScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="Export"
+        options={{ title: '导出数据' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="导出数据"
+            showBackButton={true}
+          >
+            <ExportScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="Import"
+        options={{ title: '导入数据' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="导入数据"
+            showBackButton={true}
+          >
+            <ImportScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="StorageManagement"
+        options={{ title: '存储管理' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="存储管理"
+            showBackButton={true}
+          >
+            <SettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="AddRSSSource"
+        options={{ title: '添加RSS源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="添加RSS源"
+            showBackButton={true}
+          >
+            <AddRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="ManageSubscriptions"
+        options={{ title: '管理订阅源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="管理订阅源"
+            showBackButton={true}
+          >
+            <ManageSubscriptionsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="EditRSSSource"
+        options={{ title: '编辑RSS源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="编辑RSS源"
+            showBackButton={true}
+          >
+            <EditRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="Debug"
+        options={{ title: '调试信息' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="调试信息"
+            showBackButton={true}
+          >
+            <DebugScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
 
     </UserStack.Navigator>
   );
@@ -601,77 +589,77 @@ function UserStackNavigator() {
 // 设置堆栈导航
 function SettingsStackNavigator() {
   const { theme } = useThemeContext();
-  
+
   return (
     <SettingsStack.Navigator
-       screenOptions={{
-         headerStyle: {
-           backgroundColor: theme?.colors?.primary || '#3B82F6',
-         },
-         headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
-         headerTitleStyle: HEADER_TITLE_STYLE,
-       }}
-     >
-       <SettingsStack.Screen 
-         name="SettingsMain" 
-         component={SettingsScreen}
-         options={{ title: '设置' }}
-       />
-       <SettingsStack.Screen 
-         name="AppSettings" 
-         component={SettingsScreen}
-         options={{ title: '应用设置' }}
-       />
-       <SettingsStack.Screen 
-         name="ReadingSettings" 
-         component={ReadingSettingsScreen}
-         options={{ title: '阅读偏好' }}
-       />
-       <SettingsStack.Screen 
-         name="LLMSettings" 
-         component={LLMSettingsScreen}
-         options={{ title: 'LLM设置' }}
-       />
-       <SettingsStack.Screen 
-         name="ThemeSettings" 
-         component={ThemeSettingsScreen}
-         options={{ title: '主题设置' }}
-       />
-       <SettingsStack.Screen 
-         name="About" 
-         component={AboutScreen}
-         options={{ title: '关于' }}
-       />
-       <SettingsStack.Screen 
-         name="Export" 
-         component={ExportScreen}
-         options={{ title: '导出数据' }}
-       />
-       <SettingsStack.Screen 
-         name="Import" 
-         component={ImportScreen}
-         options={{ title: '导入数据' }}
-       />
-       <SettingsStack.Screen 
-         name="StorageManagement" 
-         component={SettingsScreen}
-         options={{ title: '存储管理' }}
-       />
-       <SettingsStack.Screen 
-         name="AddRSSSource" 
-         component={AddRSSSourceScreen}
-         options={{ title: '添加RSS源' }}
-       />
-       <SettingsStack.Screen 
-         name="ManageSubscriptions" 
-         component={ManageSubscriptionsScreen}
-         options={{ title: '管理订阅源' }}
-       />
-       <SettingsStack.Screen 
-         name="EditRSSSource" 
-         component={EditRSSSourceScreen}
-         options={{ title: '编辑RSS源' }}
-       />
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme?.colors?.primary || '#3B82F6',
+        },
+        headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
+        headerTitleStyle: HEADER_TITLE_STYLE,
+      }}
+    >
+      <SettingsStack.Screen
+        name="SettingsMain"
+        component={SettingsScreen}
+        options={{ title: '设置' }}
+      />
+      <SettingsStack.Screen
+        name="AppSettings"
+        component={SettingsScreen}
+        options={{ title: '应用设置' }}
+      />
+      <SettingsStack.Screen
+        name="ReadingSettings"
+        component={ReadingSettingsScreen}
+        options={{ title: '阅读偏好' }}
+      />
+      <SettingsStack.Screen
+        name="LLMSettings"
+        component={LLMSettingsScreen}
+        options={{ title: 'LLM设置' }}
+      />
+      <SettingsStack.Screen
+        name="ThemeSettings"
+        component={ThemeSettingsScreen}
+        options={{ title: '主题设置' }}
+      />
+      <SettingsStack.Screen
+        name="About"
+        component={AboutScreen}
+        options={{ title: '关于' }}
+      />
+      <SettingsStack.Screen
+        name="Export"
+        component={ExportScreen}
+        options={{ title: '导出数据' }}
+      />
+      <SettingsStack.Screen
+        name="Import"
+        component={ImportScreen}
+        options={{ title: '导入数据' }}
+      />
+      <SettingsStack.Screen
+        name="StorageManagement"
+        component={SettingsScreen}
+        options={{ title: '存储管理' }}
+      />
+      <SettingsStack.Screen
+        name="AddRSSSource"
+        component={AddRSSSourceScreen}
+        options={{ title: '添加RSS源' }}
+      />
+      <SettingsStack.Screen
+        name="ManageSubscriptions"
+        component={ManageSubscriptionsScreen}
+        options={{ title: '管理订阅源' }}
+      />
+      <SettingsStack.Screen
+        name="EditRSSSource"
+        component={EditRSSSourceScreen}
+        options={{ title: '编辑RSS源' }}
+      />
 
     </SettingsStack.Navigator>
   );
@@ -681,7 +669,7 @@ function SettingsStackNavigator() {
 function MainTabNavigator() {
   const { theme, isDark } = useThemeContext();
   const insets = useSafeAreaInsets();
-  
+
   // 计算实际的标签栏高度，包含底部安全区域
   const tabBarHeight = getTabBarHeight();
   const bottomInset = insets.bottom;
@@ -733,19 +721,19 @@ function MainTabNavigator() {
       // 禁用 React Navigation 默认的安全区域处理
       safeAreaInsets={{ bottom: 0 }}
     >
-      <MainTab.Screen 
-        name="Articles" 
-        component={HomeStackNavigator} 
+      <MainTab.Screen
+        name="Articles"
+        component={HomeStackNavigator}
         options={{ tabBarLabel: '文章' }}
       />
-      <MainTab.Screen 
-        name="Vocabulary" 
-        component={VocabularyStackNavigator} 
+      <MainTab.Screen
+        name="Vocabulary"
+        component={VocabularyStackNavigator}
         options={{ tabBarLabel: '词汇本' }}
       />
-      <MainTab.Screen 
-        name="User" 
-        component={UserStackNavigator} 
+      <MainTab.Screen
+        name="User"
+        component={UserStackNavigator}
         options={{ tabBarLabel: '我的' }}
       />
     </MainTab.Navigator>
@@ -756,7 +744,7 @@ function MainTabNavigator() {
 function RootNavigator() {
   const { theme } = useThemeContext();
   const { state } = useUser();
-  
+
   return (
     <RootStack.Navigator
       screenOptions={{
@@ -768,8 +756,8 @@ function RootNavigator() {
       ) : (
         <RootStack.Screen name="Auth" component={AuthStackNavigator} />
       )}
-      <RootStack.Screen 
-        name="ArticleDetail" 
+      <RootStack.Screen
+        name="ArticleDetail"
         component={ArticleDetailScreen}
         options={({ navigation }) => ({
           headerShown: true,
@@ -778,10 +766,18 @@ function RootNavigator() {
             backgroundColor: theme?.colors?.primary || '#6750A4',
           },
           headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
+          // 【核心修复】设置卡片背景色与主题一致，防止转场/返回时闪烁白屏
+          // 把 contentStyle 去掉，防止覆盖 WebView 内容导致看起来像白屏滑出
+          presentation: 'card',           // 强制卡片模式
+          animation: 'slide_from_right',  // 强制右侧滑入/滑出
+          gestureEnabled: true,           // 启用手势
+          gestureDirection: 'horizontal', // 水平方向
+          fullScreenGesture: true,        // 全屏手势支持
+          animationDuration: 350,         // 标准动画时长
         })}
       />
-      <RootStack.Screen 
-        name="VocabularyDetail" 
+      <RootStack.Screen
+        name="VocabularyDetail"
         component={ArticleDetailScreen}
         options={({ navigation }) => ({
           headerShown: true,
@@ -792,8 +788,8 @@ function RootNavigator() {
           headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
         })}
       />
-      <RootStack.Screen 
-        name="RSSSourceDetail" 
+      <RootStack.Screen
+        name="RSSSourceDetail"
         component={ArticleDetailScreen}
         options={({ navigation }) => ({
           headerShown: true,
@@ -804,8 +800,8 @@ function RootNavigator() {
           headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
         })}
       />
-      <RootStack.Screen 
-        name="AddRSSSource" 
+      <RootStack.Screen
+        name="AddRSSSource"
         component={AddRSSSourceScreen}
         options={{
           headerShown: true,

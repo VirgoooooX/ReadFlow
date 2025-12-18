@@ -52,7 +52,7 @@ export class VocabularyService {
         lastReviewedAt: undefined,
         nextReviewAt: this.calculateNextReview(new Date(), 0),
         masteryLevel: 0,
-        difficulty: this.calculateDifficulty(word),
+        difficulty: this.calculateDifficulty(word, definition),
         tags: [],
         notes: '',
       };
@@ -82,9 +82,7 @@ export class VocabularyService {
           JSON.stringify(vocabularyEntry.tags),
           vocabularyEntry.notes || '',
         ]
-      );
-
-      // 查询刚插入的记录获取完整数据
+      );      // 查询刚插入的记录获取完整数据
       const inserted = await this.getWordEntry(vocabularyEntry.word);
       
       return inserted || {
@@ -486,10 +484,16 @@ export class VocabularyService {
     articleId?: number
   ): Promise<VocabularyEntry> {
     try {
+      const entry = await this.getWordById(id);
+      if (!entry) {
+        throw new Error('Word entry not found');
+      }
+
       const updates: string[] = [];
       const params: any[] = [];
 
-      if (context) {
+      // 【优化】只在 context 为空时才更新，避免覆盖已有的上下文
+      if (context && !entry.context) {
         updates.push('context = ?');
         params.push(context);
       }
@@ -515,8 +519,8 @@ export class VocabularyService {
     }
   }
 
-  private calculateDifficulty(word: string): string {
-    // 简单的难度计算：基于单词长度和常见程度
+  private calculateDifficulty(word: string, definition?: WordDefinition): string {
+    // 基于单词长度的简单难度计算
     if (word.length <= 4) return 'easy';
     if (word.length <= 7) return 'medium';
     return 'hard';

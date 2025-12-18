@@ -16,6 +16,7 @@ import { store } from './src/store';
 import { ThemeProvider } from './src/theme';
 import { UserProvider } from './src/contexts/UserContext';
 import { RSSSourceProvider } from './src/contexts/RSSSourceContext';
+import { ReadingSettingsProvider } from './src/contexts/ReadingSettingsContext'; // 1. 导入 Provider
 import { AppNavigator } from './src/navigation';
 
 // 导入数据库初始化
@@ -57,12 +58,14 @@ function App(): React.JSX.Element {
         <ThemeProvider initialTheme="system">
           <UserProvider>
             <RSSSourceProvider>
-              <StatusBar
-                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                backgroundColor="transparent"
-                translucent
-              />
-              <AppNavigator />
+              <ReadingSettingsProvider>
+                <StatusBar
+                  barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                  backgroundColor="transparent"
+                  translucent
+                />
+                <AppNavigator />
+              </ReadingSettingsProvider>
             </RSSSourceProvider>
           </UserProvider>
         </ThemeProvider>

@@ -1,96 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Switch,
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
-import { useNavigation } from '@react-navigation/native';
-import { SettingsService } from '../../services/SettingsService';
-
-interface ThemeSettings {
-  themeMode: string;
-  currentPreset: string;
-  customConfig: any;
-  autoNightMode: boolean;
-  nightModeStartTime: string;
-  nightModeEndTime: string;
-}
+import { THEME_PRESETS } from '../../theme/presets';
 
 const ThemeSettingsScreen: React.FC = () => {
-  const { theme, isDark, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig, setCustomColors } = useThemeContext();
-  const navigation = useNavigation();
-  const styles = createStyles(isDark, theme);
+  // 【优化】直接从 Context 解构所需状态，移除冗余本地 state
+  const { theme, isDark, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig } = useThemeContext();
+  
+  // 【优化】使用 useMemo 缓存样式，避免每次渲染重新创建
+  const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
 
-  const [selectedPreset, setSelectedPreset] = useState(currentPreset);
-  const [autoNightMode, setAutoNightMode] = useState(false);
-  const [nightModeStartTime, setNightModeStartTime] = useState('22:00');
-  const [nightModeEndTime, setNightModeEndTime] = useState('06:00');
-  const [loading, setLoading] = useState(true);
+  // 【优化】合并预设列表：标准预设 + 自定义预设
+  const displayPresets = useMemo(() => [
+    ...THEME_PRESETS,
+    {
+      id: 'custom',
+      name: '自定义主题',
+      colors: customConfig || { primary: '#6750A4', secondary: '#625B71' },
+    },
+  ], [customConfig]);
 
-  // 加载设置
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    try {
-      // 主题设置已经在 ThemeProvider 中加载
-      // 这里只需要更新本地 UI 状态
-      setSelectedPreset(currentPreset);
-      setAutoNightMode(false);
-      setNightModeStartTime('22:00');
-      setNightModeEndTime('06:00');
-    } catch (error) {
-      console.error('Failed to load theme settings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveSettings = async () => {
-    try {
-      // 主题设置已通过 ThemeProvider 的回调自动保存
-      // 无需额外的 saveThemeSettings 调用
-    } catch (error) {
-      console.error('Failed to save theme settings:', error);
-    }
-  };
-
-  const themePresets = [
-    { id: 'default', name: '默认主题', colors: { primary: '#6750A4', secondary: '#625B71' } },
-    { id: 'blue', name: '蓝色主题', colors: { primary: '#1976D2', secondary: '#1565C0' } },
-    { id: 'green', name: '绿色主题', colors: { primary: '#388E3C', secondary: '#2E7D32' } },
-    { id: 'orange', name: '橙色主题', colors: { primary: '#F57C00', secondary: '#EF6C00' } },
-    { id: 'purple', name: '紫色主题', colors: { primary: '#7B1FA2', secondary: '#6A1B9A' } },
-    { id: 'custom', name: '自定义主题', colors: customConfig || { primary: '#6750A4', secondary: '#625B71' } },
-  ];
-
+  // 【优化】简化处理函数，直接调用 Context 方法，无需额外的 saveSettings
   const handleThemeModeChange = async (mode: 'light' | 'dark' | 'system') => {
     await setThemeMode(mode);
-    await saveSettings();
   };
 
   const handlePresetChange = async (presetId: string) => {
-    setSelectedPreset(presetId as any);
     await setThemePreset(presetId as any);
-    await saveSettings();
-  };
-
-  const handleAutoNightModeToggle = async (value: boolean) => {
-    setAutoNightMode(value);
-    await saveSettings();
-  };
-
-  const handleNightModeTimeChange = async (startTime: string, endTime: string) => {
-    setNightModeStartTime(startTime);
-    setNightModeEndTime(endTime);
-    await saveSettings();
   };
 
   const handleCustomTheme = () => {
@@ -108,7 +52,6 @@ const ThemeSettingsScreen: React.FC = () => {
           onPress: async () => {
             await setThemePreset('default');
             await setThemeMode('system');
-            setSelectedPreset('default');
           },
         },
       ]
@@ -179,10 +122,10 @@ const ThemeSettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>主题预设</Text>
           <View style={styles.card}>
-            {themePresets.map((preset) => (
+            {displayPresets.map((preset) => (
               <TouchableOpacity
                 key={preset.id}
-                style={[styles.presetItem, selectedPreset === preset.id && styles.selectedPreset]}
+                style={[styles.presetItem, currentPreset === preset.id && styles.selectedPreset]}
                 onPress={() => handlePresetChange(preset.id)}
               >
                 <View style={styles.presetLeft}>
@@ -200,11 +143,11 @@ const ThemeSettingsScreen: React.FC = () => {
                       ]} 
                     />
                   </View>
-                  <Text style={[styles.presetName, selectedPreset === preset.id && styles.selectedText]}>
+                  <Text style={[styles.presetName, currentPreset === preset.id && styles.selectedText]}>
                     {preset.name}
                   </Text>
                 </View>
-                {selectedPreset === preset.id && (
+                {currentPreset === preset.id && (
                   <MaterialIcons name="check" size={20} color={theme?.colors?.primary} />
                 )}
               </TouchableOpacity>
@@ -212,9 +155,9 @@ const ThemeSettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* 自定义选项 */}
+        {/* 高级设置 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>自定义选项</Text>
+          <Text style={styles.sectionTitle}>高级设置</Text>
           <View style={styles.card}>
             <TouchableOpacity
               style={styles.actionItem}
@@ -235,7 +178,6 @@ const ThemeSettingsScreen: React.FC = () => {
                 <MaterialIcons name="restore" size={24} color={theme?.colors?.primary} />
                 <Text style={styles.actionText}>重置为默认</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.onSurfaceVariant} />
             </TouchableOpacity>
           </View>
         </View>

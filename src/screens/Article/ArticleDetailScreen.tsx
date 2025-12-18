@@ -6,12 +6,17 @@ import {
   Alert,
   Platform,
   Dimensions,
+  Text,
+  TouchableOpacity,
+  Animated, // 【新增】
+  Easing,   // 【新增】
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
-import ImageViewing from 'react-native-image-viewing'; // 【新增】导入图片查看器
+import ImageViewing from 'react-native-image-viewing';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // 引入安全区域
 import { useThemeContext } from '../../theme';
 import { useReadingSettings } from '../../hooks/useReadingSettings';
 import { Article, WordDefinition } from '../../types';
@@ -33,28 +38,32 @@ const ArticleDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const { articleId } = route.params;
   const { theme, isDark } = useThemeContext();
-  const { 
-    settings: readingSettings, 
-    loading: settingsLoading,
+  const {
+    settings: readingSettings,
+    loading: settingsLoading, // Restore destructured variable name
   } = useReadingSettings();
+  const insets = useSafeAreaInsets(); // 获取安全区域
   const webViewRef = useRef<WebView>(null);
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [vocabularyWords, setVocabularyWords] = useState<string[]>([]); // 单词本单词数组
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
   const [webViewReady, setWebViewReady] = useState(false); // WebView 准备就绪
-  const [initialScrollY, setInitialScrollY] = useState(0); // 【新增】初始滚动位置
-  
+  const [initialScrollY, setInitialScrollY] = useState(0);
+  const [showRefTitle, setShowRefTitle] = useState(false); // 控制顶部标题显示
+  // 【新增】标题透明度动画值 (0: 显示"文章详情", 1: 显示文章标题)
+  const titleFadeAnim = useRef(new Animated.Value(0)).current;
+
   // 【新增】图片预览状态
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
-  
+
   // 词典查询状态
   const [showDictModal, setShowDictModal] = useState(false);
   const [selectedWord, setSelectedWord] = useState('');
   const [wordDefinition, setWordDefinition] = useState<WordDefinition | null>(null);
   const [dictLoading, setDictLoading] = useState(false);
-  
+
   // 翻译状态
   const [showTransModal, setShowTransModal] = useState(false);
   const [selectedSentence, setSelectedSentence] = useState('');
@@ -73,7 +82,7 @@ const ArticleDetailScreen: React.FC = () => {
       try {
         setLoading(true);
         setWebViewReady(false); // 【关键修改】每次加载新文章前，重置 WebView 状态
-        
+
         // 【新增】使用 Promise.all 并行加载所有数据：文章内容、滚动位置、生词本
         // 确保所有数据都准备好后再生成 HTML，避免数据缺失
         const [articleData, savedScrollY, vocabularyEntries] = await Promise.all([
@@ -84,7 +93,7 @@ const ArticleDetailScreen: React.FC = () => {
 
         setArticle(articleData);
         setIsFavorite(articleData?.isFavorite || false);
-        
+
         // 【新增】设置滚动位置和生词表
         setInitialScrollY(savedScrollY || 0);
         console.log('[ArticleDetail] Prepared scroll position:', savedScrollY);
@@ -92,7 +101,7 @@ const ArticleDetailScreen: React.FC = () => {
         const words = vocabularyEntries.map((entry: any) => entry.word.toLowerCase());
         setVocabularyWords(words);
         console.log('[ArticleDetail] Prepared vocabulary words count:', words.length);
-        
+
         // 自动标记为已读
         if (articleData && !articleData.isRead) {
           articleService.markAsRead(articleId);
@@ -106,6 +115,31 @@ const ArticleDetailScreen: React.FC = () => {
 
     loadArticle();
   }, [articleId]);
+
+  // 动态更新导航栏标题
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: false, // 隐藏原生导航栏
+      animation: 'slide_from_right', // 【强制生效】都在这里定义
+      presentation: 'card',
+      gestureEnabled: true,
+      gestureDirection: 'horizontal',
+    });
+    // 设置页面背景色与主题一致，防止返回时闪烁
+    navigation.setOptions({
+      contentStyle: { backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE') },
+    });
+  }, [navigation, theme, isDark]);
+
+  // 【新增】监听 showRefTitle 变化，执行平滑动画
+  useEffect(() => {
+    Animated.timing(titleFadeAnim, {
+      toValue: showRefTitle ? 1 : 0,
+      duration: 500, // 动画时长 500ms，让切换更加柔和缓慢
+      useNativeDriver: true,
+      easing: Easing.out(Easing.ease),
+    }).start();
+  }, [showRefTitle]);
 
   // 【新增函数】提取注入逻辑为独立函数，方便复用
   const injectHighlights = useCallback((words: string[]) => {
@@ -160,7 +194,7 @@ const ArticleDetailScreen: React.FC = () => {
     setShowDictModal(true);
     setDictLoading(true);
     setWordDefinition(null);
-    
+
     try {
       const definition = await dictionaryService.lookupWord(word, sentence);
       setWordDefinition(definition);
@@ -179,7 +213,7 @@ const ArticleDetailScreen: React.FC = () => {
     setShowTransModal(true);
     setTransLoading(true);
     setTranslation(null);
-    
+
     try {
       const result = await translationService.translateSentence(sentence);
       setTranslation(result);
@@ -198,11 +232,11 @@ const ArticleDetailScreen: React.FC = () => {
       setShowDictModal(false);
       return;
     }
-    
+
     try {
       // 使用 selectedSentence 作为上下文
       const context = selectedSentence || selectedWord;
-      
+
       // 添加到单词本
       await vocabularyService.addWord(
         selectedWord,
@@ -210,20 +244,20 @@ const ArticleDetailScreen: React.FC = () => {
         articleId,
         wordDefinition
       );
-      
+
       // 更新高亮单词数组
       const newWord = selectedWord.toLowerCase();
       if (!vocabularyWords.includes(newWord)) {
         const updatedWords = [...vocabularyWords, newWord];
         setVocabularyWords(updatedWords);
-        
-      // 【修改】在添加单词时直接调用注入函数，而不是依赖 useEffect
-      if (webViewRef.current) {
-        console.log('[ArticleDetail] Adding word and injecting highlight with updated words:', updatedWords);
-        injectHighlights(updatedWords);
+
+        // 【修改】在添加单词时直接调用注入函数，而不是依赖 useEffect
+        if (webViewRef.current) {
+          console.log('[ArticleDetail] Adding word and injecting highlight with updated words:', updatedWords);
+          injectHighlights(updatedWords);
+        }
       }
-      }
-      
+
       setShowDictModal(false);
     } catch (error) {
       console.error('Failed to add word to vocabulary:', error);
@@ -235,13 +269,13 @@ const ArticleDetailScreen: React.FC = () => {
     if (!article?.imageUrl) {
       return false;
     }
-    
+
     const imgRegex = /<img[^>]*src=["']([^"']*)["'][^>]*>/gi;
     const contentImages = article.content.match(imgRegex);
     if (!contentImages || contentImages.length === 0) {
       return true;
     }
-    
+
     const thumbnailUrl = article.imageUrl;
     for (const imgTag of contentImages) {
       const srcMatch = imgTag.match(/src=["']([^"']*)["']/i);
@@ -249,10 +283,10 @@ const ArticleDetailScreen: React.FC = () => {
         try {
           const contentImageUrl = decodeURIComponent(srcMatch[1]);
           const thumbnailImageUrl = decodeURIComponent(thumbnailUrl);
-          
-          if (contentImageUrl === thumbnailImageUrl || 
-              contentImageUrl.includes(thumbnailImageUrl) || 
-              thumbnailImageUrl.includes(contentImageUrl)) {
+
+          if (contentImageUrl === thumbnailImageUrl ||
+            contentImageUrl.includes(thumbnailImageUrl) ||
+            thumbnailImageUrl.includes(contentImageUrl)) {
             return false;
           }
         } catch (e) {
@@ -262,7 +296,7 @@ const ArticleDetailScreen: React.FC = () => {
         }
       }
     }
-    
+
     return true;
   };
 
@@ -271,13 +305,13 @@ const ArticleDetailScreen: React.FC = () => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('[ArticleDetail] WebView message received:', data);
-      
+
       switch (data.type) {
         case 'debug':
           // WebView 端的调试消息
           console.log('[WebView Debug]', data.debugType, ':', data.message);
           break;
-          
+
         case 'ready':
           // WebView 已准备就绪
           console.log('[ArticleDetail] WebView ready event received');
@@ -285,7 +319,7 @@ const ArticleDetailScreen: React.FC = () => {
           // 【关键修改】此时不再需要注入高亮或滚动位置，因为 HTML 内部已经处理了
           // 仅保留 injectHighlights 以便在用户添加新单词时使用
           break;
-          
+
         case 'wordPress':
           // 单词点击 - 查词
           if (data.word && data.sentence) {
@@ -293,14 +327,14 @@ const ArticleDetailScreen: React.FC = () => {
             handleWordPress(data.word, data.sentence);
           }
           break;
-          
+
         case 'sentenceDoubleTap':
           // 双击 - 翻译整句
           if (data.sentence) {
             handleSentenceDoubleTap(data.sentence);
           }
           break;
-          
+
         // 【新增】优化3: 处理图片点击
         case 'imageClick':
           if (data.url) {
@@ -308,14 +342,20 @@ const ArticleDetailScreen: React.FC = () => {
             setIsImageViewVisible(true);
           }
           break;
-        
-        // 【关键修改】优化4: 处理滚动位置 - 仅更新 Ref，不直接保存到数据库
+
+        // 【关键修改】优化4: 处理滚动位置 
         case 'scroll':
-          // 【关键修改】这里只更新 Ref，不调用 service 写库，零性能消耗
           if (data.scrollY !== undefined) {
             currentScrollYRef.current = data.scrollY;
             hasScrolledRef.current = true;
             console.log('[ArticleDetail] Updated scroll position in memory:', data.scrollY);
+
+            // 简单的防抖/节流逻辑，根据滚动距离决定是否显示标题
+            if (data.scrollY > 60 && !showRefTitle) {
+              setShowRefTitle(true);
+            } else if (data.scrollY <= 60 && showRefTitle) {
+              setShowRefTitle(false);
+            }
           }
           break;
       }
@@ -353,7 +393,7 @@ const ArticleDetailScreen: React.FC = () => {
   // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
   const htmlContent = useMemo(() => {
     if (!article?.content || !readingSettings) return '';
-    
+
     return generateArticleHtml({
       content: article.content,
       fontSize: readingSettings.fontSize || 16,
@@ -377,14 +417,14 @@ const ArticleDetailScreen: React.FC = () => {
   if (loading || settingsLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator 
-          size="large" 
-          color={theme?.colors?.primary || '#3B82F6'} 
+        <ActivityIndicator
+          size="large"
+          color={theme?.colors?.primary || '#3B82F6'}
         />
       </View>
     );
   }
-  
+
   if (!article) {
     return (
       <View style={styles.errorContainer}>
@@ -392,9 +432,67 @@ const ArticleDetailScreen: React.FC = () => {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
+      {/* 自定义顶部导航栏 - 为了支持 height: 35 必须使用自定义 View */}
+      <View style={[styles.customHeader, {
+        paddingTop: insets.top,
+        height: 35 + insets.top, // 恢复正常高度计算，之前误写成 70 会导致过高
+        backgroundColor: theme?.colors?.primary || '#6750A4', // 同步 AppNavigator 的 Primary 背景色
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 4,
+      }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          {/* 使用 onPrimary (通常是白色) 以匹配 Primary 背景 */}
+          <MaterialIcons name="arrow-back" size={24} color={theme?.colors?.onPrimary || '#FFFFFF'} />
+        </TouchableOpacity>
+
+        <View style={[styles.headerTitleContainer, { opacity: 1 }]}>
+          {/* 这里使用两个绝对定位的 View 进行交叉淡入淡出动画 */}
+
+          {/* 1. "文章详情" (默认显示，showRefTitle=true 时淡出) */}
+          <Animated.View style={[
+            StyleSheet.absoluteFill,
+            {
+              justifyContent: 'center',
+              alignItems: 'center',
+              opacity: titleFadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0],
+              })
+            }
+          ]}>
+            <Text style={[styles.headerTitle, { color: theme?.colors?.onPrimary || '#FFFFFF' }]} numberOfLines={1}>
+              文章详情
+            </Text>
+          </Animated.View>
+
+          {/* 2. 文章标题 (默认隐藏，showRefTitle=true 时淡入) */}
+          <Animated.View style={[
+            StyleSheet.absoluteFill,
+            {
+              justifyContent: 'center',
+              alignItems: 'center',
+              opacity: titleFadeAnim // 直接使用 0->1 的动画值
+            }
+          ]}>
+            <Text style={[styles.headerTitle, { color: theme?.colors?.onPrimary || '#FFFFFF' }]} numberOfLines={1}>
+              {article?.title || ''}
+            </Text>
+          </Animated.View>
+        </View>
+
+        <View style={styles.headerRight} />
+      </View>
+
+
       {/* WebView 内容 */}
       {htmlContent && (
         <WebView
@@ -422,7 +520,7 @@ const ArticleDetailScreen: React.FC = () => {
           })}
         />
       )}
-      
+
       {/* 词典弹窗 */}
       <WordDefinitionModal
         visible={showDictModal}
@@ -432,7 +530,7 @@ const ArticleDetailScreen: React.FC = () => {
         onClose={() => setShowDictModal(false)}
         onAddToVocabulary={handleAddToVocabulary}
       />
-      
+
       {/* 翻译弹窗 */}
       <SentenceTranslationModal
         visible={showTransModal}
@@ -441,7 +539,7 @@ const ArticleDetailScreen: React.FC = () => {
         loading={transLoading}
         onClose={() => setShowTransModal(false)}
       />
-      
+
       {/* 【新增】图片查看器 */}
       <ImageViewing
         images={[{ uri: currentImageUrl }]}
@@ -457,21 +555,21 @@ const ArticleDetailScreen: React.FC = () => {
 
 const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
   StyleSheet.create({
-    container: { 
-      flex: 1, 
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), 
+    container: {
+      flex: 1,
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
-    loadingContainer: { 
-      flex: 1, 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), 
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
-    errorContainer: { 
-      flex: 1, 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'), 
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
     webView: {
       flex: 1,
@@ -484,6 +582,41 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
       right: 0,
       alignItems: 'center',
     },
+    // 自定义 Header 样式
+    customHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      zIndex: 100,
+    },
+    backButton: {
+      width: 48,
+      height: 35 + (Platform.OS === 'android' ? 0 : 0), // 确保按钮高度填满
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 101,
+    },
+    headerTitleContainer: {
+      flex: 1,
+      height: '100%', // 确保容器有高度
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      position: 'relative', // 相对定位，作为绝对定位子元素的锚点
+    },
+    headerTitleTextContainer: {
+      ...StyleSheet.absoluteFillObject, // 铺满父容器
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: 18,      // 严格同步 CustomHeader 字号
+      fontWeight: '900', // 严格同步 CustomHeader 字重 (Extra Bold)
+      color: theme?.colors?.onPrimary || '#FFFFFF', // 确保白色文字
+    },
+    headerRight: {
+      width: 48,
+    }
   });
 
 export default ArticleDetailScreen;

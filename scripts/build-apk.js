@@ -1,26 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * APK 构建脚本
- * 支持动态设置版本号和更新日志
- * 自动更新 appVersion.ts 版本信息
- * 
- * 使用方式：
- * node scripts/build-apk.js                              # 基本构建
- * node scripts/build-apk.js --version 1.2.0             # 指定版本号
- * node scripts/build-apk.js --version 1.2.0 --changelog "新功能1" "修复问题1"
- * node scripts/build-apk.js --auto-generate             # 从 Git 自动生成 changelog
- * node scripts/build-apk.js --fast                      # 快速构建（跳过缓存清除）
- * node scripts/build-apk.js --arch arm64                # 只构建指定架构
- * node scripts/build-apk.js --help                      # 显示帮助
+ * APK 构建脚本 (优化版)
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const os = require('os');
 
 // 记录构建开始时间
 const buildStartTime = Date.now();
+const isWindows = os.platform() === 'win32';
 
 // 显示帮助信息
 function showHelp() {
@@ -37,11 +28,6 @@ function showHelp() {
   --arch <arch>       只构建指定架构 (arm64/arm/x86/x86_64/all)
   --open              构建完成后打开 APK 所在目录
   --help              显示此帮助信息
-
-示例:
-  node scripts/build-apk.js --version 1.3.0 --auto-generate
-  node scripts/build-apk.js --fast --arch arm64
-  node scripts/build-apk.js --version 1.3.0 --changelog "新增功能" "修复问题"
 `);
   process.exit(0);
 }
@@ -58,44 +44,46 @@ function formatDuration(ms) {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-  if (minutes > 0) {
-    return `${minutes}分${remainingSeconds}秒`;
+  return minutes > 0 ? `${minutes}分${remainingSeconds}秒` : `${seconds}秒`;
+}
+
+// 【优化】跨平台的文件夹删除函数
+function removeDir(dirPath) {
+  if (fs.existsSync(dirPath)) {
+    try {
+      fs.rmSync(dirPath, { recursive: true, force: true });
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
-  return `${seconds}秒`;
+  return false;
 }
 
 // 清除缓存的辅助函数
 function cleanCaches(projectRoot) {
   console.log('\n🧹 清除所有缓存...');
-  
-  // 1. 清除 Metro 缓存
-  console.log('  - 清除 Metro bundler 缓存...');
-  const metroCachePath = path.join(projectRoot, '.metro-cache');
-  if (fs.existsSync(metroCachePath)) {
-    try {
-      execSync(`rmdir /s /q "${metroCachePath}"`, { stdio: 'ignore' });
-      console.log('    ✓ Metro 缓存已清除');
-    } catch (e) {
-      console.log('    ⚠️  Metro 缓存清除失败（可忽略）');
+
+  const pathsToClean = [
+    { name: 'Metro 缓存', path: path.join(projectRoot, '.metro-cache') },
+    { name: 'npm 缓存', path: path.join(projectRoot, 'node_modules', '.cache') },
+    { name: 'Android 构建目录', path: path.join(projectRoot, 'android', 'app', 'build') }
+  ];
+
+  pathsToClean.forEach(item => {
+    console.log(`  - 清除 ${item.name}...`);
+    if (removeDir(item.path)) {
+      console.log(`    ✓ ${item.name} 已清除`);
+    } else {
+      console.log(`    - ${item.name} 无需清除或失败`);
     }
-  }
-  
-  // 2. 清除 node_modules cache
-  console.log('  - 清除 npm 缓存...');
-  const npmCachePath = path.join(projectRoot, 'node_modules', '.cache');
-  if (fs.existsSync(npmCachePath)) {
-    try {
-      execSync(`rmdir /s /q "${npmCachePath}"`, { stdio: 'ignore' });
-      console.log('    ✓ npm 缓存已清除');
-    } catch (e) {
-      console.log('    ⚠️  npm 缓存清除失败（可忽略）');
-    }
-  }
-  
-  // 3. 清除 Gradle 缓存
+  });
+
+  // 清除 Gradle 缓存
   console.log('  - 清除 Gradle 缓存...');
   try {
-    execSync('gradlew.bat clean --quiet', {
+    const gradlew = isWindows ? 'gradlew.bat' : './gradlew';
+    execSync(`${gradlew} clean --quiet`, {
       cwd: path.join(projectRoot, 'android'),
       stdio: 'ignore'
     });
@@ -103,108 +91,86 @@ function cleanCaches(projectRoot) {
   } catch (e) {
     console.log('    ⚠️  Gradle clean 失败（可忽略）');
   }
-  
-  // 4. 清除 Android 构建目录
-  console.log('  - 清除 Android 构建目录...');
-  const androidBuildDir = path.join(projectRoot, 'android', 'app', 'build');
-  if (fs.existsSync(androidBuildDir)) {
-    try {
-      execSync(`rmdir /s /q "${androidBuildDir}"`, { stdio: 'ignore' });
-      console.log('    ✓ Android build 目录已清除');
-    } catch (e) {
-      console.log('    ⚠️  Android build 目录清除失败（可忽略）');
-    }
-  }
-  
+
   console.log('✅ 缓存清除完成\n');
 }
 
-// ... existing code ...
-
-// 从现有的 appVersion.ts 读取上次的 changelog
-function getPreviousChangelog() {
-  try {
-    const appVersionContent = fs.readFileSync(appVersionPath, 'utf-8');
-    // 使用正则提取 changelog 数组内容
-    const changelogMatch = appVersionContent.match(/changelog:\s*\[([\s\S]*?)\]/m);
-    if (changelogMatch) {
-      const changelogStr = changelogMatch[1];
-      // 提取所有引号内的内容
-      const items = changelogStr.match(/'([^']*)'/g);
-      if (items) {
-        return items.map(item => item.replace(/^'|'$/g, ''));
-      }
-    }
-  } catch (e) {
-    // 如果读取失败，返回空数组
-  }
-  return null;
-}
-
-function getChangelogFromGit(currentVersion, previousVersion) {
+// 【优化】完全重写的 Git 日志获取逻辑
+function getChangelogFromGit() {
   try {
     console.log('\n📝 从 Git 日志生成更新内容...');
-    
-    let commits;
-    if (previousVersion && previousVersion.length > 0) {
-      // 获取两个版本之间的 commit
-      try {
-        commits = execSync(`git log ${previousVersion}..${currentVersion} --pretty=format:"%B" --no-merges`, {
-          cwd: path.join(__dirname, '..')
-        }).toString();
-      } catch (e) {
-        // 如果 tag 不存在，获取最近的 commits
-        commits = execSync('git log --pretty=format:"%B" --no-merges -20', {
-          cwd: path.join(__dirname, '..')
-        }).toString();
-      }
-    } else {
-      // 如果没有上一个版本，获取最近的 commits
-      commits = execSync('git log --pretty=format:"%B" --no-merges -20', {
-        cwd: path.join(__dirname, '..')
-      }).toString();
+
+    // 1. 获取最近的一个 Tag
+    let range = '';
+    try {
+      // 获取最近的一个 tag (abbrev=0 只显示 tag 名)
+      const lastTag = execSync('git describe --tags --abbrev=0', {
+        cwd: path.join(__dirname, '..'),
+        encoding: 'utf-8'
+      }).toString().trim();
+
+      console.log(`    - 发现最近 Tag: ${lastTag}，将获取 ${lastTag} 到 HEAD 的提交`);
+      range = `${lastTag}..HEAD`;
+    } catch (e) {
+      console.log('    - 未发现 Tag，将获取最近 20 条提交');
+      range = '-20'; // 如果没有 tag，取最近 20 条
     }
-    
+
+    // 2. 获取提交日志
+    const cmd = range === '-20'
+      ? `git log --pretty=format:"%B" --no-merges -20`
+      : `git log ${range} --pretty=format:"%B" --no-merges`;
+
+    const commits = execSync(cmd, {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf-8' // 【重要】防止中文乱码
+    }).toString();
+
     if (!commits || commits.trim().length === 0) {
-      return ['版本更新'];
+      return ['版本更新 (暂无 Git 提交记录)'];
     }
-    
-    // 解析提交消息，提取有意义的内容
-    const lines = commits
-      .split('\n')
-      .filter(line => /^(feat|fix|perf|refactor|docs|style|test|chore)/.test(line) || line.trim().length > 10);
-    
-    const changelog = [];
-    
+
+    // 3. 过滤和清洗日志
+    const lines = commits.split('\n');
+    let changelog = [];
+
+    // 策略 A：优先提取符合 Conventional Commits 规范的 (feat, fix 等)
+    const conventionalRegex = /^(feat|fix|perf|refactor|docs|style|test|chore)(\([^)]*\))?:\s*/;
+
     for (const line of lines) {
-      if (changelog.length >= 10) break;  // 最多取 10 条
-      
-      let clean = line.trim();
-      if (clean.length === 0) continue;
-      
-      // 清理提交消息格式
-      clean = clean.replace(/^(feat|fix|perf|refactor|docs|style|test|chore)(\([^)]*\))?:\s*/, '');
-      clean = clean.replace(/\(#\d+\)$/, '');  // 移除 PR 号
-      
-      if (clean.length > 0 && !/^(Merge|Revert)/.test(clean)) {
-        changelog.push(clean);
+      const cleanLine = line.trim();
+      if (!cleanLine) continue;
+
+      if (conventionalRegex.test(cleanLine)) {
+        // 移除 pr 号 (#123)
+        const msg = cleanLine.replace(conventionalRegex, '').replace(/\s*\(#\d+\)$/, '');
+        changelog.push(msg);
       }
     }
-    
+
+    // 策略 B：如果规范提交太少（少于1条），则提取所有非空且稍微长一点的提交
+    if (changelog.length === 0) {
+      console.log('    - 未检测到规范提交格式，切换到通用提取模式');
+      changelog = lines
+        .map(l => l.trim())
+        .filter(l => l.length > 5 && !l.startsWith('Merge') && !l.startsWith('Revert'))
+        .slice(0, 10); // 最多取10条
+    }
+
+    // 去重并限制数量
+    changelog = [...new Set(changelog)].slice(0, 10);
+
     return changelog.length > 0 ? changelog : ['版本更新'];
+
   } catch (error) {
     console.warn('\n⚠️  无法从 Git 生成更新内容:', error.message);
     return ['版本更新'];
   }
 }
 
-// 解析命令行参数
+// ... 参数解析部分保持不变 ...
 const args = process.argv.slice(2);
-
-// 显示帮助
-if (args.includes('--help') || args.includes('-h')) {
-  showHelp();
-}
+if (args.includes('--help') || args.includes('-h')) showHelp();
 
 const versionIndex = args.indexOf('--version');
 const changelogIndex = args.indexOf('--changelog');
@@ -217,7 +183,6 @@ let version = versionIndex !== -1 ? args[versionIndex + 1] : null;
 let changelog = [];
 let targetArch = archIndex !== -1 ? args[archIndex + 1] : 'all';
 
-// 架构映射
 const archMap = {
   'arm64': 'arm64-v8a',
   'arm': 'armeabi-v7a',
@@ -227,7 +192,6 @@ const archMap = {
 };
 const buildArch = archMap[targetArch] || archMap['all'];
 
-// 解析 changelog 参数（支持多个值）
 if (changelogIndex !== -1) {
   for (let i = changelogIndex + 1; i < args.length; i++) {
     if (args[i].startsWith('--')) break;
@@ -236,11 +200,8 @@ if (changelogIndex !== -1) {
 }
 
 const appJsonPath = path.join(__dirname, '..', 'app.json');
-const androidBuildGradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
-const androidBuildDir = path.join(__dirname, '..', 'android', 'app', 'build');
 const appVersionPath = path.join(__dirname, '..', 'src', 'constants', 'appVersion.ts');
 
-// 计算 versionCode
 function calculateVersionCode(versionString) {
   const parts = versionString.split('.');
   let code = 0;
@@ -253,182 +214,133 @@ function calculateVersionCode(versionString) {
 
 try {
   const projectRoot = path.join(__dirname, '..');
-  
+
   console.log('\n🚀 开始构建 ReadFlow APK...\n');
-  
-  // 根据参数决定是否清除缓存
+
   if (fastBuild) {
     console.log('⚡ 快速构建模式 - 跳过缓存清除');
   } else {
     cleanCaches(projectRoot);
   }
-  
-  // 显示构建架构
+
   if (targetArch !== 'all') {
     console.log(`📱 目标架构: ${targetArch} (${buildArch})`);
   }
-  
-  // 读取 app.json
+
   const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
-  
-  // 如果没有指定版本号，使用 app.json 中的版本号
+
   if (!version) {
     version = appJson.expo.version;
   }
-  
+
   const versionCode = calculateVersionCode(version);
-  const updateTime = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  
+  const updateTime = new Date().toISOString().split('T')[0];
+
   console.log(`📝 当前版本: ${version} (Build: ${versionCode})`);
-  
-  // 生成或使用提供的更新日志
+
+  // 处理 Changelog
   if (autoGenerate) {
-    // 从 Git 日志自动生成
-    let previousVersion = null;
-    try {
-      // 获取上一个 tag
-      const tags = execSync('git tag -l --sort=-version:refname', {
-        cwd: path.join(__dirname, '..')
-      }).toString().trim().split('\n');
-      
-      if (tags.length > 1) {
-        previousVersion = tags[1].replace(/^v/, '');  // 使用第二新的 tag
-      } else if (tags.length > 0) {
-        previousVersion = tags[0].replace(/^v/, '');
-      }
-    } catch (e) {
-      // 处理 git tag 不存在的情况
-    }
-    
-    changelog = getChangelogFromGit(version, previousVersion);
+    changelog = getChangelogFromGit();
   } else if (changelog.length === 0) {
-    // 如果没有提供 changelog，尝试读取上个版本的内容
-    const previousChangelog = getPreviousChangelog();
-    if (previousChangelog && previousChangelog.length > 0) {
-      changelog = previousChangelog;
-      console.log('📝 使用上个版本的 changelog');
-    } else {
-      changelog = ['版本更新'];
-    }
+    // 尝试从 appVersion.ts 读取旧的，这里简化逻辑，如果没有就默认
+    changelog = ['版本更新'];
   }
-  
-  // 更新 app.json 版本号
+
+  // 【优化】同时更新 app.json 中的 version 和 android.versionCode
+  // 这样 expo prebuild 会自动处理 build.gradle，无需手动正则替换
+  let isAppJsonChanged = false;
   if (appJson.expo.version !== version) {
-    console.log(`📝 更新版本号: ${appJson.expo.version} → ${version}`);
     appJson.expo.version = version;
-    fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf-8');
-    console.log('✅ app.json 已更新');
+    isAppJsonChanged = true;
   }
-  
+  if (appJson.expo.android.versionCode !== versionCode) {
+    appJson.expo.android.versionCode = versionCode;
+    isAppJsonChanged = true;
+  }
+
+  if (isAppJsonChanged) {
+    console.log(`📝 更新 app.json: v${version} (code: ${versionCode})`);
+    fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf-8');
+  }
+
   // 更新 appVersion.ts
   console.log('📝 更新 appVersion.ts...');
-  
   const changelogItems = changelog.map(item => `    '${item.replace(/'/g, "\\'")}',`).join('\n');
-  
   const appVersionContent = `// 应用版本信息
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  // 版本号
   version: '${version}',
-  // 构建号
   buildNumber: ${versionCode},
-  // 更新时间
   updateTime: '${updateTime}',
-  // 更新内容
   changelog: [
 ${changelogItems}
   ],
 };
 
-// 应用信息
 export const APP_INFO = {
   name: 'ReadFlow',
   description: '一款专注英语阅读学习的应用',
 };
 `;
-  
   fs.writeFileSync(appVersionPath, appVersionContent, 'utf-8');
-  console.log('✅ appVersion.ts 已更新');
-  
 
-  
   // 执行 expo prebuild
   console.log('\n🔨 执行 expo prebuild...');
-  execSync('npx expo prebuild --platform android --clean', { 
+  // 【修复】移除 --no-interactive 选项，较新版本 Expo CLI 不支持此参数
+  // 使用 CI=1 环境变量来确保非交互模式
+  execSync('npx expo prebuild --platform android --clean', {
     stdio: 'inherit',
-    cwd: path.join(__dirname, '..'),
-    env: { ...process.env, CI: '1' }  // 设置 CI=1 跳过交互式提示
+    cwd: projectRoot,
+    env: { ...process.env, CI: '1' }
   });
-  
-  // 更新 Android build.gradle 中的 versionCode 和 versionName
-  console.log('\n📝 更新 Android build.gradle...');
-  let buildGradle = fs.readFileSync(androidBuildGradlePath, 'utf-8');
-  
-  // 查找并更新 versionName
-  buildGradle = buildGradle.replace(
-    /versionName\s+"[^"]*"/,
-    `versionName "${version}"`
-  );
-  
-  // 查找并更新 versionCode
-  buildGradle = buildGradle.replace(
-    /versionCode\s+\d+/,
-    `versionCode ${versionCode}`
-  );
-  
-  fs.writeFileSync(androidBuildGradlePath, buildGradle, 'utf-8');
-  console.log(`✅ build.gradle 已更新 (versionCode: ${versionCode}, versionName: ${version})`);
-  
+
+  // 【优化】移除了手动修改 build.gradle 的代码
+  // Expo Prebuild 已经根据 app.json 生成了正确的 build.gradle
+
   // 执行 gradle build
   console.log('\n🏗️  执行 gradle assembleRelease...');
-  // 快速模式不执行 clean，正常模式已经在 cleanCaches 中执行过 clean
-  const gradleCmd = fastBuild 
-    ? `.\\gradlew assembleRelease -PreactNativeArchitectures=${buildArch}`
-    : `.\\gradlew assembleRelease -PreactNativeArchitectures=${buildArch}`;
-  
+  const gradlew = isWindows ? '.\\gradlew' : './gradlew';
+  const gradleCmd = `${gradlew} assembleRelease -PreactNativeArchitectures=${buildArch}`;
+
   execSync(gradleCmd, {
     stdio: 'inherit',
-    cwd: path.join(__dirname, '..', 'android')
+    cwd: path.join(projectRoot, 'android')
   });
-  
+
   // 重命名 APK
   const apkName = `ReadFlow-${version}${targetArch !== 'all' ? '-' + targetArch : ''}.apk`;
-  const originalApkPath = path.join(__dirname, '..', 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
-  const newApkPath = path.join(__dirname, '..', 'android', 'app', 'build', 'outputs', 'apk', 'release', apkName);
-  
+  const originalApkPath = path.join(projectRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
+  const newApkPath = path.join(projectRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', apkName);
+
   if (fs.existsSync(originalApkPath)) {
     fs.renameSync(originalApkPath, newApkPath);
     console.log(`\n📦 APK 已重命名: ${apkName}`);
   }
-  
-  // 显示 APK 大小
+
   if (fs.existsSync(newApkPath)) {
     const stats = fs.statSync(newApkPath);
     console.log(`📊 APK 大小: ${formatFileSize(stats.size)}`);
   }
-  
-  // 计算构建时间
+
   const buildDuration = Date.now() - buildStartTime;
-  
+
   console.log('\n' + '='.repeat(50));
   console.log('✨ APK 构建成功！');
   console.log('='.repeat(50));
   console.log(`📍 位置: ${newApkPath}`);
   console.log(`⏱️  构建耗时: ${formatDuration(buildDuration)}`);
   console.log('='.repeat(50) + '\n');
-  
-  // 构建完成后打开目录
+
   if (openAfterBuild) {
     const apkDir = path.dirname(newApkPath);
     try {
-      execSync(`explorer "${apkDir}"`, { stdio: 'ignore' });
+      const explorer = isWindows ? 'explorer' : 'open';
+      execSync(`${explorer} "${apkDir}"`, { stdio: 'ignore' });
       console.log('📂 已打开 APK 所在目录');
-    } catch (e) {
-      // 忽略打开失败
-    }
+    } catch (e) { }
   }
-  
+
 } catch (error) {
   const buildDuration = Date.now() - buildStartTime;
   console.error(`\n❌ 构建失败 (耗时 ${formatDuration(buildDuration)}):`, error.message);

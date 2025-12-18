@@ -99,7 +99,7 @@ export class TranslationService {
           sourceLang: row.source_lang,
           targetLang: row.target_lang,
           source: row.source,
-          createdAt: row.created_at ? new Date(row.created_at * 1000) : undefined,
+          createdAt: row.created_at ? new Date(row.created_at) : undefined,
         };
       }
 
@@ -115,7 +115,7 @@ export class TranslationService {
    */
   private async cacheTranslation(entry: TranslationCacheEntry): Promise<void> {
     try {
-      const now = Math.floor(Date.now() / 1000);
+      const now = new Date().toISOString();
 
       await this.databaseService.executeStatement(
         `INSERT INTO translation_cache (original_text, translated_text, source_lang, target_lang, source, created_at)
@@ -308,7 +308,7 @@ export class TranslationService {
     success: boolean = true
   ): Promise<void> {
     try {
-      const now = Math.floor(Date.now() / 1000);
+      const now = new Date().toISOString();
       await this.databaseService.executeStatement(
         `INSERT INTO llm_usage_stats (request_type, provider, model, success, created_at)
          VALUES (?, ?, ?, ?, ?)`,

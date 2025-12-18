@@ -37,6 +37,7 @@ const ScreenWithCustomHeader: React.FC<ScreenWithCustomHeaderProps> = ({
         showBackButton={showBackButton}
         rightComponent={rightComponent}
         onBackPress={onBackPress}
+        // 不传递默认 undefined/null，让 CustomHeader 自己处理回退
         backgroundColor={backgroundColor}
         textColor={textColor}
         titleVerticalAlign={titleVerticalAlign}

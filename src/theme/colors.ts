@@ -1,7 +1,15 @@
-// Material Design 3 Color System
-// 基于Material You设计规范的颜色定义
+// Material Design 3 Color System with Dynamic Theming
+// 【重构】使用 @material/material-color-utilities 生成科学配色方案
 
-// 自定义颜色配置接口
+import {
+  argbFromHex,
+  themeFromSourceColor,
+  hexFromArgb,
+} from '@material/material-color-utilities';
+import { getContrastColor, withAlpha, generateContainerColor } from '../utils/colorUtils';
+
+// --- 接口定义 ---
+
 export interface CustomColorConfig {
   primary?: string;
   secondary?: string;
@@ -11,20 +19,19 @@ export interface CustomColorConfig {
   surface?: string;
 }
 
-// 主题预设类型
-export type ThemePreset = 
-  | 'default' 
-  | 'blue' 
-  | 'green' 
-  | 'purple' 
-  | 'orange' 
-  | 'red' 
-  | 'pink' 
-  | 'teal' 
-  | 'indigo' 
-  | 'yellow' 
-  | 'gray' 
-  | 'dark' 
+export type ThemePreset =
+  | 'default'
+  | 'blue'
+  | 'green'
+  | 'purple'
+  | 'orange'
+  | 'red'
+  | 'pink'
+  | 'teal'
+  | 'indigo'
+  | 'yellow'
+  | 'gray'
+  | 'dark'
   | 'custom';
 
 export interface ColorTokens {
@@ -83,116 +90,194 @@ export interface ColorTokens {
   scrim: string;
 }
 
-// Light theme colors
+// --- 【核心优化】使用官方库生成完整的配色方案 ---
+
+/**
+ * 根据源颜色（种子色）生成完整的 Material Design 3 配色方案
+ * 这个函数使用 Google 官方的 HCT 色彩空间算法
+ */
+export const generateTokensFromSource = (
+  sourceColorHex: string,
+  isDark: boolean
+): ColorTokens => {
+  try {
+    // 1. 使用官方算法生成主题
+    const theme = themeFromSourceColor(argbFromHex(sourceColorHex));
+    const scheme = isDark ? theme.schemes.dark : theme.schemes.light;
+
+    // 2. 辅助函数：ARGB 转 Hex
+    const toHex = (argb: number) => hexFromArgb(argb);
+
+    // 3. 映射到 ColorTokens 结构
+    const tokens: ColorTokens = {
+      // Primary
+      primary: toHex(scheme.primary),
+      onPrimary: toHex(scheme.onPrimary),
+      primaryContainer: toHex(scheme.primaryContainer),
+      onPrimaryContainer: toHex(scheme.onPrimaryContainer),
+
+      // Secondary
+      secondary: toHex(scheme.secondary),
+      onSecondary: toHex(scheme.onSecondary),
+      secondaryContainer: toHex(scheme.secondaryContainer),
+      onSecondaryContainer: toHex(scheme.onSecondaryContainer),
+
+      // Tertiary
+      tertiary: toHex(scheme.tertiary),
+      onTertiary: toHex(scheme.onTertiary),
+      tertiaryContainer: toHex(scheme.tertiaryContainer),
+      onTertiaryContainer: toHex(scheme.onTertiaryContainer),
+
+      // Error
+      error: toHex(scheme.error),
+      onError: toHex(scheme.onError),
+      errorContainer: toHex(scheme.errorContainer),
+      onErrorContainer: toHex(scheme.onErrorContainer),
+
+      // Background
+      // Background - 强制在浅色模式下使用略深的背景色以保证卡片对比度
+      background: (!isDark && toHex(scheme.background) === toHex(scheme.surface))
+        ? '#F0F2F5' // 通用浅灰背景
+        : toHex(scheme.background),
+      onBackground: toHex(scheme.onBackground),
+
+      // Surface
+      surface: toHex(scheme.surface),
+      onSurface: toHex(scheme.onSurface),
+      surfaceVariant: toHex(scheme.surfaceVariant),
+      onSurfaceVariant: toHex(scheme.onSurfaceVariant),
+
+      // Outline
+      outline: toHex(scheme.outline),
+      outlineVariant: toHex(scheme.outlineVariant),
+
+      // Surface container (MD3 新增分层)
+      // Surface container (MD3 新增分层) - 添加回退机制，防止旧版库返回 undefined
+      surfaceDim: (scheme as any).surfaceDim ? toHex((scheme as any).surfaceDim) : toHex(scheme.surface),
+      surfaceBright: (scheme as any).surfaceBright ? toHex((scheme as any).surfaceBright) : toHex(scheme.surface),
+      surfaceContainerLowest: (scheme as any).surfaceContainerLowest ? toHex((scheme as any).surfaceContainerLowest) : toHex(scheme.surface),
+      surfaceContainerLow: (scheme as any).surfaceContainerLow ? toHex((scheme as any).surfaceContainerLow) : toHex(scheme.surface),
+      surfaceContainer: (scheme as any).surfaceContainer ? toHex((scheme as any).surfaceContainer) : toHex(scheme.surface),
+      surfaceContainerHigh: (scheme as any).surfaceContainerHigh ? toHex((scheme as any).surfaceContainerHigh) : toHex(scheme.surface),
+      surfaceContainerHighest: (scheme as any).surfaceContainerHighest ? toHex((scheme as any).surfaceContainerHighest) : toHex(scheme.surface),
+
+      // Inverse
+      inverseSurface: toHex((scheme as any).inverseSurface),
+      inverseOnSurface: toHex((scheme as any).inverseOnSurface),
+      inversePrimary: toHex((scheme as any).inversePrimary),
+
+      // Shadow & Scrim
+      shadow: toHex((scheme as any).shadow),
+      scrim: toHex((scheme as any).scrim),
+    };
+
+    return tokens;
+  } catch (error) {
+    console.error('Failed to generate tokens from source color:', error);
+    // 回退到默认浅色主题
+    return isDark ? darkColors : lightColors;
+  }
+};
+
+// --- 默认主题 (手工精心定义，确保完整的语义化颜色系统) ---
+
+// 1. 浅色模式标准定义 (Light Theme)
 export const lightColors: ColorTokens = {
-  // Primary colors - Blue theme (符合设计规范)
   primary: '#3B82F6',
   onPrimary: '#FFFFFF',
   primaryContainer: '#DBEAFE',
   onPrimaryContainer: '#1E3A8A',
 
-  // Secondary colors
-  secondary: '#6B7280',
+  // 背景：白色
+  background: '#F9FAFB',
+  onBackground: '#111827', // 深黑字
+
+  // 卡片：白色
+  surface: '#FFFFFF',
+  onSurface: '#1F2937',    // 深灰字 (标题)
+  surfaceVariant: '#F3F4F6',
+  onSurfaceVariant: '#4B5563', // 浅灰字 (副标题)
+
+  surfaceContainer: '#FFFFFF', // 列表项背景
+
+  // 其他辅助色
+  secondary: '#64748B',
   onSecondary: '#FFFFFF',
-  secondaryContainer: '#F3F4F6',
-  onSecondaryContainer: '#374151',
-
-  // Tertiary colors
-  tertiary: '#10B981',
+  secondaryContainer: '#F1F5F9',
+  onSecondaryContainer: '#0F172A',
+  tertiary: '#0F766E',
   onTertiary: '#FFFFFF',
-  tertiaryContainer: '#D1FAE5',
-  onTertiaryContainer: '#064E3B',
-
-  // Error colors
-  error: '#B3261E',
+  tertiaryContainer: '#CCFBF1',
+  onTertiaryContainer: '#115E59',
+  error: '#EF4444',
   onError: '#FFFFFF',
-  errorContainer: '#F9DEDC',
-  onErrorContainer: '#410E0B',
+  errorContainer: '#FEE2E2',
+  onErrorContainer: '#991B1B',
+  outline: '#94A3B8',
+  outlineVariant: '#CBD5E1',
 
-  // Background colors
-  background: '#FFFBFE',
-  onBackground: '#1C1B1F',
-  surface: '#FFFBFE',
-  onSurface: '#1C1B1F',
-  surfaceVariant: '#E7E0EC',
-  onSurfaceVariant: '#49454F',
-
-  // Outline colors
-  outline: '#79747E',
-  outlineVariant: '#CAC4D0',
-
-  // Surface colors
-  surfaceDim: '#DDD8E1',
-  surfaceBright: '#FFFBFE',
+  // MD3 Surface Tones (浅色模式下通常也是白色或极浅灰)
+  surfaceDim: '#DED8E1',
+  surfaceBright: '#FEF7FF',
   surfaceContainerLowest: '#FFFFFF',
   surfaceContainerLow: '#F7F2FA',
-  surfaceContainer: '#F1ECF4',
   surfaceContainerHigh: '#ECE6F0',
   surfaceContainerHighest: '#E6E0E9',
 
-  // Inverse colors
   inverseSurface: '#313033',
   inverseOnSurface: '#F4EFF4',
   inversePrimary: '#D0BCFF',
-
-  // Shadow and scrim
   shadow: '#000000',
   scrim: '#000000',
 };
 
-// Dark theme colors
+// 2. 深色模式标准定义 (Dark Theme)
+// 【重点】确保所有 onXxx 都是浅色！
 export const darkColors: ColorTokens = {
-  // Primary colors - Blue theme (符合设计规范)
   primary: '#60A5FA',
-  onPrimary: '#1E3A8A',
+  onPrimary: '#002D6C',
   primaryContainer: '#2563EB',
   onPrimaryContainer: '#DBEAFE',
 
-  // Secondary colors
-  secondary: '#9CA3AF',
-  onSecondary: '#374151',
-  secondaryContainer: '#4B5563',
-  onSecondaryContainer: '#F3F4F6',
+  // 背景：深黑
+  background: '#111827', // Gray-900
+  onBackground: '#F3F4F6', // Gray-100 (浅白字)
 
-  // Tertiary colors
-  tertiary: '#34D399',
-  onTertiary: '#064E3B',
-  tertiaryContainer: '#059669',
-  onTertiaryContainer: '#D1FAE5',
+  // 卡片：比背景稍亮
+  surface: '#1F2937',    // Gray-800
+  onSurface: '#F9FAFB',  // Gray-50 (纯白字)
+  surfaceVariant: '#374151', // Gray-700
+  onSurfaceVariant: '#D1D5DB', // Gray-300 (浅灰字)
 
-  // Error colors
-  error: '#F2B8B5',
-  onError: '#601410',
-  errorContainer: '#8C1D18',
-  onErrorContainer: '#F9DEDC',
+  surfaceContainer: '#1F2937', // 列表项背景
 
-  // Background colors
-  background: '#1C1B1F',
-  onBackground: '#E6E1E5',
-  surface: '#1C1B1F',
-  onSurface: '#E6E1E5',
-  surfaceVariant: '#49454F',
-  onSurfaceVariant: '#CAC4D0',
+  // 其他辅助色
+  secondary: '#94A3B8',
+  onSecondary: '#0F172A',
+  secondaryContainer: '#334155',
+  onSecondaryContainer: '#E2E8F0',
+  tertiary: '#2DD4BF',
+  onTertiary: '#00382E',
+  tertiaryContainer: '#0F766E',
+  onTertiaryContainer: '#CCFBF1',
+  error: '#F87171',
+  onError: '#450A0A',
+  errorContainer: '#991B1B',
+  onErrorContainer: '#FECACA',
+  outline: '#64748B',
+  outlineVariant: '#475569',
 
-  // Outline colors
-  outline: '#938F99',
-  outlineVariant: '#49454F',
-
-  // Surface colors
-  surfaceDim: '#1C1B1F',
-  surfaceBright: '#423F42',
+  // MD3 Surface Tones
+  surfaceDim: '#111827',
+  surfaceBright: '#374151',
   surfaceContainerLowest: '#0F0D13',
   surfaceContainerLow: '#1D1B20',
-  surfaceContainer: '#211F26',
   surfaceContainerHigh: '#2B2930',
   surfaceContainerHighest: '#36343B',
 
-  // Inverse colors
   inverseSurface: '#E6E1E5',
   inverseOnSurface: '#313033',
   inversePrimary: '#3B82F6',
-
-  // Shadow and scrim
   shadow: '#000000',
   scrim: '#000000',
 };
@@ -213,242 +298,231 @@ export const semanticColors = {
   },
 };
 
-// Color utilities
-// 生成自定义颜色的辅助函数
-const generateColorVariants = (baseColor: string, isDark: boolean) => {
-  // 这里可以实现更复杂的颜色生成逻辑
-  // 暂时返回基础颜色和一些变体
-  const opacity = isDark ? 0.8 : 0.9;
-  return {
-    base: baseColor,
-    container: isDark ? `${baseColor}33` : `${baseColor}1A`,
-    onContainer: isDark ? '#FFFFFF' : '#000000',
-  };
-};
+// --- 【优化】应用自定义颜色配置 ---
 
-// 应用自定义颜色配置
-const applyCustomColors = (baseColors: ColorTokens, customConfig?: CustomColorConfig): ColorTokens => {
+const applyCustomColors = (
+  baseColors: ColorTokens,
+  customConfig?: CustomColorConfig,
+  isDark: boolean = false
+): ColorTokens => {
   if (!customConfig) return baseColors;
-  
-  const customColors = { ...baseColors };
-  
+
+  // 使用官方库重新生成整套配色（如果有 primary）
   if (customConfig.primary) {
-    customColors.primary = customConfig.primary;
-    customColors.primaryContainer = `${customConfig.primary}1A`;
+    const generatedTokens = generateTokensFromSource(customConfig.primary, isDark);
+
+    // 仅覆盖用户指定的颜色，其他颜色使用生成的方案
+    const merged = { ...generatedTokens };
+
+    // 允许用户强制覆盖特定的颜色
+    if (customConfig.secondary) {
+      merged.secondary = customConfig.secondary;
+      merged.onSecondary = getContrastColor(customConfig.secondary);
+      merged.secondaryContainer = generateContainerColor(customConfig.secondary, isDark);
+    }
+
+    if (customConfig.tertiary) {
+      merged.tertiary = customConfig.tertiary;
+      merged.onTertiary = getContrastColor(customConfig.tertiary);
+      merged.tertiaryContainer = generateContainerColor(customConfig.tertiary, isDark);
+    }
+
+    if (customConfig.error) {
+      merged.error = customConfig.error;
+      merged.onError = getContrastColor(customConfig.error);
+      merged.errorContainer = generateContainerColor(customConfig.error, isDark);
+    }
+
+    if (customConfig.background) {
+      merged.background = customConfig.background;
+      merged.onBackground = getContrastColor(customConfig.background);
+    }
+
+    if (customConfig.surface) {
+      merged.surface = customConfig.surface;
+      merged.onSurface = getContrastColor(customConfig.surface);
+    }
+
+    return merged;
   }
-  
+
+  // 如果没有 primary 但有其他自定义颜色，直接应用
+  const newColors = { ...baseColors };
+
   if (customConfig.secondary) {
-    customColors.secondary = customConfig.secondary;
-    customColors.secondaryContainer = `${customConfig.secondary}1A`;
+    newColors.secondary = customConfig.secondary;
+    newColors.onSecondary = getContrastColor(customConfig.secondary);
+    newColors.secondaryContainer = generateContainerColor(customConfig.secondary, isDark);
   }
-  
+
   if (customConfig.tertiary) {
-    customColors.tertiary = customConfig.tertiary;
-    customColors.tertiaryContainer = `${customConfig.tertiary}1A`;
+    newColors.tertiary = customConfig.tertiary;
+    newColors.onTertiary = getContrastColor(customConfig.tertiary);
+    newColors.tertiaryContainer = generateContainerColor(customConfig.tertiary, isDark);
   }
-  
+
   if (customConfig.error) {
-    customColors.error = customConfig.error;
-    customColors.errorContainer = `${customConfig.error}1A`;
+    newColors.error = customConfig.error;
+    newColors.onError = getContrastColor(customConfig.error);
+    newColors.errorContainer = generateContainerColor(customConfig.error, isDark);
   }
-  
+
   if (customConfig.background) {
-    customColors.background = customConfig.background;
+    newColors.background = customConfig.background;
+    newColors.onBackground = getContrastColor(customConfig.background);
   }
-  
+
   if (customConfig.surface) {
-    customColors.surface = customConfig.surface;
+    newColors.surface = customConfig.surface;
+    newColors.onSurface = getContrastColor(customConfig.surface);
   }
-  
-  return customColors;
+
+  return newColors;
 };
 
 export const getColorTokens = (isDark: boolean, customConfig?: CustomColorConfig): ColorTokens => {
   const baseColors = isDark ? darkColors : lightColors;
-  return applyCustomColors(baseColors, customConfig);
+  const result = applyCustomColors(baseColors, customConfig, isDark);
+
+  // 【防守性编程】确保深色模式下的文字颜色永远不会是深色
+  // 更新：使用新的标准浅色 #F9FAFB 作为深色模式下的文字颜色
+  if (isDark && result.onSurface && result.onSurface.toLowerCase() !== '#f9fafb') {
+    console.warn('⚠️ 深色模式 onSurface 颜色异常:', result.onSurface, '已纠正为浅色');
+    result.onSurface = '#F9FAFB';
+    result.onBackground = '#F3F4F6';
+    result.onSurfaceVariant = '#D1D5DB';
+  }
+
+  return result;
 };
 
-// 主题预设配置
+// --- 【优化】预设颜色方案 (基于色彩理论) ---
+
 export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
-  default: null, // 使用系统默认颜色
-  
-  // 蓝色系主题
+  // 默认主题 (系统蓝色)
+  default: null,
+
+  // 1. 商务蓝 - 单色系 (Monochromatic)
+  // 主色、次色、第三色都在蓝色家族，提升专业感
   blue: {
-    primary: '#3B82F6',
-    secondary: '#6B7280',
-    tertiary: '#10B981',
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
+    primary: '#0061A4', // 深蓝
+    secondary: '#535F70', // 蓝灰
+    tertiary: '#6B5778', // 紫灰
   },
-  
-  // 绿色系主题
+
+  // 2. 森林绿 - 邻近色系 (Analogous)
+  // 绿色 + 蓝绿色，自然和谐
   green: {
-    primary: '#10B981',
-    secondary: '#6B7280',
-    tertiary: '#3B82F6',
-    background: '#F0FDF4',
-    surface: '#FFFFFF',
+    primary: '#006C4C', // 翠绿
+    secondary: '#4D6357', // 灰绿
+    tertiary: '#3E6373', // 蓝青色
   },
-  
-  // 紫色系主题
+
+  // 3. 赛博紫 - 对比色系
+  // 紫色主调，加入绿色点缀，科技感十足
   purple: {
-    primary: '#8B5CF6',
-    secondary: '#6B7280',
-    tertiary: '#F59E0B',
-    background: '#FAF5FF',
-    surface: '#FFFFFF',
+    primary: '#7C3AED', // 紫色-600
+    secondary: '#4C1D95', // 紫色-900
+    tertiary: '#10B981', // 绿色-500
   },
-  
-  // 橙色系主题
+
+  // 4. 活力橙 - 暖色系
+  // 橙色 + 褐色 + 青色，充满能量
   orange: {
-    primary: '#F97316',
-    secondary: '#6B7280',
-    tertiary: '#10B981',
-    background: '#FFF7ED',
-    surface: '#FFFFFF',
+    primary: '#EA580C', // 橙色-600
+    secondary: '#78350F', // 褐色-900
+    tertiary: '#0F766E', // 青色-700
   },
-  
-  // 红色系主题
+
+  // 5. 热情红 - 红色系
+  // 红色主导，加入中性色平衡
   red: {
-    primary: '#EF4444',
-    secondary: '#6B7280',
-    tertiary: '#10B981',
-    background: '#FEF2F2',
-    surface: '#FFFFFF',
+    primary: '#DC2626', // 红色-600
+    secondary: '#7C2D12', // 橙色-900
+    tertiary: '#0369A1', // 蓝色-600
   },
-  
-  // 粉色系主题
+
+  // 6. 温柔粉 - 粉色系
+  // 粉色主调，柔和舒适
   pink: {
-    primary: '#EC4899',
-    secondary: '#6B7280',
-    tertiary: '#8B5CF6',
-    background: '#FDF2F8',
-    surface: '#FFFFFF',
+    primary: '#EC4899', // 粉色-500
+    secondary: '#831843', // 粉色-900
+    tertiary: '#7C3AED', // 紫色-600
   },
-  
-  // 青色系主题
+
+  // 7. 沉稳青 - 冷色系
+  // 青绿色，稳重专业
   teal: {
-    primary: '#14B8A6',
-    secondary: '#6B7280',
-    tertiary: '#F59E0B',
-    background: '#F0FDFA',
-    surface: '#FFFFFF',
+    primary: '#0D9488', // 青色-600
+    secondary: '#134E4A', // 青色-900
+    tertiary: '#D97706', // 琥珀色-600
   },
-  
-  // 靛蓝系主题
+
+  // 8. 深邃靛 - 靛蓝系
+  // 靛蓝 + 紫色，高级神秘感
   indigo: {
-    primary: '#6366F1',
-    secondary: '#6B7280',
-    tertiary: '#10B981',
-    background: '#F0F9FF',
-    surface: '#FFFFFF',
+    primary: '#4F46E5', // 靛蓝-600
+    secondary: '#312E81', // 靛蓝-900
+    tertiary: '#059669', // 绿色-600
   },
-  
-  // 黄色系主题
+
+  // 9. 明亮黄 - 黄色系
+  // 活力黄色，加入深色平衡
   yellow: {
-    primary: '#F59E0B',
-    secondary: '#6B7280',
-    tertiary: '#8B5CF6',
-    background: '#FFFBEB',
-    surface: '#FFFFFF',
+    primary: '#D97706', // 琥珀色-600
+    secondary: '#78350F', // 褐色-900
+    tertiary: '#0369A1', // 蓝色-600
   },
-  
-  // 灰色系主题
+
+  // 10. 简约灰 - 中性系
+  // 专业灰色，低调优雅
   gray: {
-    primary: '#6B7280',
-    secondary: '#9CA3AF',
-    tertiary: '#3B82F6',
-    background: '#F9FAFB',
-    surface: '#FFFFFF',
+    primary: '#4B5563', // 灰色-600
+    secondary: '#1F2937', // 灰色-900
+    tertiary: '#2563EB', // 蓝色-600
   },
-  
-  // 深色主题
+
+  // 11. 深色护眼 - 专为夜间
   dark: {
-    primary: '#60A5FA',
-    secondary: '#9CA3AF',
-    tertiary: '#34D399',
-    background: '#111827',
-    surface: '#1F2937',
+    primary: '#60A5FA', // 蓝色-400
+    secondary: '#9CA3AF', // 灰色-400
+    tertiary: '#34D399', // 绿色-400
   },
-  
-  custom: null, // 用户自定义
+
+  // 12. 自定义 (用户自己设置)
+  custom: null,
 };
 
 // 主题预设描述
 export const themePresetDescriptions: Record<ThemePreset, string> = {
-  default: '系统默认主题，跟随Material Design 3规范',
-  blue: '清新的蓝色主题，适合商务和专业场景',
-  green: '自然的绿色主题，给人清新舒适的感觉',
-  purple: '优雅的紫色主题，富有创意和想象力',
-  orange: '活力的橙色主题，充满热情和能量',
-  red: '热情的红色主题，醒目而有力量感',
-  pink: '温柔的粉色主题，柔和而富有亲和力',
-  teal: '沉稳的青色主题，平衡而专业',
-  indigo: '深邃的靛蓝主题，神秘而富有深度',
-  yellow: '明亮的黄色主题，充满阳光和活力',
-  gray: '简约的灰色主题，低调而优雅',
-  dark: '深色主题，护眼且适合夜间使用',
-  custom: '完全自定义的主题，发挥你的创意',
+  default: '系统默认主题，遵循 Material Design 3 规范',
+  blue: '商务专业主题，传递信任和稳定感，适合企业应用',
+  green: '自然清新主题，给人生机和舒适感，适合健康和生活类应用',
+  purple: '赛博科技主题，富有创意和神秘感，适合创意和技术类应用',
+  orange: '活力热情主题，充满能量和热血，适合社交和娱乐应用',
+  red: '热烈醒目主题，传递激情和力量，适合运动和动作应用',
+  pink: '温柔浪漫主题，柔和亲切，适合美妆和生活方式应用',
+  teal: '沉稳优雅主题，平衡冷暖，适合金融和商务应用',
+  indigo: '深邃神秘主题，高级感十足，适合艺术和设计应用',
+  yellow: '明亮活泼主题，阳光积极，适合教育和娱乐应用',
+  gray: '简约极简主题，低调专业，适合办公和效率工具',
+  dark: '深色护眼主题，舒适的夜间体验，适合所有应用',
+  custom: '完全自定义主题，发挥你的创意和想象',
 };
 
 // 主题预设标签
 export const themePresetTags: Record<ThemePreset, string[]> = {
-  default: ['默认', '标准'],
-  blue: ['商务', '专业', '清新'],
-  green: ['自然', '健康', '舒适'],
-  purple: ['创意', '优雅', '神秘'],
-  orange: ['活力', '热情', '温暖'],
-  red: ['热情', '力量', '醒目'],
-  pink: ['温柔', '浪漫', '亲和'],
-  teal: ['沉稳', '平衡', '专业'],
-  indigo: ['深邃', '智慧', '冷静'],
-  yellow: ['明亮', '活力', '阳光'],
-  gray: ['简约', '低调', '优雅'],
-  dark: ['护眼', '夜间', '酷炫'],
-  custom: ['个性', '创意', '独特'],
-};
-
-export const getSemanticColor = (type: 'success' | 'warning' | 'info', isDark: boolean): string => {
-  return semanticColors[type][isDark ? 'dark' : 'light'];
-};
-
-// Opacity levels for overlays and states
-export const opacityLevels = {
-  disabled: 0.38,
-  hover: 0.08,
-  focus: 0.12,
-  selected: 0.12,
-  activated: 0.12,
-  pressed: 0.12,
-  dragged: 0.16,
-};
-
-// Color roles for different UI elements
-export const colorRoles = {
-  // Text colors
-  textPrimary: (colors: ColorTokens) => colors.onSurface,
-  textSecondary: (colors: ColorTokens) => colors.onSurfaceVariant,
-  textDisabled: (colors: ColorTokens) => `${colors.onSurface}${Math.round(opacityLevels.disabled * 255).toString(16)}`,
-
-  // Icon colors
-  iconPrimary: (colors: ColorTokens) => colors.onSurface,
-  iconSecondary: (colors: ColorTokens) => colors.onSurfaceVariant,
-  iconDisabled: (colors: ColorTokens) => `${colors.onSurface}${Math.round(opacityLevels.disabled * 255).toString(16)}`,
-
-  // Border colors
-  borderPrimary: (colors: ColorTokens) => colors.outline,
-  borderSecondary: (colors: ColorTokens) => colors.outlineVariant,
-
-  // Divider colors
-  divider: (colors: ColorTokens) => colors.outlineVariant,
-};
-
-export default {
-  light: lightColors,
-  dark: darkColors,
-  semantic: semanticColors,
-  getColorTokens,
-  getSemanticColor,
-  opacityLevels,
-  colorRoles,
+  default: ['默认', '标准', '官方'],
+  blue: ['商务', '专业', '信任', '单色系'],
+  green: ['自然', '健康', '清新', '邻近色'],
+  purple: ['科技', '创意', '神秘', '对比色'],
+  orange: ['活力', '热情', '能量', '暖色'],
+  red: ['热烈', '醒目', '力量', '激情'],
+  pink: ['温柔', '浪漫', '亲切', '柔和'],
+  teal: ['沉稳', '优雅', '平衡', '专业'],
+  indigo: ['深邃', '高级', '神秘', '艺术'],
+  yellow: ['明亮', '活泼', '阳光', '积极'],
+  gray: ['简约', '极简', '低调', '专业'],
+  dark: ['护眼', '深色', '舒适', '夜间'],
+  custom: ['自定义', '个性', '创意', '唯一'],
 };

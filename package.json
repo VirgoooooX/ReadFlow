@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
+    "@material/material-color-utilities": "^0.3.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/slider": "4.5.6",
     "@react-navigation/bottom-tabs": "^7.4.7",
@@ -38,7 +39,8 @@
     "react-native": "0.79.6",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-image-viewing": "^0.2.2",
-    "react-native-pager-view": "^6.9.1",
+    "react-native-pager-view": "^6.7.1",
+    "react-native-reanimated": "~3.17.4",
     "react-native-render-html": "^6.3.4",
     "react-native-rss-parser": "^1.5.1",
     "react-native-safe-area-context": "5.4.0",
