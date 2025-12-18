@@ -2,11 +2,15 @@
   "expo": {
     "name": "ReadFlow",
     "slug": "ReadFlow",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "androidStatusBar": {
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
@@ -17,7 +21,12 @@
     },
     "android": {
       "package": "com.virgoooooox.ReadFlow",
-      "versionCode": 20000
+      "versionCode": 20100,
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
