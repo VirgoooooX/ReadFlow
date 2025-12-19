@@ -13,6 +13,26 @@ const os = require('os');
 const buildStartTime = Date.now();
 const isWindows = os.platform() === 'win32';
 
+// 【修复】強制 Windows 控制台使用 UTF-8 編碼，防止中文和表情符號亂碼
+if (isWindows) {
+  try {
+    execSync('chcp 65001', { stdio: 'ignore' });
+  } catch (e) {
+    // 忽略错误
+  }
+}
+
+// 通用的环境变量，强制 UTF-8
+const commonEnv = {
+  ...process.env,
+  LANG: 'en_US.UTF-8',
+  LC_ALL: 'en_US.UTF-8',
+  PYTHONIOENCODING: 'utf-8',
+  JAVA_TOOL_OPTIONS: '-Dfile.encoding=UTF-8',
+  CI: '1',
+  FORCE_COLOR: '0' // 进一步减少特殊字符，防止乱码
+};
+
 // 显示帮助信息
 function showHelp() {
   console.log(`
@@ -21,7 +41,7 @@ function showHelp() {
 用法: node scripts/build-apk.js [options]
 
 选项:
-  --version <ver>     指定版本号 (例: 1.2.0)
+  --version <ver>     指定版本号 (例: 2.1.0)
   --changelog <msg>   指定更新日志 (可多个)
   --auto-generate     从 Git 提交日志自动生成 changelog
   --fast              快速构建模式 (跳过缓存清除)
@@ -85,7 +105,8 @@ function cleanCaches(projectRoot) {
     const gradlew = isWindows ? 'gradlew.bat' : './gradlew';
     execSync(`${gradlew} clean --quiet`, {
       cwd: path.join(projectRoot, 'android'),
-      stdio: 'ignore'
+      stdio: 'ignore',
+      env: commonEnv
     });
     console.log('    ✓ Gradle clean 完成');
   } catch (e) {
@@ -103,10 +124,12 @@ function getChangelogFromGit() {
     // 1. 获取最近的一个 Tag
     let range = '';
     try {
-      // 获取最近的一个 tag (abbrev=0 只显示 tag 名)
-      const lastTag = execSync('git describe --tags --abbrev=0', {
+      // 强制使用 UTF-8 输出并禁用 quotepath
+      const gitCmd = 'git -c core.quotepath=false -c i18n.logoutputencoding=utf-8 describe --tags --abbrev=0';
+      const lastTag = execSync(gitCmd, {
         cwd: path.join(__dirname, '..'),
-        encoding: 'utf-8'
+        encoding: 'utf-8',
+        env: commonEnv
       }).toString().trim();
 
       console.log(`    - 发现最近 Tag: ${lastTag}，将获取 ${lastTag} 到 HEAD 的提交`);
@@ -117,13 +140,16 @@ function getChangelogFromGit() {
     }
 
     // 2. 获取提交日志
-    const cmd = range === '-20'
-      ? `git log --pretty=format:"%B" --no-merges -20`
-      : `git log ${range} --pretty=format:"%B" --no-merges`;
+    // 强制使用 UTF-8 输出并禁用 pager
+    const gitBase = 'git -c core.quotepath=false -c i18n.logoutputencoding=utf-8 --no-pager';
+    const logCmd = range === '-20'
+      ? `${gitBase} log --pretty=format:"%B" --no-merges -20`
+      : `${gitBase} log ${range} --pretty=format:"%B" --no-merges`;
 
-    const commits = execSync(cmd, {
+    const commits = execSync(logCmd, {
       cwd: path.join(__dirname, '..'),
-      encoding: 'utf-8' // 【重要】防止中文乱码
+      encoding: 'utf-8',
+      env: commonEnv
     }).toString();
 
     if (!commits || commits.trim().length === 0) {
@@ -304,7 +330,7 @@ export const APP_INFO = {
   execSync('npx expo prebuild --platform android --clean', {
     stdio: 'inherit',
     cwd: projectRoot,
-    env: { ...process.env, CI: '1' }
+    env: commonEnv
   });
 
   // 【优化】移除了手动修改 build.gradle 的代码
@@ -317,7 +343,8 @@ export const APP_INFO = {
 
   execSync(gradleCmd, {
     stdio: 'inherit',
-    cwd: path.join(projectRoot, 'android')
+    cwd: path.join(projectRoot, 'android'),
+    env: commonEnv
   });
 
   // 重命名 APK
