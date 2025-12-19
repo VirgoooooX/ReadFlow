@@ -11,6 +11,10 @@
       "translucent": true,
       "backgroundColor": "#00000000"
     },
+    "androidStatusBar": {
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
