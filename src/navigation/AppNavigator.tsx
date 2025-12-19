@@ -745,6 +745,8 @@ function RootNavigator() {
   const { theme } = useThemeContext();
   const { state } = useUser();
 
+  if (state.isLoading) return null;
+
   return (
     <RootStack.Navigator
       screenOptions={{

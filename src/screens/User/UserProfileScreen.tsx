@@ -56,7 +56,7 @@ const UserProfileScreen: React.FC = () => {
   useEffect(() => {
     loadUserStats();
   }, []);
-  
+
   // 屏幕获得焦点时实时刷新数据
   useFocusEffect(
     React.useCallback(() => {
@@ -120,39 +120,39 @@ const UserProfileScreen: React.FC = () => {
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>
           {user?.avatar ? (
-            <Image 
+            <Image
               source={{ uri: user.avatar }}
               style={styles.avatar}
               defaultSource={{ uri: 'https://via.placeholder.com/80x80/6750A4/FFFFFF?text=TF' }}
             />
           ) : (
             <View style={styles.avatar}>
-              <MaterialIcons 
-                name="person" 
-                size={48} 
-                color={theme?.colors?.onPrimary || '#FFFFFF'} 
+              <MaterialIcons
+                name="person"
+                size={48}
+                color={theme?.colors?.onPrimary || '#FFFFFF'}
               />
             </View>
           )}
           <TouchableOpacity style={styles.editAvatarButton} onPress={handleEditProfile}>
-            <MaterialIcons 
-              name="edit" 
-              size={16} 
-              color={theme?.colors?.onPrimary || '#FFFFFF'} 
+            <MaterialIcons
+              name="edit"
+              size={16}
+              color={theme?.colors?.onPrimary || '#FFFFFF'}
             />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.profileInfo}>
           <Text style={styles.userName}>{user?.username || userProfile.name}</Text>
           <Text style={styles.userEmail}>{user?.email || userProfile.email}</Text>
         </View>
-        
+
         <TouchableOpacity style={styles.settingsButton} onPress={handleSettings}>
-          <MaterialIcons 
-            name="settings" 
-            size={24} 
-            color={theme?.colors?.onSurface || '#1C1B1F'} 
+          <MaterialIcons
+            name="settings"
+            size={24}
+            color={theme?.colors?.onSurface || '#1C1B1F'}
           />
         </TouchableOpacity>
       </View>
@@ -164,10 +164,10 @@ const UserProfileScreen: React.FC = () => {
         <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
           <Text style={styles.sectionTitle}>内容概览</Text>
           <TouchableOpacity onPress={() => loadUserStats()} disabled={loading}>
-            <MaterialIcons 
-              name="refresh" 
-              size={24} 
-              color={loading ? (isDark ? '#938F99' : '#79747E') : theme?.colors?.primary || '#6750A4'} 
+            <MaterialIcons
+              name="refresh"
+              size={24}
+              color={loading ? (isDark ? '#938F99' : '#79747E') : theme?.colors?.primary || '#6750A4'}
             />
           </TouchableOpacity>
         </View>
@@ -177,53 +177,53 @@ const UserProfileScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.statsGrid}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.statCard}
               onPress={() => navigation.navigate('Vocabulary' as any)}
             >
-              <MaterialIcons 
-                name="book" 
-                size={32} 
-                color={theme?.colors?.secondary || '#625B71'} 
+              <MaterialIcons
+                name="book"
+                size={32}
+                color={theme?.colors?.secondary || '#625B71'}
               />
               <Text style={styles.statValue}>{userStats?.vocabularyWords || 0}</Text>
               <Text style={styles.statLabel}>收藏单词</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.statCard}
               onPress={() => navigation.navigate('ManageSubscriptions' as any)}
             >
-              <MaterialIcons 
-                name="rss-feed" 
-                size={32} 
-                color={theme?.colors?.tertiary || '#7D5260'} 
+              <MaterialIcons
+                name="rss-feed"
+                size={32}
+                color={theme?.colors?.tertiary || '#7D5260'}
               />
               <Text style={styles.statValue}>{userStats?.rssSources || 0}</Text>
               <Text style={styles.statLabel}>RSS源</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.statCard}
               onPress={() => navigation.navigate('Articles' as any)}
             >
-              <MaterialIcons 
-                name="folder" 
-                size={32} 
-                color={theme?.colors?.secondary || '#625B71'} 
+              <MaterialIcons
+                name="folder"
+                size={32}
+                color={theme?.colors?.secondary || '#625B71'}
               />
               <Text style={styles.statValue}>{userStats?.totalArticles || 0}</Text>
               <Text style={styles.statLabel}>总文章数</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.statCard}
               onPress={() => navigation.navigate('Articles' as any)}
             >
-              <MaterialIcons 
-                name="favorite" 
-                size={32} 
-                color={theme?.colors?.tertiary || '#7D5260'} 
+              <MaterialIcons
+                name="favorite"
+                size={32}
+                color={theme?.colors?.tertiary || '#7D5260'}
               />
               <Text style={styles.statValue}>{userStats?.favoriteArticles || 0}</Text>
               <Text style={styles.statLabel}>收藏文章</Text>
@@ -237,53 +237,53 @@ const UserProfileScreen: React.FC = () => {
       {/* 快捷操作 */}
       <View style={styles.actionsSection}>
         <Text style={styles.sectionTitle}>快捷操作</Text>
-        
+
         <TouchableOpacity style={styles.actionItem} onPress={handleEditProfile}>
           <View style={styles.actionLeft}>
-            <MaterialIcons 
-              name="edit" 
-              size={24} 
-              color={theme?.colors?.primary || '#6750A4'} 
+            <MaterialIcons
+              name="edit"
+              size={24}
+              color={theme?.colors?.primary || '#6750A4'}
             />
             <Text style={styles.actionText}>编辑个人资料</Text>
           </View>
-          <MaterialIcons 
-            name="chevron-right" 
-            size={24} 
-            color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+          <MaterialIcons
+            name="chevron-right"
+            size={24}
+            color={theme?.colors?.onSurfaceVariant || '#79747E'}
           />
         </TouchableOpacity>
-        
+
         {/* 调试信息选项 */}
         <TouchableOpacity style={styles.actionItem} onPress={handleDebugInfo}>
           <View style={styles.actionLeft}>
-            <MaterialIcons 
-              name="bug-report" 
-              size={24} 
-              color={theme?.colors?.primary || '#6750A4'} 
+            <MaterialIcons
+              name="bug-report"
+              size={24}
+              color={theme?.colors?.primary || '#6750A4'}
             />
             <Text style={styles.actionText}>调试信息</Text>
           </View>
-          <MaterialIcons 
-            name="chevron-right" 
-            size={24} 
-            color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+          <MaterialIcons
+            name="chevron-right"
+            size={24}
+            color={theme?.colors?.onSurfaceVariant || '#79747E'}
           />
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.actionItem} onPress={handleLogout}>
           <View style={styles.actionLeft}>
-            <MaterialIcons 
-              name="logout" 
-              size={24} 
-              color={theme?.colors?.error || '#BA1A1A'} 
+            <MaterialIcons
+              name="logout"
+              size={24}
+              color={theme?.colors?.error || '#BA1A1A'}
             />
             <Text style={[styles.actionText, { color: theme?.colors?.error || '#BA1A1A' }]}>退出登录</Text>
           </View>
-          <MaterialIcons 
-            name="chevron-right" 
-            size={24} 
-            color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+          <MaterialIcons
+            name="chevron-right"
+            size={24}
+            color={theme?.colors?.onSurfaceVariant || '#79747E'}
           />
         </TouchableOpacity>
       </View>
