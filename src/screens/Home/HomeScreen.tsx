@@ -87,7 +87,7 @@ const ArticleListScene = memo(({
 });
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
-  const { rssSources } = useRSSSource();
+  const { rssSources, syncAllSources, syncSource } = useRSSSource();
   const { settings } = useReadingSettings(); // 获取设置
   const tabContentRef = useRef<CustomTabContentHandle>(null); // 创建 ref
   // 滑动进度跟踪 (Reanimated SharedValue)
@@ -145,12 +145,33 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [articles, routes]);
 
   const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+
     setIsRefreshing(true);
-    setTimeout(() => {
-      loadArticles();
+    try {
+      const currentRoute = routes[index];
+      if (currentRoute) {
+        if (currentRoute.key === 'all') {
+          // 刷新全部
+          await syncAllSources();
+        } else if (currentRoute.key.startsWith('source-')) {
+          // 刷新特定源
+          const sourceIdString = currentRoute.key.replace('source-', '');
+          const sourceId = parseInt(sourceIdString, 10);
+          if (!isNaN(sourceId)) {
+            await syncSource(sourceId);
+          }
+        }
+      }
+      // 无论如何，同步完成后重新从数据库加载文章列表
+      await loadArticles();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      // 可选：展示错误提示
+    } finally {
       setIsRefreshing(false);
-    }, 1000);
-  }, [index, rssSources]);
+    }
+  }, [index, routes, syncAllSources, syncSource]);
 
   const handleIndexChange = useCallback((newIndex: number) => {
     setIndex(newIndex);

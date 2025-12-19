@@ -9,33 +9,54 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import type { RSSStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
+import { RefreshControl } from 'react-native';
+import { useRSSSource } from '../../contexts/RSSSourceContext';
 
 type Props = RSSStackScreenProps<'RSSMain'>;
 
 const RSSScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
+  const { rssSources, syncAllSources } = useRSSSource();
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await syncAllSources();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [syncAllSources]);
 
   const styles = createStyles(isDark, theme);
 
   const handleAddRSSSource = () => {
-    navigation.navigate('AddRSSSource');
+    navigation.navigate('AddRSSSource' as any);
   };
 
   const handleRSSSettings = () => {
-    navigation.navigate('ManageSubscriptions');
+    navigation.navigate('ManageSubscriptions' as any);
   };
 
   const handleSourceDetail = (sourceId: number) => {
-    navigation.navigate('RSSSourceDetail', { sourceId });
+    navigation.navigate('RSSSourceDetail' as any, { sourceId });
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.header}>
-        <MaterialIcons 
-          name="rss-feed" 
-          size={48} 
-          color={theme?.colors?.primary || '#3B82F6'} 
+        <MaterialIcons
+          name="rss-feed"
+          size={48}
+          color={theme?.colors?.primary || '#3B82F6'}
         />
         <Text style={styles.title}>RSS订阅</Text>
         <Text style={styles.subtitle}>聚合优质技术内容</Text>
@@ -44,15 +65,19 @@ const RSSScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.content}>
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>12</Text>
+            <Text style={styles.statNumber}>{rssSources.length}</Text>
             <Text style={styles.statLabel}>订阅源</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>156</Text>
+            <Text style={styles.statNumber}>
+              {rssSources.reduce((acc, src) => acc + (src.article_count || 0), 0)}
+            </Text>
             <Text style={styles.statLabel}>总文章</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>23</Text>
+            <Text style={styles.statNumber}>
+              {rssSources.reduce((acc, src) => acc + (src.unread_count || 0), 0)}
+            </Text>
             <Text style={styles.statLabel}>未读</Text>
           </View>
         </View>
@@ -71,48 +96,47 @@ const RSSScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>我的订阅</Text>
           <View style={styles.sourceList}>
-            {[
-              { id: 1, name: 'TechCrunch', url: 'https://techcrunch.com/feed/', articles: 45, unread: 8, active: true },
-              { id: 2, name: 'Hacker News', url: 'https://hnrss.org/frontpage', articles: 32, unread: 12, active: true },
-              { id: 3, name: 'GitHub Blog', url: 'https://github.blog/feed/', articles: 28, unread: 3, active: true },
-              { id: 4, name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/', articles: 19, unread: 0, active: false },
-              { id: 5, name: 'Dev.to', url: 'https://dev.to/feed', articles: 67, unread: 15, active: true },
-            ].map((source) => (
+            {rssSources.slice(0, 10).map((source) => (
               <TouchableOpacity
                 key={source.id}
                 style={styles.sourceItem}
-                onPress={() => handleSourceDetail(source.id)}
+                onPress={() => handleSourceDetail(source.id!)}
               >
                 <View style={styles.sourceIcon}>
-                  <MaterialIcons 
-                    name="rss-feed" 
-                    size={24} 
-                    color={source.active ? (theme?.colors?.primary || '#3B82F6') : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))} 
+                  <MaterialIcons
+                    name="rss-feed"
+                    size={24}
+                    color={source.isActive ? (theme?.colors?.primary || '#3B82F6') : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))}
                   />
                 </View>
                 <View style={styles.sourceContent}>
                   <Text style={styles.sourceName}>{source.name}</Text>
-                  <Text style={styles.sourceUrl}>{source.url}</Text>
+                  <Text style={styles.sourceUrl} numberOfLines={1}>{source.url}</Text>
                   <View style={styles.sourceStats}>
                     <Text style={styles.sourceStatsText}>
-                      {source.articles} 篇文章 • {source.unread} 篇未读
+                      {source.article_count || 0} 篇文章 • {source.unread_count || 0} 篇未读
                     </Text>
                   </View>
                 </View>
                 <View style={styles.sourceMeta}>
-                  <View style={[styles.statusBadge, source.active ? styles.activeBadge : styles.inactiveBadge]}>
-                    <Text style={[styles.statusText, source.active ? styles.activeText : styles.inactiveText]}>
-                      {source.active ? '活跃' : '暂停'}
+                  <View style={[styles.statusBadge, source.isActive ? styles.activeBadge : styles.inactiveBadge]}>
+                    <Text style={[styles.statusText, source.isActive ? styles.activeText : styles.inactiveText]}>
+                      {source.isActive ? '活跃' : '暂停'}
                     </Text>
                   </View>
-                  <MaterialIcons 
-                    name="chevron-right" 
-                    size={20} 
-                    color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')} 
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={20}
+                    color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
                   />
                 </View>
               </TouchableOpacity>
             ))}
+            {rssSources.length === 0 && (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>暂无订阅源，点击上方按钮添加</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -368,6 +392,16 @@ const createStyles = (isDark: boolean, theme: any) =>
       fontSize: 16,
       color: theme?.colors?.primary || '#3B82F6',
       fontWeight: '500',
+    },
+    emptyContainer: {
+      padding: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyText: {
+      fontSize: 16,
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      textAlign: 'center',
     },
   });
 

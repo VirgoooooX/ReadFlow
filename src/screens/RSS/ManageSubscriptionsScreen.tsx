@@ -23,7 +23,7 @@ type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
 const ManageSubscriptionsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
-  const { rssSources, refreshRSSSources } = useRSSSource();
+  const { rssSources, refreshRSSSources, syncAllSources, syncSource } = useRSSSource();
 
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('全部');
@@ -46,9 +46,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
   };
 
   const categories = ['全部', ...Array.from(new Set(rssSources.map(s => s.category)))];
-  
-  const filteredSources = selectedCategory === '全部' 
-    ? rssSources 
+
+  const filteredSources = selectedCategory === '全部'
+    ? rssSources
     : rssSources.filter(source => source.category === selectedCategory);
 
   const totalSources = rssSources.length;
@@ -57,8 +57,14 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadRSSSources();
-    setRefreshing(false);
+    try {
+      await syncAllSources();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      Alert.alert('刷新失败', '同步RSS源时出现错误');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const toggleSourceStatus = async (sourceId: number) => {
@@ -68,12 +74,12 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
       const newStatus = !source.isActive;
       console.log(`Toggling source ${sourceId} from ${source.isActive} to ${newStatus}`);
-      
+
       await rssService.updateRSSSource(sourceId, { isActive: newStatus });
       console.log(`Database update completed for source ${sourceId}`);
-      
+
       await refreshRSSSources();
-      
+
       console.log(`Local state updated for source ${sourceId}`);
     } catch (error) {
       console.error('Error toggling source status:', error);
@@ -140,25 +146,38 @@ const ManageSubscriptionsScreen: React.FC = () => {
     navigation.navigate('EditRSSSource', { sourceId });
   };
 
+  const handleSyncSingleSource = async (sourceId: number) => {
+    try {
+      setLoading(true);
+      await syncSource(sourceId);
+      Alert.alert('刷新完成', '该源已成功更新');
+    } catch (error) {
+      console.error('Sync single source failed:', error);
+      Alert.alert('刷新失败', '无法更新该RSS源');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleMoveSource = async (sourceId: number, direction: 'up' | 'down') => {
     try {
       const currentIndex = filteredSources.findIndex(s => s.id === sourceId);
-      if ((direction === 'up' && currentIndex === 0) || 
-          (direction === 'down' && currentIndex === filteredSources.length - 1)) {
+      if ((direction === 'up' && currentIndex === 0) ||
+        (direction === 'down' && currentIndex === filteredSources.length - 1)) {
         return; // 已经是首/尾
       }
-      
+
       const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
       const sortedSources = [...filteredSources];
-      [sortedSources[currentIndex], sortedSources[newIndex]] = 
+      [sortedSources[currentIndex], sortedSources[newIndex]] =
         [sortedSources[newIndex], sortedSources[currentIndex]];
-      
+
       // 更新排序
       const updates = sortedSources.map((s, idx) => ({
         id: s.id,
         sortOrder: idx,
       }));
-      
+
       await rssService.updateSourcesOrder(updates);
       await refreshRSSSources();
     } catch (error) {
@@ -186,7 +205,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const styles = createStyles(isDark, theme);
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -237,10 +256,10 @@ const ManageSubscriptionsScreen: React.FC = () => {
                     <View style={styles.sourceNameContainer}>
                       <Text style={styles.sourceName}>{source.name}</Text>
                       <View style={styles.contentTypeBadge}>
-                        <MaterialIcons 
-                          name={source.contentType === 'text' ? 'text-fields' : 'image'} 
-                          size={12} 
-                          color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')} 
+                        <MaterialIcons
+                          name={source.contentType === 'text' ? 'text-fields' : 'image'}
+                          size={12}
+                          color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
                         />
                         <Text style={styles.contentTypeText}>
                           {source.contentType === 'text' ? '纯文本' : '多媒体'}
@@ -259,12 +278,12 @@ const ManageSubscriptionsScreen: React.FC = () => {
                       </Text>
                     </View>
                   </View>
-                  
+
                   <Text style={styles.sourceUrl}>{source.url}</Text>
                   {source.description && (
                     <Text style={styles.sourceDescription}>{source.description}</Text>
                   )}
-                  
+
                   {(source.errorCount || 0) > 0 && (
                     <View style={styles.sourceMetaRow}>
                       <View style={styles.errorBadge}>
@@ -273,7 +292,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
                       </View>
                     </View>
                   )}
-                  
+
                   <View style={styles.sourceStats}>
                     <Text style={styles.sourceStatsText}>
                       {source.article_count || 0} 篇文章 • {source.unread_count || 0} 篇未读 • {formatLastUpdated(new Date(source.last_updated || Date.now()))}
@@ -289,10 +308,10 @@ const ManageSubscriptionsScreen: React.FC = () => {
                     onPress={() => handleMoveSource(source.id, 'up')}
                     disabled={index === 0}
                   >
-                    <MaterialIcons 
-                      name="arrow-upward" 
-                      size={18} 
-                      color={index === 0 ? theme?.colors?.outline : theme?.colors?.primary} 
+                    <MaterialIcons
+                      name="arrow-upward"
+                      size={18}
+                      color={index === 0 ? theme?.colors?.outline : theme?.colors?.primary}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -300,14 +319,14 @@ const ManageSubscriptionsScreen: React.FC = () => {
                     onPress={() => handleMoveSource(source.id, 'down')}
                     disabled={index === filteredSources.length - 1}
                   >
-                    <MaterialIcons 
-                      name="arrow-downward" 
-                      size={18} 
-                      color={index === filteredSources.length - 1 ? theme?.colors?.outline : theme?.colors?.primary} 
+                    <MaterialIcons
+                      name="arrow-downward"
+                      size={18}
+                      color={index === filteredSources.length - 1 ? theme?.colors?.outline : theme?.colors?.primary}
                     />
                   </TouchableOpacity>
                 </View>
-                
+
                 <View style={styles.switchContainer}>
                   <Text style={styles.switchLabel}>启用</Text>
                   <Switch
@@ -320,38 +339,49 @@ const ManageSubscriptionsScreen: React.FC = () => {
                     thumbColor={source.isActive ? theme?.colors?.onPrimary : theme?.colors?.onSurfaceVariant}
                   />
                 </View>
-                
+
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => clearSourceArticles(source.id)}
                   >
-                    <MaterialIcons 
-                      name="clear-all" 
-                      size={20} 
-                      color={theme?.colors?.onSurfaceVariant} 
+                    <MaterialIcons
+                      name="clear-all"
+                      size={20}
+                      color={theme?.colors?.onSurfaceVariant}
                     />
                   </TouchableOpacity>
-                  
+
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleSyncSingleSource(source.id!)}
+                  >
+                    <MaterialIcons
+                      name="refresh"
+                      size={20}
+                      color={theme?.colors?.primary}
+                    />
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => editSource(source.id)}
                   >
-                    <MaterialIcons 
-                      name="edit" 
-                      size={20} 
-                      color={theme?.colors?.onSurfaceVariant} 
+                    <MaterialIcons
+                      name="edit"
+                      size={20}
+                      color={theme?.colors?.onSurfaceVariant}
                     />
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     style={styles.actionButton}
                     onPress={() => deleteSource(source.id)}
                   >
-                    <MaterialIcons 
-                      name="delete" 
-                      size={20} 
-                      color={theme?.colors?.error || '#B3261E'} 
+                    <MaterialIcons
+                      name="delete"
+                      size={20}
+                      color={theme?.colors?.error || '#B3261E'}
                     />
                   </TouchableOpacity>
                 </View>
@@ -362,10 +392,10 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
         {filteredSources.length === 0 && (
           <View style={styles.emptyState}>
-            <MaterialIcons 
-              name="rss-feed" 
-              size={48} 
-              color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')} 
+            <MaterialIcons
+              name="rss-feed"
+              size={48}
+              color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
             />
             <Text style={styles.emptyStateTitle}>暂无订阅源</Text>
             <Text style={styles.emptyStateText}>

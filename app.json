@@ -2,7 +2,7 @@
   "expo": {
     "name": "ReadFlow",
     "slug": "ReadFlow",
-    "version": "2.3.0",
+    "version": "2.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,23 +11,25 @@
       "translucent": true,
       "backgroundColor": "#00000000"
     },
-    "androidStatusBar": {
-      "translucent": true,
-      "backgroundColor": "#00000000"
-    },
     "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#E6FBFF"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.virgoooooox.ReadFlow",
-      "versionCode": 20300,
+      "versionCode": 20400,
       "splash": {
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff"
+        "image": "./assets/transparent.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#E6FBFF"
+      },
+      "navigationBar": {
+        "backgroundColor": "#00000000",
+        "barStyle": "dark-content"
       }
     },
     "web": {
@@ -39,7 +41,8 @@
       }
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-splash-screen"
     ]
   }
 }

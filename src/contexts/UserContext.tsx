@@ -27,9 +27,9 @@ export interface UserContextType {
 }
 
 const initialState: UserState = {
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
+  user: AuthService.getCurrentUser(),
+  isAuthenticated: AuthService.isAuthenticated(),
+  isLoading: !AuthService.isInitialized(),
   error: null,
 };
 
@@ -92,13 +92,22 @@ export function UserProvider({ children }: UserProviderProps) {
 
   // 初始化用户状态
   useEffect(() => {
+    // 如果认证服务已经由外部（如 App.tsx）初始化完成，则跳过
+    if (AuthService.isInitialized()) {
+      const currentUser = AuthService.getCurrentUser();
+      if (currentUser !== state.user) {
+        dispatch({ type: 'SET_USER', payload: currentUser });
+      }
+      return;
+    }
+
     const initializeAuth = async () => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
-        
+
         await AuthService.initialize();
         const currentUser = AuthService.getCurrentUser();
-        
+
         dispatch({ type: 'SET_USER', payload: currentUser });
       } catch (error) {
         console.error('初始化认证状态失败:', error);
@@ -113,22 +122,22 @@ export function UserProvider({ children }: UserProviderProps) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
-      
+
       const response = await AuthService.login(credentials);
-      
+
       if (response.success && response.user) {
         dispatch({ type: 'LOGIN_SUCCESS', payload: response.user });
       } else {
         dispatch({ type: 'SET_ERROR', payload: response.message || '登录失败' });
       }
-      
+
       dispatch({ type: 'SET_LOADING', payload: false });
       return response;
     } catch (error) {
       const errorMessage = '登录过程中出现错误，请重试';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       dispatch({ type: 'SET_LOADING', payload: false });
-      
+
       return {
         success: false,
         message: errorMessage,
@@ -140,20 +149,20 @@ export function UserProvider({ children }: UserProviderProps) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
-      
+
       const response = await AuthService.register(data);
-      
+
       if (!response.success) {
         dispatch({ type: 'SET_ERROR', payload: response.message || '注册失败' });
       }
-      
+
       dispatch({ type: 'SET_LOADING', payload: false });
       return response;
     } catch (error) {
       const errorMessage = '注册过程中出现错误，请重试';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       dispatch({ type: 'SET_LOADING', payload: false });
-      
+
       return {
         success: false,
         message: errorMessage,
@@ -164,7 +173,7 @@ export function UserProvider({ children }: UserProviderProps) {
   const logout = async (): Promise<void> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      
+
       await AuthService.logout();
       dispatch({ type: 'LOGOUT' });
     } catch (error) {
@@ -178,22 +187,22 @@ export function UserProvider({ children }: UserProviderProps) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
-      
+
       const response = await AuthService.updateProfile(updates);
-      
+
       if (response.success && response.user) {
         dispatch({ type: 'UPDATE_PROFILE', payload: response.user });
       } else {
         dispatch({ type: 'SET_ERROR', payload: response.message || '更新失败' });
       }
-      
+
       dispatch({ type: 'SET_LOADING', payload: false });
       return response;
     } catch (error) {
       const errorMessage = '更新用户信息时出现错误，请重试';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       dispatch({ type: 'SET_LOADING', payload: false });
-      
+
       return {
         success: false,
         message: errorMessage,
@@ -205,20 +214,20 @@ export function UserProvider({ children }: UserProviderProps) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
-      
+
       const response = await AuthService.changePassword(oldPassword, newPassword);
-      
+
       if (!response.success) {
         dispatch({ type: 'SET_ERROR', payload: response.message || '修改密码失败' });
       }
-      
+
       dispatch({ type: 'SET_LOADING', payload: false });
       return response;
     } catch (error) {
       const errorMessage = '修改密码时出现错误，请重试';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       dispatch({ type: 'SET_LOADING', payload: false });
-      
+
       return {
         success: false,
         message: errorMessage,

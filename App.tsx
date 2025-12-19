@@ -34,98 +34,95 @@ function App(): React.JSX.Element {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const [appIsReady, setAppIsReady] = useState(false);
-  const [dbError, setDbError] = useState<string | null>(null);
 
+  // 1. 保底机制：无论发生什么，5秒后必须尝试关闭启动页
   useEffect(() => {
-    const prepare = async () => {
+    const timebomb = setTimeout(() => {
+      console.log('💣 触发保底隐藏启动页 (5s)');
+      SplashScreen.hideAsync().catch(() => { });
+    }, 5000);
+    return () => clearTimeout(timebomb);
+  }, []);
+
+  // 2. 主初始化逻辑
+  useEffect(() => {
+    async function prepare() {
       try {
-        // 1. 预加载启动图
-        const splashImage = require('./assets/splash.png');
-        await Asset.fromModule(splashImage).downloadAsync();
+        console.log('🚀 开始应用初始化 (带有 3s 超时保护)...');
 
-        // 2. 初始化数据库
-        await databaseService.initializeDatabase();
+        // 并行加载核心服务，并设置 3 秒超时 Race
+        const initTasks = Promise.all([
+          databaseService.initializeDatabase(),
+          AuthService.initialize()
+        ]);
 
-        // 3. 初始化认证服务 (确保在进入导航器前已知晓登录状态，防止闪烁)
-        await AuthService.initialize();
+        await Promise.race([
+          initTasks,
+          new Promise(resolve => setTimeout(resolve, 3000))
+        ]);
 
-        // 模拟一些额外的加载时间以展示启动页 (可选，通常生产环境可移除或缩短)
-        // await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.error('应用初始化失败:', error);
-        setDbError('应用初始化失败，请重启应用');
+        console.log('✅ 核心服务初始化阶段完成');
+      } catch (e) {
+        console.warn('⚠️ 初始化阶段发生非致命错误:', e);
       } finally {
+        console.log('✨ 进入界面渲染阶段');
         setAppIsReady(true);
+
+        // 最后一次确认隐藏启动页
+        setTimeout(() => {
+          SplashScreen.hideAsync().catch(() => { });
+        }, 500);
       }
-    };
+    }
     prepare();
   }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      // 3. 当顶级 View 布局完成后，隐藏原生启动屏
-      await SplashScreen.hideAsync();
+      console.log('📐 布局完成触发隐藏');
+      await SplashScreen.hideAsync().catch(() => { });
     }
   }, [appIsReady]);
 
+  // 如果还没准备好，我们返回一个匹配背景色的空 View
+  // 这会遮盖在 Native Splash 层，一旦 ready 就会替换为真正的 App
   if (!appIsReady) {
-    return (
-      <View style={styles.splashContainer}>
-        <Image
-          source={require('./assets/splash.png')}
-          style={styles.fullScreenImage}
-          resizeMode="cover"
-        />
-      </View>
-    );
+    return <View style={{ flex: 1, backgroundColor: '#E6FBFF' }} />;
   }
 
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      <Provider store={store}>
-        <SafeAreaProvider>
-          <ThemeProvider initialTheme="system">
-            <UserProvider>
-              <RSSSourceProvider>
-                <ReadingSettingsProvider>
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <ThemeProvider initialTheme="system">
+          <UserProvider>
+            <RSSSourceProvider>
+              <ReadingSettingsProvider>
+                <View style={styles.container} onLayout={onLayoutRootView}>
                   <StatusBar
                     barStyle={isDarkMode ? 'light-content' : 'dark-content'}
                     backgroundColor="transparent"
                     translucent
                   />
                   <AppNavigator />
-                </ReadingSettingsProvider>
-              </RSSSourceProvider>
-            </UserProvider>
-          </ThemeProvider>
-        </SafeAreaProvider>
-      </Provider>
-    </View>
+                </View>
+              </ReadingSettingsProvider>
+            </RSSSourceProvider>
+          </UserProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </Provider>
   );
 }
 
 const styles = StyleSheet.create({
-  splashContainer: {
+  container: {
     flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  fullScreenImage: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
-    position: 'absolute',
-    top: 0,
-    left: 0,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFBFE',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#1C1B1F',
+    backgroundColor: '#E6FBFF',
   },
 });
 

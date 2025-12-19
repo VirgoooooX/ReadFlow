@@ -37,9 +37,14 @@ export class AuthService {
   private authToken: string | null = null;
   private registeredUsers: Map<string, { user: User; password: string }> = new Map();
   private static readonly REGISTERED_USERS_KEY = 'registered_users';
+  private initialized = false;
 
   private constructor() {
     // 异步初始化将在getInstance或initialize中调用
+  }
+
+  public isInitialized(): boolean {
+    return this.initialized;
   }
 
   /**
@@ -58,7 +63,7 @@ export class AuthService {
             id: '1',
             username: 'TechFlow用户',
             email: 'user@techflow.com',
-            avatar: null,
+            avatar: undefined,
             bio: '热爱技术，喜欢阅读科技文章',
             phone: '',
             location: '北京',
@@ -100,30 +105,34 @@ export class AuthService {
     try {
       // 先初始化用户数据
       await this.initializeData();
-      
+
       const token = await AsyncStorage.getItem('auth_token');
       const userStr = await AsyncStorage.getItem('current_user');
-      
+
       if (token && userStr) {
         this.authToken = token;
         this.currentUser = JSON.parse(userStr);
-        
-        // 验证token是否仍然有效
-        const isValid = await this.validateToken(token);
-        if (isValid) {
-          // 加载用户头像
-          const avatarPath = await AvatarStorageService.getAvatarPath(this.currentUser.id);
-          if (avatarPath && avatarPath !== this.currentUser.avatar) {
-            this.currentUser.avatar = avatarPath;
-            await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
+
+        if (this.currentUser) {
+          // 验证token是否仍然有效
+          const isValid = await this.validateToken(token);
+          if (isValid) {
+            // 加载用户头像
+            const avatarPath = await AvatarStorageService.getAvatarPath(this.currentUser.id);
+            if (avatarPath && avatarPath !== this.currentUser.avatar) {
+              this.currentUser.avatar = avatarPath;
+              await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
+            }
+          } else {
+            await this.logout();
           }
-        } else {
-          await this.logout();
         }
       }
     } catch (error) {
       console.error('初始化认证服务失败:', error);
       await this.logout();
+    } finally {
+      this.initialized = true;
     }
   }
 
@@ -134,20 +143,20 @@ export class AuthService {
     try {
       // TODO: 替换为实际的API调用
       const response = await this.mockLogin(credentials);
-      
+
       if (response.success && response.user && response.token) {
         this.currentUser = response.user;
         this.authToken = response.token;
-        
+
         // 保存到本地存储
         await AsyncStorage.setItem('auth_token', response.token);
         await AsyncStorage.setItem('current_user', JSON.stringify(response.user));
-        
+
         // 更新最后登录时间
         this.currentUser.lastLoginAt = new Date().toISOString();
         await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
       }
-      
+
       return response;
     } catch (error) {
       console.error('登录失败:', error);
@@ -165,7 +174,7 @@ export class AuthService {
     try {
       // TODO: 替换为实际的API调用
       const response = await this.mockRegister(data);
-      
+
       return response;
     } catch (error) {
       console.error('注册失败:', error);
@@ -182,11 +191,11 @@ export class AuthService {
   public async logout(): Promise<void> {
     try {
       // TODO: 调用API通知服务器登出
-      
+
       // 清除本地数据
       this.currentUser = null;
       this.authToken = null;
-      
+
       await AsyncStorage.multiRemove(['auth_token', 'current_user']);
     } catch (error) {
       console.error('登出失败:', error);
@@ -207,12 +216,12 @@ export class AuthService {
 
       // TODO: 替换为实际的API调用
       const response = await this.mockUpdateProfile(updates);
-      
+
       if (response.success && response.user) {
         this.currentUser = response.user;
         await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
       }
-      
+
       return response;
     } catch (error) {
       console.error('更新用户信息失败:', error);
@@ -237,7 +246,7 @@ export class AuthService {
 
       // TODO: 替换为实际的API调用
       const response = await this.mockChangePassword(oldPassword, newPassword);
-      
+
       return response;
     } catch (error) {
       console.error('修改密码失败:', error);
@@ -288,24 +297,24 @@ export class AuthService {
   private async mockLogin(credentials: LoginCredentials): Promise<AuthResponse> {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     // 从注册用户中查找
     const registeredUser = this.registeredUsers.get(credentials.email);
-    
+
     if (registeredUser && registeredUser.password === credentials.password) {
       // 更新最后登录时间
       const updatedUser = {
         ...registeredUser.user,
         lastLoginAt: new Date().toISOString(),
       };
-      
+
       // 更新存储的用户信息
       this.registeredUsers.set(credentials.email, {
         ...registeredUser,
         user: updatedUser
       });
       await this.saveRegisteredUsers();
-      
+
       return {
         success: true,
         user: updatedUser,
@@ -323,7 +332,7 @@ export class AuthService {
   private async mockRegister(data: RegisterData): Promise<AuthResponse> {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // 检查邮箱是否已被注册
     if (this.registeredUsers.has(data.email)) {
       return {
@@ -331,27 +340,27 @@ export class AuthService {
         message: '该邮箱已被注册'
       };
     }
-    
+
     // 创建新用户
     const newUser: User = {
       id: Date.now().toString(), // 简单的ID生成
       username: data.username,
       email: data.email,
-      avatar: null,
+      avatar: undefined,
       bio: '',
       phone: '',
       location: '',
       createdAt: new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
     };
-    
+
     // 保存到模拟数据库
     this.registeredUsers.set(data.email, {
       user: newUser,
       password: data.password
     });
     await this.saveRegisteredUsers();
-    
+
     return {
       success: true,
       message: '注册成功，请登录'
@@ -361,20 +370,20 @@ export class AuthService {
   private async mockUpdateProfile(updates: Partial<User>): Promise<AuthResponse> {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     if (!this.currentUser) {
       return {
         success: false,
         message: '用户未登录'
       };
     }
-    
+
     const updatedUser: User = {
       ...this.currentUser,
       ...updates,
       id: this.currentUser.id, // 确保ID不被修改
     };
-    
+
     // 更新registeredUsers中的用户信息
     const userRecord = this.registeredUsers.get(this.currentUser.email);
     if (userRecord) {
@@ -384,7 +393,7 @@ export class AuthService {
       });
       await this.saveRegisteredUsers();
     }
-    
+
     return {
       success: true,
       user: updatedUser,
@@ -395,7 +404,7 @@ export class AuthService {
   private async mockChangePassword(oldPassword: string, newPassword: string): Promise<AuthResponse> {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     // 模拟旧密码验证
     if (oldPassword !== '123456') {
       return {
@@ -403,7 +412,7 @@ export class AuthService {
         message: '原密码错误'
       };
     }
-    
+
     return {
       success: true,
       message: '密码修改成功'
@@ -413,7 +422,7 @@ export class AuthService {
   private async mockValidateToken(token: string): Promise<boolean> {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     // 简单的token格式验证
     return token.startsWith('mock_jwt_token_');
   }

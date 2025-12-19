@@ -101,7 +101,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
 
     .main-title {
       font-family: "Georgia", serif; /* 标题使用衬线体更有质感 */
-      font-size: 2em;
+      font-size: 1.6em;
       font-weight: 700;
       line-height: 1.25;
       margin: 0 0 12px 0;

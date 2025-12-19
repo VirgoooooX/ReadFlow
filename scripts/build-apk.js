@@ -116,6 +116,96 @@ function cleanCaches(projectRoot) {
   console.log('✅ 缓存清除完成\n');
 }
 
+/**
+ * 注入高级原生启动页修复逻辑
+ * 强制修改 styles.xml 以确保 windowBackground 和透明图标生效
+ */
+function applyAdvancedNativeFix(projectRoot) {
+  console.log('\n🎨 正在注入高级原生启动页优化...');
+  const resDir = path.join(projectRoot, 'android', 'app', 'src', 'main', 'res');
+  const drawableDir = path.join(resDir, 'drawable');
+  const stylesPath = path.join(resDir, 'values', 'styles.xml');
+
+  if (!fs.existsSync(drawableDir)) {
+    fs.mkdirSync(drawableDir, { recursive: true });
+  }
+
+  // 1. 确保透明图标资源存在
+  const transparentIconPath = path.join(drawableDir, 'transparent_icon.xml');
+  const transparentIconXml = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24.0"
+    android:viewportHeight="24.0">
+</vector>`;
+  fs.writeFileSync(transparentIconPath, transparentIconXml, 'utf-8');
+  console.log('    - 已确保 transparent_icon.xml 存在');
+
+  // 2. 确保启动图资源存在 (从 assets 拷贝)
+  const splashGraphicPath = path.join(drawableDir, 'splash_graphic.png');
+  const assetsSplashPath = path.join(projectRoot, 'assets', 'splash.png');
+  if (fs.existsSync(assetsSplashPath)) {
+    fs.copyFileSync(assetsSplashPath, splashGraphicPath);
+    console.log('    - 已同步 splash_graphic.png');
+  }
+
+  // 3. 确保 launch_background.xml 存在
+  // 注意：Android 原生 windowBackground 不支持 "cover" (等比例裁剪)
+  // 为了全屏覆盖，这里使用 fill (拉伸)。如果需要比例完美，建议使用 JS 桥接方案。
+  const launchBgPath = path.join(drawableDir, 'launch_background.xml');
+  const launchBgXml = `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><color android:color="#E6FBFF" /></item>
+    <item>
+        <bitmap 
+            android:gravity="fill" 
+            android:src="@drawable/splash_graphic" />
+    </item>
+</layer-list>`;
+  fs.writeFileSync(launchBgPath, launchBgXml, 'utf-8');
+  console.log('    - 已生成 launch_background.xml');
+
+  // 4. 强制修改 styles.xml
+  if (fs.existsSync(stylesPath)) {
+    let stylesContent = fs.readFileSync(stylesPath, 'utf-8');
+
+    // 替换 Theme.App.SplashScreen 部分
+    const splashThemeRegex = /<style name="Theme\.App\.SplashScreen" parent="Theme\.SplashScreen">[\s\S]*?<\/style>/;
+    const newSplashTheme = `  <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
+    <item name="android:windowBackground">@drawable/launch_background</item>
+    <item name="windowSplashScreenBackground">@drawable/launch_background</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/transparent_icon</item>
+    <item name="android:windowTranslucentStatus">true</item>
+    <item name="android:windowTranslucentNavigation">true</item>
+    <item name="android:windowFullscreen">true</item>
+    <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="28">shortEdges</item>
+    <item name="postSplashScreenTheme">@style/AppTheme</item>
+  </style>`;
+
+    stylesContent = stylesContent.replace(splashThemeRegex, newSplashTheme);
+
+    // 同时也加固 AppTheme
+    const appThemeRegex = /<style name="AppTheme" parent="Theme\.AppCompat\.DayNight\.NoActionBar">[\s\S]*?<\/style>/;
+    const newAppTheme = `  <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+    <item name="colorPrimary">@color/colorPrimary</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowTranslucentStatus">true</item>
+    <item name="android:windowTranslucentNavigation">true</item>
+    <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="28">shortEdges</item>
+  </style>`;
+
+    stylesContent = stylesContent.replace(appThemeRegex, newAppTheme);
+
+    fs.writeFileSync(stylesPath, stylesContent, 'utf-8');
+    console.log('    ✓ styles.xml 已自动修正并发帖');
+  }
+
+  console.log('✅ 原生启动页优化注入完成\n');
+}
+
 // 【优化】完全重写的 Git 日志获取逻辑
 function getChangelogFromGit() {
   try {
@@ -325,16 +415,16 @@ export const APP_INFO = {
 
   // 执行 expo prebuild
   console.log('\n🔨 执行 expo prebuild...');
-  // 【修复】移除 --no-interactive 选项，较新版本 Expo CLI 不支持此参数
   // 使用 CI=1 环境变量来确保非交互模式
-  execSync('npx expo prebuild --platform android --clean', {
+  execSync('npx expo prebuild --platform android', {
     stdio: 'inherit',
     cwd: projectRoot,
     env: commonEnv
   });
 
-  // 【优化】移除了手动修改 build.gradle 的代码
-  // Expo Prebuild 已经根据 app.json 生成了正确的 build.gradle
+  // 【优化】注入高级原生启动页修复逻辑
+  // 解决 expo prebuild 自动重置 styles.xml 的问题
+  applyAdvancedNativeFix(projectRoot);
 
   // 执行 gradle build
   console.log('\n🏗️  执行 gradle assembleRelease...');

@@ -9,6 +9,8 @@ interface RSSSourceContextType {
   addRSSSource: (source: RSSSource) => void;
   updateRSSSource: (sourceId: number, updatedSource: Partial<RSSSource>) => void;
   deleteRSSSource: (sourceId: number) => void;
+  syncAllSources: (onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
+  syncSource: (sourceId: number) => Promise<void>;
 }
 
 const RSSSourceContext = createContext<RSSSourceContextType | undefined>(undefined);
@@ -48,9 +50,9 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
   };
 
   const updateRSSSource = (sourceId: number, updatedSource: Partial<RSSSource>) => {
-    setRssSources(prev => 
-      prev.map(source => 
-        source.id === sourceId 
+    setRssSources(prev =>
+      prev.map(source =>
+        source.id === sourceId
           ? { ...source, ...updatedSource }
           : source
       )
@@ -60,6 +62,34 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
   const deleteRSSSource = (sourceId: number) => {
     setRssSources(prev => prev.filter(source => source.id !== sourceId));
   };
+  const syncAllSources = async (onProgress?: (current: number, total: number, sourceName: string) => void) => {
+    try {
+      setIsLoading(true);
+      await rssService.refreshAllSources({ onProgress });
+      await loadRSSSources();
+    } catch (error) {
+      console.error('Failed to sync all RSS sources:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const syncSource = async (sourceId: number) => {
+    try {
+      setIsLoading(true);
+      const source = rssSources.find(s => s.id === sourceId);
+      if (source) {
+        await rssService.fetchArticlesFromSource(source);
+        await loadRSSSources();
+      }
+    } catch (error) {
+      console.error(`Failed to sync RSS source ${sourceId}:`, error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const value: RSSSourceContextType = {
     rssSources,
@@ -68,6 +98,8 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     addRSSSource,
     updateRSSSource,
     deleteRSSSource,
+    syncAllSources,
+    syncSource,
   };
 
   return (

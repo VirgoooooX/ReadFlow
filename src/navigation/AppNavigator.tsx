@@ -10,6 +10,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTabBarHeight, getTabBarPaddingVertical, getHeaderHeight, HEADER_TITLE_STYLE } from '../constants/navigation';
 import CustomHeader from '../components/CustomHeader';
 import ScreenWithCustomHeader from '../components/ScreenWithCustomHeader';
+import {
+  View,
+  Image,
+  StyleSheet,
+  Dimensions,
+  StatusBar,
+} from 'react-native';
 
 // 导入屏幕组件（暂时使用占位符）
 import HomeScreen from '../screens/Home/HomeScreen';
@@ -745,7 +752,10 @@ function RootNavigator() {
   const { theme } = useThemeContext();
   const { state } = useUser();
 
-  if (state.isLoading) return null;
+  // 如果还在加载用户信息，返回一个空白占位，确保启动图继续显示
+  if (state.isLoading) {
+    return <View style={{ flex: 1, backgroundColor: '#E6FBFF' }} />;
+  }
 
   return (
     <RootStack.Navigator
@@ -821,7 +831,7 @@ function RootNavigator() {
 // 主应用导航器
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <RootNavigator />
     </NavigationContainer>
   );
@@ -831,13 +841,26 @@ export default function AppNavigator() {
 export const navigationRef = React.createRef<any>();
 
 export function navigate(name: string, params?: any) {
-  navigationRef.current?.navigate(name, params);
+  if (navigationRef.current?.isReady()) {
+    navigationRef.current?.navigate(name, params);
+  }
 }
 
 export function goBack() {
-  navigationRef.current?.goBack();
+  if (navigationRef.current?.isReady() && navigationRef.current?.canGoBack()) {
+    navigationRef.current?.goBack();
+  }
 }
 
 export function reset(state: any) {
-  navigationRef.current?.reset(state);
+  if (navigationRef.current?.isReady()) {
+    navigationRef.current?.reset(state);
+  }
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#E6FBFF',
+  },
+});
