@@ -134,8 +134,8 @@ function getChangelogFromGit() {
     const lines = commits.split('\n');
     let changelog = [];
 
-    // 策略 A：优先提取符合 Conventional Commits 规范的 (feat, fix 等)
-    const conventionalRegex = /^(feat|fix|perf|refactor|docs|style|test|chore)(\([^)]*\))?:\s*/;
+    // 策略 A：提取符合 Conventional Commits 规范的 (feat, fix 等) 或 以 -/* 开头的列表项
+    const conventionalRegex = /^(feat|fix|perf|refactor|docs|style|test|chore|build|ci)(\([^)]*\))?:\s*/;
 
     for (const line of lines) {
       const cleanLine = line.trim();
@@ -145,20 +145,27 @@ function getChangelogFromGit() {
         // 移除 pr 号 (#123)
         const msg = cleanLine.replace(conventionalRegex, '').replace(/\s*\(#\d+\)$/, '');
         changelog.push(msg);
+      } else if (cleanLine.startsWith('- ') || cleanLine.startsWith('* ')) {
+        // 如果是以 - 或 * 开头的列表项，也加入（去掉前缀）
+        const msg = cleanLine.substring(2).trim();
+        if (msg) changelog.push(msg);
       }
     }
 
-    // 策略 B：如果规范提交太少（少于1条），则提取所有非空且稍微长一点的提交
-    if (changelog.length === 0) {
-      console.log('    - 未检测到规范提交格式，切换到通用提取模式');
-      changelog = lines
+    // 策略 B：如果提取太少，提取所有非空且稍微长一点的提交
+    if (changelog.length < 2) {
+      console.log('    - 提取内容较少，尝试通用提取模式...');
+      const fallbackLogs = lines
         .map(l => l.trim())
         .filter(l => l.length > 5 && !l.startsWith('Merge') && !l.startsWith('Revert'))
-        .slice(0, 10); // 最多取10条
+        .slice(0, 10);
+
+      // 合并并去重
+      changelog = [...new Set([...changelog, ...fallbackLogs])];
     }
 
     // 去重并限制数量
-    changelog = [...new Set(changelog)].slice(0, 10);
+    changelog = [...new Set(changelog)].slice(0, 15);
 
     return changelog.length > 0 ? changelog : ['版本更新'];
 
@@ -261,6 +268,9 @@ try {
   if (isAppJsonChanged) {
     console.log(`📝 更新 app.json: v${version} (code: ${versionCode})`);
     fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf-8');
+    console.log('    ✓ app.json 已保存');
+  } else {
+    console.log('    - app.json 已是最新版本，无需更改');
   }
 
   // 更新 appVersion.ts
@@ -284,6 +294,8 @@ export const APP_INFO = {
 };
 `;
   fs.writeFileSync(appVersionPath, appVersionContent, 'utf-8');
+  console.log('    ✓ appVersion.ts 已同步更新');
+  console.log(`    - 包含 ${changelog.length} 条更新日志`);
 
   // 执行 expo prebuild
   console.log('\n🔨 执行 expo prebuild...');

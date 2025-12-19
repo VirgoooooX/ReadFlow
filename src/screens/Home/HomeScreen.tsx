@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { TabView, TabBar } from 'react-native-tab-view';
 import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
