@@ -27,9 +27,9 @@ export interface UserContextType {
 }
 
 const initialState: UserState = {
-  user: AuthService.getCurrentUser(),
-  isAuthenticated: AuthService.isAuthenticated(),
-  isLoading: !AuthService.isInitialized(),
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
   error: null,
 };
 
@@ -92,15 +92,6 @@ export function UserProvider({ children }: UserProviderProps) {
 
   // 初始化用户状态
   useEffect(() => {
-    // 如果认证服务已经由外部（如 App.tsx）初始化完成，则跳过
-    if (AuthService.isInitialized()) {
-      const currentUser = AuthService.getCurrentUser();
-      if (currentUser !== state.user) {
-        dispatch({ type: 'SET_USER', payload: currentUser });
-      }
-      return;
-    }
-
     const initializeAuth = async () => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });

@@ -352,25 +352,73 @@ try {
 
   const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
 
+  // 【优化】尝试从现有的 appVersion.ts 中读取信息
+  let existingVersionInfo = null;
+  if (fs.existsSync(appVersionPath)) {
+    try {
+      const content = fs.readFileSync(appVersionPath, 'utf-8');
+      const verMatch = content.match(/version:\s*'([^']+)'/);
+      const buildMatch = content.match(/buildNumber:\s*(\d+)/);
+      const timeMatch = content.match(/updateTime:\s*'([^']+)'/);
+
+      // 提取 changelog 数组
+      const changelogStart = content.indexOf('changelog: [');
+      const changelogEnd = content.indexOf('],', changelogStart);
+      let existingChangelog = [];
+
+      if (changelogStart !== -1 && changelogEnd !== -1) {
+        const arrayStr = content.substring(changelogStart + 12, changelogEnd);
+        existingChangelog = arrayStr.split('\n')
+          .map(line => {
+            const m = line.match(/'([^']+)'/);
+            return m ? m[1].replace(/\\'/g, "'") : null;
+          })
+          .filter(l => l !== null);
+      }
+
+      if (verMatch) {
+        existingVersionInfo = {
+          version: verMatch[1],
+          buildNumber: buildMatch ? parseInt(buildMatch[1], 10) : null,
+          updateTime: timeMatch ? timeMatch[1] : null,
+          changelog: existingChangelog
+        };
+      }
+    } catch (e) {
+      console.warn('⚠️  读取现有 appVersion.ts 失败');
+    }
+  }
+
+  // 1. 处理版本号
   if (!version) {
-    version = appJson.expo.version;
+    // 如果没传 --version，优先从 appVersion.ts 取，其次 app.json
+    version = (existingVersionInfo && existingVersionInfo.version) || appJson.expo.version;
   }
 
   const versionCode = calculateVersionCode(version);
-  const updateTime = new Date().toISOString().split('T')[0];
 
-  console.log(`📝 当前版本: ${version} (Build: ${versionCode})`);
+  // 2. 处理更新时间 (如果版本没变，保留旧时间)
+  let updateTime = new Date().toISOString().split('T')[0];
+  if (existingVersionInfo && existingVersionInfo.version === version && existingVersionInfo.updateTime) {
+    updateTime = existingVersionInfo.updateTime;
+  }
 
-  // 处理 Changelog
+  console.log(`📝 目标版本: ${version} (Build: ${versionCode})`);
+
+  // 3. 处理 Changelog
   if (autoGenerate) {
     changelog = getChangelogFromGit();
   } else if (changelog.length === 0) {
-    // 尝试从 appVersion.ts 读取旧的，这里简化逻辑，如果没有就默认
-    changelog = ['版本更新'];
+    // 如果没传 --changelog 且没 --auto-generate，优先保留旧的
+    if (existingVersionInfo && existingVersionInfo.changelog && existingVersionInfo.changelog.length > 0) {
+      changelog = existingVersionInfo.changelog;
+      console.log('    - 保留现有的更新日志');
+    } else {
+      changelog = ['版本更新'];
+    }
   }
 
   // 【优化】同时更新 app.json 中的 version 和 android.versionCode
-  // 这样 expo prebuild 会自动处理 build.gradle，无需手动正则替换
   let isAppJsonChanged = false;
   if (appJson.expo.version !== version) {
     appJson.expo.version = version;
@@ -385,12 +433,9 @@ try {
     console.log(`📝 更新 app.json: v${version} (code: ${versionCode})`);
     fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n', 'utf-8');
     console.log('    ✓ app.json 已保存');
-  } else {
-    console.log('    - app.json 已是最新版本，无需更改');
   }
 
   // 更新 appVersion.ts
-  console.log('📝 更新 appVersion.ts...');
   const changelogItems = changelog.map(item => `    '${item.replace(/'/g, "\\'")}',`).join('\n');
   const appVersionContent = `// 应用版本信息
 // 此文件由构建脚本自动更新，请勿手动修改
@@ -409,9 +454,16 @@ export const APP_INFO = {
   description: '一款专注英语阅读学习的应用',
 };
 `;
-  fs.writeFileSync(appVersionPath, appVersionContent, 'utf-8');
-  console.log('    ✓ appVersion.ts 已同步更新');
-  console.log(`    - 包含 ${changelog.length} 条更新日志`);
+
+  // 只有内容变了才写入，防止无谓的编译触发
+  const oldContent = fs.existsSync(appVersionPath) ? fs.readFileSync(appVersionPath, 'utf-8') : '';
+  if (oldContent !== appVersionContent) {
+    console.log('📝 更新 appVersion.ts...');
+    fs.writeFileSync(appVersionPath, appVersionContent, 'utf-8');
+    console.log('    ✓ appVersion.ts 已同步更新');
+  } else {
+    console.log('    - appVersion.ts 内容无变化，跳过更新');
+  }
 
   // 执行 expo prebuild
   console.log('\n🔨 执行 expo prebuild...');

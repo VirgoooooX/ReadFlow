@@ -67,22 +67,11 @@ function App(): React.JSX.Element {
       } finally {
         console.log('✨ 进入界面渲染阶段');
         setAppIsReady(true);
-
-        // 最后一次确认隐藏启动页
-        setTimeout(() => {
-          SplashScreen.hideAsync().catch(() => { });
-        }, 500);
       }
     }
     prepare();
   }, []);
 
-  const onLayoutRootView = useCallback(async () => {
-    if (appIsReady) {
-      console.log('📐 布局完成触发隐藏');
-      await SplashScreen.hideAsync().catch(() => { });
-    }
-  }, [appIsReady]);
 
   // 如果还没准备好，我们返回一个匹配背景色的空 View
   // 这会遮盖在 Native Splash 层，一旦 ready 就会替换为真正的 App
@@ -97,7 +86,7 @@ function App(): React.JSX.Element {
           <UserProvider>
             <RSSSourceProvider>
               <ReadingSettingsProvider>
-                <View style={styles.container} onLayout={onLayoutRootView}>
+                <View style={styles.container}>
                   <StatusBar
                     barStyle={isDarkMode ? 'light-content' : 'dark-content'}
                     backgroundColor="transparent"

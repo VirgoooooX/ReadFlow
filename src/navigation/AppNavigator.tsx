@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as SplashScreen from 'expo-splash-screen';
 import { useThemeContext } from '../theme';
 import { useUser } from '../contexts/UserContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -752,10 +753,17 @@ function RootNavigator() {
   const { theme } = useThemeContext();
   const { state } = useUser();
 
-  // 如果还在加载用户信息，返回一个空白占位，确保启动图继续显示
-  if (state.isLoading) {
-    return <View style={{ flex: 1, backgroundColor: '#E6FBFF' }} />;
-  }
+  // 核心逻辑：直到用户信息加载完成（确定是去登录页还是主页）后，才允许关闭原生启动页
+  React.useEffect(() => {
+    if (!state.isLoading) {
+      // 稍微延时（100-200ms）确保 React Navigation 的第一帧画面已经渲染到屏幕上
+      const timer = setTimeout(() => {
+        console.log('🏁 业务就绪，正式通过 Navigator 触发隐藏启动页');
+        SplashScreen.hideAsync().catch(() => { });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [state.isLoading]);
 
   return (
     <RootStack.Navigator
