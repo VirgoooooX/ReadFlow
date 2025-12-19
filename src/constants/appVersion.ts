@@ -2,28 +2,28 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  // 版本号
-  version: '1.4.3',
-  // 构建号
-  buildNumber: 10403,
-  // 更新时间
-  updateTime: '2025-12-15',
-  // 更新内容
+  version: '2.2.0',
+  buildNumber: 20200,
+  updateTime: '2025-12-19',
   changelog: [
-    '使用 TabView 重构主页文章列表与标签导航',
-    '- 引入 react-native-tab-view 实现标签页切换功能，提升体验与性能',
-    '- 文章列表拆分为独立组件 ArticleListScene 并使用 memo 优化渲染',
-    '- 支持多标签懒加载，仅渲染激活页内容，减少无效渲染',
-    '- 重新设计标签栏，支持水平滚动与自动滚动居中',
-    '- 使用动态路由结合订阅源生成标签，实现可扩展性',
-    '- 优化下拉刷新逻辑，支持按标签刷新对应文章',
-    '- 更新导航配置，添加词汇详情页路由',
-    '- 调整导航栏及底部标签栏高度与内边距，更符合设计规范',
-    '- 修正文章列表样式，优化未读标记与布局',
+    '优化编辑RSS源页面与构建脚本',
+    '替换 react-navigation stack 导航类型为 native-stack 类型',
+    '编辑RSS界面添加键盘避免视图行为提升用户体验',
+    '调整内容类型切换按钮颜色与样式一致性',
+    '优化构建脚本中日志提取逻辑，支持更多提交类型和列表项提取',
+    '提高 changelog 提取内容数量及去重处理',
+    '构建日志输出中增加 app.json 和 appVersion.ts 保存状态提示',
+    '移除 package.json 中未使用依赖，减少依赖体积',
+    '删除 HomeScreen 中未使用的 TabView 相关依赖与导入',
+    'Add Android native project setup, configure splash screen, and update app version.',
+    'establish foundational application structure with navigation, theming, settings, and database services.',
+    '优化文章详情页面功能和性能',
+    '新增数据库字段 scroll_position，用于保存文章滚动位置',
+    'ArticleService 新增保存和读取滚动位置的接口方法',
+    'ArticleDetailScreen 使用 WebView 渲染文章内容，提升渲染性能和交互体验',
   ],
 };
 
-// 应用信息
 export const APP_INFO = {
   name: 'ReadFlow',
   description: '一款专注英语阅读学习的应用',

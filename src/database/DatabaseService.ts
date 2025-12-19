@@ -15,7 +15,7 @@ export class DatabaseService {
     size: 50 * 1024 * 1024, // 50MB
   };
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): DatabaseService {
     if (!DatabaseService.instance) {
@@ -49,19 +49,19 @@ export class DatabaseService {
   private async doInitialize(): Promise<void> {
     try {
       console.log('🔧 开始初始化数据库...');
-      
+
       // 初始化主数据库
       this.db = await SQLite.openDatabaseAsync(this.config.name);
       console.log('✅ 数据库打开成功:', this.config.name);
-      
+
       // 创建表结构
       await this.createTables();
       console.log('✅ 表创建成功');
-      
+
       // 执行数据库迁移
       await this.migrateDatabase();
       console.log('✅ 数据库迁移成功');
-      
+
       this.isInitialized = true;
       console.log('✅ 数据库初始化完成');
     } catch (error) {
@@ -91,11 +91,11 @@ export class DatabaseService {
       const hasUnreadCount = tableInfo.some((column: any) => column.name === 'unread_count');
       const hasErrorCount = tableInfo.some((column: any) => column.name === 'error_count');
       const hasSortOrder = tableInfo.some((column: any) => column.name === 'sort_order');
-      
+
       if (!hasContentType) {
         console.log('Adding content_type column to rss_sources table...');
         await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN content_type TEXT DEFAULT "image_text"');
-        
+
         // 更新现有数据的content_type
         await this.db.execAsync(`
           UPDATE rss_sources 
@@ -104,22 +104,22 @@ export class DatabaseService {
             ELSE 'image_text'
           END
         `);
-        
+
         console.log('content_type column added successfully');
       }
-      
+
       if (!hasUnreadCount) {
         console.log('Adding unread_count column to rss_sources table...');
         await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN unread_count INTEGER DEFAULT 0');
         console.log('unread_count column added successfully');
       }
-      
+
       if (!hasErrorCount) {
         console.log('Adding error_count column to rss_sources table...');
         await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN error_count INTEGER DEFAULT 0');
         console.log('error_count column added successfully');
       }
-      
+
       if (!hasSortOrder) {
         console.log('Adding sort_order column to rss_sources table...');
         await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN sort_order INTEGER DEFAULT 0');
@@ -129,7 +129,7 @@ export class DatabaseService {
       // 【新增】检查articles表是否存在scroll_position列
       const articlesTableInfo = await this.db.getAllAsync('PRAGMA table_info(articles)');
       const hasScrollPosition = articlesTableInfo.some((column: any) => column.name === 'scroll_position');
-      
+
       if (!hasScrollPosition) {
         console.log('Adding scroll_position column to articles table...');
         await this.db.execAsync('ALTER TABLE articles ADD COLUMN scroll_position INTEGER DEFAULT 0');
@@ -140,13 +140,13 @@ export class DatabaseService {
       const vocabularyTableInfo = await this.db.getAllAsync('PRAGMA table_info(vocabulary)');
       const hasNextReviewAt = vocabularyTableInfo.some((column: any) => column.name === 'next_review_at');
       const hasLastReviewedAt = vocabularyTableInfo.some((column: any) => column.name === 'last_reviewed_at');
-      
+
       if (!hasNextReviewAt) {
         console.log('Adding next_review_at column to vocabulary table...');
         await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN next_review_at INTEGER');
         console.log('next_review_at column added successfully');
       }
-      
+
       if (!hasLastReviewedAt) {
         console.log('Adding last_reviewed_at column to vocabulary table...');
         await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN last_reviewed_at INTEGER');
@@ -240,7 +240,7 @@ export class DatabaseService {
         updated_at INTEGER DEFAULT (strftime('%s', 'now')),
         FOREIGN KEY (rss_source_id) REFERENCES rss_sources (id) ON DELETE CASCADE
       )`,
-      
+
       // RSS源表
       `CREATE TABLE IF NOT EXISTS rss_sources (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -258,7 +258,7 @@ export class DatabaseService {
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
-      
+
       // 单词本表
       `CREATE TABLE IF NOT EXISTS vocabulary (
         id TEXT PRIMARY KEY,
@@ -278,7 +278,7 @@ export class DatabaseService {
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
-      
+
       // 用户设置表
       `CREATE TABLE IF NOT EXISTS user_preferences (
         id INTEGER PRIMARY KEY,
@@ -293,7 +293,7 @@ export class DatabaseService {
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
-      
+
       // 阅读历史表
       `CREATE TABLE IF NOT EXISTS reading_history (
         id TEXT PRIMARY KEY,
@@ -303,7 +303,7 @@ export class DatabaseService {
         progress INTEGER NOT NULL, -- 0-100
         created_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
-      
+
       // 词典缓存表 - 存储LLM查询结果
       `CREATE TABLE IF NOT EXISTS dictionary_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -316,7 +316,7 @@ export class DatabaseService {
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
-      
+
       // 翻译缓存表 - 存储整句翻译结果
       `CREATE TABLE IF NOT EXISTS translation_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -327,7 +327,7 @@ export class DatabaseService {
         source TEXT DEFAULT 'llm',
         created_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
-      
+
       // LLM使用统计表
       `CREATE TABLE IF NOT EXISTS llm_usage_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -388,7 +388,7 @@ export class DatabaseService {
           return;
         }
       }
-      
+
       // 使用事务来防止数据库锁定
       await this.db.execAsync('BEGIN TRANSACTION');
 
@@ -457,7 +457,7 @@ export class DatabaseService {
       }
 
       console.log('Default RSS sources inserted successfully');
-      
+
       // 提交事务
       await this.db.execAsync('COMMIT');
     } catch (error) {
@@ -493,7 +493,7 @@ export class DatabaseService {
       const result: any = await this.db.getAllAsync(
         'SELECT * FROM user_preferences WHERE id = 1'
       );
-      
+
       if (result && result.length > 0) {
         return {
           readingSettings: JSON.parse(result[0].reading_settings),
@@ -506,7 +506,7 @@ export class DatabaseService {
           enableNotifications: result[0].enable_notifications === 1,
         };
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error getting user preferences:', error);
@@ -534,7 +534,7 @@ export class DatabaseService {
     try {
       const existing = await this.getUserPreferences();
       const now = Math.floor(Date.now() / 1000);
-      
+
       if (existing) {
         // 更新现有记录
         await this.db.runAsync(
@@ -727,14 +727,14 @@ export class DatabaseService {
     try {
       // 关闭现有连接
       await this.closeDatabase();
-      
+
       const dbPath = `${FileSystem.documentDirectory}SQLite/${this.config.name}`;
       const dbInfo = await FileSystem.getInfoAsync(dbPath);
       if (dbInfo.exists) {
         await FileSystem.deleteAsync(dbPath);
         console.log('Database file deleted');
       }
-      
+
       // 重新初始化
       await this.initializeDatabase();
       console.log('Database reset successfully');

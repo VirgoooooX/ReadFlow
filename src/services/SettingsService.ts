@@ -31,11 +31,11 @@ export class SettingsService {
   public async getReadingSettings(): Promise<ReadingSettings> {
     try {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.READING_SETTINGS);
-      
+
       if (stored) {
         return JSON.parse(stored);
       }
-      
+
       // 返回默认设置
       return this.getDefaultReadingSettings();
     } catch (error) {
@@ -70,11 +70,11 @@ export class SettingsService {
   public async getAppSettings(): Promise<AppSettings> {
     try {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.APP_SETTINGS);
-      
+
       if (stored) {
         return JSON.parse(stored);
       }
-      
+
       // 返回默认设置
       return this.getDefaultAppSettings();
     } catch (error) {
@@ -116,13 +116,13 @@ export class SettingsService {
         ...currentSettings,
         [key]: value,
       };
-      
+
       await this.saveReadingSettings(updatedSettings);
     } catch (error) {
       console.error('Error updating reading setting:', error);
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
-        message: `Failed to update reading setting: ${key}`,
+        message: `Failed to update reading setting: ${String(key)}`,
         details: error,
         timestamp: new Date(),
       });
@@ -142,13 +142,13 @@ export class SettingsService {
         ...currentSettings,
         [key]: value,
       };
-      
+
       await this.saveAppSettings(updatedSettings);
     } catch (error) {
       console.error('Error updating app setting:', error);
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
-        message: `Failed to update app setting: ${key}`,
+        message: `Failed to update app setting: ${String(key)}`,
         details: error,
         timestamp: new Date(),
       });
@@ -404,7 +404,7 @@ export class SettingsService {
       if (data.readingSettings) {
         await this.saveReadingSettings(data.readingSettings);
       }
-      
+
       if (data.appSettings) {
         await this.saveAppSettings(data.appSettings);
       }
@@ -446,12 +446,12 @@ export class SettingsService {
   public async getUserPreference<T>(key: string, defaultValue: T): Promise<T> {
     try {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.USER_PREFERENCES);
-      
+
       if (stored) {
         const preferences = JSON.parse(stored);
         return preferences[key] !== undefined ? preferences[key] : defaultValue;
       }
-      
+
       return defaultValue;
     } catch (error) {
       console.error('Error getting user preference:', error);
@@ -466,9 +466,9 @@ export class SettingsService {
     try {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.USER_PREFERENCES);
       const preferences = stored ? JSON.parse(stored) : {};
-      
+
       preferences[key] = value;
-      
+
       await AsyncStorage.setItem(
         SettingsService.STORAGE_KEYS.USER_PREFERENCES,
         JSON.stringify(preferences)
@@ -545,6 +545,7 @@ export class SettingsService {
       nightMode: false,
       sepia: false,
       brightness: 1,
+      showAllTab: true,
     };
   }
 
@@ -637,9 +638,9 @@ export class SettingsService {
   }
 
   /**
-   * 获取主题相关的设置
+   * 获取当前主题状态 (组合 ReadingSettings 和 AppSettings)
    */
-  public async getThemeSettings(): Promise<{
+  public async getCurrentThemeState(): Promise<{
     theme: string;
     backgroundColor: string;
     textColor: string;

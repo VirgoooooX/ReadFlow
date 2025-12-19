@@ -11,6 +11,7 @@ export class RSShubService {
   private static readonly RSSHUB_INSTANCES = [
     'https://rsshub.app',
     'https://rsshub.rssforever.com',
+    'https://rss.198909.xyz:37891', 
     'https://rsshub.speedcloud.one',
     'https://rsshub.pseudoyu.com'
   ];
@@ -155,7 +156,7 @@ export class RSShubService {
       'v2ex': 'V2EX 论坫',
       'sspai': '少数派文章',
       'coolapk': '酷安应用市场',
-      'cnbeta': 'CnBeta 科技资讯',
+      'cnbeta': 'cnBeta 科技资讯',
     };
 
     const description = descriptions[platform] || `${platform} RSS源`;

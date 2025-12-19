@@ -12,7 +12,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
@@ -24,7 +24,7 @@ type RootStackParamList = {
 };
 
 type EditRSSSourceRouteProp = RouteProp<RootStackParamList, 'EditRSSSource'>;
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface FormData {
   name: string;
@@ -83,7 +83,7 @@ const EditRSSSourceScreen: React.FC = () => {
     try {
       setLoading(true);
       const source = await rssService.getSourceById(sourceId);
-      
+
       if (!source) {
         Alert.alert('错误', 'RSS源不存在', [
           { text: '确定', onPress: () => navigation.goBack() }
@@ -164,13 +164,13 @@ const EditRSSSourceScreen: React.FC = () => {
     try {
       setValidating(true);
       await rssService.validateRSSFeed(url);
-      
+
       // 清除错误信息
       setErrors(prev => ({ ...prev, url: undefined }));
-      
+
       // 显示成功提示
       Alert.alert('验证成功', 'RSS源验证通过，可以正常使用');
-      
+
       return true;
     } catch (error) {
       console.error('Error validating RSS URL:', error);
@@ -209,10 +209,10 @@ const EditRSSSourceScreen: React.FC = () => {
       };
 
       await rssService.updateRSSSource(sourceId, updatedSource);
-      
+
       // 刷新RSS源列表
       await refreshRSSSources();
-      
+
       Alert.alert('成功', 'RSS源已更新', [
         { text: '确定', onPress: () => navigation.goBack() }
       ]);
@@ -228,8 +228,8 @@ const EditRSSSourceScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <KeyboardAvoidingView 
-        style={styles.container} 
+      <KeyboardAvoidingView
+        style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -241,18 +241,18 @@ const EditRSSSourceScreen: React.FC = () => {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* 页面标题 */}
           <View style={styles.header}>
-            <MaterialIcons 
-              name="rss-feed" 
-              size={32} 
-              color={theme?.colors?.primary || '#3B82F6'} 
+            <MaterialIcons
+              name="rss-feed"
+              size={32}
+              color={theme?.colors?.primary || '#3B82F6'}
             />
             <Text style={styles.title}>编辑RSS源</Text>
             <Text style={styles.subtitle}>修改RSS订阅源设置</Text>
@@ -274,9 +274,9 @@ const EditRSSSourceScreen: React.FC = () => {
                   keyboardType="url"
                 />
                 {validating && (
-                  <ActivityIndicator 
-                    size="small" 
-                    color={theme?.colors?.primary || '#3B82F6'} 
+                  <ActivityIndicator
+                    size="small"
+                    color={theme?.colors?.primary || '#3B82F6'}
                     style={styles.validatingIcon}
                   />
                 )}
@@ -329,13 +329,13 @@ const EditRSSSourceScreen: React.FC = () => {
                   ]}
                   onPress={() => updateFormData('contentType', 'image_text')}
                 >
-                  <MaterialIcons 
-                    name="image" 
-                    size={20} 
-                    color={formData.contentType === 'image_text' 
+                  <MaterialIcons
+                    name="image"
+                    size={20}
+                    color={formData.contentType === 'image_text'
                       ? (theme?.colors?.onPrimary || '#FFFFFF')
                       : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))
-                    } 
+                    }
                   />
                   <Text style={[
                     styles.contentTypeText,
@@ -344,7 +344,7 @@ const EditRSSSourceScreen: React.FC = () => {
                     多媒体内容
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={[
                     styles.contentTypeOption,
@@ -352,13 +352,13 @@ const EditRSSSourceScreen: React.FC = () => {
                   ]}
                   onPress={() => updateFormData('contentType', 'text')}
                 >
-                  <MaterialIcons 
-                    name="text-fields" 
-                    size={20} 
-                    color={formData.contentType === 'text' 
+                  <MaterialIcons
+                    name="text-fields"
+                    size={20}
+                    color={formData.contentType === 'text'
                       ? (theme?.colors?.onPrimary || '#FFFFFF')
                       : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))
-                    } 
+                    }
                   />
                   <Text style={[
                     styles.contentTypeText,
@@ -369,8 +369,8 @@ const EditRSSSourceScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
               <Text style={styles.contentTypeHint}>
-                {formData.contentType === 'image_text' 
-                  ? '将提取图片和视频，适合多媒体内容源' 
+                {formData.contentType === 'image_text'
+                  ? '将提取图片和视频，适合多媒体内容源'
                   : '不提取图片和视频，适合纯文本内容源，加载更快'}
               </Text>
             </View>
@@ -401,7 +401,7 @@ const EditRSSSourceScreen: React.FC = () => {
         >
           <Text style={styles.cancelButtonText}>取消</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
             styles.addButton,

@@ -2,6 +2,9 @@ import { useColorScheme } from 'react-native';
 import { lightColors, darkColors, getColorTokens, semanticColors, type ColorTokens, type CustomColorConfig, type ThemePreset, themePresets, themePresetDescriptions, themePresetTags } from './colors';
 import { typography, readingTypography, adjustTypography, type TypographyTokens } from './typography';
 import { spacing, componentSpacing, layoutSpacing, borderRadius, elevation, sizes, zIndex } from './spacing';
+import { withAlpha, getContrastColor } from '../utils/colorUtils';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import { themeStorageService, type ThemeSettings } from '../services/ThemeStorageService';
 
 // 主题接口定义
 export interface Theme {
@@ -43,16 +46,14 @@ export const createThemeFromPreset = (isDark: boolean, preset: ThemePreset): The
 export const lightTheme = createTheme(false);
 export const darkTheme = createTheme(true);
 
-// 主题钩子
+// 主题钩子 (简单版本，仅读)
 export const useTheme = (): Theme => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  return createTheme(isDark);
+  return useMemo(() => createTheme(isDark), [isDark]);
 };
 
-// 主题上下文（可选，用于更复杂的主题管理）
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { themeStorageService, type ThemeSettings } from '../services/ThemeStorageService';
+// --- 完整主题上下文 ---
 
 interface ThemeContextType {
   theme: Theme;
@@ -60,12 +61,12 @@ interface ThemeContextType {
   themeMode: 'light' | 'dark' | 'system';
   currentPreset: ThemePreset;
   customConfig?: CustomColorConfig;
-  toggleTheme: () => void;
-  setTheme: (isDark: boolean) => void;
+  toggleTheme: () => Promise<void>;
+  setTheme: (isDark: boolean) => Promise<void>;
   setThemeMode: (mode: 'light' | 'dark' | 'system') => Promise<void>;
-  setThemePreset: (preset: ThemePreset | null | undefined) => void;
-  setCustomColors: (config: CustomColorConfig) => void;
-  resetToDefault: () => void;
+  setThemePreset: (preset: ThemePreset | null | undefined) => Promise<void>;
+  setCustomColors: (config: CustomColorConfig) => Promise<void>;
+  resetToDefault: () => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -84,19 +85,19 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   initialCustomConfig
 }) => {
   const systemColorScheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(initialTheme);
-  const [currentPreset, setCurrentPreset] = useState<ThemePreset>(initialPreset);
-  const [customConfig, setCustomConfig] = useState<CustomColorConfig | undefined>(initialCustomConfig);
+  const [themeMode, setThemeModeState] = useState<'light' | 'dark' | 'system'>(initialTheme);
+  const [currentPreset, setCurrentPresetState] = useState<ThemePreset>(initialPreset);
+  const [customConfig, setCustomConfigState] = useState<CustomColorConfig | undefined>(initialCustomConfig);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 从存储加载主题设置
+  // 【优化】加载设置
   useEffect(() => {
     const loadThemeSettings = async () => {
       try {
         const settings = await themeStorageService.getThemeSettings();
-        setThemeMode(settings.mode || 'system');
-        setCurrentPreset(settings.preset || 'default');
-        setCustomConfig(settings.customColors || undefined);
+        setThemeModeState(settings.mode || 'system');
+        setCurrentPresetState(settings.preset || 'default');
+        setCustomConfigState(settings.customColors || undefined);
       } catch (error) {
         console.error('Failed to load theme settings:', error);
       } finally {
@@ -107,63 +108,56 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     loadThemeSettings();
   }, []);
   
-  const isDark = themeMode === 'system' 
-    ? systemColorScheme === 'dark'
-    : themeMode === 'dark';
+  // 【优化】使用 useMemo 计算 isDark，避免重复计算
+  const isDark = useMemo(() => {
+    if (themeMode === 'system') return systemColorScheme === 'dark';
+    return themeMode === 'dark';
+  }, [themeMode, systemColorScheme]);
   
-  // 根据当前预设和自定义配置创建主题
-  const getEffectiveCustomConfig = (): CustomColorConfig | undefined => {
-    if (currentPreset === 'custom') {
-      return customConfig || undefined;
-    }
+  // 【优化】使用 useMemo 计算有效的自定义颜色配置
+  const activeCustomConfig = useMemo(() => {
+    if (currentPreset === 'custom') return customConfig;
     return themePresets[currentPreset] || undefined;
-  };
+  }, [currentPreset, customConfig]);
   
-  const theme = createTheme(isDark, getEffectiveCustomConfig());
+  // 【关键优化】使用 useMemo 缓存主题对象，避免每次渲染都重新创建
+  const theme = useMemo(() => 
+    createTheme(isDark, activeCustomConfig), 
+  [isDark, activeCustomConfig]);
   
-  const toggleTheme = async () => {
-    const newMode = themeMode === 'light' ? 'dark' : themeMode === 'dark' ? 'system' : 'light';
-    setThemeMode(newMode);
-    try {
-      await themeStorageService.setThemeMode(newMode);
-    } catch (error) {
-      console.error('Failed to save theme mode:', error);
-    }
-  };
-  
-  const setTheme = async (dark: boolean) => {
-    const newMode = dark ? 'dark' : 'light';
-    setThemeMode(newMode);
-    try {
-      await themeStorageService.setThemeMode(newMode);
-    } catch (error) {
-      console.error('Failed to save theme mode:', error);
-    }
-  };
-
-  const setThemeModeAsync = async (mode: 'light' | 'dark' | 'system' | undefined | null) => {
+  // 【关键优化】使用 useCallback 包裹所有状态修改方法，避免每次渲染创建新函数
+  const setThemeMode = useCallback(async (mode: 'light' | 'dark' | 'system' | undefined | null) => {
     const validMode = mode || 'system';
-    setThemeMode(validMode);
+    setThemeModeState(validMode);
     try {
       await themeStorageService.setThemeMode(validMode);
     } catch (error) {
       console.error('Failed to save theme mode:', error);
     }
-  };
+  }, []);
+
+  const toggleTheme = useCallback(async () => {
+    const newMode = themeMode === 'light' ? 'dark' : themeMode === 'dark' ? 'system' : 'light';
+    await setThemeMode(newMode);
+  }, [themeMode, setThemeMode]);
   
-  const setThemePreset = async (preset: ThemePreset | undefined | null) => {
+  const setTheme = useCallback(async (dark: boolean) => {
+    await setThemeMode(dark ? 'dark' : 'light');
+  }, [setThemeMode]);
+
+  const setThemePreset = useCallback(async (preset: ThemePreset | undefined | null) => {
     const validPreset = preset || 'default';
-    setCurrentPreset(validPreset);
+    setCurrentPresetState(validPreset);
     try {
       await themeStorageService.setThemePreset(validPreset);
     } catch (error) {
       console.error('Failed to save theme preset:', error);
     }
-  };
+  }, []);
   
-  const setCustomColors = async (config: CustomColorConfig) => {
-    setCustomConfig(config);
-    setCurrentPreset('custom');
+  const setCustomColors = useCallback(async (config: CustomColorConfig) => {
+    setCustomConfigState(config);
+    setCurrentPresetState('custom');
     try {
       await Promise.all([
         themeStorageService.setThemePreset('custom'),
@@ -172,54 +166,41 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     } catch (error) {
       console.error('Failed to save custom colors:', error);
     }
-  };
+  }, []);
   
-  const resetToDefault = async () => {
-    setCurrentPreset('default');
-    setCustomConfig(undefined);
+  const resetToDefault = useCallback(async () => {
+    setCurrentPresetState('default');
+    setCustomConfigState(undefined);
+    setThemeModeState('system');
     try {
       await themeStorageService.resetAllSettings();
     } catch (error) {
       console.error('Failed to reset theme settings:', error);
     }
-  };
+  }, []);
 
-  // 如果还在加载中，使用默认主题而不是返回 null
-  if (isLoading) {
-    const defaultTheme = createTheme(systemColorScheme === 'dark');
-    return (
-      <ThemeContext.Provider value={{ 
-        theme: defaultTheme, 
-        isDark: systemColorScheme === 'dark', 
-        themeMode: 'system',
-        currentPreset: 'default',
-        customConfig: undefined,
-        toggleTheme: async () => {}, 
-        setTheme: () => {},
-        setThemeMode: async () => {},
-        setThemePreset: async () => {},
-        setCustomColors: async () => {},
-        resetToDefault: async () => {},
-      }}>
-        {children}
-      </ThemeContext.Provider>
-    );
-  }
+  // 【关键优化】使用 useMemo 缓存 Context value，防止所有消费者组件不必要的重渲染
+  // 即使在加载状态下也要保持一致的 Hook 调用顺序
+  const contextValue = useMemo<ThemeContextType>(() => ({
+    theme: isLoading ? createTheme(systemColorScheme === 'dark') : theme,
+    isDark: isLoading ? systemColorScheme === 'dark' : isDark,
+    themeMode: isLoading ? 'system' : themeMode,
+    currentPreset: isLoading ? 'default' : currentPreset,
+    customConfig: isLoading ? undefined : customConfig,
+    toggleTheme: isLoading ? async () => {} : toggleTheme,
+    setTheme: isLoading ? async () => {} : setTheme,
+    setThemeMode: isLoading ? async () => {} : setThemeMode,
+    setThemePreset: isLoading ? async () => {} : setThemePreset,
+    setCustomColors: isLoading ? async () => {} : setCustomColors,
+    resetToDefault: isLoading ? async () => {} : resetToDefault
+  }), [
+    isLoading, theme, isDark, themeMode, currentPreset, customConfig,
+    toggleTheme, setTheme, setThemeMode, setThemePreset, setCustomColors, resetToDefault,
+    systemColorScheme
+  ]);
   
   return (
-    <ThemeContext.Provider value={{ 
-      theme, 
-      isDark, 
-      themeMode,
-      currentPreset,
-      customConfig,
-      toggleTheme, 
-      setTheme,
-      setThemeMode: setThemeModeAsync,
-      setThemePreset,
-      setCustomColors,
-      resetToDefault
-    }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );
@@ -240,22 +221,8 @@ export const createStyles = <T extends Record<string, any>>(
   return (theme: Theme): T => styleFactory(theme);
 };
 
-// 颜色工具函数
-export const withOpacity = (color: string, opacity: number): string => {
-  // 如果颜色已经包含透明度，直接返回
-  if (color.includes('rgba') || color.length === 9) {
-    return color;
-  }
-  
-  // 转换十六进制颜色为带透明度的格式
-  const hex = color.replace('#', '');
-  const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
-  return `#${hex}${alpha}`;
-};
-
-// 响应式工具函数已暂时移除
-
-// 动画配置已暂时移除
+// 向后兼容
+export const withOpacity = withAlpha;
 
 // 导出所有主题相关内容
 export {
@@ -295,6 +262,8 @@ export default {
   ThemeProvider,
   useThemeContext,
   createStyles,
+  withAlpha,
   withOpacity,
+  getContrastColor,
   themePresets,
 };

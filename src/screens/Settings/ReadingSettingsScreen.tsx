@@ -5,12 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Switch,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { getAvailableFonts } from '../../theme/typography';
-import { useReadingSettings } from '../../hooks/useReadingSettings';
+import { useReadingSettings } from '../../contexts/ReadingSettingsContext'; // 更改引用路径
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '../../navigation/AppNavigator';
@@ -26,6 +27,7 @@ const ReadingSettingsScreen: React.FC = () => {
   const [fontSize, setFontSize] = useState(16);
   const [fontFamily, setFontFamily] = useState('system');
   const [lineHeight, setLineHeight] = useState(1.5);
+  const [showAllTab, setShowAllTab] = useState(true);
 
   // 从设置中初始化本地状态（仅在首次加载时）
   const [initialized, setInitialized] = useState(false);
@@ -34,6 +36,7 @@ const ReadingSettingsScreen: React.FC = () => {
       setFontSize(settings.fontSize);
       setFontFamily(settings.fontFamily);
       setLineHeight(settings.lineHeight);
+      setShowAllTab(settings.showAllTab ?? true);
       setInitialized(true);
     }
   }, [settings, initialized]);
@@ -54,13 +57,13 @@ const ReadingSettingsScreen: React.FC = () => {
   const availableFonts = getAvailableFonts();
   const fontFamilyOptions = availableFonts.map(font => font.name);
   const fontFamilyKeys = availableFonts.map(font => font.key);
-  
+
   // 根据key获取字体名称
   const getFontNameByKey = (key: string) => {
     const font = availableFonts.find(f => f.key === key);
     return font ? font.name : '系统默认';
   };
-  
+
   // 根据名称获取字体key
   const getFontKeyByName = (name: string) => {
     const font = availableFonts.find(f => f.name === name);
@@ -126,6 +129,17 @@ const ReadingSettingsScreen: React.FC = () => {
     }
   };
 
+  // 处理显示"全部"标签开关
+  const handleShowAllTabChange = async (value: boolean) => {
+    setShowAllTab(value);
+    try {
+      await updateSetting('showAllTab', value);
+    } catch (error) {
+      console.error('Failed to update showAllTab:', error);
+      setShowAllTab(!value);
+    }
+  };
+
   const renderOptionSelector = (
     title: string,
     currentValue: string,
@@ -186,11 +200,7 @@ const ReadingSettingsScreen: React.FC = () => {
             onValueChange={onValueChange}
             minimumTrackTintColor={theme?.colors?.primary || '#6750A4'}
             maximumTrackTintColor={theme?.colors?.outline || (isDark ? '#938F99' : '#79747E')}
-            thumbStyle={{
-              backgroundColor: theme?.colors?.primary || '#6750A4',
-              width: 20,
-              height: 20,
-            }}
+            thumbTintColor={theme?.colors?.primary || '#6750A4'}
           />
           <Text style={styles.sliderLabel}>{max}{unit}</Text>
         </View>
@@ -198,7 +208,23 @@ const ReadingSettingsScreen: React.FC = () => {
     </View>
   );
 
-
+  const renderSwitch = (
+    title: string,
+    value: boolean,
+    onValueChange: (value: boolean) => void
+  ) => (
+    <View style={styles.section}>
+      <View style={styles.switchCard}>
+        <Text style={styles.switchTitle}>{title}</Text>
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: theme?.colors?.surfaceVariant, true: theme?.colors?.primary }}
+          thumbColor={value ? theme?.colors?.onPrimary : theme?.colors?.outline}
+        />
+      </View>
+    </View>
+  );
 
   const styles = createStyles(isDark, theme);
 
@@ -213,6 +239,13 @@ const ReadingSettingsScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.content}>
+        {/* 显示设置 */}
+        {renderSwitch(
+          '显示"全部"标签',
+          showAllTab,
+          handleShowAllTabChange
+        )}
+
         {/* 字体大小滑动调节 */}
         {renderSlider(
           '字体大小',
@@ -223,10 +256,10 @@ const ReadingSettingsScreen: React.FC = () => {
           handleFontSizeChange,
           'px'
         )}
-        
+
         {/* 字体类型选择 */}
         {renderOptionSelector('字体类型', getFontNameByKey(fontFamily), fontFamilyOptions, handleFontFamilyChange)}
-        
+
         {/* 行间距滑动调节 */}
         {renderSlider(
           '行间距',
@@ -285,7 +318,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     color: theme?.colors?.primary || '#6750A4',
     fontWeight: '500',
   },
-  
+
   // 滑动条样式
   sliderCard: {
     backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
@@ -319,6 +352,20 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     textAlign: 'center',
   },
 
+  // 开关样式
+  switchCard: {
+    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+  },
 });
 
 export default ReadingSettingsScreen;

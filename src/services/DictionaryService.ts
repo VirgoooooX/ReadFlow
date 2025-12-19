@@ -1,7 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { WordDefinition, DictionaryCacheEntry } from '../types';
 import { SettingsService } from './SettingsService';
-
+import { stripHtmlTags } from '../utils/stringUtils';
 /**
  * 词典服务 - 使用LLM查询单词释义，并缓存到本地数据库
  * 支持词形识别（如 running -> run）
@@ -86,16 +86,21 @@ export class DictionaryService {
    */
   private async cacheDefinition(definition: WordDefinition): Promise<void> {
     try {
-      const now = Math.floor(Date.now() / 1000);
+      // 【优化】统一使用 ISO 字符串，与 VocabularyService 保持一致
+      const now = new Date().toISOString(); 
+      
+      // 【优化】入库前清理 HTML 标签
+      const cleanDefinition = this.cleanDefinitionHtml(definition);
+      
       const definitionsJson = JSON.stringify({
-        definitions: definition.definitions,
-        baseWordDefinitions: definition.baseWordDefinitions
+        definitions: cleanDefinition.definitions,
+        baseWordDefinitions: cleanDefinition.baseWordDefinitions
       });
 
       // 检查是否已存在
       const existing = await this.databaseService.executeQuery(
         'SELECT id FROM dictionary_cache WHERE word = ?',
-        [definition.word]
+        [cleanDefinition.word]
       );
 
       if (existing.length > 0) {
@@ -104,23 +109,22 @@ export class DictionaryService {
           `UPDATE dictionary_cache SET 
            base_word = ?, word_form = ?, phonetic = ?, definitions = ?, updated_at = ?
            WHERE word = ?`,
-          [definition.baseWord || null, definition.wordForm || null, definition.phonetic || null, definitionsJson, now, definition.word]
+          [cleanDefinition.baseWord || null, cleanDefinition.wordForm || null, cleanDefinition.phonetic || null, definitionsJson, now, cleanDefinition.word]
         );
       } else {
         // 插入新记录
         await this.databaseService.executeStatement(
           `INSERT INTO dictionary_cache (word, base_word, word_form, phonetic, definitions, source, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [definition.word, definition.baseWord || null, definition.wordForm || null, definition.phonetic || null, definitionsJson, 'llm', now, now]
+          [cleanDefinition.word, cleanDefinition.baseWord || null, cleanDefinition.wordForm || null, cleanDefinition.phonetic || null, definitionsJson, 'llm', now, now]
         );
       }
       
-      console.log(`💾 已缓存单词: ${definition.word}`);
+      console.log(`💾 已缓存单词: ${cleanDefinition.word}`);
     } catch (error) {
       console.error('Error caching definition:', error);
     }
   }
-
   /**
    * 缓存原始单词（当查询的是变形词时）
    */
@@ -137,15 +141,17 @@ export class DictionaryService {
       );
 
       if (existing.length === 0) {
-        const now = Math.floor(Date.now() / 1000);
+        // 【优化】统一使用 ISO 字符串，与 VocabularyService 保持一致
+        const now = new Date().toISOString();
+        const cleanDefinition = this.cleanDefinitionHtml(definition);
         const definitionsJson = JSON.stringify({
-          definitions: definition.baseWordDefinitions
+          definitions: cleanDefinition.baseWordDefinitions
         });
 
         await this.databaseService.executeStatement(
           `INSERT INTO dictionary_cache (word, base_word, word_form, phonetic, definitions, source, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [baseWord, null, null, definition.phonetic || null, definitionsJson, 'llm', now, now]
+          [baseWord, null, null, cleanDefinition.phonetic || null, definitionsJson, 'llm', now, now]
         );
         
         console.log(`💾 已缓存原始单词: ${baseWord}`);
@@ -153,6 +159,33 @@ export class DictionaryService {
     } catch (error) {
       console.error('Error caching base word:', error);
     }
+  }
+
+  // 【新增】递归清理定义中的 HTML
+  private cleanDefinitionHtml(def: WordDefinition): WordDefinition {
+    const clean = (str?: string) => str ? stripHtmlTags(str) : str;
+  
+    return {
+      ...def,
+      // 清理直接属性
+      word: clean(def.word)!,
+      context: clean(def.context),
+    
+      // 清理定义数组
+      definitions: def.definitions?.map(d => ({
+        ...d,
+        definition: clean(d.definition),
+        translation: clean(d.translation),
+        example: clean(d.example)
+      })),
+    
+      // 清理原形定义
+      baseWordDefinitions: def.baseWordDefinitions?.map(d => ({
+        ...d,
+        definition: clean(d.definition),
+        translation: clean(d.translation)
+      }))
+    };
   }
 
   /**
@@ -194,10 +227,10 @@ export class DictionaryService {
    * 构建查询提示词
    */
   private buildPrompt(word: string, context?: string): string {
-    let prompt = `请分析英语单词 "${word}"`;
+    let prompt = `请分析英语单词 “${word}”`;
     
     if (context) {
-      prompt += `，它在以下句子中出现："${context}"`;
+      prompt += `，它在以下句子中出现：“${context}”`;
     }
     
     prompt += `
@@ -228,7 +261,7 @@ export class DictionaryService {
 注意：
 1. 如果单词是变形词（如 running, went, dogs），请提供原始单词（run, go, dog）及其释义
 2. 如果单词已经是原形，baseWord和wordForm为null，baseWordDefinitions为空数组
-3. 只返回JSON，不要其他说明文字`;
+3. 【重要】仅返回JSON，不要其他说明文字`;
 
     return prompt;
   }
@@ -330,29 +363,40 @@ export class DictionaryService {
 
   /**
    * 解析LLM响应
+   * 【优化】增强 JSON 解析容错性，支持 Markdown 代码块
    */
   private parseLLMResponse(response: string, originalWord: string): WordDefinition | null {
     try {
-      // 尝试提取JSON
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error('No JSON found in LLM response');
-        return null;
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      // 1. 清理 Markdown 代码块标记（支持 ```json ... ``` 格式）
+      let cleanJson = response
+        .replace(/```json\s*/g, '') // 移除 ```json
+        .replace(/```\s*/g, '')     // 移除 ```
+        .trim();
+    
+      // 2. 尝试提取 JSON 对象（查找第一个 { 和最后一个 }）
+      const firstBrace = cleanJson.indexOf('{');
+      const lastBrace = cleanJson.lastIndexOf('}');
       
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+      }
+    
+      // 3. 尝试解析 JSON
+      const parsed = JSON.parse(cleanJson);
+      
+      // 4. 验证必要字段并构建返回对象
       return {
         word: parsed.word || originalWord,
         baseWord: parsed.baseWord || undefined,
         wordForm: parsed.wordForm || undefined,
         phonetic: parsed.phonetic || undefined,
-        definitions: parsed.definitions || [],
-        baseWordDefinitions: parsed.baseWordDefinitions || undefined,
+        definitions: Array.isArray(parsed.definitions) ? parsed.definitions : [],
+        baseWordDefinitions: Array.isArray(parsed.baseWordDefinitions) ? parsed.baseWordDefinitions : undefined,
         source: 'llm',
       };
     } catch (error) {
-      console.error('Error parsing LLM response:', error);
+      console.error('❌ Error parsing LLM response:', error);
+      console.error('   Response preview:', response.substring(0, 200));
       return null;
     }
   }
@@ -360,7 +404,7 @@ export class DictionaryService {
   /**
    * 将缓存行映射为WordDefinition
    */
-  private mapCacheRowToDefinition(row: any): WordDefinition {
+  public mapCacheRowToDefinition(row: any): WordDefinition {
     const parsedDefinitions = JSON.parse(row.definitions);
     
     return {
@@ -428,7 +472,7 @@ export class DictionaryService {
       
       return {
         totalWords: countResult[0]?.count || 0,
-        lastUpdated: lastResult[0]?.last_updated ? new Date(lastResult[0].last_updated * 1000) : undefined,
+        lastUpdated: lastResult[0]?.last_updated ? new Date(lastResult[0].last_updated) : undefined,
       };
     } catch (error) {
       console.error('Error getting cache stats:', error);
@@ -438,6 +482,7 @@ export class DictionaryService {
 
   /**
    * 记录LLM使用统计
+   * 【优化】统一使用 ISO 字符串时间格式
    */
   private async logUsage(
     requestType: string,
@@ -446,7 +491,8 @@ export class DictionaryService {
     success: boolean = true
   ): Promise<void> {
     try {
-      const now = Math.floor(Date.now() / 1000);
+      // 【优化】统一使用 ISO 字符串格式，与其他时间字段保持一致
+      const now = new Date().toISOString();
       await this.databaseService.executeStatement(
         `INSERT INTO llm_usage_stats (request_type, provider, model, success, created_at)
          VALUES (?, ?, ?, ?, ?)`,

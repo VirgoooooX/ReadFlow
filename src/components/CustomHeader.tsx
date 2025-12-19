@@ -42,7 +42,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   const navigation = useNavigation();
   const { theme, isDark } = useThemeContext();
   const insets = useSafeAreaInsets();
-  
+
   // 计算实际的header高度（包含状态栏）
   const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : insets.top;
   const totalHeaderHeight = HEADER_HEIGHT + statusBarHeight;
@@ -55,7 +55,10 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     }
   };
 
-  const headerBackgroundColor = backgroundColor || theme?.colors?.primary || '#6750A4';
+  // 确保使用主题色，如果传入了 backgroundColor 则优先使用
+  // 注意：如果 backgroundColor 为空或者是 undefined，我们会回退到 theme.colors.primary
+  // 使用 StyleSheet.flatten 来处理样式合并（如果将来支持 style 属性）
+  const headerBackgroundColor = backgroundColor || theme?.colors?.primary;
   const headerTextColor = textColor || theme?.colors?.onPrimary || '#FFFFFF';
 
   // 动态计算文字样式
@@ -76,7 +79,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
       baseStyle.lineHeight = titleLineHeight;
     }
     // 注意：不再在这里设置marginTop，由容器的paddingTop来控制
-    
+
     // Android特有属性
     if (Platform.OS === 'android') {
       baseStyle.textAlignVertical = 'center';
@@ -130,7 +133,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
         backgroundColor="transparent"
         translucent={true}
       />
-      <View style={[styles.container, { 
+      <View style={[styles.container, {
         backgroundColor: headerBackgroundColor,
         height: totalHeaderHeight,
         paddingTop: statusBarHeight,

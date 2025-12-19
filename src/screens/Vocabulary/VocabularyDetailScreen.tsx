@@ -15,6 +15,7 @@ import { useThemeContext } from '../../theme';
 import { vocabularyService } from '../../services/VocabularyService';
 import { VocabularyEntry, WordDefinition } from '../../types';
 import type { VocabularyStackParamList } from '../../navigation/types';
+import { stripHtmlTags } from '../../utils/stringUtils';
 
 type VocabularyDetailRouteProp = RouteProp<VocabularyStackParamList, 'VocabularyDetail'>;
 
@@ -119,20 +120,6 @@ const VocabularyDetailScreen: React.FC = () => {
     if (level >= 5) return { text: '已掌握', color: '#22C55E', bg: '#E8F5E8' };
     if (level >= 2) return { text: '学习中', color: '#F59E0B', bg: '#FFF3E0' };
     return { text: '新单词', color: '#3B82F6', bg: '#E3F2FD' };
-  };
-
-  // 清除HTML标签，保留纯文本
-  const stripHtmlTags = (html: string | undefined): string => {
-    if (!html) return '';
-    return html
-      .replace(/<[^>]+>/g, '') // 移除HTML标签
-      .replace(/&nbsp;/g, ' ') // 替换&nbsp;
-      .replace(/&amp;/g, '&') // 替换&amp;
-      .replace(/&lt;/g, '<') // 替换&lt;
-      .replace(/&gt;/g, '>') // 替换&gt;
-      .replace(/&quot;/g, '"') // 替换&quot;
-      .replace(/&#39;/g, "'") // 替换&#39;
-      .trim();
   };
 
   if (loading) {
