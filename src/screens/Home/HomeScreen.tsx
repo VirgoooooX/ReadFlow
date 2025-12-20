@@ -274,7 +274,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
     articleListContainer: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       paddingVertical: 12,
       paddingBottom: 40, // 底部留白
     },
@@ -282,7 +282,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     articleItem: {
       backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
       borderRadius: 16,
-      padding: 16,
+      padding: 12,
       marginBottom: 10, // 卡片间距
       flexDirection: 'row',
       // 阴影效果 (iOS)
@@ -318,7 +318,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       borderRadius: 4,
       backgroundColor: theme?.colors?.primary || '#3B82F6',
       marginTop: 6, // 视觉上与第一行文字居中
-      marginRight: 8,
+      marginRight: 4,
     },
     articleTitle: {
       flex: 1,
@@ -326,7 +326,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       fontWeight: '600',
       lineHeight: 22,
       color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      opacity: 0.9, // 已读文章稍微淡一点
+      opacity: 0.6, // 已读文章稍微淡一点
     },
     articleTitleUnread: {
       fontWeight: '700',

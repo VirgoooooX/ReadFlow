@@ -347,7 +347,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     backgroundColor: (theme?.colors?.primary || '#6750A4') + '15',
     marginHorizontal: 12,
     marginVertical: 8,
-    marginBottom: 0, // 与分割线紧贴
+    marginBottom: 8, // 与分割线紧贴
     padding: 12,
     borderRadius: 12,
   },
