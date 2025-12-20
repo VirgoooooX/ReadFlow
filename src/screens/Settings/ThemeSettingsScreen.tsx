@@ -10,6 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { THEME_PRESETS } from '../../theme/presets';
+import * as StyleUtils from '../../utils/styleUtils';
 
 const ThemeSettingsScreen: React.FC = () => {
   // 【优化】直接从 Context 解构所需状态，移除冗余本地 state
@@ -204,7 +205,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 12,
   },
   card: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    ...StyleUtils.createCardStyle(isDark, theme),
     borderRadius: 12,
     overflow: 'hidden',
   },

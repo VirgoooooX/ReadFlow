@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Image,
   Alert,
+  Platform, // 新增 Platform 用于阴影处理
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,8 +19,6 @@ import type { UserStackParamList } from '../../navigation/AppNavigator';
 import { userStatsService, UserStats } from '../../services/UserStatsService';
 
 type UserProfileScreenNavigationProp = NativeStackNavigationProp<UserStackParamList>;
-
-// UserStats interface moved to UserStatsService
 
 interface UserProfile {
   name: string;
@@ -43,21 +42,18 @@ const UserProfileScreen: React.FC = () => {
     name: 'TechFlow用户',
     email: 'user@techflow.com',
     joinDate: new Date('2024-01-15'),
-    level: '',
+    level: 'Lv.3', // 示例等级
     experience: 2350,
     nextLevelExp: 3000,
   });
 
-  // 真实用户统计数据
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 加载用户统计数据
   useEffect(() => {
     loadUserStats();
   }, []);
 
-  // 屏幕获得焦点时实时刷新数据
   useFocusEffect(
     React.useCallback(() => {
       loadUserStats();
@@ -68,7 +64,6 @@ const UserProfileScreen: React.FC = () => {
     try {
       setLoading(true);
       const stats = await userStatsService.getUserStats();
-      console.log('📊 用户统计数据已更新:', stats);
       setUserStats(stats);
     } catch (error) {
       console.error('Failed to load user stats:', error);
@@ -77,216 +72,178 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  const handleEditProfile = () => {
-    navigation.navigate('EditProfile');
-  };
-
-  const handleSettings = () => {
-    navigation.navigate('Settings');
-  };
-
   const handleLogout = () => {
     Alert.alert(
       '退出登录',
       '确定要退出登录吗？',
       [
-        {
-          text: '取消',
-          style: 'cancel',
-        },
-        {
-          text: '确定',
-          style: 'destructive',
-          onPress: logout,
-        },
+        { text: '取消', style: 'cancel' },
+        { text: '确定', style: 'destructive', onPress: logout },
       ]
     );
   };
 
-  // 添加调试信息处理函数
-  const handleDebugInfo = () => {
-    navigation.navigate('Debug');
+  // 【重新设计】统计卡片组件
+  // 采用横向布局：左侧图标，右侧数据
+  const StatCard = ({ icon, value, label, onPress, color }: any) => {
+    // 获取对应的背景淡色
+    // 如果是深色模式，背景色稍微深一点；浅色模式则非常淡
+    const backgroundColor = isDark 
+      ? `${color}15` // 15% 透明度
+      : `${color}10`; // 10% 透明度
+  
+    return (
+      <TouchableOpacity 
+        style={[styles.statCard, { backgroundColor }]} 
+        onPress={onPress} 
+        activeOpacity={0.7}
+      >
+        <View style={[styles.statIconContainer, { backgroundColor: theme?.colors?.surface || '#FFF' }]}>  
+          <MaterialIcons name={icon} size={20} color={color} />
+        </View>
+        <View style={styles.statContent}>
+          <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
-  const getDaysJoined = (): number => {
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - userProfile.joinDate.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
+  // 渲染操作列表项组件
+  const ActionItem = ({ icon, label, onPress, isDestructive = false }: any) => (
+    <TouchableOpacity style={styles.actionCard} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.actionLeft}>
+        <View style={[
+          styles.actionIconContainer,
+          isDestructive && styles.actionIconContainerDestructive
+        ]}>
+          <MaterialIcons
+            name={icon}
+            size={22}
+            color={isDestructive ? theme?.colors?.error : (theme?.colors?.primary || '#6750A4')}
+          />
+        </View>
+        <Text style={[
+          styles.actionText,
+          isDestructive && { color: theme?.colors?.error }
+        ]}>
+          {label}
+        </Text>
+      </View>
+      <MaterialIcons
+        name="chevron-right"
+        size={24}
+        color={theme?.colors?.outline || '#999'}
+      />
+    </TouchableOpacity>
+  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* 用户头像和基本信息 */}
-      <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-          {user?.avatar ? (
-            <Image
-              source={{ uri: user.avatar }}
-              style={styles.avatar}
-              defaultSource={{ uri: 'https://via.placeholder.com/80x80/6750A4/FFFFFF?text=TF' }}
-            />
-          ) : (
-            <View style={styles.avatar}>
-              <MaterialIcons
-                name="person"
-                size={48}
-                color={theme?.colors?.onPrimary || '#FFFFFF'}
-              />
+      
+      {/* 头部卡片 */}
+      <View style={styles.headerCard}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.avatarContainer}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <MaterialIcons name="person" size={40} color="#FFF" />
+              </View>
+            )}
+            <TouchableOpacity style={styles.editAvatarButton} onPress={() => navigation.navigate('EditProfile')}>
+              <MaterialIcons name="edit" size={14} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.userInfo}>
+            <Text style={styles.userName} numberOfLines={1}>{user?.username || userProfile.name}</Text>
+            <Text style={styles.userEmail} numberOfLines={1}>{user?.email || userProfile.email}</Text>
+            {/* 等级徽章 */}
+            <View style={styles.levelBadge}>
+              <MaterialIcons name="stars" size={14} color={theme?.colors?.primary} />
+              <Text style={styles.levelText}>{userProfile.level} 会员</Text>
             </View>
-          )}
-          <TouchableOpacity style={styles.editAvatarButton} onPress={handleEditProfile}>
-            <MaterialIcons
-              name="edit"
-              size={16}
-              color={theme?.colors?.onPrimary || '#FFFFFF'}
-            />
+          </View>
+
+          <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+            <MaterialIcons name="settings" size={24} color={theme?.colors?.onSurfaceVariant} />
           </TouchableOpacity>
         </View>
-
-        <View style={styles.profileInfo}>
-          <Text style={styles.userName}>{user?.username || userProfile.name}</Text>
-          <Text style={styles.userEmail}>{user?.email || userProfile.email}</Text>
-        </View>
-
-        <TouchableOpacity style={styles.settingsButton} onPress={handleSettings}>
-          <MaterialIcons
-            name="settings"
-            size={24}
-            color={theme?.colors?.onSurface || '#1C1B1F'}
-          />
-        </TouchableOpacity>
       </View>
 
-
-
-      {/* 内容概览 */}
-      <View style={styles.statsSection}>
-        <View style={[styles.sectionHeader, { marginBottom: 12 }]}>
-          <Text style={styles.sectionTitle}>内容概览</Text>
+      {/* 数据概览 */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>学习数据</Text>
           <TouchableOpacity onPress={() => loadUserStats()} disabled={loading}>
             <MaterialIcons
               name="refresh"
-              size={24}
-              color={loading ? (isDark ? '#938F99' : '#79747E') : theme?.colors?.primary || '#6750A4'}
+              size={20}
+              color={loading ? theme?.colors?.outline : theme?.colors?.primary}
             />
           </TouchableOpacity>
         </View>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>加载中...</Text>
-          </View>
-        ) : (
-          <View style={styles.statsGrid}>
-            <TouchableOpacity
-              style={styles.statCard}
-              onPress={() => navigation.navigate('Vocabulary' as any)}
-            >
-              <MaterialIcons
-                name="book"
-                size={32}
-                color={theme?.colors?.secondary || '#625B71'}
-              />
-              <Text style={styles.statValue}>{userStats?.vocabularyWords || 0}</Text>
-              <Text style={styles.statLabel}>收藏单词</Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.statCard}
-              onPress={() => navigation.navigate('ManageSubscriptions' as any)}
-            >
-              <MaterialIcons
-                name="rss-feed"
-                size={32}
-                color={theme?.colors?.tertiary || '#7D5260'}
-              />
-              <Text style={styles.statValue}>{userStats?.rssSources || 0}</Text>
-              <Text style={styles.statLabel}>RSS源</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.statCard}
-              onPress={() => navigation.navigate('Articles' as any)}
-            >
-              <MaterialIcons
-                name="folder"
-                size={32}
-                color={theme?.colors?.secondary || '#625B71'}
-              />
-              <Text style={styles.statValue}>{userStats?.totalArticles || 0}</Text>
-              <Text style={styles.statLabel}>总文章数</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.statCard}
-              onPress={() => navigation.navigate('Articles' as any)}
-            >
-              <MaterialIcons
-                name="favorite"
-                size={32}
-                color={theme?.colors?.tertiary || '#7D5260'}
-              />
-              <Text style={styles.statValue}>{userStats?.favoriteArticles || 0}</Text>
-              <Text style={styles.statLabel}>收藏文章</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon="book"
+            value={userStats?.vocabularyWords || 0}
+            label="单词积累"
+            color={theme?.colors?.primary || '#6750A4'}
+            onPress={() => navigation.navigate('Vocabulary' as any)}
+          />
+          <StatCard
+            icon="rss-feed"
+            value={userStats?.rssSources || 0}
+            label="订阅源"
+            color={theme?.colors?.tertiary || '#7D5260'}
+            onPress={() => navigation.navigate('ManageSubscriptions' as any)}
+          />
+          <StatCard
+            icon="article"
+            value={userStats?.totalArticles || 0}
+            label="已读文章"
+            color={theme?.colors?.secondary || '#625B71'}
+            onPress={() => navigation.navigate('Articles' as any)}
+          />
+          <StatCard
+            icon="favorite"
+            value={userStats?.favoriteArticles || 0}
+            label="收藏夹"
+            color="#E91E63" // 专门给收藏用个醒目的颜色
+            onPress={() => navigation.navigate('Articles' as any)} // 实际应跳到收藏Tab
+          />
+        </View>
       </View>
-
-
 
       {/* 快捷操作 */}
-      <View style={styles.actionsSection}>
-        <Text style={styles.sectionTitle}>快捷操作</Text>
-
-        <TouchableOpacity style={styles.actionItem} onPress={handleEditProfile}>
-          <View style={styles.actionLeft}>
-            <MaterialIcons
-              name="edit"
-              size={24}
-              color={theme?.colors?.primary || '#6750A4'}
-            />
-            <Text style={styles.actionText}>编辑个人资料</Text>
-          </View>
-          <MaterialIcons
-            name="chevron-right"
-            size={24}
-            color={theme?.colors?.onSurfaceVariant || '#79747E'}
-          />
-        </TouchableOpacity>
-
-        {/* 调试信息选项 */}
-        <TouchableOpacity style={styles.actionItem} onPress={handleDebugInfo}>
-          <View style={styles.actionLeft}>
-            <MaterialIcons
-              name="bug-report"
-              size={24}
-              color={theme?.colors?.primary || '#6750A4'}
-            />
-            <Text style={styles.actionText}>调试信息</Text>
-          </View>
-          <MaterialIcons
-            name="chevron-right"
-            size={24}
-            color={theme?.colors?.onSurfaceVariant || '#79747E'}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionItem} onPress={handleLogout}>
-          <View style={styles.actionLeft}>
-            <MaterialIcons
-              name="logout"
-              size={24}
-              color={theme?.colors?.error || '#BA1A1A'}
-            />
-            <Text style={[styles.actionText, { color: theme?.colors?.error || '#BA1A1A' }]}>退出登录</Text>
-          </View>
-          <MaterialIcons
-            name="chevron-right"
-            size={24}
-            color={theme?.colors?.onSurfaceVariant || '#79747E'}
-          />
-        </TouchableOpacity>
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>常用功能</Text>
+        
+        <ActionItem
+          icon="edit"
+          label="编辑个人资料"
+          onPress={() => navigation.navigate('EditProfile')}
+        />
+        
+        <ActionItem
+          icon="bug-report"
+          label="调试信息"
+          onPress={() => navigation.navigate('Debug')}
+        />
+        
+        <ActionItem
+          icon="logout"
+          label="退出登录"
+          isDestructive
+          onPress={handleLogout}
+        />
       </View>
+
+      {/* 底部留白 */}
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 };
@@ -295,22 +252,43 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    paddingHorizontal: 16,
   },
-  profileHeader: {
+  
+  // --- 头部卡片 ---
+  headerCard: {
+    marginTop: 16,
+    marginBottom: 24,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    // 阴影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 12,
+    elevation: isDark ? 0 : 4,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.1)',
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    marginBottom: 16,
   },
   avatarContainer: {
     position: 'relative',
     marginRight: 16,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme?.colors?.surfaceVariant,
+  },
+  avatarPlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: theme?.colors?.primary || '#6750A4',
     justifyContent: 'center',
     alignItems: 'center',
@@ -319,115 +297,153 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: theme?.colors?.secondary || '#625B71',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    borderColor: theme?.colors?.surface || '#FFF',
   },
-  profileInfo: {
+  userInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   userName: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    marginBottom: 4,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+    marginBottom: 8,
   },
-  userLevel: {
-    fontSize: 14,
-    color: theme?.colors?.primary || '#6750A4',
-    fontWeight: '500',
-    marginBottom: 2,
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: (theme?.colors?.primary || '#6750A4') + '15', // 15% opacity
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  joinDate: {
+  levelText: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    fontWeight: '600',
+    color: theme?.colors?.primary || '#6750A4',
+    marginLeft: 4,
   },
   settingsButton: {
     padding: 8,
+    marginTop: -20, // 稍微上移对齐右上角
   },
-  loadingContainer: {
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-  },
-  statsSection: {
-    marginHorizontal: 16,
-    marginBottom: 16,
+
+  // --- 通用分节 ---
+  sectionContainer: {
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 12,
+    marginBottom: 12, // 如果没有 header row，这个 margin 会生效
   },
+
+  // --- 统计数据网格 (新设计) ---
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'row' as any,
+    flexWrap: 'wrap' as any,
     justifyContent: 'space-between',
+    gap: 12, // 行间距
   },
   statCard: {
-    width: '48%',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    padding: 16,
+    width: '48%', // 两列布局
+    flexDirection: 'row' as any, // 【关键】改为横向布局
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 12,
+    borderRadius: 16,
+    // 移除边框，改用背景色区分
+    // 移除阴影，让它看起来更扁平、现代
+  },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12, // 圆角矩形图标背景
+    justifyContent: 'center' as any,
+    alignItems: 'center' as any,
+    marginRight: 12,
+    // 给图标加一点微弱的阴影，增加层次感
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  statContent: {
+    flex: 1,
+    justifyContent: 'center' as any,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700' as any, // 粗体数字
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginTop: 8,
-    marginBottom: 4,
+    lineHeight: 22,
+    marginBottom: 2,
   },
   statLabel: {
     fontSize: 12,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    textAlign: 'center',
+    opacity: 0.8,
   },
 
-  actionsSection: {
-    marginHorizontal: 16,
-    marginBottom: 32,
-  },
-  actionItem: {
+  // --- 操作卡片列表 ---
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    // 阴影
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: isDark ? 0.2 : 0.04,
+    shadowRadius: 4,
+    elevation: isDark ? 0 : 1,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.05)',
   },
   actionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+  },
+  actionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#F0F0F0'),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  actionIconContainerDestructive: {
+    backgroundColor: (theme?.colors?.error || '#FFEBEE') + '20',
   },
   actionText: {
     fontSize: 16,
+    fontWeight: '500',
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginLeft: 12,
   },
 });
 

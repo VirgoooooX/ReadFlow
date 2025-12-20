@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/RSSService';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type NavigationProp = NativeStackNavigationProp<any, 'AddRSSSource'>;
 
@@ -408,11 +409,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 4,
   },
   contentTypeOption: {
+    ...StyleUtils.createCardStyle(isDark, theme),
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    flexDirection: 'row' as any,
+    alignItems: 'center' as any,
+    justifyContent: 'center' as any,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
@@ -453,9 +454,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     gap: 8,
   },
   quickSourceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    flexDirection: 'row' as any,
+    alignItems: 'center' as any,
+    ...StyleUtils.createCardStyle(isDark, theme),
     borderRadius: 12,
     padding: 12,
   },

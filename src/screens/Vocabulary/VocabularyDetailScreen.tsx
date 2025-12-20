@@ -16,6 +16,7 @@ import { vocabularyService } from '../../services/VocabularyService';
 import { VocabularyEntry, WordDefinition } from '../../types';
 import type { VocabularyStackParamList } from '../../navigation/types';
 import { stripHtmlTags } from '../../utils/stringUtils';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type VocabularyDetailRouteProp = RouteProp<VocabularyStackParamList, 'VocabularyDetail'>;
 
@@ -344,10 +345,9 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     // 统计卡片
     statsCard: {
-      flexDirection: 'row',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+      flexDirection: 'row' as any,
+      ...StyleUtils.createCardStyle(isDark, theme),
       borderRadius: 12,
-      padding: 16,
       marginBottom: 20,
     },
     statItem: {
@@ -384,9 +384,9 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginBottom: 12,
     },
     definitionItem: {
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 10,
-      padding: 14,
+      ...StyleUtils.createCardStyle(isDark, theme),
+      borderRadius: 12,
+      padding: 16,
       marginBottom: 10,
     },
     posTag: {
@@ -432,9 +432,9 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     // 上下文
     contextCard: {
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 10,
-      padding: 14,
+      ...StyleUtils.createCardStyle(isDark, theme),
+      borderRadius: 12,
+      padding: 16,
     },
     contextText: {
       fontSize: 14,

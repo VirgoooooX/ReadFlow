@@ -18,6 +18,7 @@ import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/RSSService';
 import type { RSSSource } from '../../types';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type RootStackParamList = {
   EditRSSSource: { sourceId: number };
@@ -519,11 +520,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 4,
   },
   contentTypeOption: {
+    ...StyleUtils.createCardStyle(isDark, theme),
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    flexDirection: 'row' as any,
+    alignItems: 'center' as any,
+    justifyContent: 'center' as any,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
@@ -559,9 +560,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    alignItems: 'center' as any,
+    justifyContent: 'center' as any,
+    ...StyleUtils.createCardStyle(isDark, theme),
   },
   cancelButtonText: {
     fontSize: 16,

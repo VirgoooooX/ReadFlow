@@ -11,10 +11,11 @@ import Slider from '@react-native-community/slider';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { getAvailableFonts } from '../../theme/typography';
-import { useReadingSettings } from '../../contexts/ReadingSettingsContext'; // 更改引用路径
+import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '../../navigation/AppNavigator';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type NavigationProp = NativeStackNavigationProp<SettingsStackParamList, 'ReadingSettings'>;
 

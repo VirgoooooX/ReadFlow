@@ -13,6 +13,7 @@ import { vocabularyService } from '../../services/VocabularyService';
 import { VocabularyEntry } from '../../types';
 import { useNavigation } from '@react-navigation/native';
 import { stripHtmlTags } from '../../utils/stringUtils';
+import * as StyleUtils from '../../utils/styleUtils';
 const ReviewSessionScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation();

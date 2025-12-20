@@ -15,6 +15,7 @@ import { useThemeContext } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AppNavigator';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -222,8 +223,8 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    justifyContent: 'center',
+    ...StyleUtils.createCardStyle(isDark, theme),
+    justifyContent: 'center' as any,
     alignItems: 'center',
     marginBottom: 16,
   },
@@ -250,14 +251,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 8,
   },
   inputWrapper: {
-    flexDirection: 'row',
+    flexDirection: 'row' as any,
     alignItems: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+    borderColor: theme?.colors?.outline || (isDark ? '#49454F' : '#E6E0E9'),
     paddingHorizontal: 16,
     paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: isDark ? 0.1 : 0.05,
+    shadowRadius: 2,
+    elevation: isDark ? 0 : 1,
   },
   inputError: {
     borderColor: theme?.colors?.error || '#BA1A1A',
@@ -290,9 +296,14 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   loginButton: {
     backgroundColor: theme?.colors?.primary || '#6750A4',
     borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    paddingVertical: 14,
+    alignItems: 'center' as any,
     marginBottom: 24,
+    shadowColor: theme?.colors?.primary || '#6750A4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.15,
+    shadowRadius: 4,
+    elevation: isDark ? 0 : 3,
   },
   loginButtonDisabled: {
     opacity: 0.6,

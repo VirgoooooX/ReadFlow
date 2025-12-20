@@ -17,6 +17,7 @@ import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/RSSService';
 import { DatabaseService } from '../../database/DatabaseService';
 import type { RSSSource } from '../../types';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
 
@@ -516,7 +517,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     gap: 12,
   },
   sourceItem: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    ...StyleUtils.createCardStyle(isDark, theme),
     borderRadius: 12,
     padding: 16,
   },

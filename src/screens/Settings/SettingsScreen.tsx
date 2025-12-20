@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { imageCacheService, DatabaseService } from '../../services';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '../../navigation/AppNavigator';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type SettingsScreenNavigationProp = NativeStackNavigationProp<SettingsStackParamList>;
 
@@ -254,13 +255,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 12,
   },
   settingItem: {
-    flexDirection: 'row',
+    flexDirection: 'row' as any,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
+    ...StyleUtils.createCardStyle(isDark, theme),
     marginBottom: 8,
   },
   settingItemLeft: {

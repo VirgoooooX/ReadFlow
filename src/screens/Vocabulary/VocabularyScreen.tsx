@@ -3,10 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList, // 改用 FlatList 提升长列表性能
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
@@ -17,21 +18,102 @@ import { translationService } from '../../services/TranslationService';
 import { vocabularyService } from '../../services/VocabularyService';
 import { VocabularyEntry } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type Props = VocabularyStackScreenProps<'VocabularyMain'>;
+
+// 顶部 Tab 组件
+const SegmentedTab = ({ tabs, activeTab, onTabPress, theme, isDark }: any) => {
+  return (
+    <View style={styles(isDark, theme).tabContainer}>
+      {tabs.map((tab: any) => {
+        const isActive = activeTab === tab.key;
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles(isDark, theme).tabItem, isActive && styles(isDark, theme).tabItemActive]}
+            onPress={() => onTabPress(tab.key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles(isDark, theme).tabText, isActive && styles(isDark, theme).tabTextActive]}>
+              {tab.label}
+            </Text>
+            {isActive && <View style={styles(isDark, theme).tabIndicator} />}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
+// 单词卡片组件
+const WordCard = ({ item, theme, isDark, onPress, onSpeak }: any) => {
+  const mastery = getMasteryLabel(item.masteryLevel || item.mastery_level || 0);
+  const translation = typeof item.definition === 'object' 
+    ? item.definition?.definitions?.[0]?.translation 
+    : item.translation;
+  const phonetic = typeof item.definition === 'object'
+    ? item.definition?.phonetic
+    : null;
+
+  return (
+    <TouchableOpacity 
+      style={styles(isDark, theme).wordCard} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles(isDark, theme).wordCardHeader}>
+        <View style={styles(isDark, theme).wordMain}>
+          <Text style={styles(isDark, theme).wordText}>{item.word}</Text>
+          {phonetic && <Text style={styles(isDark, theme).phoneticText}>/{phonetic}/</Text>}
+        </View>
+        
+        {/* 发音按钮 */}
+        <TouchableOpacity 
+          style={styles(isDark, theme).speakBtn}
+          onPress={(e) => {
+            e.stopPropagation();
+            onSpeak(item.word);
+          }}
+        >
+          <MaterialIcons name="volume-up" size={20} color={theme?.colors?.primary} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles(isDark, theme).divider} />
+
+      <View style={styles(isDark, theme).wordCardBody}>
+        <Text style={styles(isDark, theme).meaningText} numberOfLines={2}>
+          {translation || '暂无释义'}
+        </Text>
+        
+        {/* 状态徽章 (放在右下角) */}
+        <View style={[styles(isDark, theme).statusBadge, { backgroundColor: mastery.color + '15' }]}>
+          <View style={[styles(isDark, theme).statusDot, { backgroundColor: mastery.color }]} />
+          <Text style={[styles(isDark, theme).statusText, { color: mastery.color }]}>{mastery.text}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// 辅助函数：获取掌握程度样式
+const getMasteryLabel = (level: number) => {
+  if (level >= 5) return { text: '已掌握', color: '#4CAF50' }; // Green
+  if (level >= 2) return { text: '学习中', color: '#FF9800' }; // Orange
+  return { text: '新单词', color: '#2196F3' }; // Blue
+};
 
 const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'vocabulary' | 'dictionary' | 'translation'>('vocabulary');
   const [stats, setStats] = useState({ vocabulary: 0, dictionary: 0, translation: 0, needReview: 0 });
-  const [vocabularyWords, setVocabularyWords] = useState<VocabularyEntry[]>([]);
-  const [dictionaryWords, setDictionaryWords] = useState<any[]>([]);
-  const [translations, setTranslations] = useState<any[]>([]);
+  const [listData, setListData] = useState<any[]>([]);
 
-  const styles = createStyles(isDark, theme);
+  // 样式对象
+  const currentStyles = styles(isDark, theme);
 
-  // 使用 useFocusEffect 在页面获得焦点时重新加载
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -42,18 +124,15 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
     try {
       const db = DatabaseService.getInstance();
-      
-      // 确保数据库已初始化
       await db.initializeDatabase();
       
-      // 加载统计数据
-      const vocabCount = await db.executeQuery('SELECT COUNT(*) as count FROM vocabulary').catch(() => [{ count: 0 }]);
-      const dictCount = await db.executeQuery('SELECT COUNT(*) as count FROM dictionary_cache').catch(() => [{ count: 0 }]);
-      const transCount = await db.executeQuery('SELECT COUNT(*) as count FROM translation_cache').catch(() => [{ count: 0 }]);
-      const needReviewCount = await db.executeQuery(
-        'SELECT COUNT(*) as count FROM vocabulary WHERE next_review_at <= ? AND mastery_level < 5',
-        [new Date().toISOString()]
-      ).catch(() => [{ count: 0 }]);
+      // 并行加载统计数据
+      const [vocabCount, dictCount, transCount, needReviewCount] = await Promise.all([
+        db.executeQuery('SELECT COUNT(*) as count FROM vocabulary').catch(() => [{ count: 0 }]),
+        db.executeQuery('SELECT COUNT(*) as count FROM dictionary_cache').catch(() => [{ count: 0 }]),
+        db.executeQuery('SELECT COUNT(*) as count FROM translation_cache').catch(() => [{ count: 0 }]),
+        db.executeQuery('SELECT COUNT(*) as count FROM vocabulary WHERE next_review_at <= ? AND mastery_level < 5', [new Date().toISOString()]).catch(() => [{ count: 0 }])
+      ]);
       
       setStats({
         vocabulary: vocabCount[0]?.count || 0,
@@ -62,545 +141,432 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
         needReview: needReviewCount[0]?.count || 0,
       });
       
-      // 根据当前标签页加载数据
+      // 加载列表数据
+      let data = [];
       if (activeTab === 'vocabulary') {
-        const entries = await vocabularyService.getAllWords({ limit: 50, sortBy: 'added_at', sortOrder: 'DESC' });
-        setVocabularyWords(entries);
+        data = await vocabularyService.getAllWords({ limit: 50, sortBy: 'added_at', sortOrder: 'DESC' });
       } else if (activeTab === 'dictionary') {
-        const words = await db.executeQuery(
-          'SELECT * FROM dictionary_cache ORDER BY created_at DESC LIMIT 50'
-        ).catch(() => []);
-        setDictionaryWords(words.map((row: any) => ({
-          word: row.word,
-          baseWord: row.base_word,
-          wordForm: row.word_form,
+        const rows = await db.executeQuery('SELECT * FROM dictionary_cache ORDER BY created_at DESC LIMIT 50').catch(() => []);
+        data = rows.map((row: any) => ({
+          ...row,
           definitions: JSON.parse(row.definitions || '{}'),
-          createdAt: new Date(row.created_at * 1000),
-        })));
+        }));
       } else if (activeTab === 'translation') {
-        const trans = await translationService.getTranslationHistory(50);
-        setTranslations(trans);
+        data = await translationService.getTranslationHistory(50);
       }
+      setListData(data);
     } catch (error) {
-      console.error('Failed to load vocabulary data:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStartReview = () => {
-    if (stats.needReview === 0) {
-      Alert.alert('暂无复习', '当前没有需要复习的单词');
-      return;
+  const handleSpeak = async (word: string) => {
+    try {
+      const isSpeaking = await Speech.isSpeakingAsync();
+      if (isSpeaking) await Speech.stop();
+      Speech.speak(word, { language: 'en', rate: 0.9 });
+    } catch (error) {
+      // ignore
     }
-    navigation.navigate('ReviewSession');
   };
 
-  const handleDeleteWord = async (id: number, word: string) => {
-    Alert.alert(
-      '删除单词',
-      `确定要从单词本中删除 "${word}" 吗？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await vocabularyService.deleteWord(id);
-              loadData(); // 重新加载
-            } catch (error) {
-              console.error('Failed to delete word:', error);
-              Alert.alert('删除失败', String(error));
-            }
-          },
-        },
-      ]
+  const renderItem = ({ item }: any) => {
+    if (activeTab === 'vocabulary') {
+      return (
+        <WordCard 
+          item={item} 
+          theme={theme} 
+          isDark={isDark} 
+          onPress={() => navigation.navigate('VocabularyDetail', { entryId: item.id })}
+          onSpeak={handleSpeak}
+        />
+      );
+    } 
+    
+    if (activeTab === 'dictionary') {
+      const translation = item.definitions?.definitions?.[0]?.translation || '暂无释义';
+      return (
+        <View style={currentStyles.simpleCard}>
+          <View style={currentStyles.simpleCardRow}>
+            <Text style={currentStyles.simpleWord}>{item.word}</Text>
+            <Text style={currentStyles.simpleTime}>{new Date(item.created_at * 1000).toLocaleDateString()}</Text>
+          </View>
+          <Text style={currentStyles.simpleMeaning} numberOfLines={1}>{translation}</Text>
+        </View>
+      );
+    }
+
+    // Translation
+    return (
+      <View style={currentStyles.transCard}>
+        <Text style={currentStyles.transOriginal}>{item.originalText}</Text>
+        <View style={currentStyles.transDivider} />
+        <Text style={currentStyles.transResult}>{item.translatedText}</Text>
+      </View>
     );
   };
 
-  const getMasteryLabel = (level: number): { text: string; style: string } => {
-    if (level >= 5) return { text: '已掌握', style: 'mastered' };
-    if (level >= 2) return { text: '学习中', style: 'learning' };
-    return { text: '新单词', style: 'new' };
-  };
-
-  const handleAddWord = () => {
-    navigation.navigate('AddWord', {});
-  };
-
-  const handleReviewSession = () => {
-    navigation.navigate('ReviewSession');
-  };
-
-  const handleViewStats = () => {
-    navigation.navigate('VocabularyStats');
-  };
-
-  const handleWordDetail = (entryId: number) => {
-    navigation.navigate('VocabularyDetail', { entryId });
-  };
-
-  // 发音功能
-  const handleSpeak = useCallback(async (word: string) => {
-    try {
-      const isSpeaking = await Speech.isSpeakingAsync();
-      if (isSpeaking) {
-        await Speech.stop();
-      }
-      
-      Speech.speak(word, {
-        language: 'en',
-        pitch: 1.0,
-        rate: 0.9,
-        onError: () => {
-          Alert.alert('发音失败', '请检查设备设置中的"文字转语音"服务是否已启用');
-        },
-      });
-    } catch (error) {
-      Alert.alert('发音错误', String(error));
-    }
-  }, []);
-
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.content}>
-        {/* 统计卡片 */}
-        <View style={styles.statsSection}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.vocabulary}</Text>
-            <Text style={styles.statLabel}>单词本</Text>
+    <View style={currentStyles.container}>
+      {/* 固定顶栏：Header + Banner + Tab */}
+      <View style={currentStyles.fixedTopBar}>
+        {/* 顶部统计概览 */}
+        <View style={currentStyles.header}>
+          <View style={currentStyles.statItem}>
+            <Text style={currentStyles.statValue}>{stats.vocabulary}</Text>
+            <Text style={currentStyles.statTitle}>总单词</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.dictionary}</Text>
-            <Text style={styles.statLabel}>查询记录</Text>
+          <View style={currentStyles.statDivider} />
+          <View style={currentStyles.statItem}>
+            <Text style={currentStyles.statValue}>{stats.needReview}</Text>
+            <Text style={currentStyles.statTitle}>待复习</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats.translation}</Text>
-            <Text style={styles.statLabel}>翻译记录</Text>
+          <View style={currentStyles.statDivider} />
+          <View style={currentStyles.statItem}>
+            <Text style={currentStyles.statValue}>{stats.dictionary + stats.translation}</Text>
+            <Text style={currentStyles.statTitle}>查词/翻译</Text>
           </View>
         </View>
 
-        {/* 标签页切换 */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'vocabulary' && styles.activeTab]}
-            onPress={() => setActiveTab('vocabulary')}
+        {/* 待复习横幅 (仅当有复习任务时显示) */}
+        {activeTab === 'vocabulary' && stats.needReview > 0 && (
+          <TouchableOpacity 
+            style={currentStyles.reviewBanner}
+            onPress={() => navigation.navigate('ReviewSession')}
           >
-            <Text style={[styles.tabText, activeTab === 'vocabulary' && styles.activeTabText]}>
-              单词本
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'dictionary' && styles.activeTab]}
-            onPress={() => setActiveTab('dictionary')}
-          >
-            <Text style={[styles.tabText, activeTab === 'dictionary' && styles.activeTabText]}>
-              查询记录
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'translation' && styles.activeTab]}
-            onPress={() => setActiveTab('translation')}
-          >
-            <Text style={[styles.tabText, activeTab === 'translation' && styles.activeTabText]}>
-              翻译记录
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 内容区域 */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme?.colors?.primary} />
-            <Text style={styles.loadingText}>加载中...</Text>
-          </View>
-        ) : (
-          <View style={styles.section}>
-            {activeTab === 'vocabulary' && (
-              <View style={styles.wordList}>
-                {/* 复习按钮 */}
-                {stats.vocabulary > 0 && (
-                  <TouchableOpacity style={styles.reviewButton} onPress={handleStartReview}>
-                    <MaterialIcons name="school" size={20} color="#FFFFFF" />
-                    <Text style={styles.reviewButtonText}>
-                      开始复习 {stats.needReview > 0 ? `(${stats.needReview})` : ''}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                
-                {vocabularyWords.length === 0 ? (
-                  <Text style={styles.emptyText}>单词本还是空的，在文章中点击单词可以添加哦</Text>
-                ) : (
-                  vocabularyWords.map((item: any, index) => {
-                    const mastery = getMasteryLabel(item.masteryLevel || item.mastery_level || 0);
-                    const translation = typeof item.definition === 'object' 
-                      ? item.definition?.definitions?.[0]?.translation 
-                      : item.translation;
-                    const phonetic = typeof item.definition === 'object'
-                      ? item.definition?.phonetic
-                      : null;
-                    return (
-                      <TouchableOpacity 
-                        key={item.id || index} 
-                        style={styles.wordItem}
-                        onPress={() => item.id && handleWordDetail(item.id)}
-                        activeOpacity={0.7}
-                      >
-                        {/* 左侧内容区 */}
-                        <View style={styles.wordContent}>
-                          {/* 第一行：单词 + 音标 + 发音按钮 */}
-                          <View style={styles.wordMainRow}>
-                            <Text style={styles.wordText}>{item.word}</Text>
-                            {phonetic && (
-                              <View style={styles.phoneticContainer}>
-                                <Text style={styles.phoneticText}>/{phonetic}/</Text>
-                              </View>
-                            )}
-                            <TouchableOpacity
-                              style={styles.speakButton}
-                              onPress={() => handleSpeak(item.word)}
-                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                              <MaterialIcons name="volume-up" size={18} color={theme?.colors?.primary || '#3B82F6'} />
-                            </TouchableOpacity>
-                          </View>
-                          {/* 第二行：释义 */}
-                          {translation && (
-                            <Text style={styles.meaningText} numberOfLines={2}>
-                              {translation}
-                            </Text>
-                          )}
-                        </View>
-                        {/* 右侧：状态标签 + 箭头 */}
-                        <View style={styles.wordActions}>
-                          <View style={[styles.levelBadge, mastery.style === 'mastered' ? styles.level_mastered : mastery.style === 'learning' ? styles.level_learning : styles.level_new]}>
-                            <Text style={[styles.levelText, mastery.style === 'mastered' ? styles.levelText_mastered : mastery.style === 'learning' ? styles.levelText_learning : styles.levelText_new]}>
-                              {mastery.text}
-                            </Text>
-                          </View>
-                          <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.onSurfaceVariant || '#79747E'} />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
+            <View style={currentStyles.reviewBannerLeft}>
+              <View style={currentStyles.reviewIconBg}>
+                <MaterialIcons name="school" size={20} color="#FFF" />
               </View>
-            )}
-            
-            {activeTab === 'dictionary' && (
-              <View style={styles.wordList}>
-                {dictionaryWords.length === 0 ? (
-                  <Text style={styles.emptyText}>暂无查询记录</Text>
-                ) : (
-                  dictionaryWords.map((item, index) => (
-                    <View key={index} style={styles.wordItem}>
-                      <View style={styles.wordContent}>
-                        <Text style={styles.wordText}>{item.word}</Text>
-                        {item.wordForm && (
-                          <Text style={styles.wordFormText}>({item.wordForm})</Text>
-                        )}
-                        {item.definitions.definitions?.[0]?.translation && (
-                          <Text style={styles.meaningText}>
-                            {item.definitions.definitions[0].translation}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  ))
-                )}
+              <View>
+                <Text style={currentStyles.reviewTitle}>开始今日复习</Text>
+                <Text style={currentStyles.reviewSubtitle}>{stats.needReview} 个单词需要巩固</Text>
               </View>
-            )}
-            
-            {activeTab === 'translation' && (
-              <View style={styles.wordList}>
-                {translations.length === 0 ? (
-                  <Text style={styles.emptyText}>暂无翻译记录</Text>
-                ) : (
-                  translations.map((item, index) => (
-                    <View key={index} style={styles.translationItem}>
-                      <Text style={styles.originalText}>{item.originalText}</Text>
-                      <Text style={styles.translatedText}>{item.translatedText}</Text>
-                    </View>
-                  ))
-                )}
-              </View>
-            )}
-          </View>
+            </View>
+            <MaterialIcons name="arrow-forward" size={20} color={theme?.colors?.primary} />
+          </TouchableOpacity>
         )}
+
+        {/* 分段控制器 */}
+        <SegmentedTab 
+          tabs={[
+            { key: 'vocabulary', label: '单词本' },
+            { key: 'dictionary', label: '查词历史' },
+            { key: 'translation', label: '翻译历史' },
+          ]}
+          activeTab={activeTab}
+          onTabPress={setActiveTab}
+          theme={theme}
+          isDark={isDark}
+        />
       </View>
-    </ScrollView>
+
+      {/* 列表内容（考虑顶栏高度） */}
+      {loading ? (
+        <View style={currentStyles.centerContainer}>
+          <ActivityIndicator size="large" color={theme?.colors?.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={listData}
+          renderItem={renderItem}
+          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          contentContainerStyle={currentStyles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={currentStyles.emptyContainer}>
+              <MaterialIcons name="inbox" size={48} color={theme?.colors?.outline} />
+              <Text style={currentStyles.emptyText}>暂无记录</Text>
+            </View>
+          }
+        />
+      )}
+    </View>
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
-    },
-    content: {
-      padding: 16,
-      paddingTop: 24,
-    },
-    statsSection: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 24,
-    },
-    statCard: {
-      flex: 1,
-      alignItems: 'center',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
-      marginHorizontal: 4,
-    },
-    statNumber: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: theme?.colors?.primary || '#3B82F6',
-      marginBottom: 4,
-    },
-    statLabel: {
-      fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-    },
-    tabsContainer: {
-      flexDirection: 'row',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 24,
-      padding: 4,
-      marginBottom: 24,
-    },
-    tab: {
-      flex: 1,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      alignItems: 'center',
-    },
-    activeTab: {
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
-    },
-    tabText: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-    },
-    activeTabText: {
-      color: '#FFFFFF',
-    },
-    loadingContainer: {
-      paddingVertical: 40,
-      alignItems: 'center',
-    },
-    loadingText: {
-      marginTop: 12,
-      fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    },
-    emptyText: {
-      textAlign: 'center',
-      fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-      paddingVertical: 32,
-    },
-    wordFormText: {
-      fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-      marginTop: 2,
-    },
-    translationItem: {
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 8,
-    },
-    originalText: {
-      fontSize: 14,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      marginBottom: 8,
-      lineHeight: 20,
-    },
-    translatedText: {
-      fontSize: 15,
-      fontWeight: '500',
-      color: theme?.colors?.primary || '#3B82F6',
-      lineHeight: 22,
-    },
-    actionSection: {
-      flexDirection: 'row',
-      gap: 12,
-      marginBottom: 24,
-    },
-    primaryButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
-      borderRadius: 24,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-    },
-    primaryButtonText: {
-      marginLeft: 8,
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme?.colors?.onPrimary || '#FFFFFF',
-    },
-    secondaryButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'transparent',
-      borderRadius: 24,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
+// 样式定义
+const styles = (isDark: boolean, theme: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#F9F9F9'),
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
-    },
-    secondaryButtonText: {
-      marginLeft: 8,
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme?.colors?.primary || '#3B82F6',
-    },
-    section: {
-      marginBottom: 24,
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    viewAllText: {
-      fontSize: 14,
-      color: theme?.colors?.primary || '#3B82F6',
-      fontWeight: '500',
-    },
-    wordList: {
-      gap: 8,
-    },
-    reviewButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
-      borderRadius: 24,
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      marginBottom: 16,
-    },
-    reviewButtonText: {
-      marginLeft: 8,
-      fontSize: 16,
-      fontWeight: '600',
-      color: '#FFFFFF',
-    },
-    wordHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 4,
-    },
-    wordTitleContainer: {
-      flexDirection: 'column',
-      flex: 1,
-    },
-    wordMainRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 4,
-    },
-    phoneticContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    speakButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    wordActions: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: 8,
-      gap: 6,
-    },
-    deleteButton: {
-      padding: 4,
-      marginTop: 4,
-    },
-    wordItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 10,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-    },
-    wordContent: {
-      flex: 1,
-    },
-    wordText: {
-      fontSize:20,
-      fontWeight: '800',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    },
-    phoneticText: {
-      fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-    },
-    meaningText: {
-      fontSize: 13,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-      lineHeight: 18,
-    },
-    wordMeta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    levelBadge: {
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 8,
-    },
-    level_mastered: {
-      backgroundColor: theme?.colors?.successContainer || (isDark ? '#1B5E20' : '#E8F5E8'),
-    },
-    level_learning: {
-      backgroundColor: theme?.colors?.warningContainer || (isDark ? '#E65100' : '#FFF3E0'),
-    },
-    level_new: {
-      backgroundColor: theme?.colors?.infoContainer || (isDark ? '#0D47A1' : '#E3F2FD'),
-    },
-    levelText: {
-      fontSize: 9,
-      fontWeight: '600',
-    },
-    levelText_mastered: {
-      color: theme?.colors?.onSuccessContainer || (isDark ? '#A5D6A7' : '#2E7D32'),
-    },
-    levelText_learning: {
-      color: theme?.colors?.onWarningContainer || (isDark ? '#FFB74D' : '#F57C00'),
-    },
-    levelText_new: {
-      color: theme?.colors?.onInfoContainer || (isDark ? '#90CAF9' : '#1976D2'),
-    },
-  });
+  // --- 固定顶栏 ---
+  fixedTopBar: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    borderBottomWidth: 1,
+    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#F0F0F0'),
+  },
+  
+  // --- Header (在固定顶栏内) ---
+  header: {
+    flexDirection: 'row' as any,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center' as any,
+    paddingHorizontal: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800' as any,
+    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', // 数字用等宽字体更有质感
+    lineHeight: 28,
+  },
+  statTitle: {
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    marginTop: 4,
+    fontWeight: '500' as any,
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E0E0E0'),
+    opacity: 0.5,
+  },
+
+  // --- Review Banner (在固定顶栏内) ---
+  reviewBanner: {
+    flexDirection: 'row' as any,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: (theme?.colors?.primary || '#6750A4') + '15',
+    marginHorizontal: 12,
+    marginVertical: 8,
+    marginBottom: 0, // 与分割线紧贴
+    padding: 12,
+    borderRadius: 12,
+  },
+  reviewBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme?.colors?.primary || '#6750A4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  reviewTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: theme?.colors?.onSurface || '#333',
+  },
+  reviewSubtitle: {
+    fontSize: 14,
+    color: theme?.colors?.primary || '#6750A4',
+    marginTop: 2,
+  },
+
+  // --- Tabs (在固定顶栏内) ---
+  tabContainer: {
+    flexDirection: 'row' as any,
+    justifyContent: 'center' as any,
+    alignItems: 'center' as any,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#F0F0F0'),
+  },
+  tabItem: {
+    marginHorizontal: 20,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    position: 'relative' as any,
+    minWidth: 60,
+    alignItems: 'center' as any,
+  },
+  tabItemActive: {
+    // 活跃状态样式（可选）
+  },
+  tabText: {
+    fontSize: 15,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    fontWeight: '500' as any,
+  },
+  tabTextActive: {
+    color: theme?.colors?.primary || '#6750A4',
+    fontWeight: '600' as any,
+    fontSize: 15,
+  },
+  tabIndicator: {
+    position: 'absolute' as any,
+    bottom: -12,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: theme?.colors?.primary || '#6750A4',
+    borderRadius: 1.5,
+  },
+
+  // --- List ---
+  listContent: {
+    padding: 16,
+    paddingBottom: 20,
+  },
+  
+  // --- Word Card (Flashcard Style) ---
+  wordCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFF'),
+    borderRadius: 16,
+    marginBottom: 10,
+    padding: 12,
+    // Card Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.05,
+    shadowRadius: 8,
+    elevation: isDark ? 0 : 2,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.1)',
+  },
+  wordCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  wordMain: {
+    flex: 1,
+  },
+  wordText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    marginBottom: 1,
+    letterSpacing: 0.5,
+  },
+  phoneticText: {
+    fontSize: 14,
+    color: theme?.colors?.secondary || '#666',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontStyle: 'italic',
+  },
+  speakBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: (theme?.colors?.primary || '#6750A4') + '10', // Very light bg
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: theme?.colors?.outlineVariant || '#F0F0F0',
+    opacity: 0.5,
+    marginBottom: 12,
+  },
+  wordCardBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  meaningText: {
+    flex: 1,
+    fontSize: 15,
+    color: theme?.colors?.onSurfaceVariant || '#666',
+    lineHeight: 22,
+    marginRight: 10,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // --- Simple Card (History) ---
+  simpleCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFF'),
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme?.colors?.outlineVariant || '#F5F5F5',
+  },
+  simpleCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  simpleWord: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme?.colors?.onSurface || '#333',
+  },
+  simpleTime: {
+    fontSize: 12,
+    color: theme?.colors?.outline || '#AAA',
+  },
+  simpleMeaning: {
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || '#666',
+  },
+
+  // --- Trans Card ---
+  transCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFF'),
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  transOriginal: {
+    fontSize: 15,
+    color: theme?.colors?.onSurface || '#333',
+    lineHeight: 22,
+  },
+  transDivider: {
+    height: 1,
+    backgroundColor: theme?.colors?.outlineVariant || '#F0F0F0',
+    marginVertical: 8,
+  },
+  transResult: {
+    fontSize: 15,
+    color: theme?.colors?.primary || '#6750A4',
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+
+  // --- Empty ---
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 15,
+    color: theme?.colors?.outline || '#999',
+  },
+});
 
 export default VocabularyScreen;

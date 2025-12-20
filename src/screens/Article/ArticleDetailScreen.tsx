@@ -118,18 +118,12 @@ const ArticleDetailScreen: React.FC = () => {
 
   // 动态更新导航栏标题
   React.useLayoutEffect(() => {
+    // 【简化】导航配置已在 AppNavigator.tsx 的 getCommonScreenOptions 中全局定义
+    // 这里只需要隐藏原生导航栏即可
     navigation.setOptions({
       headerShown: false, // 隐藏原生导航栏
-      animation: 'slide_from_right', // 【强制生效】都在这里定义
-      presentation: 'card',
-      gestureEnabled: true,
-      gestureDirection: 'horizontal',
     });
-    // 设置页面背景色与主题一致，防止返回时闪烁
-    navigation.setOptions({
-      contentStyle: { backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE') },
-    });
-  }, [navigation, theme, isDark]);
+  }, [navigation]);
 
   // 【新增】监听 showRefTitle 变化，执行平滑动画
   useEffect(() => {

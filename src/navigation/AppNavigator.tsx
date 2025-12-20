@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTabBarHeight, getTabBarPaddingVertical, getHeaderHeight, HEADER_TITLE_STYLE } from '../constants/navigation';
 import CustomHeader from '../components/CustomHeader';
 import ScreenWithCustomHeader from '../components/ScreenWithCustomHeader';
+import { getCommonScreenOptions } from './screenOptions';
 import {
   View,
   Image,
@@ -186,11 +187,13 @@ function AuthStackNavigator() {
 // 首页堆栈导航
 function HomeStackNavigator() {
   const { theme } = useThemeContext();
+  const isDark = theme.dark;
 
   return (
     <HomeStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
+        ...getCommonScreenOptions(theme, isDark),
       }}
     >
       <HomeStack.Screen
@@ -229,11 +232,13 @@ function HomeStackNavigator() {
 // 单词本堆栈导航
 function VocabularyStackNavigator() {
   const { theme } = useThemeContext();
+  const isDark = theme.dark;
 
   return (
     <VocabularyStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
+        ...getCommonScreenOptions(theme, isDark),
       }}
     >
       <VocabularyStack.Screen
@@ -308,11 +313,13 @@ function VocabularyStackNavigator() {
 // RSS堆栈导航
 function RSSStackNavigator() {
   const { theme } = useThemeContext();
+  const isDark = theme.dark;
 
   return (
     <RSSStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
+        ...getCommonScreenOptions(theme, isDark),
       }}
     >
       <RSSStack.Screen
@@ -387,11 +394,13 @@ function RSSStackNavigator() {
 // 用户堆栈导航
 function UserStackNavigator() {
   const { theme } = useThemeContext();
+  const isDark = theme.dark;
 
   return (
     <UserStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
+        ...getCommonScreenOptions(theme, isDark),
       }}
     >
       <UserStack.Screen
@@ -597,14 +606,12 @@ function UserStackNavigator() {
 // 设置堆栈导航
 function SettingsStackNavigator() {
   const { theme } = useThemeContext();
+  const isDark = theme.dark;
 
   return (
     <SettingsStack.Navigator
       screenOptions={{
-        headerStyle: {
-          backgroundColor: theme?.colors?.primary || '#3B82F6',
-        },
-        headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
+        ...getCommonScreenOptions(theme, isDark),
         headerTitleStyle: HEADER_TITLE_STYLE,
       }}
     >
@@ -751,6 +758,7 @@ function MainTabNavigator() {
 // 根导航器
 function RootNavigator() {
   const { theme } = useThemeContext();
+  const isDark = theme.dark;
   const { state } = useUser();
 
   // 核心逻辑：直到用户信息加载完成（确定是去登录页还是主页）后，才允许关闭原生启动页
@@ -769,6 +777,7 @@ function RootNavigator() {
     <RootStack.Navigator
       screenOptions={{
         headerShown: false,
+        ...getCommonScreenOptions(theme, isDark),
       }}
     >
       {state.isAuthenticated ? (
@@ -782,18 +791,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: '文章详情',
-          headerStyle: {
-            backgroundColor: theme?.colors?.primary || '#6750A4',
-          },
-          headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
-          // 【核心修复】设置卡片背景色与主题一致，防止转场/返回时闪烁白屏
-          // 把 contentStyle 去掉，防止覆盖 WebView 内容导致看起来像白屏滑出
-          presentation: 'card',           // 强制卡片模式
-          animation: 'slide_from_right',  // 强制右侧滑入/滑出
-          gestureEnabled: true,           // 启用手势
-          gestureDirection: 'horizontal', // 水平方向
-          fullScreenGesture: true,        // 全屏手势支持
-          animationDuration: 350,         // 标准动画时长
+          ...getCommonScreenOptions(theme, theme.dark),
         })}
       />
       <RootStack.Screen
@@ -802,10 +800,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: '单词详情',
-          headerStyle: {
-            backgroundColor: theme?.colors?.primary || '#6750A4',
-          },
-          headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
+          ...getCommonScreenOptions(theme, theme.dark),
         })}
       />
       <RootStack.Screen
@@ -814,10 +809,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: 'RSS源详情',
-          headerStyle: {
-            backgroundColor: theme?.colors?.primary || '#6750A4',
-          },
-          headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
+          ...getCommonScreenOptions(theme, theme.dark),
         })}
       />
       <RootStack.Screen
@@ -826,10 +818,7 @@ function RootNavigator() {
         options={{
           headerShown: true,
           title: '添加RSS源',
-          headerStyle: {
-            backgroundColor: theme?.colors?.primary || '#6750A4',
-          },
-          headerTintColor: theme?.colors?.onPrimary || '#FFFFFF',
+          ...getCommonScreenOptions(theme, theme.dark),
         }}
       />
     </RootStack.Navigator>

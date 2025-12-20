@@ -5,11 +5,10 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  Alert,
   Image,
   useWindowDimensions,
   TouchableOpacity,
-  Animated, // 【新增】引入 Animated
+  Platform, // 新增
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,13 +16,74 @@ import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { articleService, RSSService } from '../../services';
-import { useReadingSettings } from '../../contexts/ReadingSettingsContext'; // 更改引用路径
+import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import type { Article } from '../../types';
 import CustomTabBar from '../../components/CustomTabBar';
-import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent'; // 导入 Handle 类型
+import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
 import { useSharedValue } from 'react-native-reanimated';
 
 type Props = HomeStackScreenProps<'HomeMain'>;
+
+// 【优化】提取单独的 ArticleItem 组件，性能更好且代码更清晰
+const ArticleItem = memo(({ item, onPress, styles, isDark, theme }: any) => {
+  // 格式化日期，看起来更友好
+  const dateStr = useMemo(() => {
+    const date = new Date(item.publishedAt);
+    const now = new Date();
+    // 如果是今天的文章，显示时间；否则显示日期
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  }, [item.publishedAt]);
+
+  return (
+    <TouchableOpacity
+      style={[styles.articleItem, !item.isRead && styles.articleItemUnread]}
+      onPress={() => onPress(item.id)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.articleContent}>
+        {/* 标题区域：包含未读点 */}
+        <View style={styles.titleRow}>
+          {!item.isRead && <View style={styles.unreadDot} />}
+          <Text
+            style={[styles.articleTitle, !item.isRead && styles.articleTitleUnread]}
+            numberOfLines={2} // 限制2行
+            ellipsizeMode="tail"
+          >
+            {item.title}
+          </Text>
+        </View>
+
+        {/* 副标题（中文标题） */}
+        {item.titleCn ? (
+          <Text style={styles.articleSubtitle} numberOfLines={2}>
+            {item.titleCn}
+          </Text>
+        ) : null}
+
+        {/* 底部元信息 */}
+        <View style={styles.articleMeta}>
+          <Text style={styles.sourceTag} numberOfLines={1}>{item.sourceName}</Text>
+          <Text style={styles.metaDivider}>·</Text>
+          <Text style={styles.metaText}>{item.wordCount || 0} 词</Text>
+          <Text style={styles.metaDivider}>·</Text>
+          <Text style={styles.metaText}>{dateStr}</Text>
+        </View>
+      </View>
+
+      {/* 图片区域：固定尺寸，右侧展示 */}
+      {item.imageUrl && (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.articleImage}
+          resizeMode="cover"
+        />
+      )}
+    </TouchableOpacity>
+  );
+});
 
 const ArticleListScene = memo(({
   sourceName,
@@ -35,7 +95,6 @@ const ArticleListScene = memo(({
   theme,
   isActive
 }: any) => {
-  // 【修复】使用 useMemo 确保样式在主题变化时重新计算
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
 
   if (!isActive) return <View style={styles.lazyPlaceholder} />;
@@ -50,51 +109,44 @@ const ArticleListScene = memo(({
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
-          title={sourceName === '全部' ? '下拉刷新所有文章' : `下拉刷新${sourceName}`}
-          titleColor={isDark ? '#938F99' : '#79747E'}
-          tintColor={theme?.colors?.primary || '#3B82F6'}
+          title={sourceName === '全部' ? '下拉刷新' : `刷新 ${sourceName}`}
+          titleColor={theme?.colors?.outline}
+          tintColor={theme?.colors?.primary}
         />
       }
       renderItem={({ item }) => (
-        <TouchableOpacity style={styles.articleItem} onPress={() => onArticlePress(item.id)}>
-          <View style={styles.articleContent}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.articleTitle}>{item.title}</Text>
-              {!item.isRead && <View style={styles.unreadDot} />}
-            </View>
-            {item.titleCn && <Text style={styles.articleSubtitle}>{item.titleCn}</Text>}
-            <View style={styles.articleMeta}>
-              <Text style={styles.metaText}>{item.sourceName}</Text>
-              <Text style={styles.metaText}>•</Text>
-              <Text style={styles.metaText}>{item.wordCount || 0} 词</Text>
-              <Text style={styles.metaText}>•</Text>
-              <Text style={styles.metaText}>
-                {new Date(item.publishedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
-              </Text>
-            </View>
-          </View>
-          {item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.articleImage} resizeMode="cover" />}
-        </TouchableOpacity>
+        <ArticleItem
+          item={item}
+          onPress={onArticlePress}
+          styles={styles}
+          isDark={isDark}
+          theme={theme}
+        />
       )}
       ListEmptyComponent={() => (
         <View style={styles.emptyContainer}>
-          <MaterialIcons name="article" size={48} color={isDark ? '#938F99' : '#79747E'} />
-          <Text style={styles.emptyText}>{sourceName === '全部' ? '暂无文章' : `${sourceName} 暂无文章`}</Text>
+          <View style={styles.emptyIconContainer}>
+            <MaterialIcons name="inbox" size={64} color={theme?.colors?.outlineVariant} />
+          </View>
+          <Text style={styles.emptyText}>
+            {sourceName === '全部' ? '暂无文章' : `${sourceName} 暂无文章`}
+          </Text>
+          <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+            <Text style={styles.refreshButtonText}>刷新看看</Text>
+          </TouchableOpacity>
         </View>
       )}
     />
   );
 });
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const { rssSources, syncAllSources, syncSource } = useRSSSource();
-  const { settings } = useReadingSettings(); // 获取设置
-  const tabContentRef = useRef<CustomTabContentHandle>(null); // 创建 ref
-  // 滑动进度跟踪 (Reanimated SharedValue)
+  const { settings } = useReadingSettings();
+  const tabContentRef = useRef<CustomTabContentHandle>(null);
   const scrollX = useSharedValue(0);
   const { width: screenWidth } = useWindowDimensions();
-
-  const layout = useWindowDimensions();
 
   const [index, setIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -102,16 +154,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
 
   const styles = createStyles(isDark, theme);
-  const rssService = RSSService.getInstance();
 
   const routes = useMemo(() => {
     let baseRoutes = [{ key: 'all', title: '全部' }];
-
-    // 根据设置过滤"全部"标签
     if (settings && settings.showAllTab === false) {
       baseRoutes = [];
     }
-
     const sourceRoutes = rssSources.map(source => ({
       key: `source-${source.id}`,
       title: source.name
@@ -131,13 +179,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => { loadArticles(); }, []);
   useFocusEffect(useCallback(() => { loadArticles(); }, []));
 
-  const getCurrentSourceName = useCallback((tabIndex: number) => {
-    const route = routes[tabIndex];
-    if (!route) return '全部';
-    if (route.key === 'all') return '全部';
-    return route.title;
-  }, [routes]);
-
   const getFilteredArticles = useCallback((tabIndex: number) => {
     const route = routes[tabIndex];
     if (!route || route.key === 'all') return articles;
@@ -146,28 +187,20 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
-
     setIsRefreshing(true);
     try {
       const currentRoute = routes[index];
       if (currentRoute) {
         if (currentRoute.key === 'all') {
-          // 刷新全部
           await syncAllSources();
         } else if (currentRoute.key.startsWith('source-')) {
-          // 刷新特定源
-          const sourceIdString = currentRoute.key.replace('source-', '');
-          const sourceId = parseInt(sourceIdString, 10);
-          if (!isNaN(sourceId)) {
-            await syncSource(sourceId);
-          }
+          const sourceId = parseInt(currentRoute.key.replace('source-', ''), 10);
+          if (!isNaN(sourceId)) await syncSource(sourceId);
         }
       }
-      // 无论如何，同步完成后重新从数据库加载文章列表
       await loadArticles();
     } catch (error) {
       console.error('Refresh failed:', error);
-      // 可选：展示错误提示
     } finally {
       setIsRefreshing(false);
     }
@@ -178,11 +211,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     setLoadedTabs(prev => new Set(prev).add(newIndex));
   }, []);
 
-  // 标签点击处理
   const handleTabPress = useCallback((tabIndex: number) => {
     setIndex(tabIndex);
     setLoadedTabs(prev => new Set(prev).add(tabIndex));
-    // 主动触发内容滚动
     tabContentRef.current?.scrollToIndex(tabIndex);
   }, []);
 
@@ -212,7 +243,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* 自定义 Tab Bar */}
       <CustomTabBar
         tabs={routes}
         scrollX={scrollX}
@@ -220,10 +250,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         activeIndex={index}
         onTabPress={handleTabPress}
       />
-
-      {/* 自定义内容区域 */}
       <CustomTabContent
-        ref={tabContentRef} // 绑定 ref
+        ref={tabContentRef}
         tabs={routes}
         renderScene={renderScene}
         scrollX={scrollX}
@@ -234,92 +262,143 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
+// 【样式重构】
 const createStyles = (isDark: boolean, theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      // 【修复】背景颜色一定要针对不同主题
       backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
-    // 【清理】移除不再使用的 TabBar 样式
     lazyPlaceholder: {
       flex: 1,
       backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
     articleListContainer: {
-      padding: 12,
-      paddingTop: 6,
-      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      paddingBottom: 40, // 底部留白
     },
+    // 文章卡片样式优化
     articleItem: {
-      // 【关键】谐纲颜色：深色背景下永远是深灰色，不能是纴黑色
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 12,
+      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 10, // 卡片间距
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
+      // 阴影效果 (iOS)
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.3 : 0.05,
+      shadowRadius: 8,
+      // 阴影效果 (Android)
+      elevation: isDark ? 0 : 2,
+      // 深色模式下加个边框增加辨识度
+      borderWidth: isDark ? 1 : 0,
+      borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.1)',
     },
-    titleContainer: {
-      position: 'relative',
-      marginBottom: 4,
-    },
-    unreadDot: {
-      position: 'absolute',
-      left: -8,
-      top: -8,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: '#22C55E',
-    },
-    articleImage: {
-      width: 56,
-      height: 56,
-      borderRadius: 6,
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
+    // 未读文章背景稍微亮一点/不同一点 (可选)
+    articleItemUnread: {
+      backgroundColor: theme?.colors?.surfaceContainerLow || (isDark ? '#36343B' : '#FEF7FF'),
     },
     articleContent: {
       flex: 1,
+      marginRight: 12, // 文字和图片的间距
+      justifyContent: 'space-between', // 上下撑开
+    },
+    // 标题行
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start', // 对齐顶部，防止多行时错位
+      marginBottom: 6,
+    },
+    // 未读圆点
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      marginTop: 6, // 视觉上与第一行文字居中
+      marginRight: 8,
     },
     articleTitle: {
-      fontSize: 17,
+      flex: 1,
+      fontSize: 16,
       fontWeight: '600',
-      // 【关键】文字颜色一定要是浅色不是深色
+      lineHeight: 22,
       color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-      marginBottom: 3,
-      lineHeight: 24,
+      opacity: 0.9, // 已读文章稍微淡一点
+    },
+    articleTitleUnread: {
+      fontWeight: '700',
+      opacity: 1,
     },
     articleSubtitle: {
-      fontSize: 15,
-      // 副标题也是浅色文字
+      fontSize: 14,
+      lineHeight: 20,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-      marginBottom: 6,
-      lineHeight: 22,
-      fontStyle: 'italic',
+      marginBottom: 10,
     },
+    // 底部元信息行
     articleMeta: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-      marginTop: 2,
+      flexWrap: 'wrap',
+    },
+    sourceTag: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: theme?.colors?.primary || '#3B82F6',
+      maxWidth: 100,
+    },
+    metaDivider: {
+      fontSize: 12,
+      color: theme?.colors?.outline || '#999',
+      marginHorizontal: 6,
     },
     metaText: {
-      fontSize: 13,
-      // 气数信息也是浅灰色
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      fontSize: 12,
+      color: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
     },
+    // 图片样式
+    articleImage: {
+      width: 80,
+      height: 80,
+      borderRadius: 12,
+      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
+      borderWidth: 0.5,
+      borderColor: theme?.colors?.outlineVariant || 'rgba(0,0,0,0.05)',
+    },
+    // 空状态
     emptyContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: 64,
+      paddingTop: 100,
+    },
+    emptyIconContainer: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: theme?.colors?.surfaceContainerHighest || (isDark ? '#36343B' : '#F2F0F4'),
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 24,
     },
     emptyText: {
       fontSize: 16,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-      textAlign: 'center',
-      marginTop: 16,
+      marginBottom: 24,
+    },
+    refreshButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: theme?.colors?.primaryContainer,
+    },
+    refreshButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme?.colors?.onPrimaryContainer,
     },
   });
 

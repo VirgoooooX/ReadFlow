@@ -11,6 +11,7 @@ import type { RSSStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { RefreshControl } from 'react-native';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
+import * as StyleUtils from '../../utils/styleUtils';
 
 type Props = RSSStackScreenProps<'RSSMain'>;
 
@@ -216,22 +217,14 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginBottom: 24,
     },
     statCard: {
-      flex: 1,
-      alignItems: 'center',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
+      ...StyleUtils.createStatCardStyle(isDark, theme).card,
       marginHorizontal: 4,
     },
     statNumber: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: theme?.colors?.primary || '#3B82F6',
-      marginBottom: 4,
+      ...StyleUtils.createStatCardStyle(isDark, theme).number,
     },
     statLabel: {
-      fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      ...StyleUtils.createStatCardStyle(isDark, theme).label,
     },
     actionSection: {
       flexDirection: 'row',
@@ -286,9 +279,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     sourceItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
+      ...StyleUtils.createCardStyle(isDark, theme),
     },
     sourceIcon: {
       marginRight: 12,
@@ -345,9 +336,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     recommendItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-      borderRadius: 12,
-      padding: 16,
+      ...StyleUtils.createCardStyle(isDark, theme),
     },
     recommendContent: {
       flex: 1,

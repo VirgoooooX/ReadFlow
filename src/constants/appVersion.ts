@@ -2,9 +2,9 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '2.5.0',
-  buildNumber: 20500,
-  updateTime: '2025-12-19',
+  version: '2.5.1',
+  buildNumber: 20501,
+  updateTime: '2025-12-20',
   changelog: [
     '优化启动页及RSS源同步体验',
     '增加启动页保底机制，5秒后强制隐藏启动页',
