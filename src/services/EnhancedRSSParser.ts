@@ -104,45 +104,91 @@ function extractMediaContent(itemNode: any): EnhancedRSSItem['mediaContent'] {
 }
 
 /**
+ * 需要跳过第一张图片的 RSS 源列表
+ * 这些源的第一张图片通常是 Logo 或广告
+ */
+const SOURCES_SKIP_FIRST_IMAGE = [
+  'plink.anyfeeder.com/bbc',
+  'feeds.bbci.co.uk',
+];
+
+/**
+ * 检查源 URL 是否需要跳过第一张图片
+ */
+function shouldSkipFirstImage(sourceUrl?: string): boolean {
+  if (!sourceUrl) return false;
+  return SOURCES_SKIP_FIRST_IMAGE.some(pattern => sourceUrl.includes(pattern));
+}
+
+/**
  * 从增强的RSS item中提取最佳图片URL
  * @param item 增强的RSS item
+ * @param options.sourceUrl RSS源URL，用于判断是否需要特殊处理
  * @returns 最佳图片URL或undefined
  */
-export function extractBestImageUrlFromItem(item: EnhancedRSSItem): string | undefined {
+export function extractBestImageUrlFromItem(
+  item: EnhancedRSSItem,
+  options?: { sourceUrl?: string }
+): string | undefined {
+  const skipFirst = shouldSkipFirstImage(options?.sourceUrl);
+  
   // 1. 首先检查media:content中的图片
   if (item.mediaContent && item.mediaContent.length > 0) {
+    // 如果需要跳过第一张，从第二张开始
+    const startIndex = skipFirst ? 1 : 0;
+    const mediaList = item.mediaContent.slice(startIndex);
+    
     // 优先选择medium="image"的media:content
-    const imageMedia = item.mediaContent.find(media => media.medium === 'image');
+    const imageMedia = mediaList.find(media => media.medium === 'image');
     if (imageMedia && imageMedia.url) {
-      console.log(`✅ 从media:content提取到图片: ${imageMedia.url}`);
+      console.log(`✅ 从media:content提取到图片: ${imageMedia.url}${skipFirst ? ' (跳过了第一张)' : ''}`);
       return processImageUrl(imageMedia.url);
     }
     
     // 如果没有指定medium="image"，则选择第一个有url的media:content
-    const firstMediaWithUrl = item.mediaContent.find(media => media.url);
+    const firstMediaWithUrl = mediaList.find(media => media.url);
     if (firstMediaWithUrl && firstMediaWithUrl.url) {
-      console.log(`✅ 从media:content提取到图片: ${firstMediaWithUrl.url}`);
+      console.log(`✅ 从media:content提取到图片: ${firstMediaWithUrl.url}${skipFirst ? ' (跳过了第一张)' : ''}`);
       return processImageUrl(firstMediaWithUrl.url);
     }
   }
   
   // 2. 检查enclosures中的图片
   if (item.enclosures && item.enclosures.length > 0) {
-    const imageEnclosure = item.enclosures.find(enc => 
+    const startIndex = skipFirst ? 1 : 0;
+    const enclosureList = item.enclosures.slice(startIndex);
+    
+    const imageEnclosure = enclosureList.find(enc => 
       enc.mimeType && enc.mimeType.startsWith('image/')
     );
     if (imageEnclosure && imageEnclosure.url) {
-      console.log(`✅ 从enclosure提取到图片: ${imageEnclosure.url}`);
+      console.log(`✅ 从enclosure提取到图片: ${imageEnclosure.url}${skipFirst ? ' (跳过了第一张)' : ''}`);
       return imageEnclosure.url;
     }
   }
   
-  // 3. 从内容中提取图片（保持原有逻辑）
+  // 3. 从内容中提取图片
   const content = item.content || item.description || '';
-  if (content) {
-    // 这里可以复用现有的图片提取逻辑
-    // 暂时返回undefined，让调用者使用原有的图片提取服务
-    return undefined;
+  if (content && content.length > 0) {
+    // 提取所有图片
+    const imgRegex = /<img[^>]+src\s*=\s*["']?([^"'>\s]+)["']?/gi;
+    const matches: string[] = [];
+    let match;
+    
+    while ((match = imgRegex.exec(content)) !== null) {
+      let imageUrl = match[1].replace(/["']+$/, '');
+      if (imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('/'))) {
+        matches.push(imageUrl);
+      }
+    }
+    
+    if (matches.length > 0) {
+      // 如果需要跳过第一张且有多张图片
+      const imageIndex = (skipFirst && matches.length > 1) ? 1 : 0;
+      const selectedImage = matches[imageIndex];
+      console.log(`✅ 从内容HTML提取到图片: ${selectedImage}${skipFirst && matches.length > 1 ? ' (跳过了第一张)' : ''}`);
+      return selectedImage;
+    }
   }
   
   return undefined;

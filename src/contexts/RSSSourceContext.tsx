@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { RSSSource } from '../types';
-import { RSSService } from '../services/RSSService';
+import { RSSService } from '../services/rss';
 
 interface RSSSourceContextType {
   rssSources: RSSSource[];
@@ -64,11 +64,15 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
   };
   const syncAllSources = async (onProgress?: (current: number, total: number, sourceName: string) => void) => {
     try {
+      console.log('[RSSSourceContext.syncAllSources] 🚀 开始同步所有 RSS 源');
       setIsLoading(true);
+      console.log('[RSSSourceContext.syncAllSources] 调用 rssService.refreshAllSources()');
       await rssService.refreshAllSources({ onProgress });
+      console.log('[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成');
       await loadRSSSources();
+      console.log('[RSSSourceContext.syncAllSources] ✅ 所有源同步完成');
     } catch (error) {
-      console.error('Failed to sync all RSS sources:', error);
+      console.error('[RSSSourceContext.syncAllSources] 💥 同步失败:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -77,14 +81,17 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
 
   const syncSource = async (sourceId: number) => {
     try {
+      console.log(`[RSSSourceContext.syncSource] 🚀 开始同步单个源 ID: ${sourceId}`);
       setIsLoading(true);
       const source = rssSources.find(s => s.id === sourceId);
       if (source) {
+        // 直接调用 fetchArticlesFromSource，内部会自动判断代理模式
         await rssService.fetchArticlesFromSource(source);
         await loadRSSSources();
+        console.log(`[RSSSourceContext.syncSource] ✅ 单个源同步完成: ${source.name}`);
       }
     } catch (error) {
-      console.error(`Failed to sync RSS source ${sourceId}:`, error);
+      console.error(`[RSSSourceContext.syncSource] 💥 同步失败:`, error);
       throw error;
     } finally {
       setIsLoading(false);

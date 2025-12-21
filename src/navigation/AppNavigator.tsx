@@ -38,6 +38,7 @@ import SettingsScreen from '../screens/Settings/SettingsScreen';
 import ReadingSettingsScreen from '../screens/Settings/ReadingSettingsScreen';
 import LLMSettingsScreen from '../screens/Settings/LLMSettingsScreen';
 import ThemeSettingsScreen from '../screens/Settings/ThemeSettingsScreen';
+import { ProxyServerSettingsScreen } from '../screens/Settings/ProxyServerSettingsScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
 import ExportScreen from '../screens/Settings/ExportScreen';
 import ImportScreen from '../screens/Settings/ImportScreen';
@@ -102,6 +103,7 @@ export type UserStackParamList = {
   ReadingSettings: undefined;
   LLMSettings: undefined;
   ThemeSettings: undefined;
+  ProxyServerSettings: undefined;  // 新增：代理服务器设置
   About: undefined;
   Export: undefined;
   Import: undefined;
@@ -118,6 +120,7 @@ export type SettingsStackParamList = {
   ReadingSettings: undefined;
   LLMSettings: undefined;
   ThemeSettings: undefined;
+  ProxyServerSettings: undefined;  // 新增：代理服务器设置
   About: undefined;
   Export: undefined;
   Import: undefined;
@@ -495,6 +498,19 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
       <UserStack.Screen
+        name="ProxyServerSettings"
+        options={{ title: '代理服务器' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="代理服务器"
+            showBackButton={true}
+          >
+            <ProxyServerSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
         name="About"
         options={{ title: '关于' }}
       >
@@ -639,6 +655,11 @@ function SettingsStackNavigator() {
         name="ThemeSettings"
         component={ThemeSettingsScreen}
         options={{ title: '主题设置' }}
+      />
+      <SettingsStack.Screen
+        name="ProxyServerSettings"
+        component={ProxyServerSettingsScreen}
+        options={{ title: '代理服务器' }}
       />
       <SettingsStack.Screen
         name="About"

@@ -14,7 +14,7 @@ import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
-import { rssService } from '../../services/RSSService';
+import { rssService } from '../../services/rss';
 import { DatabaseService } from '../../database/DatabaseService';
 import type { RSSSource } from '../../types';
 import * as StyleUtils from '../../utils/styleUtils';

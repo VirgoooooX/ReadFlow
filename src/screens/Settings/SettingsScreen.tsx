@@ -10,7 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
-import { imageCacheService, DatabaseService } from '../../services';
+import { imageCacheService, DatabaseService, SettingsService } from '../../services';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { SettingsStackParamList } from '../../navigation/AppNavigator';
 import * as StyleUtils from '../../utils/styleUtils';
@@ -23,12 +23,33 @@ const SettingsScreen: React.FC = () => {
   const [imageCacheSize, setImageCacheSize] = useState<string>('计算中...');
   const [articleDataSize, setArticleDataSize] = useState<string>('计算中...');
   const [totalCacheSize, setTotalCacheSize] = useState<string>('计算中...');
+  const [proxyEnabled, setProxyEnabled] = useState(false);
+  const [proxyConnected, setProxyConnected] = useState(false);
   const styles = createStyles(isDark, theme);
 
-  // 初始化时获取缓存大小
+  // 初始化时获取缓存大小和代理状态
   useEffect(() => {
     updateCacheSize();
+    loadProxyStatus();
   }, []);
+
+  useEffect(() => {
+    // 监听导航聚焦，每次进入设置页时更新代理状态
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProxyStatus();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadProxyStatus = async () => {
+    try {
+      const config = await SettingsService.getInstance().getProxyModeConfig();
+      setProxyEnabled(config.enabled);
+      setProxyConnected(!!config.token);
+    } catch (error) {
+      console.error('加载代理状态失败:', error);
+    }
+  };
 
   const updateCacheSize = async () => {
     try {
@@ -164,6 +185,33 @@ const SettingsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* 数据同步 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>数据同步</Text>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('ProxyServerSettings')}
+          >
+            <View style={styles.settingItemLeft}>
+              <MaterialIcons 
+                name="cloud-queue" 
+                size={24} 
+                color={proxyConnected ? '#10B981' : (theme?.colors?.primary || '#3B82F6')} 
+              />
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>代理服务器</Text>
+                <Text style={styles.settingItemSubText}>
+                  {proxyConnected 
+                    ? (proxyEnabled ? '已启用' : '已连接，未启用') 
+                    : '未连接'
+                  }
+                </Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
+          </TouchableOpacity>
+        </View>
+
         {/* LLM设置 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>AI设置</Text>
@@ -275,6 +323,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   settingItemText: {
     fontSize: 16,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+  },
+  settingItemSubText: {
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    marginTop: 4,
   },
   settingItemDesc: {
     fontSize: 13,

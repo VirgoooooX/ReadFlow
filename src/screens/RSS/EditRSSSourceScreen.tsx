@@ -16,7 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
-import { rssService } from '../../services/RSSService';
+import { rssService } from '../../services/rss';
 import type { RSSSource } from '../../types';
 import * as StyleUtils from '../../utils/styleUtils';
 

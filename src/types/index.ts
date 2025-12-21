@@ -32,6 +32,7 @@ export interface RSSSource {
   url: string;
   category: string;
   contentType: 'text' | 'image_text'; // RSS源内容类型：纯文本或多媒体(图文视频)
+  sourceMode?: 'direct' | 'proxy'; // RSS源获取模式：direct(直连) | proxy(代理服务器)
   isActive: boolean;
   lastFetchAt?: Date;
   errorCount: number;
@@ -140,6 +141,7 @@ export interface AppSettings {
     autoSync: boolean;
     syncInterval: number;
     wifiOnly: boolean;
+    proxyMode?: boolean;  // 是否使用代理服务器模式
   };
   privacy: {
     analytics: boolean;
@@ -195,6 +197,16 @@ export interface ArticleLoadingState {
   articlesCount: number;
   translatedCount: number;
   error?: string;
+}
+
+// 代理服务器配置类型
+export interface ProxyModeConfig {
+  enabled: boolean;           // 是否启用代理模式
+  serverUrl: string;          // 服务器地址，如 http://192.168.1.100:8080
+  serverPassword: string;     // 部署密码
+  token?: string;             // 登录后获得的 Token
+  userId?: number;            // 用户 ID
+  lastSyncTime?: string;      // 最后同步时间
 }
 
 // 导航相关类型

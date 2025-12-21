@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ReadingSettings, AppSettings, AppError } from '../types';
+import { ReadingSettings, AppSettings, AppError, ProxyModeConfig } from '../types';
 import { DatabaseService } from '../database/DatabaseService';
 
 export class SettingsService {
@@ -12,6 +12,7 @@ export class SettingsService {
     RSS_SETTINGS: 'rss_settings',
     LLM_SETTINGS: 'llm_settings',
     THEME_SETTINGS: 'theme_settings',
+    PROXY_MODE_CONFIG: 'proxy_mode_config',  // 新增：代理模式配置
   };
 
   private constructor() {
@@ -725,6 +726,186 @@ export class SettingsService {
       });
     }
   }
+
+  /**
+   * 获取代理模式配置
+   */
+  public async getProxyModeConfig(): Promise<ProxyModeConfig> {
+    try {
+      const configStr = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.PROXY_MODE_CONFIG);
+      if (!configStr) {
+        console.log('[SettingsService.getProxyModeConfig] 未找到配置，返回默认');
+        return { 
+          enabled: false, 
+          serverUrl: '', 
+          serverPassword: '' 
+        };
+      }
+      const parsed = JSON.parse(configStr);
+      console.log('[SettingsService.getProxyModeConfig] 配置:');
+      console.log(`  - enabled: ${parsed.enabled}`);
+      console.log(`  - serverUrl: ${parsed.serverUrl || '未设置'}`);
+      console.log(`  - token: ${parsed.token ? '✅' : '❌'}`);
+      return parsed;
+    } catch (error) {
+      console.error('Error getting proxy mode config:', error);
+      return { 
+        enabled: false, 
+        serverUrl: '', 
+        serverPassword: '' 
+      };
+    }
+  }
+
+  /**
+   * 保存代理模式配置
+   */
+  public async saveProxyModeConfig(config: ProxyModeConfig): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        SettingsService.STORAGE_KEYS.PROXY_MODE_CONFIG, 
+        JSON.stringify(config)
+      );
+    } catch (error) {
+      console.error('Error saving proxy mode config:', error);
+      throw new AppError({
+        code: 'SETTINGS_SAVE_ERROR',
+        message: 'Failed to save proxy mode config',
+        details: error,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  /**
+   * 登录代理服务器
+   */
+  public async loginToProxyServer(
+    serverUrl: string,
+    serverPassword: string,
+    username: string
+  ): Promise<{ success: boolean; message?: string; token?: string; userId?: number }> {
+    try {
+      console.log(`[Proxy Login] 尝试连接: ${serverUrl}/api/auth/login`);
+      console.log(`[Proxy Login] 用户名: ${username}`);
+      console.log(`[Proxy Login] 发送数据: {
+        username: "${username}",
+        password: "${serverPassword}"
+      }`);
+      
+      const response = await fetch(`${serverUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username,
+          password: serverPassword,
+        }),
+        timeout: 10000,
+      } as any);
+
+      console.log(`[Proxy Login] 响应状态: ${response.status}`);
+
+      if (!response.ok) {
+        console.error(`[Proxy Login] HTTP ${response.status} 错误`);
+        const errorText = await response.text();
+        console.error(`[Proxy Login] 错误响应: ${errorText}`);
+        return { success: false, message: `HTTP ${response.status}: ${errorText || '认证失败'}` };
+      }
+
+      const data = await response.json();
+      console.log(`[Proxy Login] 响应数据:`, { success: data.success, user_id: data.user_id });
+
+      if (data.success) {
+        // 保存配置
+        const config: ProxyModeConfig = {
+          enabled: true,
+          serverUrl,
+          serverPassword,
+          token: data.token,
+          userId: data.user_id,
+        };
+        
+        await this.saveProxyModeConfig(config);
+        console.log('[Proxy Login] 登录成功，Token 已保存');
+        
+
+        return { success: true, token: data.token, userId: data.user_id };
+      } else {
+        console.error('[Proxy Login] 服务端返回失败:', data.message);
+        return { success: false, message: data.message || '认证失败' };
+      }
+    } catch (error) {
+      console.error('[Proxy Login] 错误:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `连接失败: ${errorMsg}` };
+    }
+  }
+
+  /**
+   * 批量添加订阅源到代理服务器
+   */
+  public async syncSubscriptionsToProxy(
+    sources: any[],
+    config: ProxyModeConfig
+  ): Promise<{ success: number; failed: number }> {
+    if (!config.token) {
+      throw new Error('未登录代理服务器');
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    console.log(`[SyncSubscriptions] 开始同步 ${sources.length} 个订阅源...`);
+
+    for (const source of sources) {
+      try {
+        const response = await fetch(`${config.serverUrl}/api/subscribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.token}`,
+          },
+          body: JSON.stringify({
+            url: source.url,
+            title: source.name || source.title,
+          }),
+          timeout: 10000,
+        } as any);
+
+        const data = await response.json();
+        if (data.success) {
+          successCount++;
+          console.log(`[SyncSubscriptions] ✅ ${source.name}: 成功`);
+        } else {
+          failedCount++;
+          console.warn(`[SyncSubscriptions] ⚠️ ${source.name}: ${data.message || '失败'}`);
+        }
+      } catch (error) {
+        failedCount++;
+        console.error(`[SyncSubscriptions] ❗ ${source.name}:`, error);
+      }
+    }
+
+    console.log(`[SyncSubscriptions] 完成: 成功 ${successCount}, 失败 ${failedCount}`);
+    return { success: successCount, failed: failedCount };
+  }
+
+  /**
+   * 测试代理服务器连接
+   */
+  public async testProxyServerConnection(serverUrl: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${serverUrl}/health`, {
+        method: 'GET',
+        timeout: 5000,
+      } as any);
+      return response.ok;
+    } catch (error) {
+      console.error('Error testing proxy server connection:', error);
+      return false;
+    }
+  }
+
 }
 
 // 导出单例实例

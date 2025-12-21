@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Image,
   Dimensions,
+  AppState,  // 添加 AppState监听应用生命周期
 } from 'react-native';
 import { Provider } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
@@ -26,6 +27,9 @@ import { AppNavigator } from './src/navigation';
 // 导入数据库初始化和认证服务
 import { databaseService } from './src/database/DatabaseService';
 import AuthService from './src/services/AuthService';
+import { VocabularyService } from './src/services/VocabularyService';
+import { SettingsService } from './src/services/SettingsService';
+import { RSSService } from './src/services/rss';
 
 // 阻止原生启动屏自动消失
 SplashScreen.preventAutoHideAsync();
@@ -62,6 +66,39 @@ function App(): React.JSX.Element {
         ]);
 
         console.log('✅ 核心服务初始化阶段完成');
+        
+        // 【新增】修复数据库中的错误图片URL前缀
+        try {
+          console.log('🔧 开始修复数据库中的图片URL前缀...');
+          const { articleService } = await import('./src/services/ArticleService');
+          await articleService.fixImageUrlPrefixes();
+          console.log('✅ 图片URL前缀修复完成');
+        } catch (fixError) {
+          console.warn('⚠️ 图片URL前缀修复失败:', fixError);
+        }
+        
+        // 如果启用了代理模式，尝试同步单词本和文章
+        try {
+          const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+          if (proxyConfig.enabled && proxyConfig.token) {
+            console.log('🔄 开始同步单词本...');
+            const vocabService = VocabularyService.getInstance();
+            // 异步同步单词本，不阻塞启动
+            vocabService.syncToProxyServer().catch(err => {
+              console.warn('⚠️ 单词本同步失败:', err);
+            });
+            
+            // 异步同步文章，不阻塞启动
+            console.log('📰 开始同步文章...');
+            RSSService.getInstance().refreshAllSources().then(result => {
+              console.log(`✅ 文章同步完成: 成功 ${result.success}, 失败 ${result.failed}, 新文章 ${result.totalArticles}`);
+            }).catch(err => {
+              console.warn('⚠️ 文章同步失败:', err);
+            });
+          }
+        } catch (syncError) {
+          console.warn('⚠️ 同步检查失败:', syncError);
+        }
       } catch (e) {
         console.warn('⚠️ 初始化阶段发生非致命错误:', e);
       } finally {
@@ -71,6 +108,31 @@ function App(): React.JSX.Element {
     }
     prepare();
   }, []);
+
+  // 3. App 生命周期管理：监听进入后台/前台，退出时同步
+  useEffect(() => {
+    if (!appIsReady) return;
+
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // 进入后台或非活跃状态，同步单词本
+        console.log('💾 App 进入后台，开始同步单词本...');
+        try {
+          const config = await SettingsService.getInstance().getProxyModeConfig();
+          if (config.enabled && config.token) {
+            await VocabularyService.getInstance().syncToProxyServer();
+            console.log('✅ 后台同步完成');
+          }
+        } catch (error) {
+          console.warn('⚠️ 后台同步失败:', error);
+        }
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [appIsReady]);
 
 
   // 如果还没准备好，我们返回一个匹配背景色的空 View

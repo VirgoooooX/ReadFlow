@@ -1,6 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
-import { VocabularyEntry, WordDefinition, AppError } from '../types';
+import { VocabularyEntry, WordDefinition, AppError, ProxyModeConfig } from '../types';
 import { DictionaryService } from './DictionaryService';
+import { SettingsService } from './SettingsService';
 
 export class VocabularyService {
   private static instance: VocabularyService;
@@ -609,6 +610,233 @@ export class VocabularyService {
       tags: row.tags ? JSON.parse(row.tags) : [],
       notes: row.notes,
     };
+  }
+
+  // ===================代理服务器同步相关方法===================
+
+  /**
+   * 同步到代理服务器（如果启用）
+   */
+  public async syncToProxyServer(): Promise<void> {
+    const config = await SettingsService.getInstance().getProxyModeConfig();
+    if (!config.enabled || !config.token) {
+      return;
+    }
+
+    try {
+      const startTime = Date.now();
+      console.log('\n' + '='.repeat(60));
+      console.log('[Vocabulary Sync] 🚀 开始同步生词本到代理服务器...');
+      console.log('='.repeat(60));
+
+      // 1. Push: 上传本地修改
+      const pushResult = await this.pushToServer(config);
+
+      // 2. Pull: 拉取服务端更新，并获取服务端时间
+      const pullResult = await this.pullFromServerAndGetTime(config);
+
+      // 3. 更新最后同步时间（优先使用服务端时间）
+      const syncTime = pullResult.serverTime || new Date().toISOString();
+      await SettingsService.getInstance().saveProxyModeConfig({
+        ...config,
+        lastSyncTime: syncTime,
+      });
+
+      const duration = Date.now() - startTime;
+      console.log('-'.repeat(60));
+      console.log('[Vocabulary Sync] 📊 同步总结');
+      console.log(`[Vocabulary Sync] ⬆️  上传: ${pushResult.uploadedCount} 个单词`);
+      console.log(`[Vocabulary Sync] ⬇️  下载: ${pullResult.downloadedCount} 个单词`);
+      console.log(`[Vocabulary Sync] ⏱️  耗时: ${(duration / 1000).toFixed(2)}s`);
+      console.log(`[Vocabulary Sync] 🕐 最后同步: ${syncTime}`);
+      console.log('='.repeat(60) + '\n');
+    } catch (error) {
+      console.error('[Vocabulary Sync] 💥 同步失败:', error);
+      // 静默失败，不影响本地使用
+    }
+  }
+
+  /**
+   * Push: 上传本地修改的单词（包含完整的复习数据）
+   */
+  private async pushToServer(config: ProxyModeConfig): Promise<{ uploadedCount: number }> {
+    const lastSync = config.lastSyncTime || '1970-01-01T00:00:00Z';
+
+    // 获取本地修改的单词
+    const modifiedWords = await this.databaseService.executeQuery(
+      `SELECT * FROM vocabulary WHERE updated_at > ?`,
+      [lastSync]
+    );
+
+    if (modifiedWords.length === 0) {
+      console.log('[Vocabulary Sync] ⚠️ 没有本地修改，跳过 Push');
+      return { uploadedCount: 0 };
+    }
+
+    console.log(`[Vocabulary Sync] ⬆️  准备上传 ${modifiedWords.length} 个单词`);
+
+    // 转换时间戳为 ISO 字符串格式
+    const convertToISO = (timestamp: any): string | null => {
+      if (!timestamp) return null;
+      if (typeof timestamp === 'string') return timestamp;
+      // 处理秒级时间戳（SQLite 存储的是整数秒）
+      if (typeof timestamp === 'number') {
+        return new Date(timestamp * 1000).toISOString();
+      }
+      return null;
+    };
+
+    // 解析 JSON 字段
+    const parseJSON = (value: any, defaultValue: any[] = []) => {
+      if (!value) return defaultValue;
+      if (Array.isArray(value)) return value;
+      try {
+        return typeof value === 'string' ? JSON.parse(value) : value;
+      } catch {
+        return defaultValue;
+      }
+    };
+
+    const response = await fetch(`${config.serverUrl}/api/vocab/push`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        words: modifiedWords.map(w => ({
+          // 基础信息
+          word: w.word,
+          definition: w.definition,
+          translation: w.translation || null,
+          example: w.example || null,
+          context: w.context || null,
+          
+          // 来源信息
+          sourceArticleId: w.source_article_id || null,
+          sourceArticleTitle: w.source_article_title || null,
+          articleId: w.article_id || null,
+          
+          // 学习进度数据（核心的SRS系统数据）
+          reviewCount: w.review_count || 0,
+          correctCount: w.correct_count || 0,
+          masteryLevel: w.mastery_level || 0,
+          
+          // 复习时间戳（转换为 ISO 格式）
+          nextReviewAt: convertToISO(w.next_review_at),
+          lastReviewedAt: convertToISO(w.last_reviewed_at),
+          lastReviewAt: convertToISO(w.last_review_at),
+          
+          // 分类和笔记
+          difficulty: w.difficulty || 'medium',
+          tags: parseJSON(w.tags, []),
+          notes: w.notes || null,
+          
+          // 时间戳
+          addedAt: convertToISO(w.added_at) || new Date().toISOString(),
+          updatedAt: convertToISO(w.updated_at) || new Date().toISOString(),
+          
+          // 标记
+          isDeleted: false,
+        })),
+      }),
+    });
+
+    const data = await response.json();
+    const uploadedCount = data.synced || modifiedWords.length;
+    console.log(`[Vocabulary Sync] ✅ Push 完成，成功 ${uploadedCount}/${modifiedWords.length} 个单词`);
+    
+    return { uploadedCount };
+  }
+
+  /**
+   * Pull: 拉取服务端更新，并返回服务端时间和下载数量
+   */
+  private async pullFromServerAndGetTime(config: ProxyModeConfig): Promise<{
+    serverTime: string | null;
+    downloadedCount: number;
+  }> {
+    const lastSync = config.lastSyncTime || '1970-01-01T00:00:00Z';
+    let allServerWords: any[] = [];
+    let hasMore = true;
+    let loopCount = 0;
+    let serverTime: string | null = null;
+    const MAX_LOOPS = 10; // 防止死循环
+
+    // 循环拉取直到没有更多数据
+    while (hasMore && loopCount < MAX_LOOPS) {
+      loopCount++;
+
+      const response = await fetch(
+        `${config.serverUrl}/api/vocab/pull?since=${encodeURIComponent(lastSync)}&limit=500`,
+        { headers: { 'Authorization': `Bearer ${config.token}` } }
+      );
+
+      const data = await response.json();
+      const serverWords = data.words || [];
+      allServerWords.push(...serverWords);
+
+      // 检查是否还有更多数据
+      hasMore = data.has_more === true;
+
+      // 保存服务端时间（使用最后一次的）
+      if (data.server_time) {
+        serverTime = data.server_time;
+      }
+
+      console.log(`[Vocabulary Sync] ⬇️  拉取批次 ${loopCount}: ${serverWords.length} 个单词, has_more: ${hasMore}`);
+    }
+
+    if (allServerWords.length === 0) {
+      console.log('[Vocabulary Sync] ⚠️ 服务端没有更新，跳过 Pull');
+      return { serverTime, downloadedCount: 0 };
+    }
+
+    console.log(`[Vocabulary Sync] ⬇️  从服务端总共拉取 ${allServerWords.length} 个单词`);
+
+    // Upsert 到本地数据库
+    let upsertCount = 0;
+    for (const word of allServerWords) {
+      if (word.is_deleted) {
+        // 删除单词
+        const existing = await this.getWordEntry(word.word);
+        if (existing && existing.id) {
+          await this.deleteWord(existing.id);
+          upsertCount++;
+        }
+      } else {
+        await this.upsertWord(word);
+        upsertCount++;
+      }
+    }
+
+    console.log(`[Vocabulary Sync] ✅ Pull 完成，处理 ${upsertCount}/${allServerWords.length} 个`);
+    return { serverTime, downloadedCount: upsertCount };
+  }
+
+  /**
+   * Upsert 单词（插入或更新）
+   */
+  private async upsertWord(word: any): Promise<void> {
+    const existing = await this.getWordEntry(word.word);
+
+    if (existing) {
+      // 比较时间戳，更新的覆盖旧的
+      const existingTime = new Date(existing.addedAt).getTime();
+      const serverTime = new Date(word.updated_at).getTime();
+
+      if (serverTime > existingTime) {
+        await this.databaseService.executeStatement(
+          `UPDATE vocabulary SET definition = ?, context = ?, updated_at = ? WHERE word = ?`,
+          [word.translation, word.context, word.updated_at, word.word]
+        );
+        console.log(`更新单词: ${word.word}`);
+      }
+    } else {
+      // 插入新单词
+      await this.addWord(word.word, word.context, undefined, word.translation);
+      console.log(`新增单词: ${word.word}`);
+    }
   }
 }
 

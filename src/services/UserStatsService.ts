@@ -1,7 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { ArticleService } from './ArticleService';
 import { VocabularyService } from './VocabularyService';
-import { RSSService } from './RSSService';
+import { RSSService } from './rss';
 
 export interface UserStats {
   articlesRead: number;

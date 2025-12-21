@@ -421,7 +421,7 @@ export class ArticleService {
    * 映射数据库行到Article对象
    */
   private mapArticleRow(row: any): Article {
-    return {
+    const article: Article = {
       id: row.id,
       title: row.title,
       titleCn: row.title_cn,
@@ -443,6 +443,51 @@ export class ArticleService {
       readAt: row.read_at ? new Date(row.read_at) : undefined,
       readProgress: row.read_progress,
     };
+    
+    // 【调试日志】记录image_url的实际值
+    if (article.imageUrl) {
+      console.log(`[mapArticleRow] 文章 "${article.title?.substring(0, 30)}..." 的 imageUrl: ${article.imageUrl}`);
+    }
+    
+    return article;
+  }
+
+  /**
+   * 修复数据库中的错误图片URL（多重file://前缀）
+   */
+  public async fixImageUrlPrefixes(): Promise<void> {
+    try {
+      await this.databaseService.initializeDatabase();
+      
+      // 获取所有有image_url的文章
+      const articles = await this.databaseService.executeQuery(
+        `SELECT id, image_url FROM articles WHERE image_url IS NOT NULL AND image_url != ''`
+      );
+      
+      for (const article of articles) {
+        let fixed = article.image_url;
+        
+        // 修复多重file://前缀
+        // file://file://file:/// -> file:///
+        // file://file:/// -> file:///
+        fixed = fixed.replace(/file:\/\/+/g, 'file://');
+        
+        if (fixed !== article.image_url) {
+          console.log(`[fixImageUrlPrefixes] 修复 ID ${article.id}:`);
+          console.log(`  原始: ${article.image_url}`);
+          console.log(`  修复: ${fixed}`);
+          
+          await this.databaseService.executeStatement(
+            'UPDATE articles SET image_url = ? WHERE id = ?',
+            [fixed, article.id]
+          );
+        }
+      }
+      
+      console.log(`[fixImageUrlPrefixes] 数据库修复完成`);
+    } catch (error) {
+      console.error('Error fixing image URL prefixes:', error);
+    }
   }
 
   /**
@@ -524,6 +569,55 @@ export class ArticleService {
     } catch (error) {
       console.error('Error getting currently reading articles:', error);
       return [];
+    }
+  }
+
+  /**
+   * 修复数据库中的错误图片URL
+   * - 清除 file:// 开头的本地路径（代理模式下应使用服务器URL）
+   * - 修复多重 file:// 前缀
+   */
+  public async fixImageUrlPrefixes(): Promise<void> {
+    try {
+      await this.databaseService.initializeDatabase();
+      
+      // 1. 清除所有 file:// 开头的图片URL（代理模式下的错误本地化）
+      const localPathArticles = await this.databaseService.executeQuery(
+        `SELECT id FROM articles WHERE image_url LIKE 'file://%'`
+      );
+      
+      if (localPathArticles.length > 0) {
+        console.log(`[fixImageUrlPrefixes] 清除 ${localPathArticles.length} 篇文章的本地图片路径`);
+        await this.databaseService.executeStatement(
+          `UPDATE articles SET image_url = NULL WHERE image_url LIKE 'file://%'`
+        );
+      }
+      
+      // 2. 修复内容中的 file:// 图片引用（替换为空图片）
+      const contentArticles = await this.databaseService.executeQuery(
+        `SELECT id, content FROM articles WHERE content LIKE '%file://%'`
+      );
+      
+      if (contentArticles.length > 0) {
+        console.log(`[fixImageUrlPrefixes] 修复 ${contentArticles.length} 篇文章内容中的本地图片路径`);
+        for (const article of contentArticles) {
+          // 将 file:// 开头的图片 src 替换为空（保留 img 标签但移除无效 src）
+          const fixedContent = article.content.replace(
+            /src="file:\/\/[^"]+"/g, 
+            'src=""'
+          );
+          if (fixedContent !== article.content) {
+            await this.databaseService.executeStatement(
+              'UPDATE articles SET content = ? WHERE id = ?',
+              [fixedContent, article.id]
+            );
+          }
+        }
+      }
+      
+      console.log(`[fixImageUrlPrefixes] 数据库修复完成`);
+    } catch (error) {
+      console.error('Error fixing image URL prefixes:', error);
     }
   }
 }

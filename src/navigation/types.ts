@@ -54,10 +54,16 @@ export type SettingsStackParamList = {
   SettingsMain: undefined;
   ReadingSettings: undefined;
   AppSettings: undefined;
+  LLMSettings: undefined;
+  ThemeSettings: undefined;
+  ProxyServerSettings: undefined;  // 新增：代理服务器设置
   About: undefined;
   Export: undefined;
   Import: undefined;
   StorageManagement: undefined;
+  AddRSSSource: undefined;
+  ManageSubscriptions: undefined;
+  EditRSSSource: { sourceId: number };
 };
 
 // 屏幕属性类型定义

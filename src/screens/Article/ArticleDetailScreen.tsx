@@ -271,26 +271,35 @@ const ArticleDetailScreen: React.FC = () => {
     }
 
     const thumbnailUrl = article.imageUrl;
+    console.log(`[shouldShowHeaderImage] 封面图片URL: ${thumbnailUrl}`);
+    
     for (const imgTag of contentImages) {
       const srcMatch = imgTag.match(/src=["']([^"']*)["']/i);
       if (srcMatch && srcMatch[1]) {
         try {
           const contentImageUrl = decodeURIComponent(srcMatch[1]);
           const thumbnailImageUrl = decodeURIComponent(thumbnailUrl);
+          
+          console.log(`[shouldShowHeaderImage] 内容图片URL: ${contentImageUrl}`);
+          console.log(`[shouldShowHeaderImage] 解码后封面URL: ${thumbnailImageUrl}`);
 
           if (contentImageUrl === thumbnailImageUrl ||
             contentImageUrl.includes(thumbnailImageUrl) ||
             thumbnailImageUrl.includes(contentImageUrl)) {
+            console.log(`[shouldShowHeaderImage] 图片重复，不显示封面`);
             return false;
           }
         } catch (e) {
+          console.log(`[shouldShowHeaderImage] URL解码失败，直接比较`);
           if (srcMatch[1] === thumbnailUrl) {
+            console.log(`[shouldShowHeaderImage] 图片重复(未解码)，不显示封面`);
             return false;
           }
         }
       }
     }
 
+    console.log(`[shouldShowHeaderImage] 图片不重复，显示封面`);
     return true;
   };
 
@@ -387,7 +396,14 @@ const ArticleDetailScreen: React.FC = () => {
   // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
   const htmlContent = useMemo(() => {
     if (!article?.content || !readingSettings) return '';
-
+  
+    // 【调试日志】空急论证 imageUrl
+    console.log(`[ArticleDetail] article.imageUrl = ${article.imageUrl}`);
+    console.log(`[ArticleDetail] shouldShowHeaderImage() = ${shouldShowHeaderImage()}`);
+      
+    const finalImageUrl = shouldShowHeaderImage() ? article.imageUrl : undefined;
+    console.log(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
+  
     return generateArticleHtml({
       content: article.content,
       fontSize: readingSettings.fontSize || 16,
@@ -400,7 +416,7 @@ const ArticleDetailScreen: React.FC = () => {
       sourceName: article.sourceName,
       publishedAt: formatDate(article.publishedAt),
       author: article.author,
-      imageUrl: shouldShowHeaderImage() ? article.imageUrl : undefined,
+      imageUrl: finalImageUrl,
       // 【新增】直接将初始滚动位置和生词表注入 HTML
       // 这样 HTML 初始化时就能直接处理，无需等待 WebView ready 后再注入
       initialScrollY,
@@ -500,6 +516,9 @@ const ArticleDetailScreen: React.FC = () => {
           domStorageEnabled={true}
           scrollEnabled={true}
           startInLoadingState={true}
+          allowFileAccess={true}
+          allowUniversalAccessFromFileURLs={true}
+          mixedContentMode="always"
           renderLoading={() => (
             <View style={styles.webViewLoading}>
               <ActivityIndicator size="small" color={theme?.colors?.primary} />

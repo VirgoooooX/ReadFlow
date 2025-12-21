@@ -220,7 +220,45 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       margin: 32px auto 12px auto;
     }
     
-    /* 视频 */
+    /* 视频优化 - 自适应宽度和圆角 */
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      margin: 24px 0;
+      border-radius: 12px;
+      overflow: hidden;
+      background-color: #000;
+    }
+    
+    .video-container video {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 0;
+      margin: 0;
+    }
+    
+    /* 视频暂停覆盖层 */
+    .video-paused-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.3);
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    
+    .video-container.is-paused .video-paused-overlay {
+      opacity: 1;
+    }
+    
     video {
       max-width: 100%;
       height: auto;
@@ -377,6 +415,76 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             }));
           });
         });
+      }
+      
+      // 【新增】视频优化：包裹视频并添加可见性检测
+      function setupVideos() {
+        const videos = document.querySelectorAll('video');
+        if (videos.length === 0) return;
+        
+        // 记录当前正在播放的视频
+        let currentPlayingVideo = null;
+        
+        videos.forEach(function(video) {
+          // 1. 如果视频还没有被包裹，创建容器
+          if (!video.parentElement.classList.contains('video-container')) {
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            video.parentNode.insertBefore(container, video);
+            container.appendChild(video);
+          }
+          
+          // 2. 设置视频属性
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('webkit-playsinline', 'true');
+          video.setAttribute('preload', 'metadata');
+          
+          // 3. 监听播放事件 - 暂停其他视频
+          video.addEventListener('play', function() {
+            video.parentElement.classList.remove('is-paused');
+            
+            // 如果有其他视频正在播放，先暂停它
+            if (currentPlayingVideo && currentPlayingVideo !== video) {
+              currentPlayingVideo.pause();
+            }
+            currentPlayingVideo = video;
+          });
+          
+          // 4. 监听暂停事件
+          video.addEventListener('pause', function() {
+            video.parentElement.classList.add('is-paused');
+            if (currentPlayingVideo === video) {
+              currentPlayingVideo = null;
+            }
+          });
+        });
+        
+        // 5. 使用 Intersection Observer 检测视频可见性
+        if ('IntersectionObserver' in window) {
+          const videoObserver = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+              const video = entry.target.querySelector('video');
+              if (!video) return;
+              
+              if (!entry.isIntersecting) {
+                // 视频划出可视范围，暂停播放
+                if (!video.paused) {
+                  video.pause();
+                  video.dataset.autoPaused = 'true'; // 标记为自动暂停
+                }
+              }
+              // 注意：不自动恢复播放，让用户手动控制
+            });
+          }, {
+            threshold: 0.3, // 当视频可见度低于 30% 时触发
+            rootMargin: '50px' // 提前 50px 检测
+          });
+          
+          // 观察所有视频容器
+          document.querySelectorAll('.video-container').forEach(function(container) {
+            videoObserver.observe(container);
+          });
+        }
       }
     
       // 【新增】优化2：防止滑动误触点击
@@ -704,6 +812,9 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       function init() {
         // 1. 处理图片说明
         formatImagesAndCaptions();
+        
+        // 2. 设置视频优化（可见性检测、自动暂停）
+        setupVideos();
       
         // 2. 立即执行高亮（使用注入的数据），避免延迟
         const initialWords = ${injectedWords};

@@ -126,6 +126,14 @@ export class DatabaseService {
         console.log('sort_order column added successfully');
       }
 
+      // 【新增】检查 rss_sources 表是否存在 source_mode 字段
+      const hasSourceMode = tableInfo.some((column: any) => column.name === 'source_mode');
+      if (!hasSourceMode) {
+        console.log('Adding source_mode column to rss_sources table...');
+        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN source_mode TEXT DEFAULT "direct"');
+        console.log('source_mode column added successfully');
+      }
+
       // 【新增】检查articles表是否存在scroll_position列
       const articlesTableInfo = await this.db.getAllAsync('PRAGMA table_info(articles)');
       const hasScrollPosition = articlesTableInfo.some((column: any) => column.name === 'scroll_position');

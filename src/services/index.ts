@@ -6,7 +6,7 @@ export { DatabaseService };
 export { DictionaryService, dictionaryService } from './DictionaryService';
 
 // RSS服务
-export { RSSService, rssService } from './RSSService';
+export { RSSService, rssService, localRSSService, proxyRSSService, imageLocalizer } from './rss';
 
 // 文章服务
 export { ArticleService, articleService } from './ArticleService';
