@@ -163,7 +163,7 @@ func replaceImageURLs(content string) string {
 		`(background(?:-image)?:\s*url\(['"]?)([^'"\)\s]+)(['"]?\))`,
 		// 【新增】HTML 实体编码的 img 标签: &lt;img ... src=&quot;...&quot;&gt;
 		// 支持多属性情况（如 sizes, srcset, src）
-		`(&lt;img(?:[^s]|s(?!rc=&quot;))*src=&quot;)([^&]+(?:&amp;[^&]+)*)(&quot;)`,
+		`(&lt;img[^>]*?src=&quot;)([^&]+(?:&amp;[^&]+)*)(&quot;)`,
 		// 【新增】HTML 实体编码的 srcset 属性
 		`(srcset=&quot;)([^&]+(?:&amp;[^&]+)*)(&quot;)`,
 	}

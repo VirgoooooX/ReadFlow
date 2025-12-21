@@ -495,6 +495,11 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       display: none !important;
     }
     
+    /* 2. 隐藏 BBC 的链接块 (相关阅读/外链推荐) */
+    div[data-component="links-block"] {
+      display: none !important;
+    }
+    
     /* 2. 生成的视频卡片样式 */
     .generated-video-card {
       display: flex;
@@ -1134,8 +1139,11 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
 
         // 6. 处理幻灯片容器
         unpackGallery();
-          
-        // 7. 通知 RN WebView 已准备好（此时内容已经渲染完成）
+              
+        // 7. 隐藏底部的链接块
+        hideFooterLinks();
+              
+        // 8. 通知 RN WebView 已准备好（此时内容已经渲染完成）
         setTimeout(function() {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
         }, 100);
@@ -1165,6 +1173,29 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         return false;
       }
     
+      /**
+       * 隐藏底部的链接块
+       */
+      function hideFooterLinks() {
+        try {
+          // 隐藏 BBC 的 links-block
+          const linksBlocks = document.querySelectorAll('div[data-component="links-block"]');
+          linksBlocks.forEach(function(block) {
+            block.style.display = 'none';
+          });
+              
+          // 通用规则：隐藏常见的底部垃圾信息
+          const commonFooterElements = document.querySelectorAll(
+            '.related-posts, .read-more, .sharedaddy, .social-buttons, .footer-links'
+          );
+          commonFooterElements.forEach(function(element) {
+            element.style.display = 'none';
+          });
+        } catch (error) {
+          // 静默处理错误
+        }
+      }
+          
       /**
        * 核心逻辑：处理幻灯片容器
        */
