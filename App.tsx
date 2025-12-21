@@ -65,17 +65,7 @@ function App(): React.JSX.Element {
           new Promise(resolve => setTimeout(resolve, 3000))
         ]);
 
-        console.log('✅ 核心服务初始化阶段完成');
-        
-        // 【新增】修复数据库中的错误图片URL前缀
-        try {
-          console.log('🔧 开始修复数据库中的图片URL前缀...');
-          const { articleService } = await import('./src/services/ArticleService');
-          await articleService.fixImageUrlPrefixes();
-          console.log('✅ 图片URL前缀修复完成');
-        } catch (fixError) {
-          console.warn('⚠️ 图片URL前缀修复失败:', fixError);
-        }
+        console.log('✅ 核心服务初始化完成');
         
         // 如果启用了代理模式，尝试同步单词本和文章
         try {

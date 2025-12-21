@@ -18,6 +18,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { rssService } from '../../services/rss';
 import * as StyleUtils from '../../utils/styleUtils';
+import { Switch } from 'react-native';
 
 type NavigationProp = NativeStackNavigationProp<any, 'AddRSSSource'>;
 
@@ -33,6 +34,7 @@ const AddRSSSourceScreen: React.FC = () => {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [useProxy, setUseProxy] = useState(false); // 是否通过代理获取
 
   const categories = ['技术', '新闻', '博客', '科学', '设计', '其他'];
 
@@ -70,7 +72,8 @@ const AddRSSSourceScreen: React.FC = () => {
         url.trim(),
         name.trim() || '未命名RSS源',
         contentType,
-        category
+        category,
+        useProxy ? 'proxy' : 'direct'
       );
       
       // 添加成功，刷新RSS源列表
@@ -240,6 +243,37 @@ const AddRSSSourceScreen: React.FC = () => {
                   ? '将提取图片和视频，适合多媒体内容源' 
                   : '不提取图片和视频，适合纯文本内容源，加载更快'}
               </Text>
+            </View>
+
+            {/* 代理开关 */}
+            <View style={styles.inputGroup}>
+              <View style={styles.proxyContainer}>
+                <View style={styles.proxyInfo}>
+                  <View style={styles.proxyTitleRow}>
+                    <MaterialIcons 
+                      name="cloud" 
+                      size={20} 
+                      color={useProxy ? (theme?.colors?.primary || '#3B82F6') : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))} 
+                    />
+                    <Text style={styles.proxyTitle}>通过代理获取</Text>
+                  </View>
+                  <Text style={styles.proxyHint}>
+                    使用代理服务器抓取此源，适合需要翻墙的国外源
+                  </Text>
+                </View>
+                <Switch
+                  value={useProxy}
+                  onValueChange={setUseProxy}
+                  trackColor={{ 
+                    false: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
+                    true: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF')
+                  }}
+                  thumbColor={useProxy 
+                    ? (theme?.colors?.primary || '#3B82F6') 
+                    : (theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'))
+                  }
+                />
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -434,6 +468,34 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontSize: 12,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
     marginTop: 8,
+    lineHeight: 16,
+  },
+  proxyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...StyleUtils.createCardStyle(isDark, theme),
+    borderRadius: 12,
+    padding: 16,
+  },
+  proxyInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  proxyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  proxyTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+  },
+  proxyHint: {
+    fontSize: 12,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    marginTop: 4,
     lineHeight: 16,
   },
   quickAddSection: {

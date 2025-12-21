@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Switch,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -33,6 +34,7 @@ interface FormData {
   description: string;
   category: string;
   contentType: 'text' | 'image_text';
+  sourceMode: 'direct' | 'proxy';
   updateFrequency: number;
   isActive: boolean;
 }
@@ -60,6 +62,7 @@ const EditRSSSourceScreen: React.FC = () => {
     description: '',
     category: '技术',
     contentType: 'image_text',
+    sourceMode: 'direct',
     updateFrequency: 3600,
     isActive: true,
   });
@@ -99,6 +102,7 @@ const EditRSSSourceScreen: React.FC = () => {
         description: source.description || '',
         category: source.category || '技术',
         contentType: source.contentType || 'image_text',
+        sourceMode: source.sourceMode || 'direct',
         updateFrequency: source.updateFrequency || 3600,
         isActive: source.isActive,
       });
@@ -205,6 +209,7 @@ const EditRSSSourceScreen: React.FC = () => {
         description: formData.description,
         category: formData.category,
         contentType: formData.contentType,
+        sourceMode: formData.sourceMode,
         updateFrequency: formData.updateFrequency,
         isActive: formData.isActive,
       };
@@ -376,6 +381,37 @@ const EditRSSSourceScreen: React.FC = () => {
               </Text>
             </View>
 
+            {/* 代理开关 */}
+            <View style={styles.inputGroup}>
+              <View style={styles.proxyContainer}>
+                <View style={styles.proxyInfo}>
+                  <View style={styles.proxyTitleRow}>
+                    <MaterialIcons 
+                      name="cloud" 
+                      size={20} 
+                      color={formData.sourceMode === 'proxy' ? (theme?.colors?.primary || '#3B82F6') : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))} 
+                    />
+                    <Text style={styles.proxyTitle}>通过代理获取</Text>
+                  </View>
+                  <Text style={styles.proxyHint}>
+                    使用代理服务器抓取此源，适合需要翻墙的国外源
+                  </Text>
+                </View>
+                <Switch
+                  value={formData.sourceMode === 'proxy'}
+                  onValueChange={(value) => updateFormData('sourceMode', value ? 'proxy' : 'direct')}
+                  trackColor={{ 
+                    false: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
+                    true: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF')
+                  }}
+                  thumbColor={formData.sourceMode === 'proxy' 
+                    ? (theme?.colors?.primary || '#3B82F6') 
+                    : (theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'))
+                  }
+                />
+              </View>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>描述（可选）</Text>
               <TextInput
@@ -545,6 +581,34 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontSize: 12,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
     marginTop: 8,
+    lineHeight: 16,
+  },
+  proxyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...StyleUtils.createCardStyle(isDark, theme),
+    borderRadius: 12,
+    padding: 16,
+  },
+  proxyInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  proxyTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  proxyTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+  },
+  proxyHint: {
+    fontSize: 12,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    marginTop: 4,
     lineHeight: 16,
   },
   bottomActions: {

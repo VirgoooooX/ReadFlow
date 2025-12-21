@@ -34,7 +34,8 @@ export class RSSService {
     url: string, 
     title?: string, 
     contentType: 'text' | 'image_text' = 'image_text',
-    category: string = '技术'
+    category: string = '技术',
+    sourceMode: 'direct' | 'proxy' = 'direct'
   ): Promise<RSSSource> {
     try {
       // 1. 验证 RSS 源
@@ -53,22 +54,23 @@ export class RSSService {
         url,
         category,
         contentType,
+        sourceMode,
         isActive: true,
         lastFetchAt: new Date(),
         errorCount: 0,
         description: feedInfo.description,
-        sourceMode: undefined,
       };
 
       const result = await this.databaseService.executeInsert(
-        `INSERT INTO rss_sources (url, title, description, category, content_type, is_active, last_updated) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rssSource.url,
           rssSource.name,
           rssSource.description,
           rssSource.category,
           rssSource.contentType,
+          rssSource.sourceMode,
           rssSource.isActive ? 1 : 0,
           rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
         ]
@@ -79,9 +81,15 @@ export class RSSService {
         ...rssSource,
       };
 
-      // 4. 直连模式：立即获取文章
-      if (!proxyConfig.enabled) {
-        await this.fetchArticlesFromSource(newSource);
+      // 4. 直连模式：立即获取文章（忽略全局代理设置，使用源级别配置）
+      if (sourceMode === 'direct') {
+        await localRSSService.fetchArticlesWithRetry(newSource, 3);
+      } else {
+        // 代理模式：立即获取文章
+        const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+        if (proxyConfig.serverUrl) {
+          await proxyRSSService.fetchArticlesFromProxy(newSource, proxyConfig, { mode: 'refresh' });
+        }
       }
 
       return newSource;
@@ -202,6 +210,10 @@ export class RSSService {
         setClause.push('update_frequency = ?');
         values.push(updates.updateFrequency);
       }
+      if (updates.sourceMode !== undefined) {
+        setClause.push('source_mode = ?');
+        values.push(updates.sourceMode);
+      }
       
       if (setClause.length === 0) {
         return;
@@ -270,18 +282,20 @@ export class RSSService {
 
   /**
    * 获取 RSS 源文章 - 统一入口
-   * 内部自动判断是否使用代理
-   * @param source - RSS 源
-   * @param options.mode - 代理模式下的同步方式：'sync' 仅同步，'refresh' 刷新源+同步
+   * 根据源级别的 sourceMode 判断是否使用代理
    */
   public async fetchArticlesFromSource(
     source: RSSSource,
     options: { mode?: 'sync' | 'refresh' } = {}
   ): Promise<Article[]> {
-    const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-    
-    if (proxyConfig.enabled && proxyConfig.token) {
-      // 代理模式：默认使用 refresh 模式让服务端刷新该源
+    // 根据源级别配置判断
+    if (source.sourceMode === 'proxy') {
+      // 代理模式
+      const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+      if (!proxyConfig.serverUrl) {
+        logger.warn(`[fetchArticlesFromSource] 源 ${source.name} 配置为代理模式，但未配置代理服务器，回退到直连模式`);
+        return await localRSSService.fetchArticlesWithRetry(source, 3);
+      }
       const mode = options.mode || 'refresh';
       console.log(`[fetchArticlesFromSource] 🚀 代理模式: ${source.name} (mode: ${mode})`);
       return await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
@@ -294,7 +308,7 @@ export class RSSService {
 
   /**
    * 刷新所有活跃 RSS 源
-   * @param options.mode - 代理模式下的同步方式：'sync' 仅同步，'refresh' 刷新源+同步
+   * 根据每个源的 sourceMode 分别处理
    */
   public async refreshAllSources(
     options: {
@@ -315,18 +329,65 @@ export class RSSService {
       return { success: 0, failed: 0, totalArticles: 0, errors: [] };
     }
 
-    const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+    // 按 sourceMode 分组
+    const directSources = sources.filter(s => s.sourceMode !== 'proxy');
+    const proxySources = sources.filter(s => s.sourceMode === 'proxy');
     
-    if (proxyConfig.enabled && proxyConfig.token) {
-      // 代理模式：默认使用 'refresh' 模式让服务端先拓取最新文章
-      const mode = options.mode || 'refresh';
-      console.log(`[RefreshAllSources] 🚀 代理模式 (${mode})`);
-      return await proxyRSSService.syncFromProxyServer({ ...options, mode });
-    } else {
-      // 直连模式
-      console.log('[RefreshAllSources] 直连模式');
-      return await localRSSService.refreshSources(sources, options);
+    let success = 0;
+    let failed = 0;
+    let totalArticles = 0;
+    const errors: Array<{ source: string; error: string }> = [];
+    let completed = 0;
+    const total = sources.length;
+
+    // 处理直连源
+    if (directSources.length > 0) {
+      console.log(`[RefreshAllSources] 直连模式: ${directSources.length} 个源`);
+      const directResult = await localRSSService.refreshSources(directSources, {
+        ...options,
+        onProgress: (current, _, sourceName) => {
+          completed++;
+          options.onProgress?.(completed, total, sourceName);
+        },
+      });
+      success += directResult.success;
+      failed += directResult.failed;
+      totalArticles += directResult.totalArticles;
+      errors.push(...directResult.errors);
     }
+
+    // 处理代理源
+    if (proxySources.length > 0) {
+      const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+      if (proxyConfig.serverUrl) {
+        console.log(`[RefreshAllSources] 代理模式: ${proxySources.length} 个源`);
+        const mode = options.mode || 'refresh';
+        
+        for (const source of proxySources) {
+          try {
+            const articles = await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
+            success++;
+            totalArticles += articles.length;
+          } catch (error: any) {
+            failed++;
+            errors.push({ source: source.name, error: error.message || '未知错误' });
+            options.onError?.(error, source.name);
+          }
+          completed++;
+          options.onProgress?.(completed, total, source.name);
+        }
+      } else {
+        logger.warn('[RefreshAllSources] 有代理源但未配置代理服务器，跳过');
+        failed += proxySources.length;
+        for (const source of proxySources) {
+          errors.push({ source: source.name, error: '未配置代理服务器' });
+          completed++;
+          options.onProgress?.(completed, total, source.name);
+        }
+      }
+    }
+
+    return { success, failed, totalArticles, errors };
   }
 
   /**
@@ -443,6 +504,7 @@ export class RSSService {
       description: row.description,
       category: row.category || 'General',
       contentType: row.content_type || 'image_text',
+      sourceMode: row.source_mode || 'direct',
       isActive: Boolean(row.is_active),
       lastFetchAt: row.last_updated ? new Date(row.last_updated) : new Date(),
       errorCount: row.error_count || 0,

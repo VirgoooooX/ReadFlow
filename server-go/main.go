@@ -1,0 +1,460 @@
+// RSS 极简代理服务器 - Go 版本
+//
+// 功能：
+// 1. /api/rss?url={feed_url} - 代理获取 RSS，替换图片 URL
+// 2. /api/image?url={img_url} - 代理转发图片（流式，不存储）
+// 3. /health - 健康检查
+
+package main
+
+import (
+	"fmt"
+	"html"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+)
+
+// 配置
+var (
+	port      string
+	serverURL string
+	authToken string
+)
+
+// Referer 映射表 - 用于绕过防盗链
+var refererMap = map[string]string{
+	// cnBeta
+	"cnbetacdn.com":        "https://www.cnbeta.com.tw/",
+	"static.cnbetacdn.com": "https://www.cnbeta.com.tw/",
+	// Engadget / Yahoo
+	"yimg.com":       "https://www.engadget.com/",
+	"s.yimg.com":     "https://www.engadget.com/",
+	"aolcdn.com":     "https://www.engadget.com/",
+	"o.aolcdn.com":   "https://www.engadget.com/",
+	"cloudfront.net": "https://www.engadget.com/",
+	// Twitter
+	"twimg.com":     "https://twitter.com/",
+	"pbs.twimg.com": "https://twitter.com/",
+	// Facebook/Instagram
+	"fbcdn.net":        "https://www.facebook.com/",
+	"cdninstagram.com": "https://www.instagram.com/",
+	// Medium
+	"medium.com":      "https://medium.com/",
+	"miro.medium.com": "https://medium.com/",
+	// Imgur
+	"imgur.com":   "https://imgur.com/",
+	"i.imgur.com": "https://imgur.com/",
+	// WordPress
+	"wp.com":    "https://wordpress.com/",
+	"i0.wp.com": "https://wordpress.com/",
+	"i1.wp.com": "https://wordpress.com/",
+	"i2.wp.com": "https://wordpress.com/",
+	// GitHub
+	"githubusercontent.com":     "https://github.com/",
+	"raw.githubusercontent.com": "https://github.com/",
+	// Unsplash
+	"unsplash.com":        "https://unsplash.com/",
+	"images.unsplash.com": "https://unsplash.com/",
+	// Flickr
+	"staticflickr.com": "https://www.flickr.com/",
+	// Giphy
+	"giphy.com":       "https://giphy.com/",
+	"media.giphy.com": "https://giphy.com/",
+	// Reddit
+	"redd.it":         "https://www.reddit.com/",
+	"i.redd.it":       "https://www.reddit.com/",
+	"preview.redd.it": "https://www.reddit.com/",
+}
+
+// 图片扩展名正则
+var imageExtRegex = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?.*)?$`)
+
+// 图片 CDN 域名列表
+var imageCdnHosts = []string{
+	"s.yimg.com", "techcrunch.com", "engadget.com", "cloudfront.net",
+	"amazonaws.com", "gstatic.com", "googleapis.com", "o.aolcdn.com",
+	"wp.com", "staticflickr.com", "imgur.com", "imgix.net", "twimg.com",
+	"fbcdn.net", "cdninstagram.com", "medium.com", "unsplash.com",
+}
+
+func init() {
+	port = getEnv("PORT", "3000")
+	serverURL = getEnv("SERVER_URL", "http://localhost:"+port)
+	authToken = getEnv("AUTH_TOKEN", "")
+}
+
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+// decodeHtmlEntities 解码 HTML 实体
+func decodeHtmlEntities(s string) string {
+	// 先用标准库处理
+	decoded := html.UnescapeString(s)
+	return decoded
+}
+
+// getReferer 根据域名获取合适的 Referer
+func getReferer(targetURL string) string {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(u.Host)
+
+	// 精确匹配
+	if ref, ok := refererMap[host]; ok {
+		return ref
+	}
+
+	// 部分匹配
+	for domain, referer := range refererMap {
+		if strings.HasSuffix(host, domain) || strings.Contains(host, domain) {
+			return referer
+		}
+	}
+
+	// 默认使用目标域名
+	return u.Scheme + "://" + u.Host + "/"
+}
+
+// shouldProxyURL 判断 URL 是否需要代理
+func shouldProxyURL(imgURL string) bool {
+	if imgURL == "" || strings.HasPrefix(imgURL, "data:") {
+		return false
+	}
+	if strings.Contains(imgURL, serverURL) || strings.Contains(imgURL, "/api/image?url=") {
+		return false
+	}
+	if imageExtRegex.MatchString(imgURL) {
+		return true
+	}
+	imgLower := strings.ToLower(imgURL)
+	for _, cdn := range imageCdnHosts {
+		if strings.Contains(imgLower, cdn) {
+			return true
+		}
+	}
+	return false
+}
+
+// replaceImageURLs 替换 XML 中的图片 URL
+func replaceImageURLs(content string) string {
+	// 匹配所有图片相关的属性
+	patterns := []string{
+		// HTML img 标签的各种属性
+		`(<img[^>]*?\s(?:src|data-src|data-original|data-lazy-src)=["'])([^"']+)(["'])`,
+		// enclosure 标签
+		`(<enclosure[^>]*?\surl=["'])([^"']+)(["'])`,
+		// media:content 和 media:thumbnail
+		`(<media:(?:content|thumbnail)[^>]*?\surl=["'])([^"']+)(["'])`,
+		// srcset 中的 URL（简化处理）
+		`(srcset=["'])([^"']+)(["'])`,
+		// 背景图片
+		`(background(?:-image)?:\s*url\(['"]?)([^'")\s]+)(['"]?\))`,
+	}
+
+	result := content
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		result = re.ReplaceAllStringFunc(result, func(match string) string {
+			submatches := re.FindStringSubmatch(match)
+			if len(submatches) < 4 {
+				return match
+			}
+
+			prefix := submatches[1]
+			imgURL := submatches[2]
+			suffix := submatches[3]
+
+			// 解码 HTML 实体
+			imgURL = decodeHtmlEntities(imgURL)
+
+			// 处理 srcset（可能包含多个 URL）
+			if strings.Contains(prefix, "srcset") {
+				parts := strings.Split(imgURL, ",")
+				var newParts []string
+				for _, part := range parts {
+					part = strings.TrimSpace(part)
+					fields := strings.Fields(part)
+					if len(fields) > 0 && shouldProxyURL(fields[0]) {
+						fields[0] = serverURL + "/api/image?url=" + url.QueryEscape(fields[0])
+					}
+					newParts = append(newParts, strings.Join(fields, " "))
+				}
+				return prefix + strings.Join(newParts, ", ") + suffix
+			}
+
+			// 普通 URL 替换
+			if shouldProxyURL(imgURL) {
+				proxyURL := serverURL + "/api/image?url=" + url.QueryEscape(imgURL)
+				return prefix + proxyURL + suffix
+			}
+
+			return match
+		})
+	}
+
+	return result
+}
+
+// validateToken 验证 Token
+func validateToken(r *http.Request) bool {
+	if authToken == "" {
+		return true
+	}
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return false
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return false
+	}
+	return parts[1] == authToken
+}
+
+// sendJSON 发送 JSON 响应
+func sendJSON(w http.ResponseWriter, statusCode int, data map[string]interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(statusCode)
+
+	var parts []string
+	for k, v := range data {
+		switch val := v.(type) {
+		case string:
+			parts = append(parts, fmt.Sprintf(`"%s":"%s"`, k, val))
+		case int:
+			parts = append(parts, fmt.Sprintf(`"%s":%d`, k, val))
+		case bool:
+			parts = append(parts, fmt.Sprintf(`"%s":%t`, k, val))
+		default:
+			parts = append(parts, fmt.Sprintf(`"%s":"%v"`, k, val))
+		}
+	}
+	fmt.Fprintf(w, "{%s}", strings.Join(parts, ","))
+}
+
+// handleRSS 处理 RSS 代理请求
+func handleRSS(w http.ResponseWriter, r *http.Request) {
+	feedURL := r.URL.Query().Get("url")
+	if feedURL == "" {
+		sendJSON(w, 400, map[string]interface{}{"error": "Missing url parameter"})
+		return
+	}
+
+	feedURL = decodeHtmlEntities(feedURL)
+	log.Printf("[RSS] Fetching: %s", feedURL)
+
+	// 创建请求
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", feedURL, nil)
+	if err != nil {
+		log.Printf("[RSS] Error creating request: %v", err)
+		sendJSON(w, 500, map[string]interface{}{"error": "Failed to create request"})
+		return
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; RSSProxy/1.0)")
+	req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml, */*")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[RSS] Error fetching: %v", err)
+		sendJSON(w, 502, map[string]interface{}{"error": "Failed to fetch RSS"})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[RSS] Error reading body: %v", err)
+		sendJSON(w, 500, map[string]interface{}{"error": "Failed to read response"})
+		return
+	}
+
+	content := string(body)
+
+	// 替换图片 URL
+	content = replaceImageURLs(content)
+
+	// 返回响应
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(resp.StatusCode)
+	w.Write([]byte(content))
+
+	log.Printf("[RSS] Success: %d bytes", len(content))
+}
+
+// handleImage 处理图片代理请求
+func handleImage(w http.ResponseWriter, r *http.Request) {
+	// 从 RawQuery 手动提取 url 参数，避免自动解码导致的 & 截断问题
+	rawQuery := r.URL.RawQuery
+	imageURL := ""
+
+	// 查找 url= 参数（取所有内容，不在 & 处截断）
+	if idx := strings.Index(rawQuery, "url="); idx != -1 {
+		imageURL = rawQuery[idx+4:]
+		// URL 解码（只解码一次）
+		if decoded, err := url.QueryUnescape(imageURL); err == nil {
+			imageURL = decoded
+		}
+	}
+
+	if imageURL == "" {
+		sendJSON(w, 400, map[string]interface{}{"error": "Missing url parameter"})
+		return
+	}
+
+	// HTML 实体解码
+	imageURL = decodeHtmlEntities(imageURL)
+
+	if !strings.HasPrefix(imageURL, "http://") && !strings.HasPrefix(imageURL, "https://") {
+		log.Printf("[Image] Invalid URL format: %s", imageURL[:min(50, len(imageURL))])
+		sendJSON(w, 400, map[string]interface{}{"error": "Invalid URL format"})
+		return
+	}
+
+	log.Printf("[Image] Streaming: %s", imageURL[:min(100, len(imageURL))])
+
+	streamImage(w, r, imageURL, 0)
+}
+
+// streamImage 流式转发图片
+func streamImage(w http.ResponseWriter, r *http.Request, targetURL string, redirectCount int) {
+	if redirectCount > 5 {
+		log.Printf("[Image] Too many redirects: %s", targetURL)
+		sendJSON(w, 502, map[string]interface{}{"error": "Too many redirects"})
+		return
+	}
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // 手动处理重定向
+		},
+	}
+
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		log.Printf("[Image] Error creating request: %v", err)
+		sendJSON(w, 500, map[string]interface{}{"error": "Failed to create request"})
+		return
+	}
+
+	// 设置请求头
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Accept", "image/*,*/*")
+	req.Header.Set("Referer", getReferer(targetURL))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[Image] Error fetching: %v", err)
+		sendJSON(w, 502, map[string]interface{}{"error": "Failed to fetch image"})
+		return
+	}
+	defer resp.Body.Close()
+
+	// 处理重定向
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		location := resp.Header.Get("Location")
+		if location != "" {
+			log.Printf("[Image] Redirect to: %s", location)
+			streamImage(w, r, location, redirectCount+1)
+			return
+		}
+	}
+
+	// 复制响应头
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		w.Header().Set("Content-Length", cl)
+	}
+	w.WriteHeader(resp.StatusCode)
+
+	// 流式传输
+	written, err := io.Copy(w, resp.Body)
+	if err != nil {
+		log.Printf("[Image] Error streaming: %v", err)
+		return
+	}
+
+	log.Printf("[Image] Success: %d bytes", written)
+}
+
+// handleHealth 健康检查
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	sendJSON(w, 200, map[string]interface{}{
+		"status":  "ok",
+		"service": "rss-proxy-go",
+		"time":    time.Now().Format(time.RFC3339),
+	})
+}
+
+// authMiddleware 认证中间件
+func authMiddleware(next http.HandlerFunc, skipAuth bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// CORS 预检
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.WriteHeader(204)
+			return
+		}
+
+		// 跳过认证的接口
+		if skipAuth || validateToken(r) {
+			next(w, r)
+			return
+		}
+
+		log.Printf("[Auth] Unauthorized request: %s", r.URL.Path)
+		sendJSON(w, 401, map[string]interface{}{"error": "Unauthorized"})
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func main() {
+	// 路由
+	http.HandleFunc("/api/rss", authMiddleware(handleRSS, false))
+	http.HandleFunc("/api/image", authMiddleware(handleImage, true)) // 图片跳过认证
+	http.HandleFunc("/health", authMiddleware(handleHealth, true))
+	http.HandleFunc("/", authMiddleware(handleHealth, true))
+
+	addr := ":" + port
+	log.Printf("RSS Proxy Server (Go) starting on %s", addr)
+	log.Printf("SERVER_URL: %s", serverURL)
+	if authToken != "" {
+		log.Printf("Auth: enabled (token: %s***)", authToken[:min(3, len(authToken))])
+	} else {
+		log.Printf("Auth: disabled")
+	}
+
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
+}

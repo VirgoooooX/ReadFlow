@@ -120,6 +120,48 @@ export class LocalRSSService {
     });
   }
 
+  /**
+   * 解析 RSS XML 并保存文章（供代理模式复用）
+   * 这是一个公共方法，让 ProxyRSSService 可以复用本地解析逻辑
+   */
+  public async parseRSSFeedAndSave(xmlText: string, source: RSSSource): Promise<Article[]> {
+    try {
+      const newArticles = await this.parseRSSFeed(xmlText, source);
+      
+      if (!newArticles || newArticles.length === 0) {
+        logger.info(`RSS 源 ${source.name} 没有新文章`);
+        return [];
+      }
+      
+      const savedArticles: Article[] = [];
+      
+      for (const article of newArticles) {
+        const existing = await this.databaseService.executeQuery(
+          'SELECT id FROM articles WHERE url = ?',
+          [article.url]
+        );
+        
+        if (existing.length === 0) {
+          const saved = await this.saveArticle(article);
+          if (saved) {
+            savedArticles.push(saved);
+          }
+        }
+      }
+      
+      // 更新 RSS 源统计
+      if (source.id) {
+        await this.updateSourceStats(source.id.toString());
+      }
+      
+      logger.info(`[parseRSSFeedAndSave] ${source.name}: 保存 ${savedArticles.length} 篇新文章`);
+      return savedArticles;
+    } catch (error) {
+      logger.error(`[parseRSSFeedAndSave] 解析失败 ${source.name}:`, error);
+      throw error;
+    }
+  }
+
   // =================== 内部方法 ===================
 
   /**
