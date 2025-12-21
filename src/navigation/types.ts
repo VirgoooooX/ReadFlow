@@ -57,6 +57,7 @@ export type SettingsStackParamList = {
   LLMSettings: undefined;
   ThemeSettings: undefined;
   ProxyServerSettings: undefined;  // 新增：代理服务器设置
+  AddEditProxyServer: { serverId?: string };  // 添加/编辑代理服务器
   About: undefined;
   Export: undefined;
   Import: undefined;

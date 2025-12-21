@@ -43,9 +43,11 @@ const SettingsScreen: React.FC = () => {
 
   const loadProxyStatus = async () => {
     try {
-      const config = await SettingsService.getInstance().getProxyModeConfig();
-      setProxyEnabled(config.enabled);
-      setProxyConnected(!!config.token);
+      const config = await SettingsService.getInstance().getProxyServersConfig();
+      const hasServers = config.servers.length > 0;
+      const hasActiveServer = !!config.activeServerId;
+      setProxyEnabled(hasActiveServer);
+      setProxyConnected(hasServers);
     } catch (error) {
       console.error('加载代理状态失败:', error);
     }
@@ -202,8 +204,8 @@ const SettingsScreen: React.FC = () => {
                 <Text style={styles.settingItemText}>代理服务器</Text>
                 <Text style={styles.settingItemSubText}>
                   {proxyConnected 
-                    ? (proxyEnabled ? '已启用' : '已连接，未启用') 
-                    : '未连接'
+                    ? (proxyEnabled ? '已启用' : '未启用') 
+                    : '未配置'
                   }
                 </Text>
               </View>
@@ -267,7 +269,7 @@ const SettingsScreen: React.FC = () => {
         {/* 应用信息 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>应用信息</Text>
-                  <TouchableOpacity
+          <TouchableOpacity
             style={styles.settingItem}
             onPress={handleAbout}
           >
@@ -291,25 +293,26 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
   },
   content: {
-    padding: 16,
+    padding: 12,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 12,
+    marginBottom: 8,
+    paddingLeft: 4,
   },
   settingItem: {
     flexDirection: 'row' as any,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     ...StyleUtils.createCardStyle(isDark, theme),
-    marginBottom: 8,
+    marginBottom: 6,
   },
   settingItemLeft: {
     flexDirection: 'row',
@@ -317,22 +320,22 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
   },
   settingItemContent: {
-    marginLeft: 16,
+    marginLeft: 12,
     flex: 1,
   },
   settingItemText: {
-    fontSize: 16,
+    fontSize: 15,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
   },
   settingItemSubText: {
-    fontSize: 13,
+    fontSize: 12,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    marginTop: 4,
+    marginTop: 3,
   },
   settingItemDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    marginTop: 4,
+    marginTop: 3,
   },
 });
 

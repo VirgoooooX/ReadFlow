@@ -15,8 +15,8 @@ COPY go.mod ./
 # 复制源码
 COPY main.go ./
 
-# 编译为静态二进制（CGO 禁用）
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+# 编译为静态二进制（CGO 禁用，自动检测目标架构）
+RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-w -s" \
     -o rss-proxy \
     main.go

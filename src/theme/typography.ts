@@ -294,14 +294,14 @@ export const adjustTypography = (
 };
 
 // 工具函数：获取平台特定字体
-export const getPlatformFont = (type: 'chinese' | 'english' | 'monospace' = 'chinese'): string | undefined => {
-  const fontFamily = fontFamilies[type];
+export const getPlatformFont = (type: string = 'chinese'): string | undefined => {
+  const fontFamily = fontFamilies[type as keyof typeof fontFamilies];
   if (typeof fontFamily === 'string') {
     return fontFamily;
   }
   
   // 根据平台返回合适的字体
-  if (typeof fontFamily === 'object') {
+  if (typeof fontFamily === 'object' && fontFamily !== null) {
     if (Platform.OS === 'ios') {
       return fontFamily.ios;
     } else if (Platform.OS === 'android') {
@@ -313,15 +313,47 @@ export const getPlatformFont = (type: 'chinese' | 'english' | 'monospace' = 'chi
   return undefined;
 };
 
-// 获取可用的字体选项
+// 获取可用的字体选项（用于设置页面显示）
 export const getAvailableFonts = () => {
   const fonts = [
-    { key: 'system', name: '系统默认', fontFamily: undefined },
-    { key: 'chinese', name: Platform.OS === 'ios' ? 'PingFang SC' : 'Noto Sans CJK SC', fontFamily: getPlatformFont('chinese') },
-    { key: 'english', name: Platform.OS === 'ios' ? 'SF Pro Text' : 'Roboto', fontFamily: getPlatformFont('english') },
-    { key: 'monospace', name: Platform.OS === 'ios' ? 'SF Mono' : 'Roboto Mono', fontFamily: getPlatformFont('monospace') },
+    { key: 'system', name: '系统默认', description: '跟随系统字体' },
+    { key: 'serif', name: '衬线体', description: '适合长文阅读' },
+    { key: 'sansSerif', name: '无衬线体', description: '现代简洁风格' },
+    { key: 'chinese', name: '中文优化', description: '苹方/思源黑体' },
+    { key: 'monospace', name: '等宽字体', description: '适合代码阅读' },
   ];
   return fonts;
+};
+
+/**
+ * WebView 字体栈映射
+ * 将字体 key 转换为 CSS font-family 字符串
+ * 使用字体栈确保跨平台兼容性
+ */
+export const WEBVIEW_FONT_STACKS: Record<string, string> = {
+  // 系统默认 - 最安全的跨平台方案
+  system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  
+  // 衬线体 - 适合英文长篇阅读
+  serif: 'Georgia, "Iowan Old Style", "Droid Serif", "Noto Serif", "Times New Roman", serif',
+  
+  // 无衬线体 - 现代简洁
+  sansSerif: '"Helvetica Neue", Helvetica, Roboto, "Segoe UI", Arial, sans-serif',
+  
+  // 中文优化 - 苹方/思源黑体
+  chinese: '"PingFang SC", "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif',
+  
+  // 等宽字体 - 代码/技术文章
+  monospace: '"SF Mono", "Roboto Mono", Menlo, Consolas, "Courier New", monospace',
+};
+
+/**
+ * 根据字体 key 获取 WebView 使用的 CSS font-family 字符串
+ * @param fontKey 字体选项的 key
+ * @returns CSS font-family 字符串
+ */
+export const getFontStackForWebView = (fontKey: string): string => {
+  return WEBVIEW_FONT_STACKS[fontKey] || WEBVIEW_FONT_STACKS.system;
 };
 
 export default {
@@ -336,4 +368,6 @@ export default {
   adjustTypography,
   getPlatformFont,
   getAvailableFonts,
+  WEBVIEW_FONT_STACKS,
+  getFontStackForWebView,
 };

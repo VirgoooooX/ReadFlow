@@ -2,14 +2,16 @@
 
 services:
   rss-proxy-go:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: rss-proxy-go
     restart: unless-stopped
     ports:
       - "3001:3000"  # 使用 3001 端口，避免与 Node.js 版本冲突
     environment:
       - PORT=3000
-      - SERVER_URL=http://192.168.31.27:3001
+      - SERVER_URL=https://rssproxy.198909.xyz:37891
       - AUTH_TOKEN=xdoODHJ91rgAZ7siQOw
     deploy:
       resources:

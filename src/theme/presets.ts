@@ -23,34 +23,90 @@ export const THEME_PRESETS: readonly ThemePresetConfig[] = [
   },
   {
     id: 'blue',
-    name: '蓝色主题',
+    name: '商务蓝',
     colors: {
-      primary: '#1976D2',
-      secondary: '#1565C0',
+      primary: '#0061A4',
+      secondary: '#535F70',
     },
   },
   {
     id: 'green',
-    name: '绿色主题',
+    name: '森林绿',
     colors: {
-      primary: '#388E3C',
-      secondary: '#2E7D32',
-    },
-  },
-  {
-    id: 'orange',
-    name: '橙色主题',
-    colors: {
-      primary: '#F57C00',
-      secondary: '#EF6C00',
+      primary: '#006C4C',
+      secondary: '#4D6357',
     },
   },
   {
     id: 'purple',
-    name: '紫色主题',
+    name: '赛博紫',
     colors: {
-      primary: '#7B1FA2',
-      secondary: '#6A1B9A',
+      primary: '#7C3AED',
+      secondary: '#4C1D95',
+    },
+  },
+  {
+    id: 'orange',
+    name: '活力橙',
+    colors: {
+      primary: '#EA580C',
+      secondary: '#78350F',
+    },
+  },
+  {
+    id: 'red',
+    name: '热情红',
+    colors: {
+      primary: '#DC2626',
+      secondary: '#7C2D12',
+    },
+  },
+  {
+    id: 'pink',
+    name: '温柔粉',
+    colors: {
+      primary: '#EC4899',
+      secondary: '#831843',
+    },
+  },
+  {
+    id: 'teal',
+    name: '沉稳青',
+    colors: {
+      primary: '#0D9488',
+      secondary: '#134E4A',
+    },
+  },
+  {
+    id: 'indigo',
+    name: '深邃靖',
+    colors: {
+      primary: '#4F46E5',
+      secondary: '#312E81',
+    },
+  },
+  {
+    id: 'yellow',
+    name: '明亮黄',
+    colors: {
+      primary: '#D97706',
+      secondary: '#78350F',
+    },
+  },
+  {
+    id: 'gray',
+    name: '简约黑',
+    colors: {
+      primary: '#1F2937',
+      secondary: '#374151',
+    },
+  },
+  {
+    id: 'dark',
+    name: '藏青蓝',
+    colors: {
+      primary: '#0E7490',
+      secondary: '#155E75',
     },
   },
 ] as const;

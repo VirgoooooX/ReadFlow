@@ -30,19 +30,18 @@ import RSSScreen from '../screens/RSS/RSSScreen';
 import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
 import EditRSSSourceScreen from '../screens/RSS/EditRSSSourceScreen';
-import UserProfileScreen from '../screens/User/UserProfileScreen';
+import MineScreen from '../screens/Mine/MineScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 import EditProfileScreen from '../screens/User/EditProfileScreen';
-import SettingsScreen from '../screens/Settings/SettingsScreen';
 import ReadingSettingsScreen from '../screens/Settings/ReadingSettingsScreen';
 import LLMSettingsScreen from '../screens/Settings/LLMSettingsScreen';
 import ThemeSettingsScreen from '../screens/Settings/ThemeSettingsScreen';
 import { ProxyServerSettingsScreen } from '../screens/Settings/ProxyServerSettingsScreen';
+import { AddEditProxyServerScreen } from '../screens/Settings/AddEditProxyServerScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
-import ExportScreen from '../screens/Settings/ExportScreen';
-import ImportScreen from '../screens/Settings/ImportScreen';
-import DebugScreen from '../screens/Debug/DebugScreen';
+import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
+import CustomColorScreen from '../screens/Settings/CustomColorScreen';
 
 // 导入类型定义
 export type RootStackParamList = {
@@ -56,8 +55,6 @@ export type RootStackParamList = {
   ReadingSettings: undefined;
   AppSettings: undefined;
   About: undefined;
-  Export: undefined;
-  Import: undefined;
 };
 
 export type AuthStackParamList = {
@@ -98,32 +95,13 @@ export type RSSStackParamList = {
 export type UserStackParamList = {
   UserMain: undefined;
   EditProfile: undefined;
-  Settings: undefined;
-  AppSettings: undefined;
   ReadingSettings: undefined;
   LLMSettings: undefined;
   ThemeSettings: undefined;
+  CustomColor: undefined;  // 新增：自定义颜色
   ProxyServerSettings: undefined;  // 新增：代理服务器设置
+  AddEditProxyServer: { serverId?: string };  // 添加/编辑代理服务器
   About: undefined;
-  Export: undefined;
-  Import: undefined;
-  StorageManagement: undefined;
-  AddRSSSource: undefined;
-  ManageSubscriptions: undefined;
-  EditRSSSource: { sourceId: number };
-  Debug: undefined;
-};
-
-export type SettingsStackParamList = {
-  SettingsMain: undefined;
-  AppSettings: undefined;
-  ReadingSettings: undefined;
-  LLMSettings: undefined;
-  ThemeSettings: undefined;
-  ProxyServerSettings: undefined;  // 新增：代理服务器设置
-  About: undefined;
-  Export: undefined;
-  Import: undefined;
   StorageManagement: undefined;
   AddRSSSource: undefined;
   ManageSubscriptions: undefined;
@@ -138,7 +116,6 @@ const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const VocabularyStack = createNativeStackNavigator<VocabularyStackParamList>();
 const RSSStack = createNativeStackNavigator<RSSStackParamList>();
 const UserStack = createNativeStackNavigator<UserStackParamList>();
-const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 // 主题配置
 const lightTheme = {
@@ -394,7 +371,7 @@ function RSSStackNavigator() {
   );
 }
 
-// 用户堆栈导航
+// 用户堆栈导航（"我的"页面）
 function UserStackNavigator() {
   const { theme } = useThemeContext();
   const isDark = theme.dark;
@@ -415,7 +392,7 @@ function UserStackNavigator() {
             title="我的"
             showBackButton={false}
           >
-            <UserProfileScreen {...props} />
+            <MineScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
@@ -429,32 +406,6 @@ function UserStackNavigator() {
             showBackButton={true}
           >
             <EditProfileScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="Settings"
-        options={{ title: '设置' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="设置"
-            showBackButton={true}
-          >
-            <SettingsScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="AppSettings"
-        options={{ title: '应用设置' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="应用设置"
-            showBackButton={true}
-          >
-            <SettingsScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
@@ -498,6 +449,19 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
       <UserStack.Screen
+        name="CustomColor"
+        options={{ title: '自定义颜色' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="自定义颜色"
+            showBackButton={true}
+          >
+            <CustomColorScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
         name="ProxyServerSettings"
         options={{ title: '代理服务器' }}
       >
@@ -507,6 +471,21 @@ function UserStackNavigator() {
             showBackButton={true}
           >
             <ProxyServerSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+      <UserStack.Screen
+        name="AddEditProxyServer"
+        options={({ route }: any) => ({ 
+          title: route?.params?.serverId ? '编辑服务器' : '添加服务器' 
+        })}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title={props.route?.params?.serverId ? '编辑服务器' : '添加服务器'}
+            showBackButton={true}
+          >
+            <AddEditProxyServerScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
@@ -523,55 +502,17 @@ function UserStackNavigator() {
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
-      <UserStack.Screen
-        name="Export"
-        options={{ title: '导出数据' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="导出数据"
-            showBackButton={true}
-          >
-            <ExportScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="Import"
-        options={{ title: '导入数据' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="导入数据"
-            showBackButton={true}
-          >
-            <ImportScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
+
       <UserStack.Screen
         name="StorageManagement"
-        options={{ title: '存储管理' }}
+        options={{ title: '存储空间管理' }}
       >
         {(props: any) => (
           <ScreenWithCustomHeader
-            title="存储管理"
+            title="存储空间管理"
             showBackButton={true}
           >
-            <SettingsScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="AddRSSSource"
-        options={{ title: '添加RSS源' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="添加RSS源"
-            showBackButton={true}
-          >
-            <AddRSSSourceScreen {...props} />
+            <StorageManagementScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
@@ -588,118 +529,12 @@ function UserStackNavigator() {
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
-      <UserStack.Screen
-        name="EditRSSSource"
-        options={{ title: '编辑RSS源' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="编辑RSS源"
-            showBackButton={true}
-          >
-            <EditRSSSourceScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="Debug"
-        options={{ title: '调试信息' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="调试信息"
-            showBackButton={true}
-          >
-            <DebugScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
 
     </UserStack.Navigator>
   );
 }
 
-// 设置堆栈导航
-function SettingsStackNavigator() {
-  const { theme } = useThemeContext();
-  const isDark = theme.dark;
 
-  return (
-    <SettingsStack.Navigator
-      screenOptions={{
-        ...getCommonScreenOptions(theme, isDark),
-        headerTitleStyle: HEADER_TITLE_STYLE,
-      }}
-    >
-      <SettingsStack.Screen
-        name="SettingsMain"
-        component={SettingsScreen}
-        options={{ title: '设置' }}
-      />
-      <SettingsStack.Screen
-        name="AppSettings"
-        component={SettingsScreen}
-        options={{ title: '应用设置' }}
-      />
-      <SettingsStack.Screen
-        name="ReadingSettings"
-        component={ReadingSettingsScreen}
-        options={{ title: '阅读偏好' }}
-      />
-      <SettingsStack.Screen
-        name="LLMSettings"
-        component={LLMSettingsScreen}
-        options={{ title: 'LLM设置' }}
-      />
-      <SettingsStack.Screen
-        name="ThemeSettings"
-        component={ThemeSettingsScreen}
-        options={{ title: '主题设置' }}
-      />
-      <SettingsStack.Screen
-        name="ProxyServerSettings"
-        component={ProxyServerSettingsScreen}
-        options={{ title: '代理服务器' }}
-      />
-      <SettingsStack.Screen
-        name="About"
-        component={AboutScreen}
-        options={{ title: '关于' }}
-      />
-      <SettingsStack.Screen
-        name="Export"
-        component={ExportScreen}
-        options={{ title: '导出数据' }}
-      />
-      <SettingsStack.Screen
-        name="Import"
-        component={ImportScreen}
-        options={{ title: '导入数据' }}
-      />
-      <SettingsStack.Screen
-        name="StorageManagement"
-        component={SettingsScreen}
-        options={{ title: '存储管理' }}
-      />
-      <SettingsStack.Screen
-        name="AddRSSSource"
-        component={AddRSSSourceScreen}
-        options={{ title: '添加RSS源' }}
-      />
-      <SettingsStack.Screen
-        name="ManageSubscriptions"
-        component={ManageSubscriptionsScreen}
-        options={{ title: '管理订阅源' }}
-      />
-      <SettingsStack.Screen
-        name="EditRSSSource"
-        component={EditRSSSourceScreen}
-        options={{ title: '编辑RSS源' }}
-      />
-
-    </SettingsStack.Navigator>
-  );
-}
 
 // 底部标签导航 - 符合设计规范的3个标签页
 function MainTabNavigator() {
@@ -735,11 +570,11 @@ function MainTabNavigator() {
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: isDark ? '#938F99' : '#79747E',
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
         tabBarStyle: {
-          backgroundColor: isDark ? '#1C1B1F' : '#FFFBFE',
-          borderTopColor: isDark ? '#938F99' : '#79747E',
-          borderTopWidth: 1,
+          backgroundColor: theme.colors.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
+          borderTopColor: theme.colors.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+          borderTopWidth: 0.5,
           // 显式设置底部内边距，包含安全区域
           paddingBottom: getTabBarPaddingVertical() + bottomInset,
           paddingTop: getTabBarPaddingVertical(),

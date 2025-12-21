@@ -6,30 +6,105 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeContext } from '../../theme';
 import { THEME_PRESETS } from '../../theme/presets';
-import * as StyleUtils from '../../utils/styleUtils';
+import type { UserStackParamList } from '../../navigation/AppNavigator';
+
+type ThemeSettingsNavigationProp = NativeStackNavigationProp<UserStackParamList>;
+
+// 获取屏幕宽度用于计算网格
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CONTAINER_PADDING = 16;
+const CARD_PADDING = 12;
+const COLOR_ITEM_WIDTH = (SCREEN_WIDTH - (CONTAINER_PADDING * 2) - (CARD_PADDING * 2) - 30) / 4;
+
+// 模式选择器组件
+const ModeSelector = ({ mode, currentMode, onChange, theme, isDark }: any) => {
+  const isSelected = currentMode === mode;
+  const labels: Record<string, string> = { light: '浅色', dark: '深色', system: '自动' };
+  const icons: Record<string, any> = { light: 'light-mode', dark: 'dark-mode', system: 'settings-brightness' };
+
+  return (
+    <TouchableOpacity
+      style={[
+        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
+        { backgroundColor: isSelected ? (theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF')) : (isDark ? '#3D3D3D' : '#F5F5F5') }
+      ]}
+      onPress={() => onChange(mode)}
+      activeOpacity={0.7}
+    >
+      <MaterialIcons 
+        name={icons[mode]} 
+        size={24} 
+        color={isSelected ? (theme?.colors?.primary || '#6750A4') : (theme?.colors?.onSurfaceVariant || '#999')} 
+      />
+      <Text style={{
+        fontSize: 13,
+        fontWeight: '600',
+        color: isSelected ? (theme?.colors?.primary || '#6750A4') : (theme?.colors?.onSurface || '#000')
+      }}>
+        {labels[mode]}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+// 主题色卡组件
+const ThemeCard = ({ preset, isSelected, onPress, theme }: any) => (
+  <TouchableOpacity
+    style={{ width: COLOR_ITEM_WIDTH, alignItems: 'center', marginBottom: 4 }}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <View style={{
+      width: 48, 
+      height: 48, 
+      borderRadius: 24, 
+      padding: 3, 
+      marginBottom: 8, 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      borderWidth: 2, 
+      borderColor: isSelected ? (theme?.colors?.primary || '#6750A4') : 'transparent'
+    }}>
+      <View style={{ width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', backgroundColor: preset.colors.primary }}>
+        <View style={{ position: 'absolute', right: 0, bottom: 0, width: '50%', height: '100%', backgroundColor: preset.colors.secondary }} />
+      </View>
+    </View>
+    <Text 
+      style={{
+        fontSize: 12,
+        color: isSelected ? (theme?.colors?.primary || '#6750A4') : (theme?.colors?.onSurfaceVariant || '#999'),
+        textAlign: 'center',
+        fontWeight: isSelected ? '600' : '500',
+      }} 
+      numberOfLines={1}
+    >
+      {preset.name}
+    </Text>
+  </TouchableOpacity>
+);
 
 const ThemeSettingsScreen: React.FC = () => {
-  // 【优化】直接从 Context 解构所需状态，移除冗余本地 state
+  const navigation = useNavigation<ThemeSettingsNavigationProp>();
   const { theme, isDark, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig } = useThemeContext();
   
-  // 【优化】使用 useMemo 缓存样式，避免每次渲染重新创建
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
 
-  // 【优化】合并预设列表：标准预设 + 自定义预设
   const displayPresets = useMemo(() => [
     ...THEME_PRESETS,
     {
       id: 'custom',
-      name: '自定义主题',
+      name: '自定义',
       colors: customConfig || { primary: '#6750A4', secondary: '#625B71' },
     },
   ], [customConfig]);
 
-  // 【优化】简化处理函数，直接调用 Context 方法，无需额外的 saveSettings
   const handleThemeModeChange = async (mode: 'light' | 'dark' | 'system') => {
     await setThemeMode(mode);
   };
@@ -39,7 +114,7 @@ const ThemeSettingsScreen: React.FC = () => {
   };
 
   const handleCustomTheme = () => {
-    Alert.alert('自定义主题', '自定义主题编辑器开发中...');
+    navigation.navigate('CustomColor');
   };
 
   const resetToDefault = () => {
@@ -62,122 +137,58 @@ const ThemeSettingsScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.content}>
-        {/* 主题模式 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>主题模式</Text>
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={[styles.optionItem, themeMode === 'light' && styles.selectedOption]}
-              onPress={() => handleThemeModeChange('light')}
-            >
-              <View style={styles.optionLeft}>
-                <MaterialIcons 
-                  name="light-mode" 
-                  size={24} 
-                  color={themeMode === 'light' ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant} 
-                />
-                <Text style={[styles.optionText, themeMode === 'light' && styles.selectedText]}>浅色模式</Text>
-              </View>
-              {themeMode === 'light' && (
-                <MaterialIcons name="check" size={20} color={theme?.colors?.primary} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.optionItem, themeMode === 'dark' && styles.selectedOption]}
-              onPress={() => handleThemeModeChange('dark')}
-            >
-              <View style={styles.optionLeft}>
-                <MaterialIcons 
-                  name="dark-mode" 
-                  size={24} 
-                  color={themeMode === 'dark' ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant} 
-                />
-                <Text style={[styles.optionText, themeMode === 'dark' && styles.selectedText]}>深色模式</Text>
-              </View>
-              {themeMode === 'dark' && (
-                <MaterialIcons name="check" size={20} color={theme?.colors?.primary} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.optionItem, themeMode === 'system' && styles.selectedOption]}
-              onPress={() => handleThemeModeChange('system')}
-            >
-              <View style={styles.optionLeft}>
-                <MaterialIcons 
-                  name="settings-brightness" 
-                  size={24} 
-                  color={themeMode === 'system' ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant} 
-                />
-                <Text style={[styles.optionText, themeMode === 'system' && styles.selectedText]}>跟随系统</Text>
-              </View>
-              {themeMode === 'system' && (
-                <MaterialIcons name="check" size={20} color={theme?.colors?.primary} />
-              )}
-            </TouchableOpacity>
+        {/* 外观模式 - 横向三卡片 */}
+        <View style={styles.menuGroupContainer}>
+          <Text style={styles.sectionTitle}>外观模式</Text>
+          <View style={[styles.menuGroupCard, { paddingHorizontal: CARD_PADDING, paddingVertical: 6 }]}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <ModeSelector mode="light" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} isDark={isDark} />
+              <ModeSelector mode="dark" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} isDark={isDark} />
+              <ModeSelector mode="system" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} isDark={isDark} />
+            </View>
           </View>
         </View>
 
-        {/* 主题预设 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>主题预设</Text>
-          <View style={styles.card}>
-            {displayPresets.map((preset) => (
-              <TouchableOpacity
-                key={preset.id}
-                style={[styles.presetItem, currentPreset === preset.id && styles.selectedPreset]}
-                onPress={() => handlePresetChange(preset.id)}
-              >
-                <View style={styles.presetLeft}>
-                  <View style={styles.colorPreview}>
-                    <View 
-                      style={[
-                        styles.colorSample, 
-                        { backgroundColor: preset.colors.primary }
-                      ]} 
-                    />
-                    <View 
-                      style={[
-                        styles.colorSample, 
-                        { backgroundColor: preset.colors.secondary }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={[styles.presetName, currentPreset === preset.id && styles.selectedText]}>
-                    {preset.name}
-                  </Text>
+        {/* 色彩主题 - 网格布局 */}
+        <View style={styles.menuGroupContainer}>
+          <Text style={styles.sectionTitle}>色彩主题</Text>
+          <View style={[styles.menuGroupCard, { padding: CARD_PADDING }]}>
+            <View style={styles.themeGrid}>
+              {displayPresets.map((preset) => (
+                <ThemeCard
+                  key={preset.id}
+                  preset={preset}
+                  isSelected={currentPreset === preset.id}
+                  onPress={() => handlePresetChange(preset.id)}
+                  theme={theme}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* 更多选项 */}
+        <View style={styles.menuGroupContainer}>
+          <Text style={styles.sectionTitle}>更多选项</Text>
+          <View style={styles.menuGroupCard}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleCustomTheme}>
+              <View style={styles.menuLeft}>
+                <View style={[styles.menuIconBox, { backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF') }]}>
+                  <MaterialIcons name="palette" size={20} color={theme?.colors?.primary || '#6750A4'} />
                 </View>
-                {currentPreset === preset.id && (
-                  <MaterialIcons name="check" size={20} color={theme?.colors?.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* 高级设置 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>高级设置</Text>
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={handleCustomTheme}
-            >
-              <View style={styles.actionLeft}>
-                <MaterialIcons name="palette" size={24} color={theme?.colors?.primary} />
-                <Text style={styles.actionText}>自定义颜色</Text>
+                <Text style={styles.menuText}>编辑自定义颜色</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.onSurfaceVariant} />
+              <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.outline || '#999'} />
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={resetToDefault}
-            >
-              <View style={styles.actionLeft}>
-                <MaterialIcons name="restore" size={24} color={theme?.colors?.primary} />
-                <Text style={styles.actionText}>重置为默认</Text>
+          
+            <View style={styles.menuDivider} />
+          
+            <TouchableOpacity style={styles.menuItem} onPress={resetToDefault}>
+              <View style={styles.menuLeft}>
+                <View style={[styles.menuIconBox, { backgroundColor: theme?.colors?.errorContainer || (isDark ? '#93000A' : '#F9DEDC') }]}>
+                  <MaterialIcons name="restore" size={20} color={theme?.colors?.error || '#B3261E'} />
+                </View>
+                <Text style={[styles.menuText, { color: theme?.colors?.error || '#B3261E' }]}>恢复默认设置</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -190,96 +201,74 @@ const ThemeSettingsScreen: React.FC = () => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F7FA'),
+    paddingHorizontal: CONTAINER_PADDING,
   },
   content: {
-    padding: 16,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
-  section: {
+
+  menuGroupContainer: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme?.colors?.primary || '#6750A4',
+    marginBottom: 8,
+    marginLeft: 4,
+    opacity: 0.9,
   },
-  card: {
-    ...StyleUtils.createCardStyle(isDark, theme),
-    borderRadius: 12,
+  menuGroupCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.3 : 0.04,
+    shadowRadius: 12,
+    elevation: 2,
     overflow: 'hidden',
   },
-  optionItem: {
+
+  // 列表菜单项
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
-  selectedOption: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
-  },
-  optionLeft: {
-    flexDirection: 'row',
+  menuIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
-  },
-  optionText: {
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginLeft: 12,
-  },
-  selectedText: {
-    color: theme?.colors?.primary || '#6750A4',
-    fontWeight: '500',
-  },
-  presetItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  selectedPreset: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
-  },
-  presetLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  colorPreview: {
-    flexDirection: 'row',
     marginRight: 12,
   },
-  colorSample: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginRight: 4,
-    borderWidth: 1,
-    borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+  menuText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
   },
-  presetName: {
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  actionLeft: {
+  menuLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  actionText: {
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginLeft: 12,
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    marginLeft: 60,
+  },
+
+  // 主题网格
+  themeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: 10,
   },
 });
 

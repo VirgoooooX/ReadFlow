@@ -14,10 +14,9 @@ import { getAvailableFonts } from '../../theme/typography';
 import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { SettingsStackParamList } from '../../navigation/AppNavigator';
-import * as StyleUtils from '../../utils/styleUtils';
+import type { UserStackParamList } from '../../navigation/AppNavigator';
 
-type NavigationProp = NativeStackNavigationProp<SettingsStackParamList, 'ReadingSettings'>;
+type NavigationProp = NativeStackNavigationProp<UserStackParamList, 'ReadingSettings'>;
 
 const ReadingSettingsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
@@ -116,8 +115,7 @@ const ReadingSettingsScreen: React.FC = () => {
   }, [debounce, updateSetting, settings]);
 
   // 处理字体类型变化
-  const handleFontFamilyChange = async (name: string) => {
-    const key = getFontKeyByName(name);
+  const handleFontFamilyChange = async (key: string) => {
     if (fontFamily !== key) {
       setFontFamily(key);
       try {
@@ -140,6 +138,72 @@ const ReadingSettingsScreen: React.FC = () => {
       setShowAllTab(!value);
     }
   };
+
+  // 菜单项组件 - 选择效果借鉴 LLM 设置
+  const MenuItem = ({
+    icon,
+    label,
+    onPress,
+    color,
+    isSelected = false,
+    showCheck = false,
+    description,
+    isLast = false,
+  }: any) => (
+    <>
+      <TouchableOpacity 
+        style={[styles.menuItem, isSelected && styles.selectedOption]} 
+        onPress={onPress} 
+        activeOpacity={0.6}
+      >
+        <View style={styles.menuLeft}>
+          {icon && (
+            <View style={styles.menuIconBox}>
+              <MaterialIcons
+                name={icon}
+                size={20}
+                color={color || theme?.colors?.onSurfaceVariant || '#666'}
+              />
+            </View>
+          )}
+          <View style={styles.menuTextContainer}>
+            <Text style={[styles.menuText, isSelected && styles.selectedText]}>
+              {label}
+            </Text>
+            {description && (
+              <Text style={styles.menuDescription}>{description}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.menuRight}>
+          {showCheck && (
+            <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />
+          )}
+        </View>
+      </TouchableOpacity>
+      {!isLast && <View style={styles.menuDivider} />}
+    </>
+  );
+
+  // 字体选择器（带描述信息）
+  const renderFontSelector = () => (
+    <View style={styles.menuGroupContainer}>
+      <Text style={styles.sectionTitle}>字体类型</Text>
+      <View style={styles.menuGroupCard}>
+        {availableFonts.map((font, index) => (
+          <MenuItem
+            key={font.key}
+            label={font.name}
+            description={font.description}
+            onPress={() => handleFontFamilyChange(font.key)}
+            isSelected={fontFamily === font.key}
+            showCheck={fontFamily === font.key}
+            isLast={index === availableFonts.length - 1}
+          />
+        ))}
+      </View>
+    </View>
+  );
 
   const renderOptionSelector = (
     title: string,
@@ -184,7 +248,7 @@ const ReadingSettingsScreen: React.FC = () => {
     onValueChange: (value: number) => void,
     unit: string = ''
   ) => (
-    <View style={styles.section}>
+    <View style={styles.menuGroupContainer}>
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.sliderCard}>
         <View style={styles.sliderHeader}>
@@ -214,7 +278,7 @@ const ReadingSettingsScreen: React.FC = () => {
     value: boolean,
     onValueChange: (value: boolean) => void
   ) => (
-    <View style={styles.section}>
+    <View style={styles.menuGroupContainer}>
       <View style={styles.switchCard}>
         <Text style={styles.switchTitle}>{title}</Text>
         <Switch
@@ -259,7 +323,7 @@ const ReadingSettingsScreen: React.FC = () => {
         )}
 
         {/* 字体类型选择 */}
-        {renderOptionSelector('字体类型', getFontNameByKey(fontFamily), fontFamilyOptions, handleFontFamilyChange)}
+        {renderFontSelector()}
 
         {/* 行间距滑动调节 */}
         {renderSlider(
@@ -279,52 +343,99 @@ const ReadingSettingsScreen: React.FC = () => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    paddingHorizontal: 16,
   },
   content: {
-    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
-  section: {
-    marginBottom: 24,
+
+  // 分组布局 - 完全复制 Mine
+  menuGroupContainer: {
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 12,
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      marginBottom: 10,
+      marginTop: -5,  // 👈 增加与上方容器的距离
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
   },
-  card: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+  menuGroupCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
     overflow: 'hidden',
+    // 投影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  optionItem: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  lastOptionItem: {
-    borderBottomWidth: 0,
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    marginHorizontal: 14,
+  },
+  menuLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuIconBox: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  menuTextContainer: {
+    flex: 1,
+  },
+  menuText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+  },
+  menuDescription: {
+    fontSize: 12,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    marginTop: 2,
+  },
+  menuRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedText: {
+    color: theme?.colors?.primary || '#6750A4',
+    fontWeight: '600',
   },
   selectedOption: {
     backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
   },
-  optionText: {
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-  },
-  selectedText: {
-    color: theme?.colors?.primary || '#6750A4',
-    fontWeight: '500',
-  },
 
   // 滑动条样式
   sliderCard: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
     padding: 16,
+    // 投影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sliderHeader: {
     flexDirection: 'row',
@@ -348,24 +459,30 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   sliderLabel: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
     minWidth: 32,
     textAlign: 'center',
   },
 
   // 开关样式
   switchCard: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    // 投影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   switchTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
   },
 });
 

@@ -87,9 +87,12 @@ export class UserStatsService {
    */
   private async calculateStudyDays(): Promise<number> {
     try {
+      // 确保数据库已初始化
+      await this.databaseService.initializeDatabase();
+      
       const result = await this.databaseService.executeQuery(
         'SELECT MIN(read_at) as first_read FROM articles WHERE is_read = 1 AND read_at IS NOT NULL'
-      );
+      ).catch(() => []);
       
       if (result.length > 0 && result[0].first_read) {
         const firstReadDate = new Date(result[0].first_read);
@@ -115,24 +118,25 @@ export class UserStatsService {
   }> {
     try {
       const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // 本周开始（周日）
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       weekStart.setHours(0, 0, 0, 0);
       
       const weekStartISO = weekStart.toISOString();
 
+      // 合并查询以避免多个並行查询接这u冲突
       const [articlesResult, vocabularyResult, readingTimeResult] = await Promise.all([
         this.databaseService.executeQuery(
           'SELECT COUNT(*) as count FROM articles WHERE is_read = 1 AND read_at >= ?',
           [weekStartISO]
-        ),
+        ).catch(() => [{ count: 0 }]),
         this.databaseService.executeQuery(
           'SELECT COUNT(*) as count FROM vocabulary WHERE added_at >= ?',
           [weekStart.getTime()]
-        ),
+        ).catch(() => [{ count: 0 }]),
         this.databaseService.executeQuery(
           'SELECT SUM(word_count) as total_words FROM articles WHERE is_read = 1 AND read_at >= ?',
           [weekStartISO]
-        )
+        ).catch(() => [{ total_words: 0 }])
       ]);
 
       const totalWords = readingTimeResult[0]?.total_words || 0;
@@ -154,42 +158,53 @@ export class UserStatsService {
   }
 
   /**
-   * 获取最近7天的阅读趋势
+   * 获取最近7天的阅读趨势
    */
   public async getReadingTrend(): Promise<Array<{ date: string; articles: number; words: number }>> {
     try {
       const results = [];
       const today = new Date();
-      
+        
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         date.setHours(0, 0, 0, 0);
-        
+          
         const nextDate = new Date(date);
         nextDate.setDate(nextDate.getDate() + 1);
-        
+          
         const dateISO = date.toISOString();
         const nextDateISO = nextDate.toISOString();
-        
-        const [articlesResult, wordsResult] = await Promise.all([
-          this.databaseService.executeQuery(
-            'SELECT COUNT(*) as count FROM articles WHERE is_read = 1 AND read_at >= ? AND read_at < ?',
-            [dateISO, nextDateISO]
-          ),
-          this.databaseService.executeQuery(
-            'SELECT COUNT(*) as count FROM vocabulary WHERE added_at >= ? AND added_at < ?',
-            [date.getTime(), nextDate.getTime()]
-          )
-        ]);
-        
-        results.push({
-          date: date.toISOString().split('T')[0],
-          articles: articlesResult[0]?.count || 0,
-          words: wordsResult[0]?.count || 0,
-        });
+          
+        // 也添加错误处理以保悒串串调用不会存帯
+        try {
+          const [articlesResult, wordsResult] = await Promise.all([
+            this.databaseService.executeQuery(
+              'SELECT COUNT(*) as count FROM articles WHERE is_read = 1 AND read_at >= ? AND read_at < ?',
+              [dateISO, nextDateISO]
+            ).catch(() => [{ count: 0 }]),
+            this.databaseService.executeQuery(
+              'SELECT COUNT(*) as count FROM vocabulary WHERE added_at >= ? AND added_at < ?',
+              [date.getTime(), nextDate.getTime()]
+            ).catch(() => [{ count: 0 }])
+          ]);
+            
+          results.push({
+            date: date.toISOString().split('T')[0],
+            articles: articlesResult[0]?.count || 0,
+            words: wordsResult[0]?.count || 0,
+          });
+        } catch (dayError) {
+          // 不中止鐐取整个趨势数据，仅记录错误
+          console.error(`Error processing date ${dateISO}:`, dayError);
+          results.push({
+            date: date.toISOString().split('T')[0],
+            articles: 0,
+            words: 0,
+          });
+        }
       }
-      
+        
       return results;
     } catch (error) {
       console.error('Error getting reading trend:', error);

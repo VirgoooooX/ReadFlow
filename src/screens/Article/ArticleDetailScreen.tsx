@@ -26,6 +26,7 @@ import { vocabularyService } from '../../services/VocabularyService';
 import { translationService } from '../../services/TranslationService';
 import type { RootStackParamList } from '../../navigation/types';
 import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
+import { getFontStackForWebView } from '../../theme/typography';
 import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
 
@@ -408,6 +409,7 @@ const ArticleDetailScreen: React.FC = () => {
       content: article.content,
       fontSize: readingSettings.fontSize || 16,
       lineHeight: readingSettings.lineHeight || 1.8,
+      fontFamily: getFontStackForWebView(readingSettings.fontFamily || 'system'), // 新增：传递字体设置
       isDark,
       primaryColor: theme?.colors?.primary || '#3B82F6',
       // 传入元数据

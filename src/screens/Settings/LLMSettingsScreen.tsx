@@ -287,36 +287,37 @@ const LLMSettingsScreen: React.FC = () => {
           const isLast = index === options.length - 1;
           const iconName = option.icon || defaultIcon || 'circle';
           return (
-            <TouchableOpacity
-              key={option.value || option}
-              style={[
-                styles.optionItem,
-                isSelected && styles.selectedOption,
-                isLast && styles.lastOptionItem
-              ]}
-              onPress={() => onSelect(option.value || option)}
-            >
-              <View style={styles.optionLeft}>
-                {option.value && ['openai', 'anthropic', 'google', 'local', 'custom'].includes(option.value) ? (
-                  <BrandIcon 
-                    brand={option.value} 
-                    size={24} 
-                    color={theme?.colors?.primary} 
-                  />
-                ) : (
-                  <MaterialIcons name={iconName as any} size={24} color={theme?.colors?.primary} />
+            <React.Fragment key={option.value || option}>
+              <TouchableOpacity
+                style={[
+                  styles.optionItem,
+                  isSelected && styles.selectedOption,
+                ]}
+                onPress={() => onSelect(option.value || option)}
+              >
+                <View style={styles.optionLeft}>
+                  {option.value && ['openai', 'anthropic', 'google', 'local', 'custom'].includes(option.value) ? (
+                    <BrandIcon 
+                      brand={option.value} 
+                      size={24} 
+                      color={theme?.colors?.primary} 
+                    />
+                  ) : (
+                    <MaterialIcons name={iconName as any} size={24} color={theme?.colors?.primary} />
+                  )}
+                  <Text style={[
+                    styles.optionText,
+                    isSelected && styles.selectedText
+                  ]}>
+                    {option.label || option}
+                  </Text>
+                </View>
+                {isSelected && (
+                  <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />
                 )}
-                <Text style={[
-                  styles.optionText,
-                  isSelected && styles.selectedText
-                ]}>
-                  {option.label || option}
-                </Text>
-              </View>
-              {isSelected && (
-                <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />
-              )}
-            </TouchableOpacity>
+              </TouchableOpacity>
+              {!isLast && <View style={styles.optionDivider} />}
+            </React.Fragment>
           );
         })}
       </View>
@@ -599,58 +600,72 @@ const LLMSettingsScreen: React.FC = () => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    paddingHorizontal: 16,
   },
   content: {
-    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 12,
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      marginBottom: 10,
+      marginTop: -5,  // 👈 增加与上方容器的距离
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
   },
   card: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
     overflow: 'hidden',
+    // 投影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  optionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    marginHorizontal: 14,
   },
   optionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  lastOptionItem: {
-    borderBottomWidth: 0,
-  },
   selectedOption: {
     backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
   },
   optionText: {
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
     marginLeft: 12,
   },
   selectedText: {
     color: theme?.colors?.primary || '#6750A4',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   switchItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
   switchLeft: {
     flexDirection: 'row',
@@ -662,17 +677,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
   },
   switchTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
     marginBottom: 2,
   },
   switchDescription: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
   },
   inputContainer: {
-    padding: 16,
+    padding: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
   },
   inputHeader: {
     flexDirection: 'row',
@@ -680,9 +697,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 12,
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
     marginLeft: 12,
     flex: 1,
   },
@@ -690,40 +707,48 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     padding: 4,
   },
   textInput: {
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
+    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#F0F0F0'),
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    fontSize: 15,
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
     marginBottom: 8,
   },
   inputHint: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
   },
   testButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
   testButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
     marginLeft: 8,
     color: theme?.colors?.primary || '#6750A4',
   },
   statsCard: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
     overflow: 'hidden',
+    // 投影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
   },
   lastStatItem: {
     borderBottomWidth: 0,
@@ -733,14 +758,14 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
   },
   statLabel: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
     marginBottom: 2,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
   },
   saveButton: {
     backgroundColor: theme?.colors?.primary || '#6750A4',
@@ -748,11 +773,17 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 24,
+    // 投影效果
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
     marginLeft: 8,

@@ -201,7 +201,25 @@ export interface ArticleLoadingState {
   error?: string;
 }
 
-// 代理服务器配置类型
+// 单个代理服务器配置
+export interface ProxyServer {
+  id: string;                 // 唯一标识符
+  name: string;               // 自定义名称
+  serverUrl: string;          // 服务器地址，如 http://192.168.1.100:8080
+  token?: string;             // 认证 Token
+  createdAt: string;          // 创建时间
+  updatedAt: string;          // 更新时间
+  lastTestResult?: 'success' | 'fail';  // 最后测试结果
+  lastTestTime?: string;      // 最后测试时间
+}
+
+// 多代理服务器配置
+export interface ProxyServersConfig {
+  servers: ProxyServer[];     // 服务器列表
+  activeServerId: string | null;  // 当前激活的服务器 ID
+}
+
+// 代理服务器配置类型（保留兼容旧版本）
 export interface ProxyModeConfig {
   enabled: boolean;           // 是否启用代理模式
   serverUrl: string;          // 服务器地址，如 http://192.168.1.100:8080

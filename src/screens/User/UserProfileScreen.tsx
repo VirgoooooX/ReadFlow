@@ -229,12 +229,6 @@ const UserProfileScreen: React.FC = () => {
         />
         
         <ActionItem
-          icon="bug-report"
-          label="调试信息"
-          onPress={() => navigation.navigate('Debug')}
-        />
-        
-        <ActionItem
           icon="logout"
           label="退出登录"
           isDestructive

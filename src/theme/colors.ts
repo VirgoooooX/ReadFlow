@@ -400,7 +400,9 @@ export const getColorTokens = (isDark: boolean, customConfig?: CustomColorConfig
 
 export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
   // 默认主题 (系统蓝色)
-  default: null,
+  default: {
+    surface: '#FAF9FF', // 淡紫色卡片背景
+  },
 
   // 1. 商务蓝 - 单色系 (Monochromatic)
   // 主色、次色、第三色都在蓝色家族，提升专业感
@@ -408,6 +410,7 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#0061A4', // 深蓝
     secondary: '#535F70', // 蓝灰
     tertiary: '#6B5778', // 紫灰
+    surface: '#F8FAFF', // 淡蓝色卡片背景
   },
 
   // 2. 森林绿 - 邻近色系 (Analogous)
@@ -416,6 +419,7 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#006C4C', // 翠绿
     secondary: '#4D6357', // 灰绿
     tertiary: '#3E6373', // 蓝青色
+    surface: '#F6FBF8', // 淡绿色卡片背景
   },
 
   // 3. 赛博紫 - 对比色系
@@ -424,6 +428,7 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#7C3AED', // 紫色-600
     secondary: '#4C1D95', // 紫色-900
     tertiary: '#10B981', // 绿色-500
+    surface: '#FAF8FF', // 淡紫色卡片背景
   },
 
   // 4. 活力橙 - 暖色系
@@ -432,6 +437,7 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#EA580C', // 橙色-600
     secondary: '#78350F', // 褐色-900
     tertiary: '#0F766E', // 青色-700
+    surface: '#FFFAF6', // 淡橙色卡片背景
   },
 
   // 5. 热情红 - 红色系
@@ -440,6 +446,7 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#DC2626', // 红色-600
     secondary: '#7C2D12', // 橙色-900
     tertiary: '#0369A1', // 蓝色-600
+    surface: '#FFF8F8', // 淡红色卡片背景
   },
 
   // 6. 温柔粉 - 粉色系
@@ -448,6 +455,7 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#EC4899', // 粉色-500
     secondary: '#831843', // 粉色-900
     tertiary: '#7C3AED', // 紫色-600
+    surface: '#FFF8FB', // 淡粉色卡片背景
   },
 
   // 7. 沉稳青 - 冷色系
@@ -456,14 +464,16 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#0D9488', // 青色-600
     secondary: '#134E4A', // 青色-900
     tertiary: '#D97706', // 琥珀色-600
+    surface: '#F6FDFC', // 淡青色卡片背景
   },
 
-  // 8. 深邃靛 - 靛蓝系
-  // 靛蓝 + 紫色，高级神秘感
+  // 8. 深邃靖 - 靖蓝系
+  // 靖蓝 + 紫色，高级神秘感
   indigo: {
-    primary: '#4F46E5', // 靛蓝-600
-    secondary: '#312E81', // 靛蓝-900
+    primary: '#4F46E5', // 靖蓝-600
+    secondary: '#312E81', // 靖蓝-900
     tertiary: '#059669', // 绿色-600
+    surface: '#F8F8FF', // 淡靖蓝色卡片背景
   },
 
   // 9. 明亮黄 - 黄色系
@@ -472,21 +482,25 @@ export const themePresets: Record<ThemePreset, CustomColorConfig | null> = {
     primary: '#D97706', // 琥珀色-600
     secondary: '#78350F', // 褐色-900
     tertiary: '#0369A1', // 蓝色-600
+    surface: '#FFFDF6', // 淡黄色卡片背景
   },
 
-  // 10. 简约灰 - 中性系
-  // 专业灰色，低调优雅
+  // 10. 简约黑 - 中性系
+  // 深色主调，简洁低调
   gray: {
-    primary: '#4B5563', // 灰色-600
-    secondary: '#1F2937', // 灰色-900
+    primary: '#1F2937', // 灰色-800
+    secondary: '#374151', // 灰色-700
     tertiary: '#2563EB', // 蓝色-600
+    surface: '#F9FAFB', // 淡灰色卡片背景
   },
 
-  // 11. 深色护眼 - 专为夜间
+  // 11. 藏青蓝 - 冷静优雅
+  // 藏青色，沉稳而不失活力
   dark: {
-    primary: '#60A5FA', // 蓝色-400
-    secondary: '#9CA3AF', // 灰色-400
+    primary: '#0E7490', // 青色-600
+    secondary: '#155E75', // 青色-800
     tertiary: '#34D399', // 绿色-400
+    surface: '#F5FCFC', // 淡青色卡片背景
   },
 
   // 12. 自定义 (用户自己设置)
@@ -505,8 +519,8 @@ export const themePresetDescriptions: Record<ThemePreset, string> = {
   teal: '沉稳优雅主题，平衡冷暖，适合金融和商务应用',
   indigo: '深邃神秘主题，高级感十足，适合艺术和设计应用',
   yellow: '明亮活泼主题，阳光积极，适合教育和娱乐应用',
-  gray: '简约极简主题，低调专业，适合办公和效率工具',
-  dark: '深色护眼主题，舒适的夜间体验，适合所有应用',
+  gray: '简约低调主题，深色主调，适合追求极简风格',
+  dark: '藏青蓝主题，冷静优雅，适合阅读和专注',
   custom: '完全自定义主题，发挥你的创意和想象',
 };
 
@@ -522,7 +536,7 @@ export const themePresetTags: Record<ThemePreset, string[]> = {
   teal: ['沉稳', '优雅', '平衡', '专业'],
   indigo: ['深邃', '高级', '神秘', '艺术'],
   yellow: ['明亮', '活泼', '阳光', '积极'],
-  gray: ['简约', '极简', '低调', '专业'],
-  dark: ['护眼', '深色', '舒适', '夜间'],
+  gray: ['简约', '极简', '低调', '深色'],
+  dark: ['藏青', '冷静', '优雅', '专注'],
   custom: ['自定义', '个性', '创意', '唯一'],
 };

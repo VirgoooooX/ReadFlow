@@ -7,6 +7,7 @@ export interface HtmlTemplateOptions {
   content: string;
   fontSize?: number;
   lineHeight?: number;
+  fontFamily?: string;  // 新增：CSS font-family 字符串
   isDark?: boolean;
   primaryColor?: string;
   // 元数据字段
@@ -29,6 +30,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     content,
     fontSize = 17, // 稍微调大默认字号，適合英文阅读
     lineHeight = 1.6, // 1.6 是英文阅读的黄金行高
+    fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', // 默认系统字体
     isDark = false,
     primaryColor = '#3B82F6',
     title = '',
@@ -86,7 +88,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      font-family: ${fontFamily};
       font-size: ${fontSize}px;
       line-height: ${lineHeight};
       color: ${colors.text};
@@ -110,7 +112,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     }
 
     .main-title {
-      font-family: "Georgia", serif; /* 标题使用衬线体更有质感 */
+      font-family: ${fontFamily};
       font-size: 1.6em;
       font-weight: 700;
       line-height: 1.25;
@@ -125,7 +127,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       line-height: 1.5;
       margin: 0 0 16px 0;
       color: ${colors.secondaryText};
-      font-family: "Georgia", serif;
+      font-family: ${fontFamily};
     }
 
     .meta-info {
@@ -180,7 +182,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     
     /* 正文标题 */
     h1, h2, h3, h4, h5, h6 {
-      font-family: "Georgia", serif;
+      font-family: ${fontFamily};
       margin: 2em 0 0.8em 0;
       font-weight: 700;
       line-height: 1.3;

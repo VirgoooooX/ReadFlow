@@ -92,8 +92,8 @@ android {
         applicationId 'com.virgoooooox.ReadFlow'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 20601
-        versionName "2.6.1"
+        versionCode 30000
+        versionName "3.0.0"
     }
     signingConfigs {
         debug {

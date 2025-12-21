@@ -349,21 +349,40 @@ export class ArticleService {
     averageReadingTime: number;
   }> {
     try {
-      const [totalResult, readResult, favoriteResult, wordsResult] = await Promise.all([
-        this.databaseService.executeQuery('SELECT COUNT(*) as count FROM articles'),
-        this.databaseService.executeQuery('SELECT COUNT(*) as count FROM articles WHERE is_read = 1'),
-        this.databaseService.executeQuery('SELECT COUNT(*) as count FROM articles WHERE is_favorite = 1'),
-        this.databaseService.executeQuery('SELECT SUM(word_count) as total, SUM(CASE WHEN is_read = 1 THEN word_count ELSE 0 END) as read FROM articles'),
-      ]);
+      // 确保数据库已初始化
+      await this.databaseService.initializeDatabase();
+      
+      // 使用单个查询获取所有统计数据，避免多个并行查询导致连接冲突
+      const result = await this.databaseService.executeQuery(
+        `SELECT 
+          COUNT(*) as total_count,
+          SUM(CASE WHEN is_read = 1 THEN 1 ELSE 0 END) as read_count,
+          SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) as favorite_count,
+          SUM(word_count) as total_words,
+          SUM(CASE WHEN is_read = 1 THEN word_count ELSE 0 END) as read_words
+         FROM articles`
+      );
 
-      const totalWords = wordsResult[0]?.total || 0;
-      const readWords = wordsResult[0]?.read || 0;
-      const averageReadingTime = readWords > 0 ? Math.round(readWords / 200) : 0; // 假设每分钟200词
+      if (result.length === 0) {
+        return {
+          totalArticles: 0,
+          readArticles: 0,
+          favoriteArticles: 0,
+          totalWords: 0,
+          readWords: 0,
+          averageReadingTime: 0,
+        };
+      }
+
+      const row = result[0];
+      const totalWords = row.total_words || 0;
+      const readWords = row.read_words || 0;
+      const averageReadingTime = readWords > 0 ? Math.round(readWords / 200) : 0;
 
       return {
-        totalArticles: totalResult[0]?.count || 0,
-        readArticles: readResult[0]?.count || 0,
-        favoriteArticles: favoriteResult[0]?.count || 0,
+        totalArticles: row.total_count || 0,
+        readArticles: row.read_count || 0,
+        favoriteArticles: row.favorite_count || 0,
         totalWords,
         readWords,
         averageReadingTime,

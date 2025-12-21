@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ReadingSettings, AppSettings, AppError, ProxyModeConfig } from '../types';
+import { ReadingSettings, AppSettings, AppError, ProxyModeConfig, ProxyServer, ProxyServersConfig } from '../types';
 import { DatabaseService } from '../database/DatabaseService';
 
 export class SettingsService {
@@ -13,6 +13,7 @@ export class SettingsService {
     LLM_SETTINGS: 'llm_settings',
     THEME_SETTINGS: 'theme_settings',
     PROXY_MODE_CONFIG: 'proxy_mode_config',  // 新增：代理模式配置
+    PROXY_SERVERS_CONFIG: 'proxy_servers_config',  // 多代理服务器配置
   };
 
   private constructor() {
@@ -898,6 +899,173 @@ export class SettingsService {
       console.error('Error testing proxy server connection:', error);
       return false;
     }
+  }
+
+  // ==================== 多代理服务器管理 ====================
+
+  /**
+   * 获取多代理服务器配置
+   */
+  public async getProxyServersConfig(): Promise<ProxyServersConfig> {
+    try {
+      const configStr = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.PROXY_SERVERS_CONFIG);
+      if (configStr) {
+        return JSON.parse(configStr);
+      }
+      
+      // 迁移旧版本配置
+      const oldConfig = await this.getProxyModeConfig();
+      if (oldConfig.serverUrl) {
+        const migratedServer: ProxyServer = {
+          id: this.generateServerId(),
+          name: '默认服务器',
+          serverUrl: oldConfig.serverUrl,
+          token: oldConfig.token,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        const newConfig: ProxyServersConfig = {
+          servers: [migratedServer],
+          activeServerId: oldConfig.enabled ? migratedServer.id : null,
+        };
+        await this.saveProxyServersConfig(newConfig);
+        return newConfig;
+      }
+      
+      return { servers: [], activeServerId: null };
+    } catch (error) {
+      console.error('Error getting proxy servers config:', error);
+      return { servers: [], activeServerId: null };
+    }
+  }
+
+  /**
+   * 保存多代理服务器配置
+   */
+  public async saveProxyServersConfig(config: ProxyServersConfig): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        SettingsService.STORAGE_KEYS.PROXY_SERVERS_CONFIG,
+        JSON.stringify(config)
+      );
+      
+      // 同步到旧版配置以保持兼容性
+      const activeServer = config.servers.find(s => s.id === config.activeServerId);
+      if (activeServer) {
+        await this.saveProxyModeConfig({
+          enabled: true,
+          serverUrl: activeServer.serverUrl,
+          serverPassword: '',
+          token: activeServer.token,
+        });
+      } else {
+        await this.saveProxyModeConfig({
+          enabled: false,
+          serverUrl: '',
+          serverPassword: '',
+        });
+      }
+    } catch (error) {
+      console.error('Error saving proxy servers config:', error);
+      throw new AppError({
+        code: 'SETTINGS_SAVE_ERROR',
+        message: 'Failed to save proxy servers config',
+        details: error,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  /**
+   * 添加代理服务器
+   */
+  public async addProxyServer(server: Omit<ProxyServer, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProxyServer> {
+    const config = await this.getProxyServersConfig();
+    const now = new Date().toISOString();
+    const newServer: ProxyServer = {
+      ...server,
+      id: this.generateServerId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    config.servers.push(newServer);
+    await this.saveProxyServersConfig(config);
+    return newServer;
+  }
+
+  /**
+   * 更新代理服务器
+   */
+  public async updateProxyServer(serverId: string, updates: Partial<Omit<ProxyServer, 'id' | 'createdAt'>>): Promise<void> {
+    const config = await this.getProxyServersConfig();
+    const serverIndex = config.servers.findIndex(s => s.id === serverId);
+    if (serverIndex === -1) {
+      throw new AppError({
+        code: 'SERVER_NOT_FOUND',
+        message: `Server with id ${serverId} not found`,
+        timestamp: new Date(),
+      });
+    }
+    config.servers[serverIndex] = {
+      ...config.servers[serverIndex],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.saveProxyServersConfig(config);
+  }
+
+  /**
+   * 删除代理服务器
+   */
+  public async deleteProxyServer(serverId: string): Promise<void> {
+    const config = await this.getProxyServersConfig();
+    config.servers = config.servers.filter(s => s.id !== serverId);
+    if (config.activeServerId === serverId) {
+      config.activeServerId = null;
+    }
+    await this.saveProxyServersConfig(config);
+  }
+
+  /**
+   * 设置激活的代理服务器
+   */
+  public async setActiveProxyServer(serverId: string | null): Promise<void> {
+    const config = await this.getProxyServersConfig();
+    if (serverId && !config.servers.find(s => s.id === serverId)) {
+      throw new AppError({
+        code: 'SERVER_NOT_FOUND',
+        message: `Server with id ${serverId} not found`,
+        timestamp: new Date(),
+      });
+    }
+    config.activeServerId = serverId;
+    await this.saveProxyServersConfig(config);
+  }
+
+  /**
+   * 获取当前激活的代理服务器
+   */
+  public async getActiveProxyServer(): Promise<ProxyServer | null> {
+    const config = await this.getProxyServersConfig();
+    if (!config.activeServerId) return null;
+    return config.servers.find(s => s.id === config.activeServerId) || null;
+  }
+
+  /**
+   * 更新服务器测试结果
+   */
+  public async updateServerTestResult(serverId: string, result: 'success' | 'fail'): Promise<void> {
+    await this.updateProxyServer(serverId, {
+      lastTestResult: result,
+      lastTestTime: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * 生成服务器ID
+   */
+  private generateServerId(): string {
+    return `server_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
 }
