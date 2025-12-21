@@ -942,6 +942,24 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       let lastLogTime = 0;
       const THROTTLE_DELAY = 100; // 每 100ms 至少发送一次，保证数据新鲜
       
+      // 【新增】计算阅读进度百分比
+      function calculateProgress() {
+        const scrollTop = window.scrollY || window.pageYOffset;
+        const scrollHeight = document.documentElement.scrollHeight;
+        const clientHeight = window.innerHeight;
+        const maxScroll = scrollHeight - clientHeight;
+        if (maxScroll <= 0) return 100;
+        return Math.min(100, Math.round((scrollTop / maxScroll) * 100));
+      }
+      
+      // 【新增】检测是否到达底部
+      function isAtBottom() {
+        const scrollTop = window.scrollY || window.pageYOffset;
+        const scrollHeight = document.documentElement.scrollHeight;
+        const clientHeight = window.innerHeight;
+        return scrollHeight - scrollTop - clientHeight < 50; // 50px 容差
+      }
+      
       function sendScrollMessage() {
         let y = window.scrollY || window.pageYOffset;
         // 取整，防止小数精度问题
@@ -949,9 +967,15 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         // 修正：负数归零
         y = Math.max(0, y);
         
+        // 【新增】计算进度
+        const progress = calculateProgress();
+        const atBottom = isAtBottom();
+        
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'scroll',
-          scrollY: y
+          scrollY: y,
+          progress: progress,
+          isAtBottom: atBottom
         }));
       }
       
@@ -971,6 +995,41 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       window.addEventListener('touchend', function() {
         setTimeout(sendScrollMessage, 50);
       });
+      
+      // ==========================================
+      // 【新增】底部上滑检测 - 切换下一篇文章
+      // ==========================================
+      let swipeStartY = 0;
+      let swipeStartTime = 0;
+      let wasAtBottom = false;
+      
+      window.addEventListener('touchstart', function(e) {
+        swipeStartY = e.touches[0].clientY;
+        swipeStartTime = Date.now();
+        wasAtBottom = isAtBottom();
+      }, { passive: true });
+      
+      window.addEventListener('touchend', function(e) {
+        // 只有当触摸开始时已经在底部才检测上滑
+        if (!wasAtBottom) return;
+        
+        const endY = e.changedTouches[0].clientY;
+        const deltaY = swipeStartY - endY; // 向上滑动为正值
+        const deltaTime = Date.now() - swipeStartTime;
+        
+        // 条件：
+        // 1. 向上滑动距离超过 80px
+        // 2. 滑动速度超过 0.3 (px/ms)
+        // 3. 当前仍在底部
+        if (deltaY > 80 && deltaTime > 0 && deltaTime < 500 && isAtBottom()) {
+          const velocity = deltaY / deltaTime;
+          if (velocity > 0.3) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'swipeToNext'
+            }));
+          }
+        }
+      }, { passive: true });
 
       // 【新增】优化4：提供给 RN 调用的恢复位置函数
       window.restoreScrollPosition = function(y) {

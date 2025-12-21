@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, memo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, memo, useRef, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,33 @@ import type { Article } from '../../types';
 import CustomTabBar from '../../components/CustomTabBar';
 import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
 import { useSharedValue } from 'react-native-reanimated';
+
+// 【修改】全局状态，记录是否切换过文章
+export let lastViewedArticleId: number | null = null;
+export let didSwitchArticle: boolean = false; // 【新增】标记是否在详情页切换过文章
+export let initialArticleId: number | null = null; // 【新增】记录初始打开的文章ID
+
+export const setLastViewedArticleId = (id: number | null) => {
+  if (initialArticleId === null) {
+    // 第一次设置，记录初始文章
+    initialArticleId = id;
+    didSwitchArticle = false;
+  } else if (initialArticleId !== id) {
+    // 切换到了不同的文章
+    didSwitchArticle = true;
+  }
+  lastViewedArticleId = id;
+};
+
+export const getPendingScrollInfo = () => {
+  const shouldScroll = didSwitchArticle;
+  const articleId = lastViewedArticleId;
+  // 清空状态
+  didSwitchArticle = false;
+  initialArticleId = null;
+  lastViewedArticleId = null;
+  return { shouldScroll, articleId };
+};
 
 type Props = HomeStackScreenProps<'HomeMain'>;
 
@@ -85,7 +112,7 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme }: any) => {
   );
 });
 
-const ArticleListScene = memo(({
+const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponent({
   sourceName,
   articles,
   isRefreshing,
@@ -93,18 +120,55 @@ const ArticleListScene = memo(({
   onArticlePress,
   isDark,
   theme,
-  isActive
-}: any) => {
+  isActive,
+  // 【删除】不再需要 initialArticleId prop
+}: any, ref: React.Ref<any>) {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
+  const flatListRef = useRef<FlatList>(null);
+  const ITEM_HEIGHT = 110;
+  
+  // 【删除】不再需要跟踪可见项和滚动位置
+  
+  // 【删除】不再自动滚动，仅通过 scrollToArticleId 方法调用
+
+  // 【简化】直接滚动到指定文章，不做任何检查
+  React.useImperativeHandle(ref, () => ({
+    scrollToArticleId: (articleId: number) => {
+      const index = articles.findIndex((a: any) => a.id === articleId);
+      if (index < 0 || !flatListRef.current) return;
+      
+      console.log('[ArticleListScene] Scrolling to article:', articleId, 'index:', index);
+      // viewPosition: 0.5 让文章显示在屏幕中间
+      flatListRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
+    }
+  }), [articles]);
+  
+  // 【删除】不再需要 onViewableItemsChanged 和 handleScroll
 
   if (!isActive) return <View style={styles.lazyPlaceholder} />;
 
   return (
     <FlatList
+      ref={flatListRef}
       data={articles}
       keyExtractor={(item) => item.id.toString()}
       contentContainerStyle={styles.articleListContainer}
       showsVerticalScrollIndicator={false}
+      getItemLayout={(data, index) => ({
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      })}
+      onScrollToIndexFailed={(info) => {
+        // 处理滚动失败的情况
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({ 
+            index: info.index, 
+            animated: false,
+            viewPosition: 0.5,
+          });
+        }, 100);
+      }}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -138,20 +202,24 @@ const ArticleListScene = memo(({
       )}
     />
   );
-});
+}));
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const { rssSources, syncAllSources, syncSource } = useRSSSource();
   const { settings } = useReadingSettings();
   const tabContentRef = useRef<CustomTabContentHandle>(null);
+  const sceneRefsMap = useRef<Map<string, any>>(new Map()).current;
   const scrollX = useSharedValue(0);
   const { width: screenWidth } = useWindowDimensions();
+  const flatListRef = useRef<FlatList>(null);
+  const currentSourceRef = useRef<string>('');
 
   const [index, setIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
+  // 【删除】不再需要 scrollToArticleId 状态
 
   const styles = createStyles(isDark, theme);
 
@@ -177,7 +245,32 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   useEffect(() => { loadArticles(); }, []);
-  useFocusEffect(useCallback(() => { loadArticles(); }, []));
+  
+  // 【修改】返回时检查是否需要重定位
+  useFocusEffect(useCallback(() => { 
+    loadArticles();
+    
+    // 获取滚动信息
+    const { shouldScroll, articleId } = getPendingScrollInfo();
+    console.log('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId);
+    
+    if (shouldScroll && articleId !== null) {
+      console.log('[HomeScreen] Article was switched, scrolling to:', articleId);
+      // 直接调用当前 tab 的 scene ref 滚动
+      const currentRoute = routes[index];
+      if (currentRoute) {
+        const sceneRef = sceneRefsMap.get(currentRoute.key);
+        if (sceneRef) {
+          // 使用 setImmediate 确保 scene 已经渲染
+          setImmediate(() => {
+            sceneRef.scrollToArticleId(articleId);
+          });
+        }
+      }
+    } else {
+      console.log('[HomeScreen] No article switch, skip scrolling');
+    }
+  }, [index, routes, sceneRefsMap]));
 
   const getFilteredArticles = useCallback((tabIndex: number) => {
     const route = routes[tabIndex];
@@ -225,14 +318,30 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       return <View style={[styles.lazyPlaceholder, { width: screenWidth }]} />;
     }
 
+    const filteredArticles = getFilteredArticles(tabIndex);
+    const articleIds = filteredArticles.map(a => a.id);
+    
+    // 【修改】使用状态中的待滚动ID
+
     return (
       <View style={{ width: screenWidth }}>
         <ArticleListScene
+          ref={(ref: any) => {
+            if (ref) sceneRefsMap.set(route.key, ref);
+          }}
           sourceName={route.title}
-          articles={getFilteredArticles(tabIndex)}
+          articles={filteredArticles}
           isRefreshing={isRefreshing && index === tabIndex}
           onRefresh={handleRefresh}
-          onArticlePress={(id: number) => navigation.navigate('ArticleDetail', { articleId: id })}
+          onArticlePress={(id: number) => {
+            const currentIndex = articleIds.indexOf(id);
+            setLastViewedArticleId(id);
+            navigation.navigate('ArticleDetail', { 
+              articleId: id,
+              articleIds,
+              currentIndex: currentIndex >= 0 ? currentIndex : 0
+            });
+          }}
           isDark={isDark}
           theme={theme}
           isActive={true}

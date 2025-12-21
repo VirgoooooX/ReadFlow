@@ -5,7 +5,11 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 // 根堆栈参数列表
 export type RootStackParamList = {
   MainTabs: undefined;
-  ArticleDetail: { articleId: number };
+  ArticleDetail: { 
+    articleId: number;
+    articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
+    currentIndex?: number;  // 当前文章在列表中的索引
+  };
   VocabularyDetail: { entryId: number };
   RSSSourceDetail: { sourceId: number };
   AddRSSSource: undefined;
@@ -26,7 +30,11 @@ export type MainTabParamList = {
 // 首页堆栈参数列表
 export type HomeStackParamList = {
   HomeMain: undefined;
-  ArticleDetail: { articleId: number };
+  ArticleDetail: { 
+    articleId: number;
+    articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
+    currentIndex?: number;  // 当前文章在列表中的索引
+  };
   Search: { query?: string };
 };
 

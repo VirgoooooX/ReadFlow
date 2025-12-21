@@ -11,7 +11,9 @@ import {
   Animated, // 【新增】
   Easing,   // 【新增】
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient'; // 【新增】渐变背景
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics'; // 【新增】震动反馈
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { WebView } from 'react-native-webview';
@@ -29,15 +31,245 @@ import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
 import { getFontStackForWebView } from '../../theme/typography';
 import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
+import { setLastViewedArticleId } from '../Home/HomeScreen';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// 【优化】底部进度条组件 - 流体磁吸风格设计
+const BottomProgressBar: React.FC<{ 
+  progress: number; 
+  color: string; 
+  isDark: boolean;
+  showNextHint: boolean;
+  hasNextArticle: boolean;
+  isLastArticle: boolean;
+  noUnreadArticle: boolean;
+  theme: any;
+}> = ({ progress, color, isDark, showNextHint, hasNextArticle, isLastArticle, noUnreadArticle, theme }) => {
+  // 动画值
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const hintTranslateY = useRef(new Animated.Value(50)).current;  // 提示框位移：0 = 显示位置, 50 = 隐藏在底部
+  const hintOpacity = useRef(new Animated.Value(0)).current;
+  const arrowTranslateY = useRef(new Animated.Value(0)).current;  // 箭头呼吸动画
+  const arrowAnimRef = useRef<any>(null);
+  
+  // 进度条平滑动画
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 200,  // 稍微调慢一点，显得更稳重
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,  // width 属性不支持 native driver
+    }).start();
+  }, [progress]);
+
+  // 判断是否应显示提示
+  const shouldShowHint = progress >= 92 && (hasNextArticle || isLastArticle || noUnreadArticle);
+
+  // 启动箭头呼吸动画
+  const startArrowAnimation = useCallback(() => {
+    if (arrowAnimRef.current) {
+      arrowAnimRef.current.stop();
+    }
+    arrowAnimRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(arrowTranslateY, {
+          toValue: -4,
+          duration: 600,
+          easing: Easing.inOut(Easing.sin),  // 正弦缓动，自然呼吸感
+          useNativeDriver: true,
+        }),
+        Animated.timing(arrowTranslateY, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    arrowAnimRef.current.start();
+  }, []);
+
+  // 提示框进出场动画
+  useEffect(() => {
+    if (shouldShowHint) {
+      // 触发轻微震动反馈
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      Animated.parallel([
+        Animated.spring(hintTranslateY, {
+          toValue: 0,
+          friction: 6,    // 摩擦力：越小越弹
+          tension: 60,    // 张力：越大越快
+          useNativeDriver: true,
+        }),
+        Animated.timing(hintOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // 箭头呼吸动画（仅在有下一篇时）
+      if (hasNextArticle && !isLastArticle && !noUnreadArticle) {
+        startArrowAnimation();
+      }
+    } else {
+      // 离场动画：快速下沉
+      Animated.parallel([
+        Animated.timing(hintTranslateY, {
+          toValue: 40,  // 下沉距离
+          duration: 200,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(hintOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        arrowTranslateY.setValue(0);  // 重置箭头
+        if (arrowAnimRef.current) {
+          arrowAnimRef.current.stop();
+        }
+      });
+    }
+  }, [shouldShowHint, hasNextArticle]);
+
+  // 获取提示内容和样式
+  const getHintContent = () => {
+    if (isLastArticle) return { text: '已是最后一篇', icon: 'check-circle' };
+    if (noUnreadArticle) return { text: '无未读文章', icon: 'check-circle' };
+    return { text: '上滑阅读下一篇', icon: 'keyboard-double-arrow-up' };
+  };
+
+  const { text: hintText, icon } = getHintContent();
+  const isGray = isLastArticle || noUnreadArticle;
+
+  // 提示框背景色：灰色表示无交互，高亮主色表示有交互
+  const pillBackgroundColor = isGray
+    ? (isDark ? 'rgba(50,50,50,0.95)' : 'rgba(240,240,240,0.95)')
+    : (theme?.colors?.primary || color);
+
+  const pillTextColor = isGray
+    ? (isDark ? '#AAA' : '#666')
+    : '#FFF';
+
+  // Hex 转 RGBA 工具函数
+  const hexToRgba = (hex: string, alpha: number) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (result) {
+      return `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`;
+    }
+    return hex;
+  };
+
+  // 生成渐变色（从底部到顶部渐变透明）
+  const getGradientColors = () => {
+    if (color.startsWith('#')) {
+      return [
+        hexToRgba(color, 0.9),  // 底部 90% 不透明
+        hexToRgba(color, 0.4),  // 中间 40%
+        hexToRgba(color, 0),    // 顶部完全透明
+      ];
+    }
+    return [
+      'rgba(103, 80, 164, 0.9)',
+      'rgba(103, 80, 164, 0.4)',
+      'rgba(103, 80, 164, 0)',
+    ];
+  };
+  
+  return (
+    <View pointerEvents="none" style={{
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+    }}>
+      {/* A. 进度条（15px 高的渐变色块） */}
+      <View style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 15,
+        overflow: 'hidden',
+      }}>
+        <Animated.View style={{
+          height: '100%',
+          width: progressAnim.interpolate({
+            inputRange: [0, 100],
+            outputRange: ['0%', '100%'],
+          }),
+          overflow: 'hidden',
+        }}>
+          {/* 进度条使用渐变（从下往上渐变透明） */}
+          <LinearGradient
+            colors={getGradientColors() as any}
+            start={{ x: 0, y: 1 }}  // 从底部开始
+            end={{ x: 0, y: 0 }}    // 到顶部结束
+            style={{
+              flex: 1,
+              width: '100%',
+            }}
+          />
+        </Animated.View>
+      </View>
+
+      {/* B. 浮动提示胶囊（Pill） - 更显眼的样式 */}
+      <Animated.View style={{
+        position: 'absolute',
+        bottom: 30,  // 距离底部稍微高一点，避免遮挡进度条
+        alignSelf: 'center',
+        opacity: hintOpacity,
+        transform: [{ translateY: hintTranslateY }],
+      }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: pillBackgroundColor,
+          paddingVertical: 10,
+          paddingHorizontal: 20,
+          borderRadius: 30,
+          // 优质阴影
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+          elevation: 6,
+          borderWidth: isGray ? 1 : 0,
+          borderColor: 'rgba(0,0,0,0.05)',
+        }}>
+          {!isGray && (
+            <Animated.View style={{
+              transform: [{ translateY: arrowTranslateY }],
+              marginRight: 6,
+            }}>
+              <MaterialIcons name={icon as any} size={20} color={pillTextColor} />
+            </Animated.View>
+          )}
+          <Text style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: pillTextColor,
+          }}>
+            {hintText}
+          </Text>
+        </View>
+      </Animated.View>
+    </View>
+  );
+};
+
 const ArticleDetailScreen: React.FC = () => {
   const route = useRoute<ArticleDetailRouteProp>();
   const navigation = useNavigation();
-  const { articleId } = route.params;
+  const { articleId, articleIds, currentIndex } = route.params;
   const { theme, isDark } = useThemeContext();
   const {
     settings: readingSettings,
@@ -75,6 +307,17 @@ const ArticleDetailScreen: React.FC = () => {
   const currentScrollYRef = useRef(0);
   // 记录是否需要保存（只有滚动过才保存）
   const hasScrolledRef = useRef(false);
+  
+  // 【新增】阅读进度和底部状态
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [isAtBottom, setIsAtBottom] = useState(false);
+  const [showNextHint, setShowNextHint] = useState(false);
+  const [showLastArticleHint, setShowLastArticleHint] = useState(false); // 【新增】已是最后一篇提示
+  const [noUnreadArticle, setNoUnreadArticle] = useState(false); // 【新增】无未读文章提示
+  const [nextUnreadIndex, setNextUnreadIndex] = useState<number | null>(null); // 【新增】下一篇未读文章索引
+  
+  // 【修改】检查是否有下一篇未读文章
+  const hasNextArticle = nextUnreadIndex !== null;
 
   const styles = createStyles(isDark, theme, readingSettings);
 
@@ -106,6 +349,34 @@ const ArticleDetailScreen: React.FC = () => {
         // 自动标记为已读
         if (articleData && !articleData.isRead) {
           articleService.markAsRead(articleId);
+        }
+        
+        // 【新增】查找下一篇未读文章
+        if (articleIds && currentIndex !== undefined) {
+          let foundNextUnread = false;
+          for (let i = currentIndex + 1; i < articleIds.length; i++) {
+            try {
+              const nextArticle = await articleService.getArticleById(articleIds[i]);
+              if (nextArticle && !nextArticle.isRead) {
+                setNextUnreadIndex(i);
+                foundNextUnread = true;
+                console.log('[ArticleDetail] Found next unread article at index:', i);
+                break;
+              }
+            } catch (e) {
+              console.log('[ArticleDetail] Failed to check article:', articleIds[i]);
+            }
+          }
+          if (!foundNextUnread) {
+            setNextUnreadIndex(null);
+            // 判断是否是最后一篇文章
+            if (currentIndex >= articleIds.length - 1) {
+              setShowLastArticleHint(true);
+            } else {
+              setNoUnreadArticle(true);
+            }
+            console.log('[ArticleDetail] No more unread articles');
+          }
         }
       } catch (error) {
         console.error('Failed to load article data:', error);
@@ -218,6 +489,34 @@ const ArticleDetailScreen: React.FC = () => {
       setTransLoading(false);
     }
   };
+
+  /**
+   * 【修改】导航到下一篇未读文章
+   */
+  const navigateToNextArticle = useCallback(() => {
+    if (nextUnreadIndex === null || !articleIds) {
+      // 没有未读文章
+      setNoUnreadArticle(true);
+      setTimeout(() => setNoUnreadArticle(false), 2000);
+      return;
+    }
+    
+    // 触发震动反馈
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    const nextArticleId = articleIds[nextUnreadIndex];
+    
+    // 【新增】更新最后查看的文章ID，用于返回时滚动定位
+    setLastViewedArticleId(nextArticleId);
+    
+    // 使用 replace 替代当前页面，这样返回时直接回到列表
+    (navigation as any).replace('ArticleDetail', {
+      articleId: nextArticleId,
+      articleIds,
+      currentIndex: nextUnreadIndex,
+      isNextArticle: true,
+    });
+  }, [nextUnreadIndex, articleIds, navigation]);
 
   /**
    * 添加到单词本
@@ -360,13 +659,40 @@ const ArticleDetailScreen: React.FC = () => {
             } else if (data.scrollY <= 60 && showRefTitle) {
               setShowRefTitle(false);
             }
+            
+            // 【新增】更新阅读进度
+            if (data.progress !== undefined) {
+              setReadingProgress(data.progress);
+            }
+            
+            // 【新增】更新底部状态，显示“上滑查看下一篇”提示
+            if (data.isAtBottom !== undefined) {
+              setIsAtBottom(data.isAtBottom);
+              if (data.isAtBottom && hasNextArticle) {
+                setShowNextHint(true);
+              } else {
+                setShowNextHint(false);
+              }
+            }
+          }
+          break;
+        
+        // 【新增】处理底部上滑切换下一篇
+        case 'swipeToNext':
+          console.log('[ArticleDetail] Swipe to next article triggered');
+          if (hasNextArticle) {
+            navigateToNextArticle();
+          } else {
+            // 【新增】如果是最后一篇，显示提示后 2 秒消失
+            setShowLastArticleHint(true);
+            setTimeout(() => setShowLastArticleHint(false), 2000);
           }
           break;
       }
     } catch (error) {
       console.error('Failed to parse WebView message:', error);
     }
-  }, [handleWordPress, handleSentenceDoubleTap]);
+  }, [handleWordPress, handleSentenceDoubleTap, showRefTitle, hasNextArticle, navigateToNextArticle]);
 
   // 【关键修改】在组件卸载（用户退出页面）时，统一保存一次
   useEffect(() => {
@@ -569,6 +895,18 @@ const ArticleDetailScreen: React.FC = () => {
         swipeToCloseEnabled={true}
         doubleTapToZoomEnabled={true}
       />
+      
+      {/* 【修改】底部进度条 - 带联动动画 */}
+      <BottomProgressBar 
+        progress={readingProgress}
+        color={theme?.colors?.primary || '#3B82F6'}
+        isDark={isDark}
+        showNextHint={showNextHint}
+        hasNextArticle={hasNextArticle || false}
+        isLastArticle={showLastArticleHint}
+        noUnreadArticle={noUnreadArticle}
+        theme={theme}
+      />
     </View>
   );
 };
@@ -636,7 +974,7 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
     },
     headerRight: {
       width: 48,
-    }
+    },
   });
 
 export default ArticleDetailScreen;
