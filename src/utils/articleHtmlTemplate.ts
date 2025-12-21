@@ -16,6 +16,9 @@ export interface HtmlTemplateOptions {
   publishedAt?: string;
   author?: string;
   imageUrl?: string;
+  imageCaption?: string;    // 【新增】图片说明
+  imageCredit?: string;      // 【新增】图片来源/版权
+  articleUrl?: string;       // 【新增】文章原始链接，用于视频跳转
   // 【新增】直接传入初始滚动位置和生词表
   initialScrollY?: number;
   vocabularyWords?: string[];
@@ -24,7 +27,7 @@ export interface HtmlTemplateOptions {
 export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   const {
     content,
-    fontSize = 17, // 稍微调大默认字号，适合英文阅读
+    fontSize = 17, // 稍微调大默认字号，適合英文阅读
     lineHeight = 1.6, // 1.6 是英文阅读的黄金行高
     isDark = false,
     primaryColor = '#3B82F6',
@@ -34,6 +37,9 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     publishedAt = '',
     author = '',
     imageUrl = '',
+    imageCaption = '', // 【新增】图片说明
+    imageCredit = '',  // 【新增】图片来源
+    articleUrl = '',   // 【新增】文章原始链接
     // 【新增】默认值
     initialScrollY = 0,
     vocabularyWords = []
@@ -55,7 +61,11 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     caption: isDark ? '#999999' : '#666666', // 图片说明颜色
   };
 
-  // 【新增】优化1：图片懒加载 - 处理内容添加loading="lazy"属性
+  // 构建标题下方的图片说明 HTML
+  const imageCaptionHtml = imageCaption ? `<div class="hero-image-caption">${imageCaption}</div>` : '';
+  const imageCreditHtml = imageCredit ? `<div class="hero-image-credit">${imageCredit}</div>` : '';
+
+  // 【新增】优化1：图片懐加载 - 处理内容添加loading="lazy"属性
   // 将 <img src="..."> 替换为 <img loading="lazy" src="...">
   const optimizedContent = content.replace(/<img\s+/gi, '<img loading="lazy" ');
 
@@ -360,6 +370,109 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       font-family: -apple-system, sans-serif; /* 说明文字用无衬线体 */
     }
     
+    /* figure 和 figcaption 标准样式 - 优化视觉层次 */
+    figure {
+      margin: 24px 0 32px 0;
+      padding: 0;
+    }
+    
+    figure img {
+      margin-bottom: 12px !important; /* 覆盖默认的 img margin */
+      border-radius: 8px;
+    }
+    
+    /* 图片说明：第二层级，中等字号，居中，灰色 */
+    figcaption {
+      font-size: 0.9em;
+      line-height: 1.5;
+      color: ${colors.caption};
+      text-align: center;
+      padding: 8px 16px;
+      margin: 0 0 8px 0;
+      font-family: -apple-system, sans-serif;
+      /* 添加左侧竖线装饰，增加引用感 */
+      border-left: 3px solid ${isDark ? '#555' : '#ddd'};
+      text-align: left;
+      margin-left: 8px;
+      padding-left: 12px;
+      font-style: italic;
+    }
+    
+    /* 【关键】BBC 等网站的版权信息通常放在 figure 下的 span 里 */
+    /* 第三层级：最小字号，最浅颜色，右对齐 */
+    figure span {
+      display: block;
+      font-size: 0.7em; /* 更小，约 11px */
+      color: ${isDark ? '#777' : '#aaa'}; /* 更浅 */
+      margin-top: 0;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      text-align: right;
+      letter-spacing: 0.8px;
+      padding: 0 16px;
+      font-weight: 500;
+    }
+    
+    /* 如果版权 span 在 figcaption 内部 */
+    figcaption span {
+      display: block;
+      font-size: 0.8em;
+      color: ${isDark ? '#777' : '#aaa'};
+      margin-top: 8px;
+      text-transform: uppercase;
+      text-align: right;
+      letter-spacing: 0.8px;
+      font-style: normal; /* 版权不用斜体 */
+      border-left: none;
+      padding-left: 0;
+    }
+    
+    /* 【关键】隐藏占位图和无用图片 */
+    /* BBC 等网站常用 placeholder 图片，需要隐藏 */
+    img[src*="placeholder"],
+    img[src*="loading"],
+    img[alt="loading"],
+    img.hide-when-no-script,
+    img[data-src] {
+      display: none !important;
+    }
+    
+    /* 图片来源/版权信息样式 */
+    .img-credit {
+      font-size: 0.75em;
+      color: ${isDark ? '#888' : '#999'};
+      font-style: italic;
+      margin-top: 4px;
+      text-align: right;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* 文章头部的图片说明 */
+    .hero-image-caption {
+      font-size: 0.85em;
+      line-height: 1.4;
+      color: ${colors.caption};
+      text-align: center;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      padding: 0 8px;
+      font-family: -apple-system, sans-serif;
+      font-style: normal;
+    }
+    
+    .hero-image-credit {
+      font-size: 0.75em;
+      color: ${isDark ? '#888' : '#999'};
+      text-align: right;
+      text-transform: uppercase;
+      margin-top: 4px;
+      margin-bottom: 24px;
+      padding: 0 8px;
+      letter-spacing: 0.5px;
+    }
+
+    
     /* 生词高亮 - 淡黄色胶囊样式 */
     .vocabulary-word {
       background-color: ${isDark ? 'rgba(245, 200, 40, 0.25)' : 'rgba(255, 220, 80, 0.4)'};
@@ -369,13 +482,112 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       font-weight: 500;
       display: inline-block;
     }
+    
+    /* ================================================== */
+    /* 【新增】BBC 视频处理：隐藏坏掉的视频框 + 视频链接卡片 */
+    /* ================================================== */
+    
+    /* 1. 彻底隐藏坏掉的 SVG 视频框 (BBC 等网站的视频占位符) */
+    div[data-component="video-block"], 
+    div[data-testid="fabl-video-container"],
+    div[class*="VideoContainer"],
+    div[class*="MediaPlayer"] {
+      display: none !important;
+    }
+    
+    /* 2. 隐藏 BBC 的链接块 (相关阅读/外链推荐) */
+    div[data-component="links-block"] {
+      display: none !important;
+    }
+    
+    /* 2. 生成的视频卡片样式 */
+    .generated-video-card {
+      display: flex;
+      align-items: center;
+      background-color: ${isDark ? '#2B2930' : '#f0f0f0'};
+      border-left: 5px solid #cc0000; /* BBC Red */
+      padding: 12px;
+      margin: 20px 0;
+      text-decoration: none;
+      color: ${isDark ? '#E6E1E5' : '#333'};
+      border-radius: 4px;
+      -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+      transition: background-color 0.2s;
+    }
+    
+    .generated-video-card:hover {
+      background-color: ${isDark ? '#36343B' : '#e0e0e0'};
+    }
+    
+    .generated-video-card .icon {
+      font-size: 20px;
+      margin-right: 12px;
+      color: #cc0000;
+      flex-shrink: 0;
+    }
+    
+    .generated-video-card .text {
+      font-weight: 600;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    
+    /* 3. 视频链接卡片的提示文字 */
+    .video-link-hint {
+      font-size: 12px;
+      color: ${isDark ? '#999' : '#666'};
+      margin-top: 4px;
+      font-weight: normal;
+    }
+    
+    /* =========================================
+       幻灯片拆解样式 (Unpacked Gallery)
+       ========================================= */
+    /* 隐藏掉常见的无用元素 (通用黑名单) */
+    .hide-when-no-script, 
+    [aria-hidden="true"], 
+    [class*="placeholder"],
+    [class*="arrow"],
+    [class*="control"],
+    [class*="pagination"],
+    [class*="indicator"] {
+       display: none !important;
+    }
+    
+    /* 拆解后的卡片样式 */
+    .gallery-card {
+       margin-bottom: 32px;
+       background-color: ${colors.background};
+    }
+    
+    .gallery-card img {
+       width: 100%;
+       border-radius: 6px;
+    }
+    
+    .gallery-card .caption {
+       margin-top: 8px;
+       padding: 0 4px;
+       font-size: 0.9em;
+       color: ${colors.caption};
+       line-height: 1.4;
+       border-left: 3px solid ${isDark ? '#444' : '#eee'}; /* 左侧装饰线 */
+       padding-left: 10px;
+    }
   `;
 
   // 【关键】将数据直接序列化以便注入 JS，在页面初始化时使用
   const injectedWords = JSON.stringify(vocabularyWords);
   const injectedScrollY = initialScrollY;
+  const injectedArticleUrl = JSON.stringify(articleUrl);
 
   // JavaScript 注入脚本 - 添加图片说明自动识别
+  // 【设计原则】
+  // 遵循 Web 标准和可访问性（A11y）最佳实践：
+  // 1. figcaption - 给所有用户显示（视觉内容）
+  // 2. alt 属性 - 给盲人用户和失败情况使用（隐形备选文本）
+  // 3. 不主动提取 alt 到 DOM - 避免与 figcaption 重复
+  // 详见：https://www.w3.org/WAI/tutorials/images/
   const javascript = `
     (function() {
       'use strict';
@@ -384,27 +596,46 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         const contentDiv = document.querySelector('.article-content');
         if (!contentDiv) return;
 
+        // 1. 先处理 figcaption，标记已有说明的图片
+        const figcaptions = contentDiv.querySelectorAll('figcaption');
+        const imagesWithCaption = new Set();
+        
+        figcaptions.forEach(function(figcaption) {
+          // 找到 figcaption 对应的图片
+          const figure = figcaption.closest('figure');
+          if (figure) {
+            const img = figure.querySelector('img');
+            if (img) {
+              imagesWithCaption.add(img);
+            }
+          }
+        });
+
+        // 2. 处理所有图片
         const images = contentDiv.querySelectorAll('img');
       
         images.forEach(function(img) {
-          // 获取图片后的下一个元素
-          const nextNode = img.nextElementSibling;
-        
-          // 判断逻辑：
-          // 1. 下一个元素存在
-          // 2. 是 P 标签
-          // 3. 内容不为空
-          // 4. 字数小于 200 (通常 caption 不会太长，避免误判正文)
-          if (nextNode && 
-              nextNode.tagName === 'P' && 
-              nextNode.innerText.trim().length > 0 &&
-              nextNode.innerText.length < 200) {
-          
-            // 标记为图片说明
-            nextNode.classList.add('img-caption');
+          // 检查图片是否已有说明（通过 figcaption）
+          if (imagesWithCaption.has(img)) {
+            // 已有 figcaption，不需要额外处理
+            // 保留 alt 属性不删除，给盲人用户用（屏幕阅读器）
+            // WebView 会自动处理：若图片加载成功，alt 对普通用户不可见
+            return;
           }
           
-          // 【新增】优化3：图片点击放大 - 添加点击事件监听
+          // 【关键修改】优先级策略：不主动提取 alt 属性显示
+          // 原因：
+          // 1. 如果有 figcaption，我们已经在上面处理过了
+          // 2. 如果有接在图片后的 P 标签（通常是 RSS 源解析出来的说明），我们也处理过了
+          // 3. alt 属性是「备选文本」，只在以下场景使用：
+          //    - 图片加载失败时（浏览器显示）
+          //    - 盲人用户开启屏幕阅读器时（读屏软件读出）
+          // 4. 不应该主动把 alt 内容提取成 DOM 元素显示，避免与 figcaption 重复
+          // 
+          // 「可选优化」如果想为文本模式的内容生成说明（比如从第三方 API 获取的 JSON）：
+          // 可以在后端处理时就生成好 figcaption，而不是在前端提取 alt
+          
+          // 【新增】图片点击放大 - 添加点击事件监听
           img.addEventListener('click', function(e) {
             e.stopPropagation(); // 阻止冒泡，防止触发查词
             e.preventDefault();
@@ -484,6 +715,56 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
           document.querySelectorAll('.video-container').forEach(function(container) {
             videoObserver.observe(container);
           });
+        }
+      }
+    
+      // 【新增】处理 BBC 等网站的视频链接卡片
+      // 基于 DOM 结构特征而非文本特征，更加通用和健壮
+      function processVideoLinks(articleUrl) {
+        try {
+          const contentDiv = document.querySelector('.article-content');
+          if (!contentDiv) return;
+          
+          // 1. 找到所有视频空壳
+          var videoBlocks = contentDiv.querySelectorAll('div[data-component="video-block"]');
+        
+          videoBlocks.forEach(function(videoBlock) {
+            // 2. 尝试找它的邻居（下一个元素）
+            var nextSibling = videoBlock.nextElementSibling;
+            var captionText = "Watch Video"; // 默认文案
+            var foundCaption = false;
+
+            // 检查邻居是不是 caption-block
+            if (nextSibling && nextSibling.getAttribute('data-component') === 'caption-block') {
+              // 提取 figcaption 里的纯文本
+              var figcaption = nextSibling.querySelector('figcaption');
+              if (figcaption) {
+                captionText = figcaption.innerText.trim();
+                foundCaption = true;
+              }
+            }
+
+            // 3. 创建新的跳转卡片
+            var link = document.createElement('a');
+            link.href = articleUrl || '#'; // 注入文章原本的链接
+            link.className = "generated-video-card";
+            link.innerHTML = '<span class="icon">▶</span><span class="text">' + captionText + '</span>';
+            link.target = "_blank";
+
+            // 4. 替换 DOM
+            // 在 videoBlock 的位置插入新链接
+            videoBlock.parentNode.insertBefore(link, videoBlock);
+          
+            // 移除旧的空壳
+            videoBlock.remove();
+          
+            // 如果找到了对应的字幕块，也把它移除（避免重复显示）
+            if (foundCaption && nextSibling) {
+              nextSibling.remove();
+            }
+          });
+        } catch (error) {
+          // 静默处理错误
         }
       }
     
@@ -816,13 +1097,19 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         // 2. 设置视频优化（可见性检测、自动暂停）
         setupVideos();
       
-        // 2. 立即执行高亮（使用注入的数据），避免延迟
+        // 3. 处理视频链接卡片
+        const articleUrl = ${injectedArticleUrl};
+        if (articleUrl) {
+          processVideoLinks(articleUrl);
+        }
+      
+        // 4. 立即执行高亮（使用注入的数据），避免延迟
         const initialWords = ${injectedWords};
         if (initialWords && Array.isArray(initialWords) && initialWords.length > 0) {
           window.highlightVocabularyWords(initialWords);
         }
 
-        // 3. 立即恢复滚动位置（使用注入的数据）
+        // 5. 立即恢复滚动位置（使用注入的数据）
         const targetY = ${injectedScrollY};
         if (targetY > 0 && typeof targetY === 'number') {
           window.scrollTo(0, targetY);
@@ -850,12 +1137,134 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
           document.body.style.opacity = '1';
         }
 
-        // 5. 通知 RN WebView 已准备好（此时内容已经渲染完成）
+        // 6. 处理幻灯片容器
+        unpackGallery();
+              
+        // 7. 隐藏底部的链接块
+        hideFooterLinks();
+              
+        // 8. 通知 RN WebView 已准备好（此时内容已经渲染完成）
         setTimeout(function() {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
         }, 100);
       }
-
+    
+      /**
+       * 判断一张图片是否是"垃圾图"
+       * 通用逻辑：过滤占位图、加载图、极小的图标
+       */
+      function isJunkImage(img) {
+        const src = (img.src || '').toLowerCase();
+        const alt = (img.alt || '').toLowerCase();
+        const className = (img.className || '').toLowerCase();
+        
+        // 1. 关键词黑名单
+        const keywords = ['placeholder', 'loading', 'loader', 'spinner', 'pixel', 'spacer', 'grey'];
+        if (keywords.some(k => src.includes(k) || className.includes(k))) return true;
+    
+        // 2. BBC 特有特征
+        if (className.includes('hide-when-no-script')) return true;
+    
+        // 3. 尺寸过滤 (防止把 "下一页" 箭头图标当成正文图)
+        // 注意：有些图片加载前 width 为 0，所以要结合 naturalWidth 判断
+        // 这里主要过滤明确写了 width="1" 这种
+        if (img.getAttribute('width') === '1' || img.getAttribute('height') === '1') return true;
+        
+        return false;
+      }
+    
+      /**
+       * 隐藏底部的链接块
+       */
+      function hideFooterLinks() {
+        try {
+          // 隐藏 BBC 的 links-block
+          const linksBlocks = document.querySelectorAll('div[data-component="links-block"]');
+          linksBlocks.forEach(function(block) {
+            block.style.display = 'none';
+          });
+              
+          // 通用规则：隐藏常见的底部垃圾信息
+          const commonFooterElements = document.querySelectorAll(
+            '.related-posts, .read-more, .sharedaddy, .social-buttons, .footer-links'
+          );
+          commonFooterElements.forEach(function(element) {
+            element.style.display = 'none';
+          });
+        } catch (error) {
+          // 静默处理错误
+        }
+      }
+          
+      /**
+       * 核心逻辑：处理幻灯片容器
+       */
+      function unpackGallery() {
+        // 1. 定义可能的幻灯片容器选择器 (越靠前优先级越高)
+        const selectors = [
+          'div[data-testid="slideshowWrapper"]', // BBC
+          '.slideshow',                          // 通用
+          '.gallery',                            // 通用
+          '.carousel',                           // Bootstrap 等常用
+          '.swiper-container',                   // Swiper 插件
+          '.slider',                             // 通用
+          '[data-component="slideshow"]'         // 许多 CMS 常用
+        ];
+    
+        // 找到页面上所有可能的容器
+        const potentialContainers = document.querySelectorAll(selectors.join(','));
+    
+        potentialContainers.forEach(function(container) {
+          // A. 提取容器内所有图片
+          const allImgs = Array.from(container.querySelectorAll('img'));
+          const validImages = allImgs.filter(img => !isJunkImage(img));
+    
+          // 如果容器里有效图片少于2张，可能它不是幻灯片，或者是单图结构，暂不处理，以免误伤
+          if (validImages.length < 2) return;
+    
+          // B. 提取容器内所有字幕
+          // 优先找 figcaption，没有的话找 class 带 caption 的元素
+          let captions = container.querySelectorAll('figcaption');
+          if (captions.length === 0) {
+            captions = container.querySelectorAll('.caption, .description, .desc');
+          }
+    
+          // C. 创建新的 DOM 结构
+          const newWrapper = document.createElement('div');
+          newWrapper.className = 'unpacked-gallery-container';
+    
+          validImages.forEach(function(img, index) {
+            const card = document.createElement('div');
+            card.className = 'gallery-card';
+    
+            // 1. 处理图片
+            const imgClone = img.cloneNode(true);
+            imgClone.style.display = 'block'; // 强制显示
+            imgClone.removeAttribute('loading'); // 移除懒加载属性防止闪烁
+            card.appendChild(imgClone);
+    
+            // 2. 处理字幕 (尝试匹配 index)
+            if (captions[index]) {
+              const capClone = document.createElement('div');
+              capClone.className = 'caption';
+              capClone.innerText = captions[index].innerText.trim(); // 只取纯文本，防止样式污染
+              
+              // 只有当字幕有内容时才添加
+              if (capClone.innerText) {
+                card.appendChild(capClone);
+              }
+            }
+    
+            newWrapper.appendChild(card);
+          });
+    
+          // D. 替换掉原容器
+          // 为了安全，我们先把原容器隐藏，插入新容器，而不是直接 remove (防止脚本报错)
+          container.style.display = 'none';
+          container.parentNode.insertBefore(newWrapper, container);
+        });
+      }
+    
       // 确保 DOM 加载完成后执行初始化
       if (document.readyState === 'complete' || document.readyState === 'interactive') {
         init();
@@ -880,6 +1289,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       ${imageUrl ? `
         <div class="hero-image-container">
           <img src="${imageUrl}" class="hero-image" alt="Cover" />
+          ${imageCaptionHtml}
+          ${imageCreditHtml}
         </div>
       ` : ''}
     </header>

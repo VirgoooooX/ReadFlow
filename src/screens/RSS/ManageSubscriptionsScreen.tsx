@@ -267,16 +267,23 @@ const ManageSubscriptionsScreen: React.FC = () => {
                         </Text>
                       </View>
                     </View>
-                    <View style={[
-                      styles.statusBadge,
-                      source.isActive ? styles.activeBadge : styles.inactiveBadge
-                    ]}>
-                      <Text style={[
-                        styles.statusText,
-                        source.isActive ? styles.activeText : styles.inactiveText
+                    <View style={styles.badgesRow}>
+                      {source.sourceMode === 'proxy' && (
+                        <View style={[styles.statusBadge, styles.proxyBadge]}>
+                          <Text style={[styles.statusText, styles.proxyText]}>代理</Text>
+                        </View>
+                      )}
+                      <View style={[
+                        styles.statusBadge,
+                        source.isActive ? styles.activeBadge : styles.inactiveBadge
                       ]}>
-                        {source.isActive ? '活跃' : '暂停'}
-                      </Text>
+                        <Text style={[
+                          styles.statusText,
+                          source.isActive ? styles.activeText : styles.inactiveText
+                        ]}>
+                          {source.isActive ? '活跃' : '暂停'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
@@ -533,6 +540,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   sourceNameContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -596,6 +608,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+  },
+  proxyBadge: {
+    backgroundColor: isDark ? '#2D2640' : '#EDE9FE',
+  },
+  proxyText: {
+    color: '#8B5CF6',
   },
   sourceStats: {
     flexDirection: 'row',

@@ -417,6 +417,11 @@ const ArticleDetailScreen: React.FC = () => {
       publishedAt: formatDate(article.publishedAt),
       author: article.author,
       imageUrl: finalImageUrl,
+      // 【新增】传入图片说明和图片来源
+      imageCaption: article.imageCaption,
+      imageCredit: article.imageCredit,
+      // 【新增】传入文章原始链接，用于视频跳转
+      articleUrl: article.url,
       // 【新增】直接将初始滚动位置和生词表注入 HTML
       // 这样 HTML 初始化时就能直接处理，无需等待 WebView ready 后再注入
       initialScrollY,

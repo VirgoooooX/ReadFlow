@@ -734,19 +734,13 @@ export class SettingsService {
     try {
       const configStr = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.PROXY_MODE_CONFIG);
       if (!configStr) {
-        console.log('[SettingsService.getProxyModeConfig] 未找到配置，返回默认');
         return { 
           enabled: false, 
           serverUrl: '', 
           serverPassword: '' 
         };
       }
-      const parsed = JSON.parse(configStr);
-      console.log('[SettingsService.getProxyModeConfig] 配置:');
-      console.log(`  - enabled: ${parsed.enabled}`);
-      console.log(`  - serverUrl: ${parsed.serverUrl || '未设置'}`);
-      console.log(`  - token: ${parsed.token ? '✅' : '❌'}`);
-      return parsed;
+      return JSON.parse(configStr);
     } catch (error) {
       console.error('Error getting proxy mode config:', error);
       return { 
