@@ -67,28 +67,29 @@ function App(): React.JSX.Element {
 
         console.log('✅ 核心服务初始化完成');
         
-        // 如果启用了代理模式，尝试同步单词本和文章
-        try {
-          const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-          if (proxyConfig.enabled && proxyConfig.token) {
-            console.log('🔄 开始同步单词本...');
-            const vocabService = VocabularyService.getInstance();
-            // 异步同步单词本，不阻塞启动
-            vocabService.syncToProxyServer().catch(err => {
-              console.warn('⚠️ 单词本同步失败:', err);
-            });
-            
-            // 异步同步文章，不阻塞启动
-            console.log('📰 开始同步文章...');
-            RSSService.getInstance().refreshAllSources().then(result => {
-              console.log(`✅ 文章同步完成: 成功 ${result.success}, 失败 ${result.failed}, 新文章 ${result.totalArticles}`);
-            }).catch(err => {
-              console.warn('⚠️ 文章同步失败:', err);
-            });
-          }
-        } catch (syncError) {
-          console.warn('⚠️ 同步检查失败:', syncError);
-        }
+        // 【暂时禁用】如果启用了代理模式，尝试同步单词本和文章
+        // 保留代码逻辑，但暂不自动调用，等后续手动触发
+        // try {
+        //   const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+        //   if (proxyConfig.enabled && proxyConfig.token) {
+        //     console.log('🔄 开始同步单词本...');
+        //     const vocabService = VocabularyService.getInstance();
+        //     // 异步同步单词本，不阻塞启动
+        //     vocabService.syncToProxyServer().catch(err => {
+        //       console.warn('⚠️ 单词本同步失败:', err);
+        //     });
+        //     
+        //     // 异步同步文章，不阻塞启动
+        //     console.log('📰 开始同步文章...');
+        //     RSSService.getInstance().refreshAllSources().then(result => {
+        //       console.log(`✅ 文章同步完成: 成功 ${result.success}, 失败 ${result.failed}, 新文章 ${result.totalArticles}`);
+        //     }).catch(err => {
+        //       console.warn('⚠️ 文章同步失败:', err);
+        //     });
+        //   }
+        // } catch (syncError) {
+        //   console.warn('⚠️ 同步检查失败:', syncError);
+        // }
       } catch (e) {
         console.warn('⚠️ 初始化阶段发生非致命错误:', e);
       } finally {
@@ -100,29 +101,30 @@ function App(): React.JSX.Element {
   }, []);
 
   // 3. App 生命周期管理：监听进入后台/前台，退出时同步
-  useEffect(() => {
-    if (!appIsReady) return;
-
-    const subscription = AppState.addEventListener('change', async (nextAppState) => {
-      if (nextAppState === 'background' || nextAppState === 'inactive') {
-        // 进入后台或非活跃状态，同步单词本
-        console.log('💾 App 进入后台，开始同步单词本...');
-        try {
-          const config = await SettingsService.getInstance().getProxyModeConfig();
-          if (config.enabled && config.token) {
-            await VocabularyService.getInstance().syncToProxyServer();
-            console.log('✅ 后台同步完成');
-          }
-        } catch (error) {
-          console.warn('⚠️ 后台同步失败:', error);
-        }
-      }
-    });
-
-    return () => {
-      subscription?.remove();
-    };
-  }, [appIsReady]);
+  // 【暂时禁用】保留代码逻辑，但暂不自动调用
+  // useEffect(() => {
+  //   if (!appIsReady) return;
+  //
+  //   const subscription = AppState.addEventListener('change', async (nextAppState) => {
+  //     if (nextAppState === 'background' || nextAppState === 'inactive') {
+  //       // 进入后台或非活跃状态，同步单词本
+  //       console.log('💾 App 进入后台，开始同步单词本...');
+  //       try {
+  //         const config = await SettingsService.getInstance().getProxyModeConfig();
+  //         if (config.enabled && config.token) {
+  //           await VocabularyService.getInstance().syncToProxyServer();
+  //           console.log('✅ 后台同步完成');
+  //         }
+  //       } catch (error) {
+  //         console.warn('⚠️ 后台同步失败:', error);
+  //       }
+  //     }
+  //   });
+  //
+  //   return () => {
+  //     subscription?.remove();
+  //   };
+  // }, [appIsReady]);
 
 
   // 如果还没准备好，我们返回一个匹配背景色的空 View

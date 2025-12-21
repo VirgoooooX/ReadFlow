@@ -144,6 +144,22 @@ export class DatabaseService {
         console.log('scroll_position column added successfully');
       }
 
+      // 【新增】检查articles表是否存在image_caption和image_credit列
+      const hasImageCaption = articlesTableInfo.some((column: any) => column.name === 'image_caption');
+      const hasImageCredit = articlesTableInfo.some((column: any) => column.name === 'image_credit');
+
+      if (!hasImageCaption) {
+        console.log('Adding image_caption column to articles table...');
+        await this.db.execAsync('ALTER TABLE articles ADD COLUMN image_caption TEXT');
+        console.log('image_caption column added successfully');
+      }
+
+      if (!hasImageCredit) {
+        console.log('Adding image_credit column to articles table...');
+        await this.db.execAsync('ALTER TABLE articles ADD COLUMN image_credit TEXT');
+        console.log('image_credit column added successfully');
+      }
+
       // 检查vocabulary表是否存在缺失的字段
       const vocabularyTableInfo = await this.db.getAllAsync('PRAGMA table_info(vocabulary)');
       const hasNextReviewAt = vocabularyTableInfo.some((column: any) => column.name === 'next_review_at');

@@ -7,7 +7,7 @@ import { DatabaseService } from '../../database/DatabaseService';
 import { RSSSource, Article, AppError } from '../../types';
 import { imageExtractionService } from '../ImageExtractionService';
 import { rsshubService } from '../RSShubService';
-import { parseEnhancedRSS, extractBestImageUrlFromItem } from '../EnhancedRSSParser';
+import { parseEnhancedRSS, extractBestImageUrlFromItem, extractBestImageWithCaption } from '../EnhancedRSSParser';
 import {
   fetchWithRetry,
   logger,
@@ -365,12 +365,24 @@ export class LocalRSSService {
           tags: [],
         };
         
-        // 提取图片
+        // 提取图片（使用增强版函数，同时提取说明信息）
         if (shouldExtractImages) {
           let imageUrl = null;
+          let imageCaption: string | undefined;
+          let imageCredit: string | undefined;
           
           try {
-            imageUrl = extractBestImageUrlFromItem(item, { sourceUrl: source.url });
+            // 使用增强版提取函数，同时获取图片说明
+            const imageInfo = extractBestImageWithCaption(item, { sourceUrl: source.url });
+            if (imageInfo) {
+              imageUrl = imageInfo.url;
+              // 保存图片说明信息
+              imageCaption = imageInfo.caption || imageInfo.alt;
+              imageCredit = imageInfo.credit;
+              if (imageCaption || imageCredit) {
+                logger.info(`[图片说明] ${imageCaption || ''}${imageCredit ? ` (来源: ${imageCredit})` : ''}`);
+              }
+            }
           } catch (error) {
             // 忽略
           }
@@ -394,6 +406,8 @@ export class LocalRSSService {
           
           if (imageUrl) {
             article.imageUrl = imageUrl;
+            article.imageCaption = imageCaption;
+            article.imageCredit = imageCredit;
           }
         }
         
@@ -479,8 +493,9 @@ export class LocalRSSService {
         `INSERT INTO articles (
           title, url, content, summary, author, published_at, rss_source_id, 
           source_name, category, word_count, reading_time, difficulty, 
-          is_read, is_favorite, read_progress, tags, guid, image_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_read, is_favorite, read_progress, tags, guid, image_url,
+          image_caption, image_credit
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           article.title,
           article.url,
@@ -500,6 +515,8 @@ export class LocalRSSService {
           JSON.stringify(article.tags),
           article.url,
           article.imageUrl || null,
+          article.imageCaption || null,
+          article.imageCredit || null,
         ]
       );
 

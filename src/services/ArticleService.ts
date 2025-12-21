@@ -433,6 +433,8 @@ export class ArticleService {
       sourceName: row.source_name,
       url: row.url,
       imageUrl: row.image_url,
+      imageCaption: row.image_caption || undefined,
+      imageCredit: row.image_credit || undefined,
       tags: row.tags ? JSON.parse(row.tags) : [],
       category: row.category,
       wordCount: row.word_count,

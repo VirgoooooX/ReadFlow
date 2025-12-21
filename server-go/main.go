@@ -72,8 +72,8 @@ var refererMap = map[string]string{
 	"preview.redd.it": "https://www.reddit.com/",
 }
 
-// 图片扩展名正则
-var imageExtRegex = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?.*)?$`)
+// 图片扩展名正则（新增 avif 格式支持）
+var imageExtRegex = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|avif)(\?.*)?$`)
 
 // 图片 CDN 域名列表
 var imageCdnHosts = []string{
@@ -160,7 +160,12 @@ func replaceImageURLs(content string) string {
 		// srcset 中的 URL（简化处理）
 		`(srcset=["'])([^"']+)(["'])`,
 		// 背景图片
-		`(background(?:-image)?:\s*url\(['"]?)([^'")\s]+)(['"]?\))`,
+		`(background(?:-image)?:\s*url\(['"]?)([^'"\)\s]+)(['"]?\))`,
+		// 【新增】HTML 实体编码的 img 标签: &lt;img ... src=&quot;...&quot;&gt;
+		// 支持多属性情况（如 sizes, srcset, src）
+		`(&lt;img(?:[^s]|s(?!rc=&quot;))*src=&quot;)([^&]+(?:&amp;[^&]+)*)(&quot;)`,
+		// 【新增】HTML 实体编码的 srcset 属性
+		`(srcset=&quot;)([^&]+(?:&amp;[^&]+)*)(&quot;)`,
 	}
 
 	result := content
