@@ -19,6 +19,8 @@ import {
   shouldUseCorsProxy,
   fixRelativeImageUrls,
 } from './RSSUtils';
+import { Readability } from '@mozilla/readability';
+import { parseHTML } from 'linkedom';
 
 export class LocalRSSService {
   private static instance: LocalRSSService;
@@ -532,78 +534,68 @@ export class LocalRSSService {
   }
 
   /**
-   * 从原始 URL 获取完整内容
+   * 从原始 URL 获取完整内容（使用 Mozilla Readability）
    */
   private async fetchFullContent(url: string): Promise<string | null> {
     try {
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          // 🔥 伪装成手机浏览器，通常能拿到更简洁的页面
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         }
       });
 
       if (!response.ok) {
+        logger.error(`[fetchFullContent] HTTP ${response.status} for ${url}`);
         return null;
       }
 
-      let html = await response.text();
+      const html = await response.text();
       
-      // 🔥 第一步：移除无用标签（脚本、样式、导航、广告等）
-      html = html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
-        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-        .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
-        .replace(/<!--[\s\S]*?-->/g, ''); // 移除 HTML 注释
+      // 🔥 使用 linkedom 创建虚拟 DOM（解决正则无法处理嵌套 div 的问题）
+      const { document } = parseHTML(html);
       
-      // 🔥 第二步：尝试匹配内容区域（优先宽松匹配，避免丢失标题和图片）
-      const contentSelectors = [
-        // 少数派特有选择器 - 只匹配 article-body 的开始标签到最近的闭合 div
-        /<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*?)(?=<\/div>\s*<\/div>)/i,
-        // 通用选择器 - 宽松匹配，允许嵌套
-        /<article[^>]*>([\s\S]*?)<\/article>/i,
-        /<div[^>]*class="[^"]*post-content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
-        /<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
-        /<div[^>]*class="[^"]*article-content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
-        /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
-        /<main[^>]*>([\s\S]*?)<\/main>/i
-      ];
-
-      for (const regex of contentSelectors) {
-        const match = html.match(regex);
-        if (match && match[1] && match[1].length > 200) {
-          let content = match[1];
-          
-          // 🔥 第三步：仅清理明显的干扰元素（社交、广告、评论），保留标题和图片
-          content = content
-            // 移除社交分享按钮
-            .replace(/<div[^>]*class="[^"]*share[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            .replace(/<div[^>]*class="[^"]*social[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            // 移除广告
-            .replace(/<div[^>]*class="[^"]*ad[s]?[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            .replace(/<div[^>]*class="[^"]*banner[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            // 移除相关文章/推荐
-            .replace(/<div[^>]*class="[^"]*related[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            .replace(/<div[^>]*class="[^"]*recommend[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            // 移除评论区
-            .replace(/<div[^>]*class="[^"]*comment[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-            // 移除空链接和无用按钮（但保留有href的正常链接）
-            .replace(/<a[^>]*href="#"[^>]*>[\s\S]*?<\/a>/gi, '')
-            // 移除事件处理器（但保留 data-* 属性，可能包含有用信息）
-            .replace(/\s+onclick="[^"]*"/gi, '')
-            .replace(/\s+onload="[^"]*"/gi, '');
-          
-          logger.info(`[fetchFullContent] 提取到内容: ${content.length} 字符`);
-          return content;
+      // 🔥 关键优化：处理懒加载图片（在 Readability 解析前）
+      const imgs = document.querySelectorAll('img');
+      imgs.forEach((img: any) => {
+        // 常见的懒加载属性
+        const realSrc = img.getAttribute('data-src') || 
+                       img.getAttribute('data-original') || 
+                       img.getAttribute('data-url') ||
+                       img.getAttribute('data-actualsrc');
+        
+        if (realSrc) {
+          img.setAttribute('src', realSrc);
+          logger.info(`[fetchFullContent] 修复懒加载图片: ${realSrc}`);
         }
+        
+        // 🔥 关键优化：修复相对路径
+        const src = img.getAttribute('src');
+        if (src && src.startsWith('/')) {
+          try {
+            const baseUrl = new URL(url).origin;
+            const fullUrl = `${baseUrl}${src}`;
+            img.setAttribute('src', fullUrl);
+            logger.info(`[fetchFullContent] 修复相对路径: ${src} -> ${fullUrl}`);
+          } catch (error) {
+            logger.warn(`[fetchFullContent] 无法解析 URL: ${url}`);
+          }
+        }
+      });
+      
+      // 🔥 使用 Readability 智能提取正文
+      const reader = new Readability(document);
+      const article = reader.parse();
+      
+      if (article && article.content) {
+        logger.info(`[Readability] 成功提取标题: ${article.title}, 内容长度: ${article.content.length}`);
+        return article.content; // 返回清洗过、保留了格式的纯净 HTML
       }
-
+      
+      logger.warn(`[Readability] 无法提取正文: ${url}`);
       return null;
+
     } catch (error) {
       logger.error('[fetchFullContent] 获取全文失败:', error);
       return null;
