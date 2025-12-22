@@ -167,7 +167,7 @@ function AuthStackNavigator() {
 // 首页堆栈导航
 function HomeStackNavigator() {
   const { theme } = useThemeContext();
-  const isDark = theme.dark;
+  const isDark = theme.isDark;
 
   return (
     <HomeStack.Navigator
@@ -212,7 +212,7 @@ function HomeStackNavigator() {
 // 单词本堆栈导航
 function VocabularyStackNavigator() {
   const { theme } = useThemeContext();
-  const isDark = theme.dark;
+  const isDark = theme.isDark;
 
   return (
     <VocabularyStack.Navigator
@@ -293,7 +293,7 @@ function VocabularyStackNavigator() {
 // RSS堆栈导航
 function RSSStackNavigator() {
   const { theme } = useThemeContext();
-  const isDark = theme.dark;
+  const isDark = theme.isDark;
 
   return (
     <RSSStack.Navigator
@@ -374,7 +374,7 @@ function RSSStackNavigator() {
 // 用户堆栈导航（"我的"页面）
 function UserStackNavigator() {
   const { theme } = useThemeContext();
-  const isDark = theme.dark;
+  const isDark = theme.isDark;
 
   return (
     <UserStack.Navigator
@@ -614,7 +614,7 @@ function MainTabNavigator() {
 // 根导航器
 function RootNavigator() {
   const { theme } = useThemeContext();
-  const isDark = theme.dark;
+  const isDark = theme.isDark;
   const { state } = useUser();
 
   // 核心逻辑：直到用户信息加载完成（确定是去登录页还是主页）后，才允许关闭原生启动页
@@ -647,7 +647,7 @@ function RootNavigator() {
         options={({ navigation, route }) => {
           const isNextArticle = (route as any).params?.isNextArticle || false;
           return {
-            ...getCommonScreenOptions(theme, theme.dark),
+            ...getCommonScreenOptions(theme, theme.isDark),
             headerShown: true,
             title: '文章详情',
             // 翻页用 fade，不影响返回动画
@@ -664,7 +664,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: '单词详情',
-          ...getCommonScreenOptions(theme, theme.dark),
+          ...getCommonScreenOptions(theme, theme.isDark),
         })}
       />
       <RootStack.Screen
@@ -673,7 +673,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: 'RSS源详情',
-          ...getCommonScreenOptions(theme, theme.dark),
+          ...getCommonScreenOptions(theme, theme.isDark),
         })}
       />
       <RootStack.Screen
@@ -682,7 +682,7 @@ function RootNavigator() {
         options={{
           headerShown: true,
           title: '添加RSS源',
-          ...getCommonScreenOptions(theme, theme.dark),
+          ...getCommonScreenOptions(theme, theme.isDark),
         }}
       />
     </RootStack.Navigator>
