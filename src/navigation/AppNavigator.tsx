@@ -652,7 +652,7 @@ function RootNavigator() {
             title: '文章详情',
             // 翻页用 fade，不影响返回动画
             ...(isNextArticle && {
-              animation: 'fade',
+              animation: 'slide_from_bottom',
               animationDuration: 200,
             }),
           };

@@ -1,4 +1,5 @@
 import { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import { StyleProp, ViewStyle } from 'react-native';
 
 /**
  * 获取通用的屏幕配置选项
@@ -8,7 +9,7 @@ import { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 export const getCommonScreenOptions = (
   theme: any,
   isDark: boolean
-): NativeStackNavigationOptions => {
+): NativeStackNavigationOptions & { cardStyle?: StyleProp<ViewStyle> } => {
   const backgroundColor = theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE');
   const primaryColor = theme?.colors?.primary || '#6750A4';
   const onPrimaryColor = theme?.colors?.onPrimary || '#FFFFFF';
@@ -25,20 +26,15 @@ export const getCommonScreenOptions = (
     // 而不是显示空白屏
     cardStyle: {
       backgroundColor: 'transparent',
-    },
+    } as StyleProp<ViewStyle>,
 
     // 4. 内容背景：用于页面内容区域的背景色
     contentStyle: {
       backgroundColor: backgroundColor,
     },
 
-    // 5. 手势支持：允许用户从边缘向右滑动返回
-    gestureEnabled: true,
-    gestureDirection: 'horizontal',
-    fullScreenGesture: true,
-
-    // 6. 动画时长：350ms，与 Android 系统默认一致
-    animationDuration: 350,
+    // 6. 动画时长：200ms，与 Android 系统默认一致
+    animationDuration: 200,
 
     // 7. 头部样式统一：使用主题色作为背景
     headerStyle: {

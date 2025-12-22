@@ -65,8 +65,9 @@ const BottomProgressBar: React.FC<{
     }).start();
   }, [progress]);
 
-  // 判断是否应显示提示
-  const shouldShowHint = progress >= 92 && (hasNextArticle || isLastArticle || noUnreadArticle);
+  // 【修复】直接使用传递过来的 showNextHint，而不是基于 progress 百分比判断
+  // 这样才能确保根据物理滚动距离（而非百分比）来控制提示显示
+  const shouldShowHintLocal = showNextHint && (hasNextArticle || isLastArticle || noUnreadArticle);
 
   // 启动箭头呼吸动画
   const startArrowAnimation = useCallback(() => {
@@ -94,7 +95,7 @@ const BottomProgressBar: React.FC<{
 
   // 提示框进出场动画
   useEffect(() => {
-    if (shouldShowHint) {
+    if (shouldShowHintLocal) {
       // 触发轻微震动反馈
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -137,7 +138,7 @@ const BottomProgressBar: React.FC<{
         }
       });
     }
-  }, [shouldShowHint, hasNextArticle]);
+  }, [shouldShowHintLocal, hasNextArticle]);
 
   // 获取提示内容和样式
   const getHintContent = () => {
@@ -390,20 +391,30 @@ const ArticleDetailScreen: React.FC = () => {
 
   // 动态更新导航栏标题
   React.useLayoutEffect(() => {
-    const isNextArticle = (route as any).params?.isNextArticle || false;
-    
-    // 【关键】翻页进入后，立即把动画改回 slide_from_right
-    // 这样返回时就会用 slide 而不是 fade
-    if (isNextArticle) {
-      navigation.setOptions({
-        animation: 'slide_from_right',
-        animationDuration: 350,
-      });
-    }
-    
+    // 【修复】仅在这里设置 headerShown，不在这里修改动画
+    // 因为 useLayoutEffect 执行时机太早，会覆盖导航器的 fade 动画配置
     navigation.setOptions({
       headerShown: false, // 隐藏原生导航栏
     });
+  }, [navigation, route]);
+
+  // 【修复】延迟重置动画配置，确保 Fade 进场动画先播放完
+  useEffect(() => {
+    const isNextArticle = (route as any).params?.isNextArticle || false;
+
+    if (isNextArticle) {
+      // 关键修复：延迟 400ms 执行，确保 Fade 动画（200ms）先播放完
+      // 这样返回按钮才能使用 slide 动画，同时不影响进场的 fade 效果
+      const timer = setTimeout(() => {
+        console.log('[ArticleDetail] 🎬 Restoring slide animation for back action');
+        navigation.setOptions({
+          animation: 'slide_from_right',
+          animationDuration: 200,
+        });
+      }, 400);
+
+      return () => clearTimeout(timer);
+    }
   }, [navigation, route]);
 
   // 【新增】监听 showRefTitle 变化，执行平滑动画
@@ -673,11 +684,14 @@ const ArticleDetailScreen: React.FC = () => {
             if (data.progress !== undefined) {
               setReadingProgress(data.progress);
             }
-            
-            // 【新增】更新底部状态，显示“上滑查看下一篇”提示
-            if (data.isAtBottom !== undefined) {
-              setIsAtBottom(data.isAtBottom);
-              if (data.isAtBottom && hasNextArticle) {
+                        
+            // 【修复】使用 shouldShowHint 判断是否进入空白区域（基于物理滚动距离，而非 DOM 元素）
+            if (data.shouldShowHint !== undefined) {
+              const inBlankArea = data.shouldShowHint;
+              setIsAtBottom(data.isAtBottom || false);
+                          
+              // 只有在进入空白区域且有下一篇时才显示提示
+              if (inBlankArea && hasNextArticle) {
                 setShowNextHint(true);
               } else {
                 setShowNextHint(false);

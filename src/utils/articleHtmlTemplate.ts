@@ -613,16 +613,29 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     (function() {
       'use strict';
     
+      /**
+       * 图片说明智能识别与标准化重构
+       * 
+       * 【核心思路】
+       * 数据库存原味，渲染层做料理 (Runtime Processing)
+       * 
+       * 【三层判定漏斗】
+       * 1️⃣ 显式样式特征：居中对齐 (style="text-align:center" / align="center")
+       * 2️⃣ 显式格式特征：括号包裹 (（图自：BBC）/ (19岁的xxx))
+       * 3️⃣ 隐式排版特征：短文本 + 无终止标点
+       * 
+       * 【执行方案】
+       * DOM 手术：将 <p><img></p> + <p>说明</p> 重构为标准的 <figure><img><figcaption>
+       */
       function formatImagesAndCaptions() {
         const contentDiv = document.querySelector('.article-content');
         if (!contentDiv) return;
 
-        // 1. 先处理 figcaption，标记已有说明的图片
+        // 1. 先标记已有 figcaption 的图片（避免重复处理）
         const figcaptions = contentDiv.querySelectorAll('figcaption');
         const imagesWithCaption = new Set();
         
         figcaptions.forEach(function(figcaption) {
-          // 找到 figcaption 对应的图片
           const figure = figcaption.closest('figure');
           if (figure) {
             const img = figure.querySelector('img');
@@ -632,32 +645,82 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
           }
         });
 
-        // 2. 处理所有图片
-        const images = contentDiv.querySelectorAll('img');
+        // 2. 遍历所有 <p> 标签，找出包含图片的段落
+        const allParagraphs = contentDiv.querySelectorAll('p');
       
-        images.forEach(function(img) {
-          // 检查图片是否已有说明（通过 figcaption）
-          if (imagesWithCaption.has(img)) {
-            // 已有 figcaption，不需要额外处理
-            // 保留 alt 属性不删除，给盲人用户用（屏幕阅读器）
-            // WebView 会自动处理：若图片加载成功，alt 对普通用户不可见
-            return;
+        allParagraphs.forEach(function(imgPara) {
+          // 检查该 P 标签是否直接包含图片
+          const img = imgPara.querySelector('img');
+          if (!img) return;
+          
+          // 如果图片已有 figcaption，跳过
+          if (imagesWithCaption.has(img)) return;
+          
+          // 获取紧跟在图片段落后的下一个兄弟元素
+          const nextPara = imgPara.nextElementSibling;
+          
+          // 必须是 <p> 标签才有可能是说明
+          if (!nextPara || nextPara.tagName !== 'P') return;
+          
+          // 提取候选说明文字（去除前后空白）
+          const captionText = nextPara.innerText.trim();
+          if (!captionText) return;
+          
+          // ========================================
+          // 【三层判定漏斗】
+          // ========================================
+          let isCaptionCandidate = false;
+          
+          // 【第一层】显式样式特征：居中对齐
+          const style = nextPara.getAttribute('style') || '';
+          const align = nextPara.getAttribute('align') || '';
+          if (style.includes('text-align') && style.includes('center')) {
+            isCaptionCandidate = true;
+          } else if (align.toLowerCase() === 'center') {
+            isCaptionCandidate = true;
           }
           
-          // 【关键修改】优先级策略：不主动提取 alt 属性显示
-          // 原因：
-          // 1. 如果有 figcaption，我们已经在上面处理过了
-          // 2. 如果有接在图片后的 P 标签（通常是 RSS 源解析出来的说明），我们也处理过了
-          // 3. alt 属性是「备选文本」，只在以下场景使用：
-          //    - 图片加载失败时（浏览器显示）
-          //    - 盲人用户开启屏幕阅读器时（读屏软件读出）
-          // 4. 不应该主动把 alt 内容提取成 DOM 元素显示，避免与 figcaption 重复
-          // 
-          // 「可选优化」如果想为文本模式的内容生成说明（比如从第三方 API 获取的 JSON）：
-          // 可以在后端处理时就生成好 figcaption，而不是在前端提取 alt
+          // 【第二层】显式格式特征：括号包裹
+          // 匹配模式：（xxx）或 (xxx)，且字数 < 50
+          if (!isCaptionCandidate) {
+            const fullParenMatch = /^[（(].+[）)]$/.test(captionText);
+            if (fullParenMatch && captionText.length < 50) {
+              isCaptionCandidate = true;
+            }
+          }
           
-          // 【优化】图片点击放大使用事件代理（在后面统一处理）
-          // 不再给每个 img 绑定监听器，减少内存占用
+          // 【第三层】隐式排版特征：短文本 + 无终止标点
+          if (!isCaptionCandidate) {
+            const hasEndPunctuation = /[.!?。！？]$/.test(captionText);
+            if (captionText.length < 50 && !hasEndPunctuation) {
+              isCaptionCandidate = true;
+            }
+          }
+          
+          // 如果三层都没命中，判定为正文，不做处理
+          if (!isCaptionCandidate) return;
+          
+          // ========================================
+          // 【DOM 手术】结构化重构
+          // ========================================
+          
+          // 创建标准的 <figure> 容器
+          const figure = document.createElement('figure');
+          
+          // 移动图片到 figure 中
+          figure.appendChild(img.cloneNode(true));
+          
+          // 创建标准的 <figcaption> 元素
+          const figcaption = document.createElement('figcaption');
+          figcaption.textContent = captionText; // 使用 textContent 防止 XSS
+          figure.appendChild(figcaption);
+          
+          // 在原图片段落位置插入新的 figure
+          imgPara.parentNode.insertBefore(figure, imgPara);
+          
+          // 清理旧的 DOM 节点
+          imgPara.remove();      // 删除旧的图片段落
+          nextPara.remove();     // 删除旧的说明段落
         });
       }
       
@@ -977,6 +1040,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       let rafId = null;
       let lastSentY = -1;          // 上次发送的 Y 坐标
       let lastSentProgress = -1;   // 上次发送的进度
+      let lastIsAtBottom = false;  // 上次发送的底部状态 - 防止重复触发
       
       // 【优化】计算阅读进度百分比 - 基于距离底部的像素值
       function calculateProgress() {
@@ -989,73 +1053,75 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         if (maxScroll <= 0) return 100;
         
         // 计算基础百分比
-        const percentage = Math.min(100, Math.round((scrollTop / maxScroll) * 100));
+        let percentage = (scrollTop / maxScroll) * 100;
         
-        // 【关键】距离底部的绝对距离
-        const distanceToBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
+        // 修正：确保不超过 100，不低于 0
+        percentage = Math.min(100, Math.max(0, percentage));
         
-        // 【优化】如果距离底部 < 50px，强制进度为 100%
-        // 解决图片加载导致的高度变化问题
-        if (distanceToBottom < 50) {
-          return 100;
-        }
-        
-        return percentage;
+        return Math.round(percentage);
       }
       
-      // 【优化】检测是否到达底部 - 更精确的判断
+      // 【核心修改】精准判断是否到达底部 - 基于物理滚动距离
       function isAtBottom() {
         const scrollTop = window.scrollY || window.pageYOffset;
         const scrollHeight = document.documentElement.scrollHeight;
         const clientHeight = window.innerHeight;
+        
+        // 计算距离底部的物理像素距离
         const distanceToBottom = scrollHeight - scrollTop - clientHeight;
         
-        // 容差 30px，同时考虑小数精度问题
-        return distanceToBottom < 30 && distanceToBottom >= -1;
+        // 【阈值设置】
+        // CSS 中 body padding-bottom 约为 80px
+        // 设置为 50px 意味着：用户必须滚动进入底部的留白区域，指示器才会出现
+        // 这样可以避免"刚看到最后一行字就弹出"的问题
+        // 容错处理：distanceToBottom 可能因弹性滚动变成负数，所以要 >= -100
+        return distanceToBottom <= 10 && distanceToBottom >= -100;
       }
       
-      // 【新增】判断是否应该显示"下一篇"提示
+      // 【核心修改】判断是否应该显示"下一篇"提示 - 基于物理滚动距离
       function shouldShowNextHint() {
         const scrollTop = window.scrollY || window.pageYOffset;
         const scrollHeight = document.documentElement.scrollHeight;
         const clientHeight = window.innerHeight;
-        const distanceToBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
-        const maxScroll = scrollHeight - clientHeight;
-        
-        // 文章不满一屏，立即显示
-        if (maxScroll <= 0) return true;
-        
-        // 判断是否进入留白区域
-        const paddingBottom = 80;
-        const inPaddingArea = distanceToBottom < paddingBottom;
-        return inPaddingArea;
+      
+        // 如果内容不满一屏，立即显示
+        if (scrollHeight <= clientHeight) return true;
+      
+        const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+      
+        // 比 isAtBottom 稍微宽松一点 (60px instead of 50px)
+        // 但绝对不使用"元素可见性"判断，那样太早了
+        return distanceToBottom <= 60;
       }
       
       function sendScrollMessage() {
         let y = window.scrollY || window.pageYOffset;
-        // 取整，防止小数精度问题
-        y = Math.round(y);
-        // 修正：负数归零
-        y = Math.max(0, y);
-        
-        // 计算进度
+        y = Math.max(0, Math.round(y));
+      
         const progress = calculateProgress();
         const atBottom = isAtBottom();
-        
-        // 【关键】数据去重：只有位置或进度真正变化才发送
-        if (y === lastSentY && progress === lastSentProgress) {
+        const showHint = shouldShowNextHint();
+      
+        // 【关键】数据去重：只有当关键状态发生变化时才发送消息
+        // 1. 滚动位置变化
+        // 2. 进度变化
+        // 3. 到底状态变化（这很重要，保证 UI 及时响应）
+        if (y === lastSentY && 
+            progress === lastSentProgress && 
+            atBottom === lastIsAtBottom) {
           return; // 数据没变，不发送
         }
-        
-        // 记录本次发送的值
+      
         lastSentY = y;
         lastSentProgress = progress;
-        
+        lastIsAtBottom = atBottom;
+      
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'scroll',
           scrollY: y,
           progress: progress,
-          isAtBottom: atBottom
+          isAtBottom: atBottom,
+          shouldShowHint: showHint
         }));
       }
       
@@ -1117,38 +1183,94 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       }
       
       // ==========================================
-      // 【新增】底部上滑检测 - 切换下一篇文章
+      // 【重写】防误触版：底部上滑检测 - 切换下一篇文章
       // ==========================================
       let swipeStartY = 0;
+      let swipeStartX = 0; // 新增：记录X轴，用于计算角度
       let swipeStartTime = 0;
-      let wasAtBottom = false;
+      let isSwipeValidStart = false;
+    
+      // 记录"到达底部"的时间戳
+      let arrivedBottomTime = 0;
+      let hasArrivedBottom = false;
+
+      // 在 scroll 事件中更新到达底部的时间戳
+      window.addEventListener('scroll', function() {
+        const atBottom = isAtBottom(); // 复用上面的判断函数
       
-      window.addEventListener('touchstart', function(e) {
-        swipeStartY = e.touches[0].clientY;
-        swipeStartTime = Date.now();
-        wasAtBottom = isAtBottom();
+        if (atBottom) {
+          if (!hasArrivedBottom) {
+            // 状态变更：从"未到底"变成了"到底"
+            hasArrivedBottom = true;
+            arrivedBottomTime = Date.now(); // 记录到达时刻
+          }
+        } else {
+          hasArrivedBottom = false;
+        }
       }, { passive: true });
+
+      window.addEventListener('touchstart', function(e) {
+        // 1. 必须已经处于底部
+        if (!isAtBottom()) {
+          isSwipeValidStart = false;
+          return;
+        }
       
+        // 2. 【核心防护】冷却检查
+        // 如果距离"刚到达底部"的时间不足 600ms，说明用户可能正在快速滑动刹车
+        // 此时不应该响应新的手势，强制用户"停顿"一下
+        const timeSinceArrived = Date.now() - arrivedBottomTime;
+        if (timeSinceArrived < 600) {
+          isSwipeValidStart = false;
+          return;
+        }
+
+        swipeStartY = e.touches[0].clientY;
+        swipeStartX = e.touches[0].clientX;
+        swipeStartTime = Date.now();
+        isSwipeValidStart = true;
+      }, { passive: true });
+    
       window.addEventListener('touchend', function(e) {
-        // 只有当触摸开始时已经在底部才检测上滑
-        if (!wasAtBottom) return;
-        
+        // 如果开始触摸时条件不满足，直接忽略
+        if (!isSwipeValidStart) return;
+      
+        // 再次检查是否还在底部（防止用户先上滑再下滑的操作）
+        if (!isAtBottom()) return;
+      
         const endY = e.changedTouches[0].clientY;
-        const deltaY = swipeStartY - endY; // 向上滑动为正值
+        const endX = e.changedTouches[0].clientX;
+      
+        const deltaY = swipeStartY - endY; // 向上滑动为正
+        const deltaX = Math.abs(swipeStartX - endX); // 水平移动距离
         const deltaTime = Date.now() - swipeStartTime;
-        
-        // 条件：
-        // 1. 向上滑动距离超过 80px
-        // 2. 滑动速度超过 0.3 (px/ms)
-        // 3. 当前仍在底部
-        if (deltaY > 80 && deltaTime > 0 && deltaTime < 500 && isAtBottom()) {
-          const velocity = deltaY / deltaTime;
-          if (velocity > 0.3) {
+      
+        // ============================
+        // 【判定条件升级】
+        // ============================
+      
+        // 1. 距离阈值：增加到 150px (原 80px)，需要滑得更長
+        const MIN_DISTANCE = 150;
+      
+        // 2. 时间限制：必须是一个果断的滑动，不能按住拖太久
+        const MAX_TIME = 800;
+      
+        // 3. 【核心防护】角度锁定
+        // 垂直移动距离必须是水平移动距离的 2 倍以上
+        // 防止用户斜着划动屏幕浏览时误触
+        const isVerticalSwipe = deltaY > (deltaX * 2);
+
+        if (deltaY > MIN_DISTANCE && deltaTime < MAX_TIME && isVerticalSwipe) {
+          // 发送消息前再次确认冷却时间（双重保险）
+          if (Date.now() - arrivedBottomTime > 600) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'swipeToNext'
             }));
           }
         }
+      
+        // 重置状态
+        isSwipeValidStart = false;
       }, { passive: true });
 
       // 【新增】优化4：提供给 RN 调用的恢复位置函数
