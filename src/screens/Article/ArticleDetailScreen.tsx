@@ -96,8 +96,8 @@ const BottomProgressBar: React.FC<{
   // 提示框进出场动画
   useEffect(() => {
     if (shouldShowHintLocal) {
-      // 触发轻微震动反馈
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // 【优化】删除滚动显示提示时的震动
+      // 只在用户实际交互（快速上滑触发翻页）时才震动，避免信号冲突
 
       Animated.parallel([
         Animated.spring(hintTranslateY, {
@@ -138,7 +138,7 @@ const BottomProgressBar: React.FC<{
         }
       });
     }
-  }, [shouldShowHintLocal, hasNextArticle]);
+  }, [shouldShowHintLocal, hasNextArticle, isLastArticle, noUnreadArticle]);
 
   // 获取提示内容和样式
   const getHintContent = () => {
@@ -521,8 +521,9 @@ const ArticleDetailScreen: React.FC = () => {
       return;
     }
     
-    // 触发震动反馈
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // 【优化】使用 Rigid（短促、清脆）震动，表示"操作成功"
+    // 相比 Medium 更快、更干脆，体验更爽快
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
     
     const nextArticleId = articleIds[nextUnreadIndex];
     
@@ -690,8 +691,9 @@ const ArticleDetailScreen: React.FC = () => {
               const inBlankArea = data.shouldShowHint;
               setIsAtBottom(data.isAtBottom || false);
                           
-              // 只有在进入空白区域且有下一篇时才显示提示
-              if (inBlankArea && hasNextArticle) {
+              // 【关键修复】在进入空白区域时，根据文章状态显示相应提示
+              // 包括三种情况：有下一篇 / 最后一篇 / 无未读文章
+              if (inBlankArea && (hasNextArticle || showLastArticleHint || noUnreadArticle)) {
                 setShowNextHint(true);
               } else {
                 setShowNextHint(false);
@@ -715,7 +717,7 @@ const ArticleDetailScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to parse WebView message:', error);
     }
-  }, [handleWordPress, handleSentenceDoubleTap, showRefTitle, hasNextArticle, navigateToNextArticle]);
+  }, [handleWordPress, handleSentenceDoubleTap, showRefTitle, hasNextArticle, navigateToNextArticle, showLastArticleHint, noUnreadArticle]);
 
   // 【关键修改】在组件卸载（用户退出页面）时，统一保存一次
   useEffect(() => {
