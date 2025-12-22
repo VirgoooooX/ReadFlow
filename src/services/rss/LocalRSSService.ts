@@ -46,7 +46,14 @@ export class LocalRSSService {
     language?: string;
   }> {
     try {
-      let actualUrl = url;
+      // 🔥 清理 URL：去除空格和末尾多余斜杠
+      let actualUrl = url.trim();
+      // 对于普通 URL，移除末尾斜杠（保留根路径的斜杠，如 http://example.com/）
+      if (actualUrl.match(/\/[^/]+\/$/) && !actualUrl.endsWith('://')) {
+        actualUrl = actualUrl.replace(/\/$/, '');
+        logger.info(`[validateRSSFeed] 已移除末尾斜杠: ${url} -> ${actualUrl}`);
+      }
+      
       let rsshubInfo = null;
       
       // 处理 RSSHUB 协议
@@ -98,8 +105,32 @@ export class LocalRSSService {
       
       const xmlText = await response.text();
       
-      if (!xmlText.trim() || !xmlText.includes('<?xml') && !xmlText.includes('<rss') && !xmlText.includes('<feed')) {
-        throw new Error('响应不是有效的 RSS/Atom 格式');
+      // 🔥 增强的 RSS/Atom 格式检测
+      const trimmedXml = xmlText.trim();
+      
+      // 检测 Cloudflare 人机验证拦截
+      if (trimmedXml.includes('Just a moment') && trimmedXml.includes('_cf_chl_opt')) {
+        throw new Error('该网站启用了 Cloudflare 防护，无法直接访问\n\n建议：\n• 尝试通过 RSSHub 订阅\n• 使用第三方 RSS 服务');
+      }
+      
+      // 检测 HTML 错误页面（通常表示 URL 错误或者 403/404）
+      if (trimmedXml.startsWith('<!DOCTYPE html') || trimmedXml.startsWith('<html')) {
+        throw new Error('该地址返回的是网页而非 RSS\n\n建议：\n• 检查 URL 是否正确\n• 确认该网站提供 RSS 订阅');
+      }
+      
+      // 检测是否是有效的 XML/RSS/Atom
+      const isValidFormat = 
+        trimmedXml.includes('<?xml') || 
+        trimmedXml.includes('<rss') || 
+        trimmedXml.includes('<feed') ||
+        trimmedXml.includes('<channel') ||  // 某些源直接以 channel 开头
+        trimmedXml.includes('xmlns="http://www.w3.org/2005/Atom"'); // Atom 命名空间
+      
+      if (!trimmedXml || !isValidFormat) {
+        // 提供更详细的错误信息
+        const preview = trimmedXml.substring(0, 200);
+        logger.error(`无效的 RSS 响应内容预览: ${preview}`);
+        throw new Error('响应不是有效的 RSS/Atom 格式\n\n建议：\n• 检查 URL 是否正确\n• 尝试在浏览器中打开确认');
       }
       
       const titleMatch = xmlText.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -434,10 +465,23 @@ export class LocalRSSService {
             }
           }
           
-          // 从已修复的 rawContent 中提取图片
-          if (!imageUrl && fixedRawContent) {
+          // 🔥 优先从全文内容中提取图片（content 可能是从原文链接抓取的全文）
+          // 如果 RSS 只有短摘要，fixedRawContent 里没有图片，但 content 里有
+          if (!imageUrl && content) {
             try {
-              imageUrl = await imageExtractionService.extractImageFromContent(fixedRawContent);
+              imageUrl = await imageExtractionService.extractImageFromContent(content, itemLink);
+              if (imageUrl) {
+                logger.info(`[图片提取] 从全文内容中提取到图片: ${imageUrl}`);
+              }
+            } catch (error) {
+              // 忽略
+            }
+          }
+          
+          // 备选：从原始 RSS 内容中提取
+          if (!imageUrl && fixedRawContent && fixedRawContent !== content) {
+            try {
+              imageUrl = await imageExtractionService.extractImageFromContent(fixedRawContent, itemLink);
             } catch (error) {
               // 忽略
             }
@@ -503,25 +547,65 @@ export class LocalRSSService {
         return null;
       }
 
-      const html = await response.text();
+      let html = await response.text();
       
+      // 🔥 第一步：移除无用标签（脚本、样式、导航、广告等）
+      html = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+        .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, ''); // 移除 HTML 注释
+      
+      // 🔥 第二步：尝试匹配内容区域（优先宽松匹配，避免丢失标题和图片）
       const contentSelectors = [
+        // 少数派特有选择器 - 只匹配 article-body 的开始标签到最近的闭合 div
+        /<div[^>]*class="[^"]*article-body[^"]*"[^>]*>([\s\S]*?)(?=<\/div>\s*<\/div>)/i,
+        // 通用选择器 - 宽松匹配，允许嵌套
         /<article[^>]*>([\s\S]*?)<\/article>/i,
-        /<div[^>]*class="[^"]*post-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-        /<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-        /<div[^>]*class="[^"]*article-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+        /<div[^>]*class="[^"]*post-content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
+        /<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
+        /<div[^>]*class="[^"]*article-content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
+        /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>)/i,
         /<main[^>]*>([\s\S]*?)<\/main>/i
       ];
 
       for (const regex of contentSelectors) {
         const match = html.match(regex);
-        if (match && match[1] && match[1].length > 500) {
-          return match[1];
+        if (match && match[1] && match[1].length > 200) {
+          let content = match[1];
+          
+          // 🔥 第三步：仅清理明显的干扰元素（社交、广告、评论），保留标题和图片
+          content = content
+            // 移除社交分享按钮
+            .replace(/<div[^>]*class="[^"]*share[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            .replace(/<div[^>]*class="[^"]*social[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            // 移除广告
+            .replace(/<div[^>]*class="[^"]*ad[s]?[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            .replace(/<div[^>]*class="[^"]*banner[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            // 移除相关文章/推荐
+            .replace(/<div[^>]*class="[^"]*related[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            .replace(/<div[^>]*class="[^"]*recommend[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            // 移除评论区
+            .replace(/<div[^>]*class="[^"]*comment[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+            // 移除空链接和无用按钮（但保留有href的正常链接）
+            .replace(/<a[^>]*href="#"[^>]*>[\s\S]*?<\/a>/gi, '')
+            // 移除事件处理器（但保留 data-* 属性，可能包含有用信息）
+            .replace(/\s+onclick="[^"]*"/gi, '')
+            .replace(/\s+onload="[^"]*"/gi, '');
+          
+          logger.info(`[fetchFullContent] 提取到内容: ${content.length} 字符`);
+          return content;
         }
       }
 
       return null;
     } catch (error) {
+      logger.error('[fetchFullContent] 获取全文失败:', error);
       return null;
     }
   }

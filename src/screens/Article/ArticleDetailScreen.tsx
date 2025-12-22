@@ -26,6 +26,7 @@ import { articleService } from '../../services/ArticleService';
 import { dictionaryService } from '../../services/DictionaryService';
 import { vocabularyService } from '../../services/VocabularyService';
 import { translationService } from '../../services/TranslationService';
+import { SettingsService } from '../../services/SettingsService';
 import type { RootStackParamList } from '../../navigation/types';
 import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
 import { getFontStackForWebView } from '../../theme/typography';
@@ -317,6 +318,9 @@ const ArticleDetailScreen: React.FC = () => {
   const [noUnreadArticle, setNoUnreadArticle] = useState(false); // 【新增】无未读文章提示
   const [nextUnreadIndex, setNextUnreadIndex] = useState<number | null>(null); // 【新增】下一篇未读文章索引
   
+  // 【新增】代理服务器地址，用于处理防盗链图片
+  const [proxyServerUrl, setProxyServerUrl] = useState<string>('');
+  
   // 【修改】检查是否有下一篇未读文章
   const hasNextArticle = nextUnreadIndex !== null;
 
@@ -327,6 +331,12 @@ const ArticleDetailScreen: React.FC = () => {
       try {
         setLoading(true);
         setWebViewReady(false); // 【关键修改】每次加载新文章前，重置 WebView 状态
+
+        // 【新增】获取代理服务器配置
+        const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+        if (proxyConfig.enabled && proxyConfig.serverUrl) {
+          setProxyServerUrl(proxyConfig.serverUrl);
+        }
 
         // 【新增】使用 Promise.all 并行加载所有数据：文章内容、滚动位置、生词本
         // 确保所有数据都准备好后再生成 HTML，避免数据缺失
@@ -779,8 +789,10 @@ const ArticleDetailScreen: React.FC = () => {
       // 这样 HTML 初始化时就能直接处理，无需等待 WebView ready 后再注入
       initialScrollY,
       vocabularyWords,
+      // 【新增】代理服务器地址，用于处理防盗链图片
+      proxyServerUrl,
     });
-  }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, vocabularyWords]);
+  }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, vocabularyWords, proxyServerUrl]);
 
   if (loading || settingsLoading) {
     return (

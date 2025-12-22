@@ -38,20 +38,29 @@ export class RSSService {
     sourceMode: 'direct' | 'proxy' = 'direct'
   ): Promise<RSSSource> {
     try {
-      // 1. 验证 RSS 源
-      const feedInfo = await localRSSService.validateRSSFeed(url);
+      // 🔥 清理 URL：去除空格和末尾多余斜杠
+      let cleanUrl = url.trim();
+      if (cleanUrl.match(/\/[^/]+\/$/) && !cleanUrl.endsWith('://')) {
+        cleanUrl = cleanUrl.replace(/\/$/, '');
+        logger.info(`[addRSSSource] 已移除末尾斜杠: ${url} -> ${cleanUrl}`);
+      }
       
-      // 2. 代理模式：调用服务端订阅 API
-      const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-      if (proxyConfig.enabled && proxyConfig.token) {
-        await proxyRSSService.subscribeToProxyServer(url, title, proxyConfig);
+      // 1. 验证 RSS 源
+      const feedInfo = await localRSSService.validateRSSFeed(cleanUrl);
+      
+      // 2. 代理模式：调用服务端订阅 API（仅当源级别选择代理模式时）
+      if (sourceMode === 'proxy') {
+        const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
+        if (proxyConfig.enabled && proxyConfig.token) {
+          await proxyRSSService.subscribeToProxyServer(cleanUrl, title, proxyConfig);
+        }
       }
       
       // 3. 保存到本地数据库
       const rssSource: Omit<RSSSource, 'id'> = {
         sortOrder: 0,
         name: title || feedInfo.title || 'Unknown Feed',
-        url,
+        url: cleanUrl,
         category,
         contentType,
         sourceMode,
@@ -97,7 +106,7 @@ export class RSSService {
       logger.error('Error adding RSS source:', error);
       throw new AppError({
         code: 'RSS_ADD_ERROR',
-        message: `Failed to add RSS source: ${url}`,
+        message: `Failed to add RSS source: ${url.trim()}`,
         details: error,
         timestamp: new Date(),
       });

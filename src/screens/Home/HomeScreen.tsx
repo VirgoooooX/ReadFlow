@@ -16,11 +16,38 @@ import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { articleService, RSSService } from '../../services';
+import { SettingsService } from '../../services/SettingsService';
 import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import type { Article } from '../../types';
 import CustomTabBar from '../../components/CustomTabBar';
 import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
 import { useSharedValue } from 'react-native-reanimated';
+
+// 🔥 防盗链域名列表
+const ANTI_HOTLINK_DOMAINS = [
+  'cdnfile.sspai.com', 'cdn.sspai.com', 'sspai.com',
+  's3.ifanr.com', 'images.ifanr.cn', 'ifanr.com',
+  'cnbetacdn.com', 'static.cnbetacdn.com',
+  'twimg.com', 'pbs.twimg.com',
+  'miro.medium.com',
+];
+
+/**
+ * 检查图片 URL 是否需要代理
+ */
+function needsProxy(url: string): boolean {
+  if (!url || url.startsWith('data:')) return false;
+  const urlLower = url.toLowerCase();
+  return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
+}
+
+/**
+ * 将图片 URL 转换为代理 URL
+ */
+function toProxyUrl(url: string, proxyServerUrl: string): string {
+  if (!url || !proxyServerUrl) return url;
+  return `${proxyServerUrl}/api/image?url=${encodeURIComponent(url)}`;
+}
 
 // 【修改】全局状态，记录是否切换过文章
 export let lastViewedArticleId: number | null = null;
@@ -52,7 +79,7 @@ export const getPendingScrollInfo = () => {
 type Props = HomeStackScreenProps<'HomeMain'>;
 
 // 【优化】提取单独的 ArticleItem 组件，性能更好且代码更清晰
-const ArticleItem = memo(({ item, onPress, styles, isDark, theme }: any) => {
+const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl }: any) => {
   // 格式化日期，看起来更友好
   const dateStr = useMemo(() => {
     const date = new Date(item.publishedAt);
@@ -63,6 +90,15 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme }: any) => {
     }
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   }, [item.publishedAt]);
+
+  // 🔥 处理防盗链图片代理
+  const imageUri = useMemo(() => {
+    if (!item.imageUrl) return null;
+    if (proxyServerUrl && needsProxy(item.imageUrl)) {
+      return toProxyUrl(item.imageUrl, proxyServerUrl);
+    }
+    return item.imageUrl;
+  }, [item.imageUrl, proxyServerUrl]);
 
   return (
     <TouchableOpacity
@@ -101,9 +137,9 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme }: any) => {
       </View>
 
       {/* 图片区域：固定尺寸，右侧展示 */}
-      {item.imageUrl && (
+      {imageUri && (
         <Image
-          source={{ uri: item.imageUrl }}
+          source={{ uri: imageUri }}
           style={styles.articleImage}
           resizeMode="cover"
         />
@@ -121,6 +157,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   isDark,
   theme,
   isActive,
+  proxyServerUrl, // 🔥 新增
   // 【删除】不再需要 initialArticleId prop
 }: any, ref: React.Ref<any>) {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
@@ -185,6 +222,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
           styles={styles}
           isDark={isDark}
           theme={theme}
+          proxyServerUrl={proxyServerUrl}
         />
       )}
       ListEmptyComponent={() => (
@@ -219,6 +257,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
+  const [proxyServerUrl, setProxyServerUrl] = useState<string>(''); // 🔥 新增
   // 【删除】不再需要 scrollToArticleId 状态
 
   const styles = createStyles(isDark, theme);
@@ -245,6 +284,21 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   useEffect(() => { loadArticles(); }, []);
+  
+  // 🔥 获取代理配置
+  useEffect(() => {
+    const loadProxyConfig = async () => {
+      try {
+        const config = await SettingsService.getInstance().getProxyModeConfig();
+        if (config.enabled && config.serverUrl) {
+          setProxyServerUrl(config.serverUrl);
+        }
+      } catch (error) {
+        console.error('Failed to load proxy config:', error);
+      }
+    };
+    loadProxyConfig();
+  }, []);
   
   // 【修改】返回时检查是否需要重定位
   useFocusEffect(useCallback(() => { 
@@ -345,6 +399,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           isDark={isDark}
           theme={theme}
           isActive={true}
+          proxyServerUrl={proxyServerUrl}
         />
       </View>
     );

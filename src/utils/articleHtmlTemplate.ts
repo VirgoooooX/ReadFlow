@@ -1,7 +1,48 @@
 /**
  * HTML 模板生成器
- * 用于 WebView 渲染文章内容，包含样式和交互脚本
+ * 用于 WebView 渲柣文章内容，包含样式和交互脚本
  */
+
+// 防盗链图片域名列表，需要通过代理加载
+const ANTI_HOTLINK_DOMAINS = [
+  'cdnfile.sspai.com', 'cdn.sspai.com', 'sspai.com',
+  's3.ifanr.com', 'images.ifanr.cn', 'ifanr.com',
+  'cnbetacdn.com', 'static.cnbetacdn.com',
+  'twimg.com', 'pbs.twimg.com',
+  'miro.medium.com',
+];
+
+/**
+ * 检查图片 URL 是否需要代理
+ */
+function needsProxy(url: string): boolean {
+  if (!url || url.startsWith('data:')) return false;
+  const urlLower = url.toLowerCase();
+  return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
+}
+
+/**
+ * 将图片 URL 转换为代理 URL
+ */
+function toProxyUrl(url: string, proxyServerUrl: string): string {
+  if (!url || !proxyServerUrl) return url;
+  return `${proxyServerUrl}/api/image?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * 替换 HTML 中需要代理的图片 URL
+ */
+function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
+  if (!html || !proxyServerUrl) return html;
+  
+  // 替换 src 属性中的图片 URL
+  return html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
+    if (needsProxy(url)) {
+      return `${prefix}${toProxyUrl(url, proxyServerUrl)}${suffix}`;
+    }
+    return match;
+  });
+}
 
 export interface HtmlTemplateOptions {
   content: string;
@@ -23,6 +64,8 @@ export interface HtmlTemplateOptions {
   // 【新增】直接传入初始滚动位置和生词表
   initialScrollY?: number;
   vocabularyWords?: string[];
+  // 【新增】代理服务器地址，用于处理防盗链图片
+  proxyServerUrl?: string;
 }
 
 export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
@@ -44,7 +87,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     articleUrl = '',   // 【新增】文章原始链接
     // 【新增】默认值
     initialScrollY = 0,
-    vocabularyWords = []
+    vocabularyWords = [],
+    proxyServerUrl = ''  // 【新增】代理服务器地址
   } = options;
 
   // 主题色配置 - 优化了颜色方案
@@ -67,9 +111,19 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   const imageCaptionHtml = imageCaption ? `<div class="hero-image-caption">${imageCaption}</div>` : '';
   const imageCreditHtml = imageCredit ? `<div class="hero-image-credit">${imageCredit}</div>` : '';
 
-  // 【新增】优化1：图片懐加载 - 处理内容添加loading="lazy"属性
-  // 将 <img src="..."> 替换为 <img loading="lazy" src="...">
-  const optimizedContent = content.replace(/<img\s+/gi, '<img loading="lazy" ');
+  // 【新增】优化1：图片懒加载 - 处理内容添加loading="lazy"属性
+  let optimizedContent = content.replace(/<img\s+/gi, '<img loading="lazy" ');
+
+  // 【新增】处理防盗链图片：将需要代理的图片 URL 替换为代理 URL
+  if (proxyServerUrl) {
+    optimizedContent = proxyImagesInHtml(optimizedContent, proxyServerUrl);
+  }
+
+  // 处理封面图片的代理
+  let proxiedImageUrl = imageUrl || '';
+  if (proxyServerUrl && imageUrl && needsProxy(imageUrl)) {
+    proxiedImageUrl = toProxyUrl(imageUrl, proxyServerUrl);
+  }
 
   // CSS 样式 - 优化英文排版和图片说明
   const css = `
@@ -1597,9 +1651,9 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         ${author ? `<span class="meta-item author">By ${author}</span>` : ''}
       </div>
 
-      ${imageUrl ? `
+      ${proxiedImageUrl ? `
         <div class="hero-image-container">
-          <img src="${imageUrl}" class="hero-image" alt="Cover" />
+          <img src="${proxiedImageUrl}" class="hero-image" alt="Cover" />
           ${imageCaptionHtml}
           ${imageCreditHtml}
         </div>

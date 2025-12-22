@@ -31,6 +31,15 @@ export class ImageExtractionService {
   ];
   private readonly MIN_FILE_SIZE = 5000; // 5KB 最小文件大小
   private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB 最大文件大小
+  
+  // 🔥 防盗链域名列表 - 这些域名跳过 HEAD 验证（因为会被拒绝）
+  private readonly ANTI_HOTLINK_DOMAINS = [
+    'cdnfile.sspai.com', 'cdn.sspai.com', 'sspai.com',
+    's3.ifanr.com', 'images.ifanr.cn', 'ifanr.com',
+    'cnbetacdn.com', 'static.cnbetacdn.com',
+    'twimg.com', 'pbs.twimg.com',
+    'miro.medium.com',
+  ]
 
   constructor() {}
 
@@ -219,7 +228,13 @@ export class ImageExtractionService {
       'amazonaws.com',        // AWS S3
       'gstatic.com',          // Google Static
       'googleapis.com',       // Google APIs
-      'o.aolcdn.com'          // AOL CDN (Engadget使用)
+      'o.aolcdn.com',         // AOL CDN (Engadget使用)
+      // 🔥 防盗链 CDN 也认为是有效图片域名
+      'cdnfile.sspai.com', 'cdn.sspai.com',
+      's3.ifanr.com', 'images.ifanr.cn',
+      'cnbetacdn.com', 'static.cnbetacdn.com',
+      'twimg.com', 'pbs.twimg.com',
+      'miro.medium.com',
     ];
     
     const isImageHost = imageHostnames.some(hostname => {
@@ -269,10 +284,25 @@ export class ImageExtractionService {
   }
 
   /**
+   * 检查是否是防盗链域名
+   */
+  private isAntiHotlinkDomain(url: string): boolean {
+    const urlLower = url.toLowerCase();
+    return this.ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
+  }
+
+  /**
    * 异步验证图片质量
    */
   private async validateImage(url: string): Promise<ImageValidationResult> {
     try {
+      // 🔥 对于防盗链域名，跳过 HEAD 验证（会被拒绝），直接返回成功
+      // 这些图片会通过代理服务器加载
+      if (this.isAntiHotlinkDomain(url)) {
+        console.log(`✅ 防盗链域名，跳过验证: ${url}`);
+        return { isValid: true };
+      }
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
       

@@ -29,6 +29,14 @@ var (
 
 // Referer 映射表 - 用于绕过防盗链
 var refererMap = map[string]string{
+	// 少数派 sspai
+	"cdnfile.sspai.com": "https://sspai.com/",
+	"cdn.sspai.com":     "https://sspai.com/",
+	"sspai.com":         "https://sspai.com/",
+	// 爱范儿 ifanr
+	"s3.ifanr.com":    "https://www.ifanr.com/",
+	"images.ifanr.cn": "https://www.ifanr.com/",
+	"ifanr.com":       "https://www.ifanr.com/",
 	// cnBeta
 	"cnbetacdn.com":        "https://www.cnbeta.com.tw/",
 	"static.cnbetacdn.com": "https://www.cnbeta.com.tw/",
@@ -77,6 +85,8 @@ var imageExtRegex = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|webp|svg|bmp|ico
 
 // 图片 CDN 域名列表
 var imageCdnHosts = []string{
+	"cdnfile.sspai.com", "cdn.sspai.com", // 少数派
+	"s3.ifanr.com", "images.ifanr.cn", // 爱范儿
 	"s.yimg.com", "techcrunch.com", "engadget.com", "cloudfront.net",
 	"amazonaws.com", "gstatic.com", "googleapis.com", "o.aolcdn.com",
 	"wp.com", "staticflickr.com", "imgur.com", "imgix.net", "twimg.com",
@@ -472,6 +482,18 @@ func streamImage(w http.ResponseWriter, r *http.Request, targetURL string, redir
 	log.Printf("[Image] Success: %d bytes", written)
 }
 
+// handleSubscribe 处理订阅请求
+// 极简代理模式下，服务端不存储订阅列表，直接返回成功
+func handleSubscribe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		sendJSON(w, 405, map[string]interface{}{"success": false, "message": "Method not allowed"})
+		return
+	}
+
+	log.Printf("[Subscribe] New subscription request")
+	sendJSON(w, 200, map[string]interface{}{"success": true, "message": "Subscribed"})
+}
+
 // handleHealth 健康检查
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, 200, map[string]interface{}{
@@ -514,7 +536,8 @@ func min(a, b int) int {
 func main() {
 	// 路由
 	http.HandleFunc("/api/rss", authMiddleware(handleRSS, false))
-	http.HandleFunc("/api/image", authMiddleware(handleImage, true)) // 图片跳过认证
+	http.HandleFunc("/api/image", authMiddleware(handleImage, true))          // 图片跳过认证
+	http.HandleFunc("/api/subscribe", authMiddleware(handleSubscribe, false)) // 订阅接口
 	http.HandleFunc("/health", authMiddleware(handleHealth, true))
 	http.HandleFunc("/", authMiddleware(handleHealth, true))
 
