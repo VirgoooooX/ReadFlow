@@ -530,6 +530,34 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
 
+      <UserStack.Screen
+        name="AddRSSSource"
+        options={{ title: '添加RSS源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="添加RSS源"
+            showBackButton={true}
+          >
+            <AddRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
+        name="EditRSSSource"
+        options={{ title: '编辑RSS源' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="编辑RSS源"
+            showBackButton={true}
+          >
+            <EditRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
     </UserStack.Navigator>
   );
 }

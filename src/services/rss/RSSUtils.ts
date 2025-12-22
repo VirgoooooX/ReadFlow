@@ -155,6 +155,54 @@ export function preserveHtmlContent(
 }
 
 /**
+ * 修复 HTML 中的相对路径图片链接
+ * @param htmlContent RSS 中的 description 内容
+ * @param articleLink RSS 中的 link (文章原始链接)
+ * @returns 修复后的 HTML 内容
+ */
+export function fixRelativeImageUrls(htmlContent: string, articleLink: string): string {
+  if (!htmlContent || !articleLink) return htmlContent;
+
+  try {
+    // 1. 从文章链接中提取 Base URL (例如: http://military.people.com.cn)
+    const urlObj = new URL(articleLink);
+    const origin = urlObj.origin; // 结果如: "http://military.people.com.cn"
+
+    // 检查是否有相对路径图片
+    const hasRelativePath = /src=["']\/[^\/]/.test(htmlContent) || /(data-[\w-]+)=["']\/[^\/]/.test(htmlContent);
+    if (hasRelativePath) {
+      logger.info(`[fixRelativeImageUrls] 检测到相对路径图片，原始域名: ${origin}`);
+    }
+
+    // 2. 修复 src="/..." 形式的相对路径
+    let fixed = htmlContent.replace(/src="\/([^"]+)"/g, (match, path) => {
+      const fixedUrl = `src="${origin}/${path}"`;
+      logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
+      return fixedUrl;
+    });
+
+    // 3. 修复 src='/...' 形式的相对路径（单引号）
+    fixed = fixed.replace(/src='\/([^']+)'/g, (match, path) => {
+      const fixedUrl = `src='${origin}/${path}'`;
+      logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
+      return fixedUrl;
+    });
+
+    // 4. 修复 data-src="/..." 等懒加载属性
+    fixed = fixed.replace(/(data-[\w-]+)="\/([^"]+)"/g, (match, attr, path) => {
+      const fixedUrl = `${attr}="${origin}/${path}"`;
+      logger.info(`[fixRelativeImageUrls] 修复懒加载: ${match} -> ${fixedUrl}`);
+      return fixedUrl;
+    });
+
+    return fixed;
+  } catch (e) {
+    logger.warn('[fixRelativeImageUrls] URL解析失败:', e);
+    return htmlContent;
+  }
+}
+
+/**
  * 生成文章摘要
  */
 export function generateSummary(content: string, maxLength: number = 200): string {

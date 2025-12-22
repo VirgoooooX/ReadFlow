@@ -213,6 +213,71 @@ func replaceImageURLs(content string) string {
 	return result
 }
 
+// fixRelativeImageURLs 修复 XML 中的相对路径图片链接
+// 从 RSS 源 URL 中提取 origin（协议+域名）并补全所有相对路径
+func fixRelativeImageURLs(content string, feedURL string) string {
+	// 解析 feedURL 提取 origin
+	parsedURL, err := url.Parse(feedURL)
+	if err != nil {
+		log.Printf("[fixRelativeImageURLs] Failed to parse feedURL: %v", err)
+		return content
+	}
+
+	origin := parsedURL.Scheme + "://" + parsedURL.Host
+	log.Printf("[fixRelativeImageURLs] Origin: %s", origin)
+
+	// 匹配相对路径图片的模式
+	patterns := []struct {
+		pattern string
+		desc    string
+	}{
+		// src="/..." 形式
+		{`(src=)(["'])(/[^"']+)(["'])`, "src=\"/...\""},
+		// data-src="/..." 等懒加载属性
+		{`(data-[\w-]+=)(["'])(/[^"']+)(["'])`, "data-*=\"/...\""},
+		// HTML 实体编码形式: src=&quot;/...&quot;
+		{`(src=&quot;)(/[^&]+)(&quot;)`, "src=&quot;/...&quot;"},
+		// enclosure url="/..."
+		{`(url=)(["'])(/[^"']+)(["'])`, "url=\"/...\""},
+	}
+
+	result := content
+
+	for _, p := range patterns {
+		re := regexp.MustCompile(p.pattern)
+		result = re.ReplaceAllStringFunc(result, func(match string) string {
+			submatches := re.FindStringSubmatch(match)
+			if len(submatches) < 4 {
+				return match
+			}
+
+			// 根据不同格式提取组件
+			var attrPrefix, quote1, path, quote2 string
+			if len(submatches) == 5 {
+				// 标准格式: attr=" /path "
+				attrPrefix = submatches[1]
+				quote1 = submatches[2]
+				path = submatches[3]
+				quote2 = submatches[4]
+			} else {
+				// HTML实体格式: src=&quot; /path &quot;
+				attrPrefix = submatches[1]
+				path = submatches[2]
+				quote2 = submatches[3]
+				quote1 = ""
+			}
+
+			// 补全为绝对路径
+			fixedURL := origin + path
+			log.Printf("[fixRelativeImageURLs] Fixed: %s -> %s", match, fixedURL)
+
+			return attrPrefix + quote1 + fixedURL + quote2
+		})
+	}
+
+	return result
+}
+
 // validateToken 验证 Token
 func validateToken(r *http.Request) bool {
 	if authToken == "" {
@@ -293,6 +358,9 @@ func handleRSS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	content := string(body)
+
+	// 🔥 在替换图片 URL 之前，先修复相对路径
+	content = fixRelativeImageURLs(content, feedURL)
 
 	// 替换图片 URL
 	content = replaceImageURLs(content)

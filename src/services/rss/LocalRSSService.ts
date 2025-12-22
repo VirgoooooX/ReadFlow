@@ -17,6 +17,7 @@ import {
   countWords,
   parsePublishedDate,
   shouldUseCorsProxy,
+  fixRelativeImageUrls,
 } from './RSSUtils';
 
 export class LocalRSSService {
@@ -59,10 +60,36 @@ export class LocalRSSService {
         rsshubInfo = rsshubService.parseRSSHubUrl(url);
       }
       
-      const response = await fetch(actualUrl, {
+      // 检查是否需要使用 CORS 代理
+      const useCorsProxy = shouldUseCorsProxy(actualUrl);
+      
+      // 使用完整的请求头，模拟真实浏览器
+      const fetchOptions: RequestInit = {
         headers: {
-          'User-Agent': 'TechFlow Mobile App/1.0',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'Accept-Encoding': 'gzip, deflate',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
         },
+      };
+      
+      let finalUrl = actualUrl;
+      if (useCorsProxy) {
+        finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(actualUrl)}`;
+        if (fetchOptions.headers && typeof fetchOptions.headers === 'object') {
+          const headers = fetchOptions.headers as Record<string, string>;
+          delete headers['User-Agent'];
+        }
+      }
+      
+      // 使用重试机制和超时控制
+      const response = await fetchWithRetry(finalUrl, {
+        ...fetchOptions,
+        retries: 3,
+        retryDelay: 1500,
+        timeout: 20000  // 增加超时时间到20秒
       });
       
       if (!response.ok) {
@@ -86,6 +113,7 @@ export class LocalRSSService {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error(`RSS 源验证失败 [${url}]:`, error);
       throw new Error(`RSS 源验证失败: ${errorMsg}`);
     }
   }
@@ -337,8 +365,18 @@ export class LocalRSSService {
         
         if (!item.title || !itemLink) continue;
         
+        // 🔥 关键：在提取内容和图片之前，先修复相对路径
         const rawContent = item.content || item.description || '';
-        const content = await this.extractContent(rawContent, itemLink, source.contentType || 'image_text');
+        const fixedRawContent = fixRelativeImageUrls(rawContent, itemLink);
+        
+        // 🔥 修复后更新回 item 对象，确保封面图提取也用修复后的内容
+        if (item.content) {
+          item.content = fixedRawContent;
+        } else if (item.description) {
+          item.description = fixedRawContent;
+        }
+        
+        const content = await this.extractContent(fixedRawContent, itemLink, source.contentType || 'image_text');
         const wordCount = countWords(content);
         
         let publishedAt = new Date();
@@ -396,9 +434,10 @@ export class LocalRSSService {
             }
           }
           
-          if (!imageUrl && rawContent) {
+          // 从已修复的 rawContent 中提取图片
+          if (!imageUrl && fixedRawContent) {
             try {
-              imageUrl = await imageExtractionService.extractImageFromContent(rawContent);
+              imageUrl = await imageExtractionService.extractImageFromContent(fixedRawContent);
             } catch (error) {
               // 忽略
             }
@@ -435,9 +474,12 @@ export class LocalRSSService {
         const fullContent = await this.fetchFullContent(url);
         if (fullContent) {
           rawContent = fullContent;
+          // 如果从全文获取，也需要修复相对路径
+          rawContent = fixRelativeImageUrls(rawContent, url);
         }
       }
 
+      // 清理 HTML（相对路径已在外层修复过了）
       return preserveHtmlContent(rawContent, contentType);
     } catch (error) {
       logger.error('内容提取失败:', error);

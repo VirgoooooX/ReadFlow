@@ -57,7 +57,25 @@ const AddRSSSourceScreen: React.FC = () => {
       return true;
     } catch (error) {
       setIsValidating(false);
-      Alert.alert('验证失败', '无法访问该RSS源，请检查地址是否正确');
+      console.error('RSS验证失败:', error);
+      
+      // 提供更详细的错误信息和解决方案
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      let helpText = '无法访问该RSS源。\n\n';
+      
+      if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
+        helpText += '可能原因：\n• 网络连接较慢\n• RSS源服务器响应慢\n\n建议：\n• 检查网络连接\n• 开启「通过代理获取」开关\n• 稍后再试';
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+        helpText += '可能原因：\n• 无法连接到服务器\n• 域名解析失败\n\n建议：\n• 检查URL是否正确\n• 尝试开启「通过代理获取」';
+      } else if (errorMsg.includes('404') || errorMsg.includes('Not Found')) {
+        helpText += '可能原因：\n• RSS地址不存在\n\n建议：\n• 检查URL是否完整正确\n• 在浏览器中测试该地址';
+      } else if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+        helpText += '可能原因：\n• 服务器拒绝访问\n\n建议：\n• 开启「通过代理获取」开关';
+      } else {
+        helpText += '建议：\n• 检查URL是否正确\n• 尝试开启「通过代理获取」\n• 检查网络连接';
+      }
+      
+      Alert.alert('验证失败', helpText);
       return false;
     }
   };
