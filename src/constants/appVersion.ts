@@ -2,10 +2,17 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '3.1.0',
-  buildNumber: 30100,
-  updateTime: '2025-12-21',
+  version: 'test',
+  buildNumber: 1,
+  updateTime: '2025-12-22',
   changelog: [
+    '升级版本号至3.1.0',
+    '修改android/app/build.gradle中的versionCode至30100',
+    '修改android/app/build.gradle中的versionName至3.1.0',
+    '更新app.json内的version为3.1.0',
+    '更新app.json中android配置的versionCode为30100',
+    '移除多余依赖，精简package-lock.json',
+    '添加expo-haptics和expo-linear-gradient依赖版本信息',
     '升级版本号至3.0.0并调整构建配置',
     '更新app.json和android build.gradle中的版本号和buildCode',
     '修改Go服务Dockerfile支持自动架构检测及优化docker-compose配置',
@@ -14,13 +21,6 @@ export const APP_VERSION = {
     '优化底部标签栏样式使用主题颜色及边框，提升视觉一致性',
     '调整CustomHeader组件，支持深色模式下更合适的背景和文字颜色',
     '增强状态栏文字颜色逻辑，提升深浅色模式下的显示效果',
-    '优化AboutScreen和LLMSettingsScreen的样式，提升配色和间距布局',
-    'LLMSettingsScreen调整选项列表渲染方式，改进分割线与选中样式',
-    'ArticleDetailScreen新增传递字体设置至WebView，增强字体渲染一致性',
-    '删除项目样式系统统一更新总结文档，样式改进已整合至代码中',
-    '新增RSS源代理获取功能及相关设置界面',
-    '新增通过代理服务器抓取RSS源的选项，适用于需要翻墙的国外源',
-    '在添加和编辑RSS源界面中增加“通过代理获取”开关',
   ],
 };
 

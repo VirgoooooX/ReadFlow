@@ -73,6 +73,22 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
 
   // CSS 样式 - 优化英文排版和图片说明
   const css = `
+    /* 【优化】CSS 变量，支持动态换肤 */
+    :root {
+      --color-text: ${colors.text};
+      --color-bg: ${colors.background};
+      --color-secondary: ${colors.secondaryText};
+      --color-strong: ${colors.strong};
+      --color-link: ${colors.link};
+      --color-blockquote-bg: ${colors.blockquoteBg};
+      --color-blockquote-border: ${colors.blockquoteBorder};
+      --color-code-bg: ${colors.codeBg};
+      --color-code-text: ${colors.codeText};
+      --color-table-border: ${colors.tableBorder};
+      --color-table-header-bg: ${colors.tableHeaderBg};
+      --color-caption: ${colors.caption};
+    }
+    
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
@@ -91,13 +107,16 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       font-family: ${fontFamily};
       font-size: ${fontSize}px;
       line-height: ${lineHeight};
-      color: ${colors.text};
-      background-color: ${colors.background};
+      color: var(--color-text);
+      background-color: var(--color-bg);
       /* 增加最大宽度，优化平板阅读体验 */
       max-width: 800px;
       margin: 0 auto;
-      padding: 20px;
-      padding-bottom: 80px;
+      /* 【优化】Safe Area 适配 */
+      padding-left: max(20px, env(safe-area-inset-left));
+      padding-right: max(20px, env(safe-area-inset-right));
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: calc(80px + env(safe-area-inset-bottom));
       word-wrap: break-word;
       overflow-wrap: break-word;
       
@@ -117,7 +136,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       font-weight: 700;
       line-height: 1.25;
       margin: 0 0 12px 0;
-      color: ${colors.text};
+      color: var(--color-text);
       letter-spacing: -0.02em;
     }
 
@@ -126,7 +145,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       font-weight: 400;
       line-height: 1.5;
       margin: 0 0 16px 0;
-      color: ${colors.secondaryText};
+      color: var(--color-secondary);
       font-family: ${fontFamily};
     }
 
@@ -135,7 +154,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       flex-wrap: wrap;
       align-items: center;
       font-size: 0.9em;
-      color: ${colors.secondaryText};
+      color: var(--color-secondary);
       margin-bottom: 24px;
       font-family: sans-serif;
     }
@@ -146,7 +165,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   
     .meta-item.source {
       font-weight: 600;
-      color: ${colors.link};
+      color: var(--color-link);
     }
 
     .hero-image-container {
@@ -168,7 +187,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     .header-divider {
       border: none;
       height: 1px;
-      background-color: ${colors.tableBorder};
+      background-color: var(--color-table-border);
       margin: 0 0 32px 0;
       opacity: 0.6;
     }
@@ -186,15 +205,15 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       margin: 2em 0 0.8em 0;
       font-weight: 700;
       line-height: 1.3;
-      color: ${colors.text};
+      color: var(--color-text);
     }
     
-    h1 { font-size: 1.8em; }
-    h2 { font-size: 1.6em; }
-    h3 { font-size: 1.4em; }
-    h4 { font-size: 1.2em; }
-    h5 { font-size: 1.1em; }
-    h6 { font-size: 1.0em; }
+    h1 { font-size: 1.4em; }
+    h2 { font-size: 1.3em; }
+    h3 { font-size: 1.2em; }
+    h4 { font-size: 1.1em; }
+    h5 { font-size: 1.0em; }
+    h6 { font-size: 0.95em; }
     
     .article-content {
       /* 正文容器 */
@@ -203,7 +222,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     /* 强调 */
     strong, b {
       font-weight: 700;
-      color: ${colors.strong};
+      color: var(--color-strong);
     }
     
     em, i {
@@ -212,7 +231,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     
     /* 链接优化 */
     a {
-      color: ${colors.link};
+      color: var(--color-link);
       text-decoration: none;
       border-bottom: 1px solid rgba(59, 130, 246, 0.3);
       padding-bottom: 1px;
@@ -297,12 +316,12 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     blockquote {
       margin: 2em 0;
       padding: 16px 20px;
-      background-color: ${colors.blockquoteBg};
-      border-left: 4px solid ${colors.blockquoteBorder};
+      background-color: var(--color-blockquote-bg);
+      border-left: 4px solid var(--color-blockquote-border);
       border-radius: 4px;
       font-family: "Georgia", serif;
       font-style: italic;
-      color: ${colors.text};
+      color: var(--color-text);
     }
     
     blockquote p {
@@ -313,8 +332,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     code {
       font-family: 'Courier New', Courier, monospace;
       font-size: 0.9em;
-      background-color: ${colors.codeBg};
-      color: ${colors.codeText};
+      background-color: var(--color-code-bg);
+      color: var(--color-code-text);
       padding: 2px 6px;
       border-radius: 4px;
     }
@@ -322,7 +341,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     pre {
       margin: 1.5em 0;
       padding: 12px;
-      background-color: ${colors.codeBg};
+      background-color: var(--color-code-bg);
       border-radius: 8px;
       overflow-x: auto;
     }
@@ -344,12 +363,12 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     
     th, td {
       padding: 10px;
-      border: 1px solid ${colors.tableBorder};
+      border: 1px solid var(--color-table-border);
       text-align: left;
     }
     
     th {
-      background-color: ${colors.tableHeaderBg};
+      background-color: var(--color-table-header-bg);
       font-weight: 700;
     }
     
@@ -364,7 +383,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     .img-caption {
       font-size: 0.85em; /* 字号更小 */
       line-height: 1.4;
-      color: ${colors.caption}; /* 灰色 */
+      color: var(--color-caption); /* 灰色 */
       text-align: center; /* 居中对齐 */
       margin-top: -4px; /* 向上拉近与图片的距离 */
       margin-bottom: 32px; /* 与下方正文拉开距离 */
@@ -387,7 +406,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     figcaption {
       font-size: 0.9em;
       line-height: 1.5;
-      color: ${colors.caption};
+      color: var(--color-caption);
       text-align: center;
       padding: 8px 16px;
       margin: 0 0 8px 0;
@@ -454,7 +473,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     .hero-image-caption {
       font-size: 0.85em;
       line-height: 1.4;
-      color: ${colors.caption};
+      color: var(--color-caption);
       text-align: center;
       margin-top: 8px;
       margin-bottom: 8px;
@@ -559,7 +578,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     /* 拆解后的卡片样式 */
     .gallery-card {
        margin-bottom: 32px;
-       background-color: ${colors.background};
+       background-color: var(--color-bg);
     }
     
     .gallery-card img {
@@ -571,7 +590,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
        margin-top: 8px;
        padding: 0 4px;
        font-size: 0.9em;
-       color: ${colors.caption};
+       color: var(--color-caption);
        line-height: 1.4;
        border-left: 3px solid ${isDark ? '#444' : '#eee'}; /* 左侧装饰线 */
        padding-left: 10px;
@@ -637,18 +656,23 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
           // 「可选优化」如果想为文本模式的内容生成说明（比如从第三方 API 获取的 JSON）：
           // 可以在后端处理时就生成好 figcaption，而不是在前端提取 alt
           
-          // 【新增】图片点击放大 - 添加点击事件监听
-          img.addEventListener('click', function(e) {
-            e.stopPropagation(); // 阻止冒泡，防止触发查词
-            e.preventDefault();
-          
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'imageClick',
-              url: img.src
-            }));
-          });
+          // 【优化】图片点击放大使用事件代理（在后面统一处理）
+          // 不再给每个 img 绑定监听器，减少内存占用
         });
       }
+      
+      // 【新增】图片点击事件代理 - 性能优化
+      document.querySelector('.article-content').addEventListener('click', function(e) {
+        if (e.target.tagName === 'IMG') {
+          e.stopPropagation();
+          e.preventDefault();
+          
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'imageClick',
+            url: e.target.src
+          }));
+        }
+      });
       
       // 【新增】视频优化：包裹视频并添加可见性检测
       function setupVideos() {
@@ -750,8 +774,19 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             var link = document.createElement('a');
             link.href = articleUrl || '#'; // 注入文章原本的链接
             link.className = "generated-video-card";
-            link.innerHTML = '<span class="icon">▶</span><span class="text">' + captionText + '</span>';
             link.target = "_blank";
+            
+            // 【优化】使用 textContent 防止 XSS
+            var iconSpan = document.createElement('span');
+            iconSpan.className = 'icon';
+            iconSpan.textContent = '▶';
+            
+            var textSpan = document.createElement('span');
+            textSpan.className = 'text';
+            textSpan.textContent = captionText; // 安全
+            
+            link.appendChild(iconSpan);
+            link.appendChild(textSpan);
 
             // 4. 替换 DOM
             // 在 videoBlock 的位置插入新链接
@@ -937,27 +972,63 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       }
 
       // ==========================================
-      // 【关键修改】优化4：改为高频节流 + touchend 强制保存
+      // 【优化】RAF + 去重方案 - 解决响应慢和进度不一致
       // ==========================================
-      let lastLogTime = 0;
-      const THROTTLE_DELAY = 100; // 每 100ms 至少发送一次，保证数据新鲜
+      let rafId = null;
+      let lastSentY = -1;          // 上次发送的 Y 坐标
+      let lastSentProgress = -1;   // 上次发送的进度
       
-      // 【新增】计算阅读进度百分比
+      // 【优化】计算阅读进度百分比 - 基于距离底部的像素值
       function calculateProgress() {
         const scrollTop = window.scrollY || window.pageYOffset;
         const scrollHeight = document.documentElement.scrollHeight;
         const clientHeight = window.innerHeight;
         const maxScroll = scrollHeight - clientHeight;
+        
+        // 如果内容不足一屏，进度始终为 100%
         if (maxScroll <= 0) return 100;
-        return Math.min(100, Math.round((scrollTop / maxScroll) * 100));
+        
+        // 计算基础百分比
+        const percentage = Math.min(100, Math.round((scrollTop / maxScroll) * 100));
+        
+        // 【关键】距离底部的绝对距离
+        const distanceToBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
+        
+        // 【优化】如果距离底部 < 50px，强制进度为 100%
+        // 解决图片加载导致的高度变化问题
+        if (distanceToBottom < 50) {
+          return 100;
+        }
+        
+        return percentage;
       }
       
-      // 【新增】检测是否到达底部
+      // 【优化】检测是否到达底部 - 更精确的判断
       function isAtBottom() {
         const scrollTop = window.scrollY || window.pageYOffset;
         const scrollHeight = document.documentElement.scrollHeight;
         const clientHeight = window.innerHeight;
-        return scrollHeight - scrollTop - clientHeight < 50; // 50px 容差
+        const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+        
+        // 容差 30px，同时考虑小数精度问题
+        return distanceToBottom < 30 && distanceToBottom >= -1;
+      }
+      
+      // 【新增】判断是否应该显示"下一篇"提示
+      function shouldShowNextHint() {
+        const scrollTop = window.scrollY || window.pageYOffset;
+        const scrollHeight = document.documentElement.scrollHeight;
+        const clientHeight = window.innerHeight;
+        const distanceToBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
+        const maxScroll = scrollHeight - clientHeight;
+        
+        // 文章不满一屏，立即显示
+        if (maxScroll <= 0) return true;
+        
+        // 判断是否进入留白区域
+        const paddingBottom = 80;
+        const inPaddingArea = distanceToBottom < paddingBottom;
+        return inPaddingArea;
       }
       
       function sendScrollMessage() {
@@ -967,9 +1038,18 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         // 修正：负数归零
         y = Math.max(0, y);
         
-        // 【新增】计算进度
+        // 计算进度
         const progress = calculateProgress();
         const atBottom = isAtBottom();
+        
+        // 【关键】数据去重：只有位置或进度真正变化才发送
+        if (y === lastSentY && progress === lastSentProgress) {
+          return; // 数据没变，不发送
+        }
+        
+        // 记录本次发送的值
+        lastSentY = y;
+        lastSentProgress = progress;
         
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'scroll',
@@ -980,21 +1060,61 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       }
       
       function handleScroll() {
-        const now = Date.now();
-        // 如果距离上次发送超过了 100ms，立即发送
-        if (now - lastLogTime >= THROTTLE_DELAY) {
-          sendScrollMessage();
-          lastLogTime = now;
+        // 取消之前的 RAF（如果有）
+        if (rafId) {
+          cancelAnimationFrame(rafId);
         }
+        
+        // 在下一帧执行（约 16ms，60fps）
+        rafId = requestAnimationFrame(function() {
+          sendScrollMessage();
+          rafId = null;
+        });
       }
       
-      // 监听滚动 - 高频节流（100ms）
+      // 监听滚动
       window.addEventListener('scroll', handleScroll, { passive: true });
       
-      // 【新增】监听触摸结束，额外发送一次，确保手指离开瞬间的位置被记录
-      window.addEventListener('touchend', function() {
-        setTimeout(sendScrollMessage, 50);
-      });
+      // 【新增】监听图片加载，动态更新进度
+      function setupImageLoadListener() {
+        const images = document.querySelectorAll('img[loading="lazy"], img');
+        let loadedCount = 0;
+        const totalImages = images.length;
+        
+        if (totalImages === 0) return;
+        
+        images.forEach(function(img) {
+          // 如果图片已经加载完成
+          if (img.complete) {
+            loadedCount++;
+            return;
+          }
+          
+          // 监听图片加载完成
+          img.addEventListener('load', function() {
+            loadedCount++;
+            
+            // 【关键】图片加载后，立即重新计算并发送进度
+            // 解决"已到底但进度只有 80%"的问题
+            requestAnimationFrame(function() {
+              sendScrollMessage();
+            });
+            
+            // 所有图片加载完成后，最终更新一次
+            if (loadedCount === totalImages) {
+              console.log('[Progress] All images loaded, final update');
+              setTimeout(function() {
+                sendScrollMessage();
+              }, 100);
+            }
+          }, { once: true }); // 使用 once 避免内存泄漏
+          
+          // 监听加载失败
+          img.addEventListener('error', function() {
+            loadedCount++;
+          }, { once: true });
+        });
+      }
       
       // ==========================================
       // 【新增】底部上滑检测 - 切换下一篇文章
@@ -1169,6 +1289,9 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         if (initialWords && Array.isArray(initialWords) && initialWords.length > 0) {
           window.highlightVocabularyWords(initialWords);
         }
+        
+        // 【新增】监听图片加载，动态更新进度
+        setupImageLoadListener();
 
         // 5. 立即恢复滚动位置（使用注入的数据）
         const targetY = ${injectedScrollY};
@@ -1203,6 +1326,11 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
               
         // 7. 隐藏底部的链接块
         hideFooterLinks();
+        
+        // 【新增】监听触摸结束，额外发送一次，确保手指离开瞬间的位置被记录
+        window.addEventListener('touchend', function() {
+          setTimeout(sendScrollMessage, 100);
+        });
               
         // 8. 通知 RN WebView 已准备好（此时内容已经渲染完成）
         setTimeout(function() {

@@ -390,12 +390,21 @@ const ArticleDetailScreen: React.FC = () => {
 
   // 动态更新导航栏标题
   React.useLayoutEffect(() => {
-    // 【简化】导航配置已在 AppNavigator.tsx 的 getCommonScreenOptions 中全局定义
-    // 这里只需要隐藏原生导航栏即可
+    const isNextArticle = (route as any).params?.isNextArticle || false;
+    
+    // 【关键】翻页进入后，立即把动画改回 slide_from_right
+    // 这样返回时就会用 slide 而不是 fade
+    if (isNextArticle) {
+      navigation.setOptions({
+        animation: 'slide_from_right',
+        animationDuration: 350,
+      });
+    }
+    
     navigation.setOptions({
       headerShown: false, // 隐藏原生导航栏
     });
-  }, [navigation]);
+  }, [navigation, route]);
 
   // 【新增】监听 showRefTitle 变化，执行平滑动画
   useEffect(() => {

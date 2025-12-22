@@ -645,15 +645,16 @@ function RootNavigator() {
         name="ArticleDetail"
         component={ArticleDetailScreen}
         options={({ navigation, route }) => {
-          // 【修改】下一篇文章使用 fade 淡入淡出动画，更自然
           const isNextArticle = (route as any).params?.isNextArticle || false;
           return {
-            ...getCommonScreenOptions(theme, theme.dark),  // 先应用默认配置
+            ...getCommonScreenOptions(theme, theme.dark),
             headerShown: true,
             title: '文章详情',
-            // 【关键】后设置动画，覆盖默认配置
-            animation: isNextArticle ? 'fade' : 'slide_from_right',
-            animationDuration: isNextArticle ? 200 : 350,
+            // 翻页用 fade，不影响返回动画
+            ...(isNextArticle && {
+              animation: 'fade',
+              animationDuration: 200,
+            }),
           };
         }}
       />
