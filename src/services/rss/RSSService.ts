@@ -400,7 +400,8 @@ export class RSSService {
   }
 
   /**
-   * 后台刷新所有 RSS 源
+   * 【改进】后台刷新所有 RSS 源 (使用优化的并发控制)
+   * 核心优化：使用简单但有效的 p-limit 模例
    */
   public async refreshAllSourcesBackground(
     options: {
@@ -422,17 +423,18 @@ export class RSSService {
       return { success: 0, failed: 0, totalArticles: 0, errors: [] };
     }
 
+    // 使用简单的并发控制器
+    const limiter = this.createLimiter(maxConcurrent);
+    
     let success = 0;
     let failed = 0;
     let totalArticles = 0;
     const errors: Array<{ source: string; error: string }> = [];
     let completed = 0;
 
-    const executeWithConcurrency = async (sources: RSSSource[]) => {
-      const executing: Promise<void>[] = [];
-      
-      for (const source of sources) {
-        const promise = this.fetchArticlesFromSource(source)
+    const tasks = sources.map(source => 
+      limiter(() => 
+        this.fetchArticlesFromSource(source)
           .then((articles) => {
             success++;
             totalArticles += articles.length;
@@ -452,27 +454,38 @@ export class RSSService {
             
             onError?.(error, source.name);
             onProgress?.(completed, sources.length, source.name);
-          });
+          })
+      )
+    );
 
-        executing.push(promise);
-
-        if (executing.length >= maxConcurrent) {
-          await Promise.race(executing);
-          for (let i = executing.length - 1; i >= 0; i--) {
-            if (await Promise.race([executing[i].then(() => true), Promise.resolve(false)])) {
-              executing.splice(i, 1);
-              break;
-            }
-          }
-        }
-      }
-
-      await Promise.all(executing);
-    };
-
-    await executeWithConcurrency(sources);
+    await Promise.all(tasks);
 
     return { success, failed, totalArticles, errors };
+  }
+
+  /**
+   * 【辅助】不需要依赖外部库的 p-limit 模例
+   * 配置最大3个同时请求，防止主线程阻塞或服务器过载
+   */
+  private createLimiter(maxConcurrent: number = 3) {
+    let running = 0;
+    const queue: Array<(value: void) => void> = [];
+
+    const run = async (fn: () => Promise<any>) => {
+      while (running >= maxConcurrent) {
+        await new Promise<void>(resolve => queue.push(resolve));
+      }
+      running++;
+      try {
+        return await fn();
+      } finally {
+        running--;
+        const resolve = queue.shift();
+        if (resolve) resolve();
+      }
+    };
+
+    return (fn: () => Promise<any>) => run(fn);
   }
 
   /**

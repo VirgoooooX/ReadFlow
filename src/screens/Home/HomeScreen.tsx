@@ -157,17 +157,18 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   isDark,
   theme,
   isActive,
-  proxyServerUrl, // 🔥 新增
-  // 【删除】不再需要 initialArticleId prop
+  isNeighbor,
+  proxyServerUrl,
 }: any, ref: React.Ref<any>) {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
   const flatListRef = useRef<FlatList>(null);
   const ITEM_HEIGHT = 110;
   
+  // 🌟 中間层优化：传入 isNeighbor 下，得以组件本身接收 props
+  const hasTriedLoad = useRef(false);
+
   // 【删除】不再需要跟踪可见项和滚动位置
   
-  // 【删除】不再自动滚动，仅通过 scrollToArticleId 方法调用
-
   // 【简化】直接滚动到指定文章，不做任何检查
   React.useImperativeHandle(ref, () => ({
     scrollToArticleId: (articleId: number) => {
@@ -175,14 +176,15 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       if (index < 0 || !flatListRef.current) return;
       
       console.log('[ArticleListScene] Scrolling to article:', articleId, 'index:', index);
-      // viewPosition: 0.5 让文章显示在屏幕中间
+      // viewPosition: 0.5 让文章显示在屏幕中間
       flatListRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
     }
   }), [articles]);
   
   // 【删除】不再需要 onViewableItemsChanged 和 handleScroll
 
-  if (!isActive) return <View style={styles.lazyPlaceholder} />;
+  // 🌟 优化点：仅当是主页面或预加载时才渲染内容
+  if (!isActive && !isNeighbor) return <View style={styles.lazyPlaceholder} />;
 
   return (
     <FlatList
@@ -276,8 +278,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const loadArticles = async () => {
     try {
-      const allArticles = await articleService.getArticles({ limit: 500 });
+      // 🌟 优化点：对聚合页使用公平聚合查询
+      const allArticles = await articleService.getInitialFairFeed(10);
       setArticles(allArticles);
+      console.log('[HomeScreen] Loaded articles with fair feed:', allArticles.length);
     } catch (error) {
       console.error('Failed to load articles:', error);
     }
@@ -299,6 +303,39 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     };
     loadProxyConfig();
   }, []);
+  
+  // 🌟 【新增】第四层优化：启动时静默后台刷新 RSS 源
+  useEffect(() => {
+    const triggerBackgroundSync = async () => {
+      console.log('[HomeScreen] 🔄 启动静默后台刷新...');
+      try {
+        const { rssSources, refreshAllSourcesBackground } = require('../../contexts/RSSSourceContext');
+        // 注意：这里需要从 RSSSourceContext 中导出 refreshAllSourcesBackground
+        // 或直接调用 RSSService.getInstance().refreshAllSourcesBackground()
+        await RSSService.getInstance().refreshAllSourcesBackground({
+          maxConcurrent: 3, // 核心并发控制
+          onProgress: (current, total, sourceName) => {
+            console.log(`[HomeScreen] 🔄 正在刷新: ${sourceName} (${current}/${total})`);
+          },
+          onArticlesReady: (articles, sourceName) => {
+            console.log(`[HomeScreen] ✅ ${sourceName} 刷新完成，新增 ${articles.length} 篇文章`);
+          },
+        });
+        // 后台刷新完成后，重新加载前台数据
+        await loadArticles();
+        console.log('[HomeScreen] ✅ 后台刷新完成，前台数据已更新');
+      } catch (error) {
+        console.warn('[HomeScreen] ⚠️ 后台刷新失败（可忽略，已有缓存）:', error);
+      }
+    };
+
+    // 仅在首页加载完成且有活跃源时，才启动后台刷新
+    if (rssSources.length > 0) {
+      // 延迟 500ms 启动，给 UI 充分时间展示缓存数据
+      const timer = setTimeout(triggerBackgroundSync, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [rssSources]);
   
   // 【修改】返回时检查是否需要重定位
   useFocusEffect(useCallback(() => { 
@@ -366,17 +403,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderScene = useCallback(({ route, index: tabIndex }: { route: { key: string; title: string }; index: number }) => {
     const isActive = loadedTabs.has(tabIndex);
+    // 🌟 中間层优化：计算是否是主页灾邻页（预加载）
     const isCloseToFocus = Math.abs(index - tabIndex) <= 1;
-
+    const isNeighbor = !isActive && isCloseToFocus; // 预加载标记
+  
     if (!isActive && !isCloseToFocus) {
       return <View style={[styles.lazyPlaceholder, { width: screenWidth }]} />;
     }
-
+  
     const filteredArticles = getFilteredArticles(tabIndex);
     const articleIds = filteredArticles.map(a => a.id);
-    
-    // 【修改】使用状态中的待滚动ID
-
+      
+    // 【修改】推送 isNeighbor 参数直接给 ArticleListScene
+  
     return (
       <View style={{ width: screenWidth }}>
         <ArticleListScene
@@ -398,7 +437,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           }}
           isDark={isDark}
           theme={theme}
-          isActive={true}
+          isActive={isActive}
+          isNeighbor={isNeighbor}
           proxyServerUrl={proxyServerUrl}
         />
       </View>

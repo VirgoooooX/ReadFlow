@@ -757,7 +757,14 @@ const ArticleDetailScreen: React.FC = () => {
 
   // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
   const htmlContent = useMemo(() => {
-    if (!article?.content || !readingSettings) return '';
+    console.log('[ArticleDetail] Generating HTML, article exists:', !!article);
+    console.log('[ArticleDetail] article.content exists:', !!article?.content);
+    console.log('[ArticleDetail] readingSettings exists:', !!readingSettings);
+    
+    if (!article?.content || !readingSettings) {
+      console.log('[ArticleDetail] ❌ HTML generation skipped - missing article.content or readingSettings');
+      return '';
+    }
   
     // 【调试日志】空急论证 imageUrl
     console.log(`[ArticleDetail] article.imageUrl = ${article.imageUrl}`);
@@ -766,7 +773,7 @@ const ArticleDetailScreen: React.FC = () => {
     const finalImageUrl = shouldShowHeaderImage() ? article.imageUrl : undefined;
     console.log(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
   
-    return generateArticleHtml({
+    const html = generateArticleHtml({
       content: article.content,
       fontSize: readingSettings.fontSize || 16,
       lineHeight: readingSettings.lineHeight || 1.8,
@@ -792,6 +799,9 @@ const ArticleDetailScreen: React.FC = () => {
       // 【新增】代理服务器地址，用于处理防盗链图片
       proxyServerUrl,
     });
+    
+    console.log('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);
+    return html;
   }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, vocabularyWords, proxyServerUrl]);
 
   if (loading || settingsLoading) {
@@ -874,13 +884,13 @@ const ArticleDetailScreen: React.FC = () => {
 
 
       {/* WebView 内容 */}
-      {htmlContent && (
+      {htmlContent ? (
         <WebView
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html: htmlContent }}
           onMessage={handleWebViewMessage}
-          style={[styles.webView, { opacity: 0.99 }]}
+          style={styles.webView}
           showsVerticalScrollIndicator={false}
           javaScriptEnabled={true}
           domStorageEnabled={true}
@@ -889,6 +899,13 @@ const ArticleDetailScreen: React.FC = () => {
           allowFileAccess={true}
           allowUniversalAccessFromFileURLs={true}
           mixedContentMode="always"
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('[WebView] Load error:', nativeEvent);
+          }}
+          onLoad={() => {
+            console.log('[WebView] ✅ Content loaded successfully');
+          }}
           renderLoading={() => (
             <View style={styles.webViewLoading}>
               <ActivityIndicator size="small" color={theme?.colors?.primary} />
@@ -902,6 +919,10 @@ const ArticleDetailScreen: React.FC = () => {
             androidLayerType: 'hardware',
           })}
         />
+      ) : (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: theme?.colors?.error }}>⚠️ HTML 内容为空</Text>
+        </View>
       )}
 
       {/* 词典弹窗 */}

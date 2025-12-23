@@ -174,9 +174,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       word-wrap: break-word;
       overflow-wrap: break-word;
       
-      /* 【关键修改】初始隐藏 body，避免闪烁和跳动 */
-      opacity: 0;
-      transition: opacity 0.25s ease-in;
+      /* 【紧急修复】直接显示，不依赖 JavaScript */
+      opacity: 1 !important;
     }
     
     /* 文章头部样式优化 */
@@ -382,27 +381,68 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       margin: 0.5em 0;
     }
     
-    /* 代码 */
-    code {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 0.9em;
-      background-color: var(--color-code-bg);
-      color: var(--color-code-text);
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    
+    /* 代码块 - 容器 */
     pre {
       margin: 1.5em 0;
-      padding: 12px;
+      padding: 12px 0; /* 上下留白，左右由行内控制 */
       background-color: var(--color-code-bg);
       border-radius: 8px;
-      overflow-x: auto;
+      border: 1px solid var(--color-table-border);
+      overflow-x: hidden; /* 隐藏横向滚动，因为我们强制换行了 */
+      position: relative;
     }
-    
-    pre code {
-      padding: 0;
+  
+    /* 代码块 - 核心样式 */
+    code {
+      font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+      font-size: 0.85em; /* 字号调小 */
       background-color: transparent;
+      color: var(--color-code-text);
+      display: block;
+      width: 100%;
+      /* 【关键】开启自动换行 */
+      white-space: pre-wrap; 
+      word-wrap: break-word;
+      word-break: break-all; /* 强制打断长单词，防止撑开屏幕 */
+    }
+
+    /* 每一行的包装器 */
+    .code-line {
+      display: flex; /* 使用 Flex 布局让行号和代码对齐 */
+      line-height: 1.6;
+      padding: 0 12px; /* 每一行的内边距 */
+    }
+
+    /* 斑马纹效果（可选，提升阅读体验） */
+    .code-line:nth-child(even) {
+      background-color: ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'};
+    }
+
+    /* 行号样式 */
+    .code-line::before {
+      counter-increment: line-num; /* 计数器自增 */
+      content: counter(line-num);  /* 显示序号 */
+    
+      /* 行号外观 */
+      display: inline-block;
+      width: 2.5em; /* 固定宽度 */
+      min-width: 2.5em;
+      margin-right: 1em;
+      text-align: right;
+      color: var(--color-secondary); /* 使用次要文本颜色 */
+      opacity: 0.5;
+      font-size: 0.9em;
+      border-right: 1px solid var(--color-table-border);
+      padding-right: 8px;
+    
+      /* 【关键】禁止选择行号，复制时不会带上数字 */
+      user-select: none; 
+      -webkit-user-select: none;
+    }
+
+    /* 初始化计数器 */
+    pre code {
+      counter-reset: line-num;
     }
     
     /* 表格 */
@@ -668,6 +708,47 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       'use strict';
     
       /**
+       * 格式化代码块：添加行号 + 自动换行结构
+       * 将原本的一大坨代码文本，拆分成 <span class="code-line">...</span> 的形式
+       * 这样每一行都能通过 CSS counter 生成独立的行号
+       */
+      function formatCodeBlocks() {
+        const preBlocks = document.querySelectorAll('pre code');
+      
+        preBlocks.forEach(function(block) {
+          // 1. 获取原始内容
+          // 使用 textContent 获取纯文本内容，避免破坏已有的格式
+          let content = block.textContent || '';
+        
+          // 去除末尾多余的换行
+          content = content.replace(/\n$/, '');
+        
+          // 2. 按换行符分割
+          const lines = content.split('\n');
+        
+          // 3. 构建新的 HTML
+          // 将每一行包裹在 span.code-line 中
+          const formattedHtml = lines.map(function(line) {
+            // 处理空行，确保它有高度
+            const lineContent = line.length === 0 ? '&nbsp;' : line
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+            
+            return '<span class="code-line">' + lineContent + '</span>';
+          }).join('');
+        
+          // 4. 更新 DOM
+          block.innerHTML = formattedHtml;
+        
+          // 5. 标记父级 pre，用于可能的样式调整
+          block.parentElement.classList.add('formatted-code');
+        });
+      }
+    
+      /**
        * 图片说明智能提取脚本 v5.0 (高性能读写分离版)
        * 
        * 【性能优化策略】
@@ -826,18 +907,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         setTimeout(formatImagesAndCaptions, 100);
       }
       
-      // 【新增】图片点击事件代理 - 性能优化
-      document.querySelector('.article-content').addEventListener('click', function(e) {
-        if (e.target.tagName === 'IMG') {
-          e.stopPropagation();
-          e.preventDefault();
-          
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'imageClick',
-            url: e.target.src
-          }));
-        }
-      });
+      // 【修复】图片点击事件代理 - 移到 init() 或 DOMContentLoaded 后执行
+      // 防止在 DOM 未就绪时访问 .article-content 导致报错
       
       // 【新增】视频优化：包裹视频并添加可见性检测
       function setupVideos() {
@@ -1516,6 +1587,22 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         
         // 【新增】监听图片加载，动态更新进度
         setupImageLoadListener();
+        
+        // 【修复】图片点击事件代理 - 移到 init() 中确保 DOM 已就绪
+        const articleContent = document.querySelector('.article-content');
+        if (articleContent) {
+          articleContent.addEventListener('click', function(e) {
+            if (e.target.tagName === 'IMG') {
+              e.stopPropagation();
+              e.preventDefault();
+              
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'imageClick',
+                url: e.target.src
+              }));
+            }
+          });
+        }
 
         // 5. 立即恢复滚动位置（使用注入的数据）
         const targetY = ${injectedScrollY};
@@ -1529,7 +1616,6 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             // 如果位置已经接近目标或已尝试 20 次，则停止轮询
             if (Math.abs(currentY - targetY) < 10 || attempts >= 20) {
               clearInterval(forceScrollInterval);
-              document.body.style.opacity = '1';
               return;
             }
             // 如果内容高度足够但位置不对，强行滚
@@ -1538,11 +1624,6 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             }
             attempts++;
           }, 50);
-
-          // 兜底显示
-          setTimeout(function() { document.body.style.opacity = '1'; }, 1000);
-        } else {
-          document.body.style.opacity = '1';
         }
 
         // 6. 处理幻灯片容器
@@ -1719,7 +1800,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   <meta name="format-detection" content="telephone=no">
   <style>${css}</style>
 </head>
-<body>
+<body style="opacity: 1 !important;">
   ${headerHtml}
   <div class="article-content">
     ${optimizedContent}

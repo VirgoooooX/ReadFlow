@@ -1,6 +1,5 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { Article, ReadingSettings } from '../types';
-import { RSSService } from './RSSService';
 
 export class ArticleService {
   private static instance: ArticleService;
@@ -15,6 +14,66 @@ export class ArticleService {
       ArticleService.instance = new ArticleService();
     }
     return ArticleService.instance;
+  }
+
+  /**
+   * 【新增】获取"公平"的初始聚合流：每个源取前 N 条
+   * 目标：解决首页被更新频率高的源霸屏的问题
+   * 返回值：所有源合并的按发布时间排序的文章数组（未分页）
+   */
+  public async getInitialFairFeed(limitPerSource: number = 10): Promise<Article[]> {
+    try {
+      await this.databaseService.initializeDatabase();
+
+      // 1. 获取所有活跃的 RSS 源 ID
+      const sourcesResult = await this.databaseService.executeQuery(
+        'SELECT id FROM rss_sources WHERE 1=1'
+      );
+      
+      if (!sourcesResult || sourcesResult.length === 0) {
+        return [];
+      }
+
+      const sources = sourcesResult as any[];
+      
+      // 2. 性能保护：如果源超过 50 个，每个源只取 5 条，防止数据量过大
+      const safeLimit = sources.length > 50 ? 5 : limitPerSource;
+      
+      // 3. 关键优化：改用"应用层聚合"而非 SQL UNION ALL
+      // 原因：SQLite 对 UNION ALL 的限制多，改在 JS 做排序更灵活且性能也不差
+      const allArticles: Article[] = [];
+      
+      // 逐个源查询（利用 Promise.all 并行查询）
+      const queries = sources.map(source =>
+        this.databaseService.executeQuery(
+          `SELECT a.*, r.title as source_title, r.url as source_url 
+           FROM articles a 
+           LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
+           WHERE a.rss_source_id = ${source.id} 
+           ORDER BY a.published_at DESC
+           LIMIT ${safeLimit}`
+        )
+      );
+      
+      const results = await Promise.all(queries);
+      
+      // 合并所有结果
+      results.forEach(sourceArticles => {
+        sourceArticles.forEach((row: any) => {
+          allArticles.push(this.mapArticleRow(row));
+        });
+      });
+      
+      // 4. 在应用层做最终排序（性能优异，且避免 SQL 语法限制）
+      allArticles.sort((a, b) => 
+        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      );
+      
+      return allArticles;
+    } catch (error) {
+      console.error('Error getting initial fair feed:', error);
+      return [];
+    }
   }
 
   /**

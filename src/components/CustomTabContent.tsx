@@ -37,26 +37,18 @@ const CustomTabContent = forwardRef<CustomTabContentHandle, CustomTabContentProp
         },
     }));
 
-    // 滚动处理
+    // 【优化3】滑动结束才触发 React 状态更新，释放 JS 线程
+    // 但保留 onScroll 用于驱动动画（Reanimated 的 useAnimatedScrollHandler）
     const scrollHandler = useAnimatedScrollHandler({
         onScroll: (event) => {
             scrollX.value = event.contentOffset.x;
         },
     });
 
-    // 可见性变化回调
-    const onViewableItemsChanged = useCallback(
-        ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-            if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-                onIndexChange(viewableItems[0].index);
-            }
-        },
-        [onIndexChange]
-    );
-
-    const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 50,
-    }).current;
+    const onMomentumScrollEnd = useCallback((e: any) => {
+      const index = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+      onIndexChange(index);
+    }, [onIndexChange, screenWidth]);
 
     // 渲染每一页
     const renderItem = useCallback(
@@ -79,8 +71,7 @@ const CustomTabContent = forwardRef<CustomTabContentHandle, CustomTabContentProp
             showsHorizontalScrollIndicator={false}
             onScroll={scrollHandler}
             scrollEventThrottle={16}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
+            onMomentumScrollEnd={onMomentumScrollEnd}
             initialScrollIndex={initialIndex}
             getItemLayout={(_, index) => ({
                 length: screenWidth,
@@ -89,10 +80,11 @@ const CustomTabContent = forwardRef<CustomTabContentHandle, CustomTabContentProp
             })}
             removeClippedSubviews={true}
             bounces={false}
-            // 性能优化配置
-            windowSize={5} // 减少渲染窗口，默认是 21
-            initialNumToRender={1} // 初始只渲染一个页面
-            maxToRenderPerBatch={1} // 每批只渲染一个
+            // 【关键优化4】性能参数调优
+            // windowSize=11: 当前1页 + 左5页 + 右5页 => 保证左右滑回时页面还在，不丢失滚动位置
+            windowSize={11}
+            initialNumToRender={1}      // 初始只渲染当前页面
+            maxToRenderPerBatch={1}     // 每批只渲染1页，避免一次性大量渲染
             legacyImplementation={false}
         />
     );

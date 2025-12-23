@@ -1,13 +1,14 @@
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, TouchableOpacity, Text, ScrollView, LayoutChangeEvent } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { StyleSheet, View, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import Animated, {
     useAnimatedStyle,
-    interpolate,
     SharedValue,
     useAnimatedReaction,
     useAnimatedRef,
     scrollTo,
     interpolateColor,
+    useSharedValue,
+    runOnUI,
 } from 'react-native-reanimated';
 import { useThemeContext } from '../theme';
 
@@ -24,41 +25,43 @@ interface CustomTabBarProps {
     onTabPress: (index: number) => void;
 }
 
+// 布局测量数据类型
+interface TabMeasurement {
+    x: number;
+    width: number;
+}
+
 // 提取 TabItem 组件以利用 React.memo 减少重渲染
 const TabItem = React.memo(({
     item,
     index,
-    isFocused,
     onPress,
     onLayout,
     scrollX,
     screenWidth,
-    activeColor,
     inactiveColor
 }: {
     item: Tab;
     index: number;
-    isFocused: boolean;
     onPress: () => void;
     onLayout: (e: LayoutChangeEvent) => void;
     scrollX: SharedValue<number>;
     screenWidth: number;
-    activeColor: string;
     inactiveColor: string;
 }) => {
     // 文字颜色动画样式 - O(1) 复杂度优化
+    // 只关注当前 index 附近的区间，使用相邻插值法
     const textAnimatedStyle = useAnimatedStyle(() => {
         const currentProgress = scrollX.value / screenWidth;
 
-        // 只关注当前 index 附近的区间，而不是遍历整个数组
         return {
             color: interpolateColor(
                 currentProgress,
                 [index - 1, index, index + 1],
-                [inactiveColor, '#FFFFFF', inactiveColor] // 激活色固定为白色
+                [inactiveColor, '#FFFFFF', inactiveColor]
             )
         };
-    }, [index, screenWidth, inactiveColor]); // 移除不必要的依赖
+    });
 
     return (
         <TouchableOpacity
@@ -90,111 +93,102 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     const { theme, isDark } = useThemeContext();
     const scrollViewRef = useAnimatedRef<Animated.ScrollView>();
 
-    // 存储每个标签的布局信息
-    const [tabLayouts, setTabLayouts] = useState<Record<string, { x: number; width: number }>>({});
-    const [containerWidth, setContainerWidth] = useState(0);
+    // 🚀 核心优化：将布局数据存入 SharedValue，避免 worklet 跨桥
+    const tabMeasurements = useSharedValue<TabMeasurement[]>(
+        tabs.map(() => ({ x: 0, width: 0 }))
+    );
+    const isLayoutReady = useSharedValue(false);
+    const containerWidthShared = useSharedValue(0);
 
-    const activeColor = theme.colors.primary; // 仅用于部分逻辑，文字激活色固定为白色
+    // 使用 useRef 暂存 JS 端的测量数据，避免频繁 setSharedValue
+    const layoutCache = useRef<TabMeasurement[]>(tabs.map(() => ({ x: 0, width: 0 })));
+    const layoutCount = useRef(0);
+
     const inactiveColor = isDark ? '#938F99' : '#64748B';
     const pillBackgroundColor = theme.colors.primary;
 
-    // 检查布局是否准备好
-    const isLayoutReady = tabs.every((tab) => tabLayouts[tab.key]) && containerWidth > 0;
-
-    // 预计算插值数组，避免在 worklet 中每帧重复计算 (O(n) -> O(1) in worklet)
-    const { inputRange, widths, positions } = React.useMemo(() => {
-        const inputRange = tabs.map((_, i) => i);
-        const widths = tabs.map((tab) => tabLayouts[tab.key]?.width || 0);
-        const positions = tabs.map((tab) => tabLayouts[tab.key]?.x || 0);
-        return { inputRange, widths, positions };
-    }, [tabs, tabLayouts]);
-
-    // 处理标签布局测量
-    const handleTabLayout = useCallback((key: string, event: LayoutChangeEvent) => {
+    // 处理标签布局测量 - 收集完毕后一次性写入 SharedValue
+    const handleTabLayout = useCallback((index: number, event: LayoutChangeEvent) => {
         const { x, width } = event.nativeEvent.layout;
-        setTabLayouts((prev) => {
-            // 只有当值真正改变时才更新，减少重渲染
-            if (prev[key] && Math.abs(prev[key].x - x) < 0.5 && Math.abs(prev[key].width - width) < 0.5) return prev;
-            return { ...prev, [key]: { x, width } };
-        });
-    }, []);
+        
+        // 检查是否真的变化了
+        const cached = layoutCache.current[index];
+        if (cached && Math.abs(cached.x - x) < 0.5 && Math.abs(cached.width - width) < 0.5) {
+            return;
+        }
+
+        // 更新 JS 缓存
+        layoutCache.current[index] = { x, width };
+        layoutCount.current += 1;
+
+        // 检查是否所有 Tab 都测量完毕
+        if (layoutCount.current >= tabs.length) {
+            // 一次性写入 SharedValue (跨桥只发生这一次)
+            tabMeasurements.value = [...layoutCache.current];
+            isLayoutReady.value = true;
+        }
+    }, [tabs.length, tabMeasurements, isLayoutReady]);
 
     // 处理容器布局测量
     const handleContainerLayout = useCallback((event: LayoutChangeEvent) => {
-        setContainerWidth(event.nativeEvent.layout.width);
-    }, []);
+        containerWidthShared.value = event.nativeEvent.layout.width;
+    }, [containerWidthShared]);
 
-    // 胶囊动画样式
+    // 🚀 胶囊动画样式 - 纯 UI 线程计算，无跨桥！
     const pillAnimatedStyle = useAnimatedStyle(() => {
-        if (!isLayoutReady) return { opacity: 0 };
+        if (!isLayoutReady.value) return { opacity: 0 };
 
-        const currentIndex = scrollX.value / screenWidth;
+        // 获取当前进度 (0 -> 1 -> 2.5 ...)
+        const index = scrollX.value / screenWidth;
 
-        // 使用预计算的数组
-        const width = interpolate(
-            currentIndex,
-            inputRange,
-            widths,
-            'clamp'
-        );
+        // 核心优化：手动插值 (只取相邻的两个 measurement)
+        const floorIndex = Math.floor(index);
+        const progress = index - floorIndex;
 
-        const translateX = interpolate(
-            currentIndex,
-            inputRange,
-            positions,
-            'clamp'
-        );
+        // 安全获取 measurements (防止数组越界)
+        const measurements = tabMeasurements.value;
+        const currentM = measurements[floorIndex] || { x: 0, width: 0 };
+        const nextM = measurements[floorIndex + 1] || currentM;
+
+        // 线性插值计算 x 和 width
+        const x = currentM.x + (nextM.x - currentM.x) * progress;
+        const width = currentM.width + (nextM.width - currentM.width) * progress;
 
         return {
-            width,
-            transform: [{ translateX }],
+            transform: [{ translateX: x }],
+            width: width,
             opacity: 1,
         };
-    }, [isLayoutReady, inputRange, widths, positions, screenWidth]);
+    });
 
-    // 创建 scrollTo 的 JS 函数
-    const scrollToTab = useCallback((offset: number) => {
-        scrollViewRef.current?.scrollTo({ x: offset, animated: false });
-    }, []);
-
-    // 使用 useAnimatedReaction 实时同步标签条滚动（完全在 UI 线程）
+    // 🚀 使用 useAnimatedReaction 实时同步标签条滚动（纯 UI 线程）
     useAnimatedReaction(
-        () => {
-            if (!isLayoutReady) return -1;
-            return scrollX.value / screenWidth;
-        },
-        (currentProgress, previousProgress) => {
-            if (currentProgress === -1) return;
+        () => scrollX.value / screenWidth,
+        (index) => {
+            if (!isLayoutReady.value) return;
+            if (containerWidthShared.value === 0) return;
 
-            // 阈值检查避免微小抖动
-            if (previousProgress !== null && Math.abs(currentProgress - previousProgress) < 0.001) {
-                return;
-            }
+            const measurements = tabMeasurements.value;
+            const floorIndex = Math.floor(index);
+            const progress = index - floorIndex;
 
-            const currentIndex = Math.floor(currentProgress);
-            const nextIndex = Math.min(currentIndex + 1, tabs.length - 1);
-            const interpolation = currentProgress - currentIndex;
+            const currentM = measurements[floorIndex];
+            const nextM = measurements[floorIndex + 1] || currentM;
 
-            const currentTab = tabs[currentIndex];
-            const nextTab = tabs[nextIndex];
-            if (!currentTab) return;
+            if (!currentM) return;
 
-            const currentLayout = tabLayouts[currentTab.key];
-            if (!currentLayout || containerWidth === 0) return;
+            // 计算胶囊当前的中心点 X 坐标
+            const currentCenterX = currentM.x + currentM.width / 2;
+            const nextCenterX = nextM.x + nextM.width / 2;
 
-            const currentCenterOffset = currentLayout.x + currentLayout.width / 2 - containerWidth / 2;
+            // 插值得到实时的中心点
+            const indicatorCenterX = currentCenterX + (nextCenterX - currentCenterX) * progress;
 
-            let targetOffset = currentCenterOffset;
-            if (nextTab && currentIndex !== nextIndex) {
-                const nextLayout = tabLayouts[nextTab.key];
-                if (nextLayout) {
-                    const nextCenterOffset = nextLayout.x + nextLayout.width / 2 - containerWidth / 2;
-                    targetOffset = currentCenterOffset + (nextCenterOffset - currentCenterOffset) * interpolation;
-                }
-            }
+            // 目标：让胶囊居中 -> ScrollView 偏移量 = 胶囊中心 - 容器一半
+            const targetScrollX = Math.max(0, indicatorCenterX - containerWidthShared.value / 2);
 
-            const finalOffset = Math.max(0, targetOffset);
-            scrollTo(scrollViewRef, finalOffset, 0, false);
+            // 调用 scrollTo (纯 UI 线程调用，性能极高)
+            scrollTo(scrollViewRef, targetScrollX, 0, false);
         }
     );
     return (
@@ -202,7 +196,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
             style={[styles.container, { backgroundColor: theme.colors.background }]}
             onLayout={handleContainerLayout}
         >
-            <ScrollView
+            <Animated.ScrollView
                 ref={scrollViewRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -224,16 +218,14 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
                         key={tab.key}
                         item={tab}
                         index={index}
-                        isFocused={activeIndex === index}
                         onPress={() => onTabPress(index)}
-                        onLayout={(e) => handleTabLayout(tab.key, e)}
+                        onLayout={(e) => handleTabLayout(index, e)}
                         scrollX={scrollX}
                         screenWidth={screenWidth}
-                        activeColor={activeColor}
                         inactiveColor={inactiveColor}
                     />
                 ))}
-            </ScrollView>
+            </Animated.ScrollView>
         </View>
     );
 };
