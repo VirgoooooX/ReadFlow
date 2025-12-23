@@ -458,7 +458,7 @@ export class LocalRSSService {
             // 忽略
           }
           
-          if (!imageUrl && item.enclosures?.length > 0) {
+          if (!imageUrl && item.enclosures && item.enclosures.length > 0) {
             const imageEnclosure = item.enclosures.find(enc => 
               enc.mimeType?.startsWith('image/')
             );

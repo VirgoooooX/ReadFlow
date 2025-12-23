@@ -668,114 +668,162 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       'use strict';
     
       /**
-       * 图片说明智能识别与标准化重构
+       * 图片说明智能提取脚本 v5.0 (高性能读写分离版)
        * 
-       * 【核心思路】
-       * 数据库存原味，渲染层做料理 (Runtime Processing)
+       * 【性能优化策略】
+       * ✅ 读写分离：先收集所有候选者 (Read)，再一次性修改 DOM (Write)
+       * ✅ 批处理：彻底消除布局抖动 (Layout Thrashing)
+       * ✅ requestAnimationFrame：保证视觉流畅，无闪烁
+       * ✅ 延迟启动：优先首屏加载，后台悄悄处理图片说明
        * 
        * 【三层判定漏斗】
        * 1️⃣ 显式样式特征：居中对齐 (style="text-align:center" / align="center")
-       * 2️⃣ 显式格式特征：括号包裹 (（图自：BBC）/ (19岁的xxx))
-       * 3️⃣ 隐式排版特征：短文本 + 无终止标点
-       * 
-       * 【执行方案】
-       * DOM 手术：将 <p><img></p> + <p>说明</p> 重构为标准的 <figure><img><figcaption>
+       * 2️⃣ 显式格式特征：括号包裹 + VIP 强特征 (图、表、摄、Credit...)
+       * 3️⃣ 隐式排版特征：短文本 + 无终止标点 (十一重防御机制)
        */
       function formatImagesAndCaptions() {
-        const contentDiv = document.querySelector('.article-content');
+        const CONTAINER_SELECTOR = '.article-content';
+        const contentDiv = document.querySelector(CONTAINER_SELECTOR);
         if (!contentDiv) return;
 
-        // 1. 先标记已有 figcaption 的图片（避免重复处理）
-        const figcaptions = contentDiv.querySelectorAll('figcaption');
-        const imagesWithCaption = new Set();
-        
-        figcaptions.forEach(function(figcaption) {
-          const figure = figcaption.closest('figure');
-          if (figure) {
-            const img = figure.querySelector('img');
-            if (img) {
-              imagesWithCaption.add(img);
-            }
+        // 正则配置
+        const REGEX = {
+          VIP_START: /^(图|表|Figure|Fig|Source|来源|图自|Credit|Photo|Image|Via|Courtesy|摄|摄影|Author|By)[\s\d:：.]/i,
+          VIP_BRACKETS: /^[（(].+[）)]$/,
+          BLOCK_META: /^(责任编辑|校对|Posted by|Published on)[:：]/i,
+          BLOCK_DATE: /^(\d{4}[-/年]\d{1,2})|(\d{1,2}:\d{2})/,
+          BLOCK_ACTION: /(点击|长按|关注|分享|View on|Advertisement|广告)/i,
+          BLOCK_NAV: /^(Next|Prev|Top|Back|Menu|Home|Login|\d+)$/i,
+          END_PUNCTUATION: /[.!?。！？]$/
+        };
+
+        const processedImages = new Set();
+        contentDiv.querySelectorAll('figure img').forEach(img => processedImages.add(img));
+        const allParagraphs = contentDiv.querySelectorAll('p');
+
+        // ============================================================
+        // 阶段一：收集 (READ ONLY)
+        // 只读取属性和样式，绝不修改 DOM
+        // ============================================================
+        const candidates = [];
+
+        allParagraphs.forEach(function(imgPara) {
+          const img = imgPara.querySelector('img');
+          if (!img || processedImages.has(img)) return;
+          
+          // 🔥 防止破坏图文混排（如果 P 标签里文字太多，就不碰）
+          if (imgPara.innerText.replace(/\s/g, '').length > 10) return;
+
+          const nextPara = imgPara.nextElementSibling;
+          if (!nextPara || nextPara.tagName !== 'P' || nextPara.querySelector('img')) return;
+
+          const captionText = nextPara.innerText.trim();
+          if (!captionText) return;
+
+          // --- 逻辑判定开始 ---
+          
+          // 【步骤 1】黑名单初筛
+          if (REGEX.BLOCK_META.test(captionText) || 
+              REGEX.BLOCK_DATE.test(captionText) || 
+              REGEX.BLOCK_ACTION.test(captionText) ||
+              REGEX.BLOCK_NAV.test(captionText)) return;
+
+          // 【步骤 2】特征提取
+          const isCenterAligned = 
+              (nextPara.getAttribute('style') || '').includes('text-align: center') ||
+              nextPara.getAttribute('align') === 'center';
+          
+          const isVipFormat = 
+              REGEX.VIP_START.test(captionText) || 
+              REGEX.VIP_BRACKETS.test(captionText) ||
+              isCenterAligned;
+
+          let isValid = false;
+
+          // 【步骤 3】双通道判定
+          if (isVipFormat) {
+            // ➤ VIP 通道（强特征）
+            if (captionText.length >= 2) isValid = true;
+          } else {
+            // ➤ 普通通道（弱特征）- 严格检查
+            
+            // A. 结构检查
+            if (nextPara.querySelector('strong, b, a, h1, h2, h3, h4, h5, h6')) return;
+            
+            // B. 引导词检查
+            if (/[：:，,]$/.test(captionText)) return;
+
+            // C. 长度检查
+            const hasChinese = /[\u4e00-\u9fa5]/.test(captionText);
+            const minLength = hasChinese ? 2 : 5;
+            if (captionText.length < minLength || captionText.length > 60) return;
+
+            // D. 标点检查
+            if (REGEX.END_PUNCTUATION.test(captionText)) return;
+
+            // E. 🔥 字号与样式检测（性能优化：放在最后）
+            // 注意：即使这里调用 getComputedStyle，也不会触发重排
+            // 因为我们还没有修改 DOM，浏览器会使用缓存的布局信息
+            const computedStyle = window.getComputedStyle(nextPara);
+            const fontSize = parseFloat(computedStyle.fontSize);
+            const fontWeight = computedStyle.fontWeight;
+            
+            if (fontSize > 20) return;
+            if (fontWeight === 'bold' || parseInt(fontWeight) > 700) return;
+
+            isValid = true;
+          }
+
+          if (isValid) {
+            // 💾 存入待处理列表，先不动 DOM
+            candidates.push({
+              imgPara: imgPara,
+              nextPara: nextPara,
+              img: img,
+              captionText: captionText
+            });
           }
         });
 
-        // 2. 遍历所有 <p> 标签，找出包含图片的段落
-        const allParagraphs = contentDiv.querySelectorAll('p');
-      
-        allParagraphs.forEach(function(imgPara) {
-          // 检查该 P 标签是否直接包含图片
-          const img = imgPara.querySelector('img');
-          if (!img) return;
+        // ============================================================
+        // 阶段二：执行 (WRITE ONLY)
+        // 集中修改 DOM，触发一次重排
+        // ============================================================
+        if (candidates.length === 0) return;
+
+        // 使用 requestAnimationFrame 确保在下一帧渲染前执行，避免卡顿
+        window.requestAnimationFrame(() => {
+          candidates.forEach(task => {
+            // 再次检查节点是否还在 DOM 中（防止极端情况）
+            if (!task.imgPara.parentNode || !task.nextPara.parentNode) return;
+
+            const figure = document.createElement('figure');
+            figure.appendChild(task.img);
           
-          // 如果图片已有 figcaption，跳过
-          if (imagesWithCaption.has(img)) return;
+            const figcaption = document.createElement('figcaption');
+            figcaption.textContent = task.captionText;
+            figure.appendChild(figcaption);
+
+            task.imgPara.parentNode.insertBefore(figure, task.imgPara);
+            task.nextPara.remove();
           
-          // 获取紧跟在图片段落后的下一个兄弟元素
-          const nextPara = imgPara.nextElementSibling;
-          
-          // 必须是 <p> 标签才有可能是说明
-          if (!nextPara || nextPara.tagName !== 'P') return;
-          
-          // 提取候选说明文字（去除前后空白）
-          const captionText = nextPara.innerText.trim();
-          if (!captionText) return;
-          
-          // ========================================
-          // 【三层判定漏斗】
-          // ========================================
-          let isCaptionCandidate = false;
-          
-          // 【第一层】显式样式特征：居中对齐
-          const style = nextPara.getAttribute('style') || '';
-          const align = nextPara.getAttribute('align') || '';
-          if (style.includes('text-align') && style.includes('center')) {
-            isCaptionCandidate = true;
-          } else if (align.toLowerCase() === 'center') {
-            isCaptionCandidate = true;
-          }
-          
-          // 【第二层】显式格式特征：括号包裹
-          // 匹配模式：（xxx）或 (xxx)，且字数 < 50
-          if (!isCaptionCandidate) {
-            const fullParenMatch = /^[（(].+[）)]$/.test(captionText);
-            if (fullParenMatch && captionText.length < 50) {
-              isCaptionCandidate = true;
+            if (task.imgPara.innerText.trim() === '') {
+              task.imgPara.remove();
             }
+          });
+        
+          if (candidates.length > 0) {
+            console.log('[CaptionExtractor v5.0] 已优化 ' + candidates.length + ' 张图片说明');
           }
-          
-          // 【第三层】隐式排版特征：短文本 + 无终止标点
-          if (!isCaptionCandidate) {
-            const hasEndPunctuation = /[.!?。！？]$/.test(captionText);
-            if (captionText.length < 50 && !hasEndPunctuation) {
-              isCaptionCandidate = true;
-            }
-          }
-          
-          // 如果三层都没命中，判定为正文，不做处理
-          if (!isCaptionCandidate) return;
-          
-          // ========================================
-          // 【DOM 手术】结构化重构
-          // ========================================
-          
-          // 创建标准的 <figure> 容器
-          const figure = document.createElement('figure');
-          
-          // 移动图片到 figure 中
-          figure.appendChild(img.cloneNode(true));
-          
-          // 创建标准的 <figcaption> 元素
-          const figcaption = document.createElement('figcaption');
-          figcaption.textContent = captionText; // 使用 textContent 防止 XSS
-          figure.appendChild(figcaption);
-          
-          // 在原图片段落位置插入新的 figure
-          imgPara.parentNode.insertBefore(figure, imgPara);
-          
-          // 清理旧的 DOM 节点
-          imgPara.remove();      // 删除旧的图片段落
-          nextPara.remove();     // 删除旧的说明段落
         });
+      }
+    
+      // 初始化执行
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', formatImagesAndCaptions);
+      } else {
+        // 🔥 延迟启动：优先首屏加载，后台悄悄处理图片说明
+        setTimeout(formatImagesAndCaptions, 100);
       }
       
       // 【新增】图片点击事件代理 - 性能优化
