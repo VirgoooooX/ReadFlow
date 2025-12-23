@@ -21,6 +21,7 @@ import { store } from './src/store';
 import { ThemeProvider } from './src/theme';
 import { UserProvider } from './src/contexts/UserContext';
 import { RSSSourceProvider } from './src/contexts/RSSSourceContext';
+import { RSSGroupProvider } from './src/contexts/RSSGroupContext';
 import { ReadingSettingsProvider } from './src/contexts/ReadingSettingsContext';
 import { AppNavigator } from './src/navigation';
 
@@ -139,16 +140,18 @@ function App(): React.JSX.Element {
         <ThemeProvider initialTheme="system">
           <UserProvider>
             <RSSSourceProvider>
-              <ReadingSettingsProvider>
-                <View style={styles.container}>
-                  <StatusBar
-                    barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                    backgroundColor="transparent"
-                    translucent
-                  />
-                  <AppNavigator />
-                </View>
-              </ReadingSettingsProvider>
+              <RSSGroupProvider>
+                <ReadingSettingsProvider>
+                  <View style={styles.container}>
+                    <StatusBar
+                      barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                      backgroundColor="transparent"
+                      translucent
+                    />
+                    <AppNavigator />
+                  </View>
+                </ReadingSettingsProvider>
+              </RSSGroupProvider>
             </RSSSourceProvider>
           </UserProvider>
         </ThemeProvider>

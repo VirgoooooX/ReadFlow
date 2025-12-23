@@ -86,144 +86,119 @@ export class DatabaseService {
     }
 
     try {
-      const tableInfo = await this.db.getAllAsync('PRAGMA table_info(rss_sources)');
-      const hasContentType = tableInfo.some((column: any) => column.name === 'content_type');
-      const hasUnreadCount = tableInfo.some((column: any) => column.name === 'unread_count');
-      const hasErrorCount = tableInfo.some((column: any) => column.name === 'error_count');
-      const hasSortOrder = tableInfo.some((column: any) => column.name === 'sort_order');
-
-      if (!hasContentType) {
-        console.log('Adding content_type column to rss_sources table...');
-        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN content_type TEXT DEFAULT "image_text"');
-
-        // 更新现有数据的content_type
-        await this.db.execAsync(`
-          UPDATE rss_sources 
-          SET content_type = CASE 
-            WHEN url LIKE '%slashdot%' THEN 'text'
-            ELSE 'image_text'
-          END
-        `);
-
-        console.log('content_type column added successfully');
-      }
-
-      if (!hasUnreadCount) {
-        console.log('Adding unread_count column to rss_sources table...');
-        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN unread_count INTEGER DEFAULT 0');
-        console.log('unread_count column added successfully');
-      }
-
-      if (!hasErrorCount) {
-        console.log('Adding error_count column to rss_sources table...');
-        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN error_count INTEGER DEFAULT 0');
-        console.log('error_count column added successfully');
-      }
-
-      if (!hasSortOrder) {
-        console.log('Adding sort_order column to rss_sources table...');
-        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN sort_order INTEGER DEFAULT 0');
-        console.log('sort_order column added successfully');
-      }
-
-      // 【新增】检查 rss_sources 表是否存在 source_mode 字段
-      const hasSourceMode = tableInfo.some((column: any) => column.name === 'source_mode');
-      if (!hasSourceMode) {
-        console.log('Adding source_mode column to rss_sources table...');
-        await this.db.execAsync('ALTER TABLE rss_sources ADD COLUMN source_mode TEXT DEFAULT "direct"');
-        console.log('source_mode column added successfully');
-      }
-
-      // 【新增】检查articles表是否存在scroll_position列
-      const articlesTableInfo = await this.db.getAllAsync('PRAGMA table_info(articles)');
-      const hasScrollPosition = articlesTableInfo.some((column: any) => column.name === 'scroll_position');
-
-      if (!hasScrollPosition) {
-        console.log('Adding scroll_position column to articles table...');
-        await this.db.execAsync('ALTER TABLE articles ADD COLUMN scroll_position INTEGER DEFAULT 0');
-        console.log('scroll_position column added successfully');
-      }
-
-      // 【新增】检查articles表是否存在image_caption和image_credit列
-      const hasImageCaption = articlesTableInfo.some((column: any) => column.name === 'image_caption');
-      const hasImageCredit = articlesTableInfo.some((column: any) => column.name === 'image_credit');
-
-      if (!hasImageCaption) {
-        console.log('Adding image_caption column to articles table...');
-        await this.db.execAsync('ALTER TABLE articles ADD COLUMN image_caption TEXT');
-        console.log('image_caption column added successfully');
-      }
-
-      if (!hasImageCredit) {
-        console.log('Adding image_credit column to articles table...');
-        await this.db.execAsync('ALTER TABLE articles ADD COLUMN image_credit TEXT');
-        console.log('image_credit column added successfully');
-      }
-
-      // 检查vocabulary表是否存在缺失的字段
-      const vocabularyTableInfo = await this.db.getAllAsync('PRAGMA table_info(vocabulary)');
-      const hasNextReviewAt = vocabularyTableInfo.some((column: any) => column.name === 'next_review_at');
-      const hasLastReviewedAt = vocabularyTableInfo.some((column: any) => column.name === 'last_reviewed_at');
-
-      if (!hasNextReviewAt) {
-        console.log('Adding next_review_at column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN next_review_at INTEGER');
-        console.log('next_review_at column added successfully');
-      }
-
-      if (!hasLastReviewedAt) {
-        console.log('Adding last_reviewed_at column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN last_reviewed_at INTEGER');
-        console.log('last_reviewed_at column added successfully');
-      }
-
-      // 检查vocabulary表是否存在新增的字段
-      const hasContext = vocabularyTableInfo.some((column: any) => column.name === 'context');
-      const hasArticleId = vocabularyTableInfo.some((column: any) => column.name === 'article_id');
-      const hasCorrectCount = vocabularyTableInfo.some((column: any) => column.name === 'correct_count');
-      const hasDifficulty = vocabularyTableInfo.some((column: any) => column.name === 'difficulty');
-      const hasNotes = vocabularyTableInfo.some((column: any) => column.name === 'notes');
-
-      if (!hasContext) {
-        console.log('Adding context column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN context TEXT');
-        console.log('context column added successfully');
-      }
-
-      if (!hasArticleId) {
-        console.log('Adding article_id column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN article_id INTEGER');
-        console.log('article_id column added successfully');
-      }
-
-      if (!hasCorrectCount) {
-        console.log('Adding correct_count column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN correct_count INTEGER DEFAULT 0');
-        console.log('correct_count column added successfully');
-      }
-
-      if (!hasDifficulty) {
-        console.log('Adding difficulty column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN difficulty TEXT DEFAULT "medium"');
-        console.log('difficulty column added successfully');
-      }
-
-      if (!hasNotes) {
-        console.log('Adding notes column to vocabulary table...');
-        await this.db.execAsync('ALTER TABLE vocabulary ADD COLUMN notes TEXT DEFAULT ""');
-        console.log('notes column added successfully');
-      }
-
-      // 清理旧数据：删除 id 为 NULL 或空字符串的单词记录
+      console.log('📁 开始数据库迁移...');
+      
+      // 获取 rss_sources 表信息
+      let tableInfo: any[] = [];
       try {
-        console.log('Cleaning up invalid vocabulary entries with null/empty IDs...');
+        tableInfo = await this.db.getAllAsync('PRAGMA table_info(rss_sources)');
+      } catch (e) {
+        console.warn('Warning: Could not get rss_sources table info:', e);
+        return;
+      }
+
+      // 逐个添加缺失的列,每个操作都有独立的 try-catch
+      const columnsToAdd = [
+        { name: 'content_type', sql: 'ALTER TABLE rss_sources ADD COLUMN content_type TEXT DEFAULT "image_text"' },
+        { name: 'unread_count', sql: 'ALTER TABLE rss_sources ADD COLUMN unread_count INTEGER DEFAULT 0' },
+        { name: 'error_count', sql: 'ALTER TABLE rss_sources ADD COLUMN error_count INTEGER DEFAULT 0' },
+        { name: 'sort_order', sql: 'ALTER TABLE rss_sources ADD COLUMN sort_order INTEGER DEFAULT 0' },
+        { name: 'source_mode', sql: 'ALTER TABLE rss_sources ADD COLUMN source_mode TEXT DEFAULT "direct"' },
+        { name: 'group_id', sql: 'ALTER TABLE rss_sources ADD COLUMN group_id INTEGER' },
+        { name: 'group_sort_order', sql: 'ALTER TABLE rss_sources ADD COLUMN group_sort_order INTEGER DEFAULT 0' },
+      ];
+
+      for (const column of columnsToAdd) {
+        const hasColumn = tableInfo.some((col: any) => col.name === column.name);
+        if (!hasColumn) {
+          try {
+            console.log(`Adding ${column.name} column to rss_sources table...`);
+            await this.db.execAsync(column.sql);
+            console.log(`✅ ${column.name} column added successfully`);
+          } catch (error) {
+            console.warn(`⚠️ Could not add ${column.name} column:`, error);
+          }
+        }
+      }
+
+      // 处理 articles 表
+      let articlesTableInfo: any[] = [];
+      try {
+        articlesTableInfo = await this.db.getAllAsync('PRAGMA table_info(articles)');
+      } catch (e) {
+        console.warn('Warning: Could not get articles table info:', e);
+      }
+
+      const articleColumnsToAdd = [
+        { name: 'scroll_position', sql: 'ALTER TABLE articles ADD COLUMN scroll_position INTEGER DEFAULT 0' },
+        { name: 'image_caption', sql: 'ALTER TABLE articles ADD COLUMN image_caption TEXT' },
+        { name: 'image_credit', sql: 'ALTER TABLE articles ADD COLUMN image_credit TEXT' },
+      ];
+
+      for (const column of articleColumnsToAdd) {
+        const hasColumn = articlesTableInfo.some((col: any) => col.name === column.name);
+        if (!hasColumn) {
+          try {
+            console.log(`Adding ${column.name} column to articles table...`);
+            await this.db.execAsync(column.sql);
+            console.log(`✅ ${column.name} column added successfully`);
+          } catch (error) {
+            console.warn(`⚠️ Could not add ${column.name} column to articles:`, error);
+          }
+        }
+      }
+
+      // 处理 vocabulary 表
+      let vocabularyTableInfo: any[] = [];
+      try {
+        vocabularyTableInfo = await this.db.getAllAsync('PRAGMA table_info(vocabulary)');
+      } catch (e) {
+        console.warn('Warning: Could not get vocabulary table info:', e);
+      }
+
+      const vocabColumnsToAdd = [
+        { name: 'next_review_at', sql: 'ALTER TABLE vocabulary ADD COLUMN next_review_at INTEGER' },
+        { name: 'last_reviewed_at', sql: 'ALTER TABLE vocabulary ADD COLUMN last_reviewed_at INTEGER' },
+        { name: 'context', sql: 'ALTER TABLE vocabulary ADD COLUMN context TEXT' },
+        { name: 'article_id', sql: 'ALTER TABLE vocabulary ADD COLUMN article_id INTEGER' },
+        { name: 'correct_count', sql: 'ALTER TABLE vocabulary ADD COLUMN correct_count INTEGER DEFAULT 0' },
+        { name: 'difficulty', sql: 'ALTER TABLE vocabulary ADD COLUMN difficulty TEXT DEFAULT "medium"' },
+        { name: 'notes', sql: 'ALTER TABLE vocabulary ADD COLUMN notes TEXT DEFAULT ""' },
+      ];
+
+      for (const column of vocabColumnsToAdd) {
+        const hasColumn = vocabularyTableInfo.some((col: any) => col.name === column.name);
+        if (!hasColumn) {
+          try {
+            console.log(`Adding ${column.name} column to vocabulary table...`);
+            await this.db.execAsync(column.sql);
+            console.log(`✅ ${column.name} column added successfully`);
+          } catch (error) {
+            console.warn(`⚠️ Could not add ${column.name} column to vocabulary:`, error);
+          }
+        }
+      }
+
+      // 清理无效数据
+      try {
+        console.log('Cleaning up invalid vocabulary entries...');
         await this.db.execAsync("DELETE FROM vocabulary WHERE id IS NULL OR id = ''");
-        console.log('✅ Invalid vocabulary entries cleaned up successfully');
-      } catch (cleanupError) {
-        console.warn('Warning: Could not clean up invalid entries:', cleanupError);
+        console.log('✅ Invalid vocabulary entries cleaned up');
+      } catch (error) {
+        console.warn('⚠️ Could not clean up vocabulary entries:', error);
+      }
+
+      console.log('✅ 数据库迁移完成');
+
+      // 🔗 创建 group_id 索引(在迁移完成后)
+      try {
+        await this.db.execAsync('CREATE INDEX IF NOT EXISTS idx_rss_sources_group_id ON rss_sources(group_id)');
+        console.log('✅ group_id 索引创建成功');
+      } catch (error) {
+        console.warn('⚠️ Could not create group_id index:', error);
       }
     } catch (error) {
-      console.error('Database migration failed:', error);
+      console.error('❌ 数据库迁移异常:', error);
       // 不抛出错误，让应用继续运行
     }
   }
@@ -362,6 +337,17 @@ export class DatabaseService {
         success INTEGER DEFAULT 1,
         created_at INTEGER DEFAULT (strftime('%s', 'now'))
       )`,
+
+      // 📁 RSS分组表
+      `CREATE TABLE IF NOT EXISTS rss_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT,
+        color TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
     ];
 
     // 创建索引
@@ -379,6 +365,9 @@ export class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_translation_cache_text ON translation_cache(original_text)',
       'CREATE INDEX IF NOT EXISTS idx_llm_usage_stats_type ON llm_usage_stats(request_type)',
       'CREATE INDEX IF NOT EXISTS idx_llm_usage_stats_created ON llm_usage_stats(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_rss_groups_sort_order ON rss_groups(sort_order)',
+      // 注意: idx_rss_sources_group_id 移动到 migrateDatabase() 中创建,
+      // 因为 group_id 列是通过迁移添加的,此时可能不存在
     ];
 
     // 执行创建表语句

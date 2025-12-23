@@ -8,6 +8,10 @@ export { DictionaryService, dictionaryService } from './DictionaryService';
 // RSS服务
 export { RSSService, rssService, localRSSService, proxyRSSService, imageLocalizer } from './rss';
 
+// RSS分组服务
+export { RSSGroupService } from './RSSGroupService';
+export { default as rssGroupService } from './RSSGroupService';
+
 // 文章服务
 export { ArticleService, articleService } from './ArticleService';
 

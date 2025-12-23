@@ -68,6 +68,7 @@ export class RSSService {
         lastFetchAt: new Date(),
         errorCount: 0,
         description: feedInfo.description,
+        groupId: null, // 新源默认未分组
       };
 
       const result = await this.databaseService.executeInsert(
@@ -534,6 +535,9 @@ export class RSSService {
       article_count: row.article_count || 0,
       unread_count: row.unread_count || 0,
       last_updated: row.last_updated,
+      // 📦 分组字段
+      groupId: row.group_id || null,
+      groupSortOrder: row.group_sort_order || 0,
     };
   }
 }

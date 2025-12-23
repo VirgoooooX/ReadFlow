@@ -24,12 +24,16 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Articles: undefined; // 文章（合并Home和Reading）
   Vocabulary: undefined; // 词汇本
-  Settings: undefined; // 设置
+  RSS: undefined; // RSS订阅
+  User: undefined; // 用户
 };
 
 // 首页堆栈参数列表
 export type HomeStackParamList = {
-  HomeMain: undefined;
+  HomeMain: {
+    sourceId?: number;
+    sourceName?: string;
+  };
   ArticleDetail: { 
     articleId: number;
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
@@ -51,27 +55,26 @@ export type VocabularyStackParamList = {
 
 // RSS堆栈参数列表
 export type RSSStackParamList = {
-  RSSMain: undefined;
-  RSSSourceDetail: { sourceId: number };
+  RSSMain: undefined;  // 直接显示 ManageSubscriptionsScreen
   AddRSSSource: undefined;
-  RSSSettings: undefined;
+  EditRSSSource: { sourceId: number };
+  GroupManagement: undefined;  // 分组管理
 };
 
-// 设置堆栈参数列表
-export type SettingsStackParamList = {
-  SettingsMain: undefined;
+// 用户堆栈参数列表
+export type UserStackParamList = {
+  UserMain: undefined;
+  EditProfile: undefined;
   ReadingSettings: undefined;
-  AppSettings: undefined;
   LLMSettings: undefined;
   ThemeSettings: undefined;
-  ProxyServerSettings: undefined;  // 新增：代理服务器设置
-  AddEditProxyServer: { serverId?: string };  // 添加/编辑代理服务器
+  CustomColor: undefined;
+  ProxyServerSettings: undefined;
+  AddEditProxyServer: { serverId?: string };
   About: undefined;
-  Export: undefined;
-  Import: undefined;
   StorageManagement: undefined;
+  GroupManagement: undefined;
   AddRSSSource: undefined;
-  ManageSubscriptions: undefined;
   EditRSSSource: { sourceId: number };
 };
 
@@ -93,8 +96,8 @@ export type VocabularyStackScreenProps<Screen extends keyof VocabularyStackParam
 export type RSSStackScreenProps<Screen extends keyof RSSStackParamList> =
   NativeStackScreenProps<RSSStackParamList, Screen>;
 
-export type SettingsStackScreenProps<Screen extends keyof SettingsStackParamList> =
-  NativeStackScreenProps<SettingsStackParamList, Screen>;
+export type SettingsStackScreenProps<Screen extends keyof UserStackParamList> =
+  NativeStackScreenProps<UserStackParamList, Screen>;
 
 // 导航钩子类型
 export type NavigationProp = {

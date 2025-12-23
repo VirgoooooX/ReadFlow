@@ -16,6 +16,7 @@ import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
+import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
 import * as StyleUtils from '../../utils/styleUtils';
 import { Switch } from 'react-native';
@@ -26,6 +27,7 @@ const AddRSSSourceScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
   const { refreshRSSSources } = useRSSSource();
+  const { groups, addSourceToGroup } = useRSSGroup();
 
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
@@ -35,6 +37,7 @@ const AddRSSSourceScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [useProxy, setUseProxy] = useState(false); // 是否通过代理获取
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null); // 📁 选中的分组
 
   const categories = ['技术', '新闻', '博客', '科学', '设计', '其他'];
 
@@ -86,13 +89,18 @@ const AddRSSSourceScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await rssService.addRSSSource(
+      const result = await rssService.addRSSSource(
         url.trim(),
         name.trim() || '未命名RSS源',
         contentType,
         category,
         useProxy ? 'proxy' : 'direct'
       );
+      
+      // 📁 如果选择了分组，将源添加到分组
+      if (selectedGroupId && result?.id) {
+        await addSourceToGroup(result.id, selectedGroupId);
+      }
       
       // 添加成功，刷新RSS源列表
       await refreshRSSSources();
@@ -262,6 +270,49 @@ const AddRSSSourceScreen: React.FC = () => {
                   : '不提取图片和视频，适合纯文本内容源，加载更快'}
               </Text>
             </View>
+
+            {/* 📁 分组选择 */}
+            {groups.length > 0 && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>所属分组（可选）</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                  {/* 未分组选项 */}
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryChip,
+                      selectedGroupId === null && styles.categoryChipSelected
+                    ]}
+                    onPress={() => setSelectedGroupId(null)}
+                  >
+                    <Text style={[
+                      styles.categoryChipText,
+                      selectedGroupId === null && styles.categoryChipTextSelected
+                    ]}>
+                      未分组
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {/* 分组列表 */}
+                  {groups.map((group) => (
+                    <TouchableOpacity
+                      key={group.id}
+                      style={[
+                        styles.categoryChip,
+                        selectedGroupId === group.id && styles.categoryChipSelected
+                      ]}
+                      onPress={() => setSelectedGroupId(group.id)}
+                    >
+                      <Text style={[
+                        styles.categoryChipText,
+                        selectedGroupId === group.id && styles.categoryChipTextSelected
+                      ]}>
+                        {group.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             {/* 代理开关 */}
             <View style={styles.inputGroup}>

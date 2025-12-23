@@ -244,7 +244,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   );
 }));
 
-const HomeScreen: React.FC<Props> = ({ navigation }) => {
+const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { theme, isDark } = useThemeContext();
   const { rssSources, syncAllSources, syncSource } = useRSSSource();
   const { settings } = useReadingSettings();
@@ -341,6 +341,27 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   useFocusEffect(useCallback(() => { 
     loadArticles();
     
+    // 🔀 检查是否从订阅源管理页穿透过来
+    const sourceId = (route?.params as any)?.sourceId;
+    const sourceName = (route?.params as any)?.sourceName;
+    
+    if (sourceId && sourceName) {
+      // 找到对应源的 tab 索引
+      const sourceTabIndex = routes.findIndex(r => r.key === `source-${sourceId}`);
+      if (sourceTabIndex !== -1) {
+        console.log(`[HomeScreen] 🔀 穿透到源标签: ${sourceName} (index: ${sourceTabIndex})`);
+        setIndex(sourceTabIndex);
+        setLoadedTabs(prev => new Set(prev).add(sourceTabIndex));
+        // 使用 setImmediate 确保 UI 更新后再滚动
+        setImmediate(() => {
+          tabContentRef.current?.scrollToIndex(sourceTabIndex);
+        });
+      }
+      // 清除参数，避免重复触发
+      navigation.setParams({ sourceId: null, sourceName: null } as any);
+      return;
+    }
+    
     // 获取滚动信息
     const { shouldScroll, articleId } = getPendingScrollInfo();
     console.log('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId);
@@ -361,7 +382,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     } else {
       console.log('[HomeScreen] No article switch, skip scrolling');
     }
-  }, [index, routes, sceneRefsMap]));
+  }, [index, routes, sceneRefsMap, navigation, route]));
 
   const getFilteredArticles = useCallback((tabIndex: number) => {
     const route = routes[tabIndex];

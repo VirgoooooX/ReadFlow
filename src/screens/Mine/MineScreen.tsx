@@ -15,7 +15,7 @@ import { useUser } from '../../contexts/UserContext';
 import { userStatsService, UserStats } from '../../services/UserStatsService';
 import { SettingsService } from '../../services';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { UserStackParamList } from '../../navigation/AppNavigator';
+import type { UserStackParamList } from '../../navigation/types';
 
 type MineScreenNavigationProp = NativeStackNavigationProp<UserStackParamList>;
 
@@ -237,12 +237,6 @@ const MineScreen: React.FC = () => {
             label="阅读偏好"
             onPress={() => navigation.navigate('ReadingSettings')}
             color={theme?.colors?.primary || '#3B82F6'}
-          />
-          <MenuItem
-            icon="rss-feed"
-            label="订阅源管理"
-            onPress={() => navigation.navigate('ManageSubscriptions')}
-            color="#F59E0B"
             isLast
           />
         </View>

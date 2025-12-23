@@ -43,7 +43,32 @@ export interface RSSSource {
   article_count?: number;
   unread_count?: number;
   last_updated?: string;
+  
+  // 📁 分组相关字段
+  groupId: number | null;        // 所属分组 ID（null = 未分组）
+  groupSortOrder?: number;       // 在分组内的排序
 }
+
+// 📁 RSS分组类型
+export interface RSSGroup {
+  id: number;
+  name: string;
+  icon?: string;                 // MaterialIcon name 或 emoji
+  color?: string;                // Hex 值，如 #3B82F6
+  sortOrder: number;
+  createdAt: number;             // 时间戳（毫秒）
+  updatedAt: number;
+  
+  // 📊 统计字段（由 Service 层聚合查询填充）
+  sourceCount?: number;          // SQL COUNT 填充
+  unreadCount?: number;          // SQL SUM 填充
+}
+
+// 🆚️ 虚拟分组（前端概念）
+export const VIRTUAL_GROUPS = {
+  ALL: { id: -1, name: '全部' },
+  UNCATEGORIZED: { id: 0, name: '未分组' },  // 对应 groupId = NULL
+} as const;
 
 // 词典相关类型
 export interface WordDefinition {

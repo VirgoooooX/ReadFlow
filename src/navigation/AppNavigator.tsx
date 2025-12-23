@@ -12,6 +12,7 @@ import { getTabBarHeight, getTabBarPaddingVertical, getHeaderHeight, HEADER_TITL
 import CustomHeader from '../components/CustomHeader';
 import ScreenWithCustomHeader from '../components/ScreenWithCustomHeader';
 import { getCommonScreenOptions } from './screenOptions';
+import { HomeStackParamList, RSSStackParamList, MainTabParamList, UserStackParamList, VocabularyStackParamList } from './types';
 import {
   View,
   Image,
@@ -26,10 +27,10 @@ import ArticleDetailScreen from '../screens/Article/ArticleDetailScreen';
 import VocabularyScreen from '../screens/Vocabulary/VocabularyScreen';
 import ReviewSessionScreen from '../screens/Vocabulary/ReviewSessionScreen';
 import VocabularyDetailScreen from '../screens/Vocabulary/VocabularyDetailScreen';
-import RSSScreen from '../screens/RSS/RSSScreen';
 import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
 import EditRSSSourceScreen from '../screens/RSS/EditRSSSourceScreen';
+import GroupManagementScreen from '../screens/RSS/GroupManagementScreen';
 import MineScreen from '../screens/Mine/MineScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
@@ -62,51 +63,7 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
-export type MainTabParamList = {
-  Articles: undefined; // 文章（合并Home和Reading）
-  Vocabulary: undefined; // 词汇本
-  User: undefined; // 用户
-};
-
-export type HomeStackParamList = {
-  HomeMain: undefined;
-  ArticleDetail: { articleId: number };
-  Search: undefined;
-};
-
-
-
-export type VocabularyStackParamList = {
-  VocabularyMain: undefined;
-  VocabularyDetail: { entryId: number };
-  AddWord: { word?: string; context?: string; articleId?: number };
-  ReviewSession: undefined;
-  VocabularyStats: undefined;
-};
-
-export type RSSStackParamList = {
-  RSSMain: undefined;
-  RSSSourceDetail: { sourceId: number };
-  AddRSSSource: undefined;
-  ManageSubscriptions: undefined;
-  EditRSSSource: { sourceId: number };
-};
-
-export type UserStackParamList = {
-  UserMain: undefined;
-  EditProfile: undefined;
-  ReadingSettings: undefined;
-  LLMSettings: undefined;
-  ThemeSettings: undefined;
-  CustomColor: undefined;  // 新增：自定义颜色
-  ProxyServerSettings: undefined;  // 新增：代理服务器设置
-  AddEditProxyServer: { serverId?: string };  // 添加/编辑代理服务器
-  About: undefined;
-  StorageManagement: undefined;
-  AddRSSSource: undefined;
-  ManageSubscriptions: undefined;
-  EditRSSSource: { sourceId: number };
-};
+// 不需要在这里重新定义，使用 types.ts 中的定义
 
 // 创建导航器
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -290,7 +247,7 @@ function VocabularyStackNavigator() {
   );
 }
 
-// RSS堆栈导航
+// RSS堆栈导航（直接使用 ManageSubscriptionsScreen 作为主页）
 function RSSStackNavigator() {
   const { theme } = useThemeContext();
   const isDark = theme.isDark;
@@ -304,27 +261,14 @@ function RSSStackNavigator() {
     >
       <RSSStack.Screen
         name="RSSMain"
-        options={{ title: 'RSS订阅' }}
+        options={{ title: '订阅源' }}
       >
-        {(props) => (
+        {() => (
           <ScreenWithCustomHeader
-            title="RSS订阅"
+            title="订阅源"
             showBackButton={false}
           >
-            <RSSScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </RSSStack.Screen>
-      <RSSStack.Screen
-        name="RSSSourceDetail"
-        options={{ title: 'RSS源详情' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="RSS源详情"
-            showBackButton={true}
-          >
-            <RSSScreen {...props} />
+            <ManageSubscriptionsScreen />
           </ScreenWithCustomHeader>
         )}
       </RSSStack.Screen>
@@ -342,19 +286,6 @@ function RSSStackNavigator() {
         )}
       </RSSStack.Screen>
       <RSSStack.Screen
-        name="ManageSubscriptions"
-        options={{ title: '管理订阅源' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="管理订阅源"
-            showBackButton={true}
-          >
-            <ManageSubscriptionsScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </RSSStack.Screen>
-      <RSSStack.Screen
         name="EditRSSSource"
         options={{ title: '编辑RSS源' }}
       >
@@ -364,6 +295,19 @@ function RSSStackNavigator() {
             showBackButton={true}
           >
             <EditRSSSourceScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="GroupManagement"
+        options={{ title: '分组管理' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="分组管理"
+            showBackButton={true}
+          >
+            <GroupManagementScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </RSSStack.Screen>
@@ -531,6 +475,20 @@ function UserStackNavigator() {
       </UserStack.Screen>
 
       <UserStack.Screen
+        name="GroupManagement"
+        options={{ title: '分组管理' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="分组管理"
+            showBackButton={true}
+          >
+            <GroupManagementScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
         name="AddRSSSource"
         options={{ title: '添加RSS源' }}
       >
@@ -588,6 +546,9 @@ function MainTabNavigator() {
             case 'Vocabulary':
               iconName = 'book';
               break;
+            case 'RSS':
+              iconName = 'rss-feed';
+              break;
             case 'User':
               iconName = 'person';
               break;
@@ -629,6 +590,11 @@ function MainTabNavigator() {
         name="Vocabulary"
         component={VocabularyStackNavigator}
         options={{ tabBarLabel: '词汇本' }}
+      />
+      <MainTab.Screen
+        name="RSS"
+        component={RSSStackNavigator}
+        options={{ tabBarLabel: 'RSS' }}
       />
       <MainTab.Screen
         name="User"
