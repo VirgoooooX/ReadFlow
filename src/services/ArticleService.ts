@@ -1,5 +1,6 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { Article, ReadingSettings } from '../types';
+import cacheEventEmitter from './CacheEventEmitter';
 
 export class ArticleService {
   private static instance: ArticleService;
@@ -94,7 +95,7 @@ export class ArticleService {
       await this.databaseService.initializeDatabase();
       
       const {
-        limit = 20,
+        limit = 10,
         offset = 0,
         rssSourceId,
         isRead,
@@ -226,8 +227,37 @@ export class ArticleService {
         'UPDATE articles SET is_read = 1, read_progress = ?, read_at = ? WHERE id = ?',
         [progress, new Date().toISOString(), id]
       );
+      
+      // 获取文章的源ID，并更新该源的未读数量
+      const article = await this.getArticleById(id);
+      if (article && article.sourceId) {
+        await this.updateSourceStats(article.sourceId);
+      }
     } catch (error) {
       console.error('Error marking article as read:', error);
+    }
+  }
+  
+  /**
+   * 更新 RSS 源统计信息 (已读计数)
+   */
+  private async updateSourceStats(sourceId: number): Promise<void> {
+    try {
+      const unreadCountResult = await this.databaseService.executeQuery(
+        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0',
+        [sourceId]
+      );
+      const unreadCount = unreadCountResult[0]?.count || 0;
+      
+      await this.databaseService.executeStatement(
+        'UPDATE rss_sources SET unread_count = ? WHERE id = ?',
+        [unreadCount, sourceId]
+      );
+      
+      // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
+      cacheEventEmitter.updateRSSStats();
+    } catch (error) {
+      console.error('Error updating source stats:', error);
     }
   }
 
@@ -241,6 +271,12 @@ export class ArticleService {
         'UPDATE articles SET is_read = 0, read_progress = 0, read_at = NULL WHERE id = ?',
         [id]
       );
+      
+      // 获取文章的源ID，并更新该源的未读数量
+      const article = await this.getArticleById(id);
+      if (article && article.sourceId) {
+        await this.updateSourceStats(article.sourceId);
+      }
     } catch (error) {
       console.error('Error marking article as unread:', error);
     }
@@ -552,7 +588,8 @@ export class ArticleService {
   }
 
   /**
-   * 【新增】保存滚动位置
+   * 【新增】保存滚动位置 - 静默执行，失败不重试
+   * 滚动位置不是关键数据，失败不影响用户体验
    */
   public async saveScrollPosition(id: number, scrollY: number): Promise<void> {
     try {
@@ -561,9 +598,14 @@ export class ArticleService {
         'UPDATE articles SET scroll_position = ? WHERE id = ?',
         [Math.round(scrollY), id]
       );
-    } catch (error) {
-      console.error('Error saving scroll position:', error);
-      throw error;
+    } catch (error: any) {
+      // 静默失败：滚动位置不是关键数据，不值得重试或报错
+      // 只在非数据库锁定错误时记录，避免日志刷屏
+      const isDbLocked = error?.message?.includes('database is locked') ||
+                        error?.toString?.()?.includes('database is locked');
+      if (!isDbLocked) {
+        console.warn(`[ScrollPosition] Failed to save for article ${id}:`, error);
+      }
     }
   }
 

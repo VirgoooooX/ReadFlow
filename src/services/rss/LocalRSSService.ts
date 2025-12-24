@@ -21,6 +21,7 @@ import {
 } from './RSSUtils';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
+import cacheEventEmitter from '../CacheEventEmitter';
 
 export class LocalRSSService {
   private static instance: LocalRSSService;
@@ -500,7 +501,12 @@ export class LocalRSSService {
       }
       
       logger.info(`RSS 解析完成，源: ${sourceName}，解析 ${articles.length} 篇新文章`);
-      return articles;
+
+      // 🔥 应用过滤规则 (核心功能)
+      const filteredArticles = await this.applyFilterRules(articles, sourceId);
+      logger.info(`过滤后剩余 ${filteredArticles.length} 篇文章 (被过滤: ${articles.length - filteredArticles.length} 篇)`);
+      
+      return filteredArticles;
     } catch (error) {
       logger.error(`RSS 解析失败，源: ${sourceName}:`, error);
       throw error;
@@ -603,6 +609,76 @@ export class LocalRSSService {
   }
 
   /**
+   * 🔥 应用过滤规则 - 白名单优先，黑名单次之
+   */
+  private async applyFilterRules(
+    articles: Omit<Article, 'id'>[],
+    sourceId: number
+  ): Promise<Omit<Article, 'id'>[]> {
+    try {
+      // 1. 获取该源生效的所有规则 (全局 + 绑定的)
+      const rules = await this.databaseService.getEffectiveRules(sourceId);
+      
+      if (rules.length === 0) {
+        return articles; // 没有规则，直接返回
+      }
+      
+      // 2. 分类规则
+      const whitelist = rules.filter((r: any) => r.mode === 'include');
+      const blacklist = rules.filter((r: any) => r.mode === 'exclude');
+      
+      logger.info(`[过滤规则] 白名单: ${whitelist.length} 条, 黑名单: ${blacklist.length} 条`);
+      
+      // 3. 应用过滤
+      const filteredArticles = articles.filter(article => {
+        const title = (article.title || '').toLowerCase();
+        const summary = (article.summary || '').toLowerCase();
+        const content = (article.content || '').toLowerCase();
+        const contentToCheck = `${title} ${summary} ${content}`;
+        
+        // 辅助函数：检查是否命中规则
+        const checkMatch = (rule: any): boolean => {
+          if (rule.is_regex === 1) {
+            try {
+              const regex = new RegExp(rule.keyword, 'i');
+              return regex.test(contentToCheck);
+            } catch (e) {
+              logger.warn(`[过滤规则] 无效的正则: ${rule.keyword}`);
+              return false;
+            }
+          } else {
+            // 普通文本匹配
+            return contentToCheck.includes(rule.keyword.toLowerCase());
+          }
+        };
+        
+        // 🔥 白名单检查：如果存在白名单，文章**必须**命中至少一条
+        if (whitelist.length > 0) {
+          const hitsWhitelist = whitelist.some(rule => checkMatch(rule));
+          if (!hitsWhitelist) {
+            return false; // 未命中白名单，直接丢弃
+          }
+        }
+        
+        // 🔥 黑名单检查：如果命中任何一条黑名单，直接丢弃
+        if (blacklist.length > 0) {
+          const hitsBlacklist = blacklist.some(rule => checkMatch(rule));
+          if (hitsBlacklist) {
+            return false; // 命中黑名单，丢弃
+          }
+        }
+        
+        return true; // 通过过滤
+      });
+      
+      return filteredArticles;
+    } catch (error) {
+      logger.error('[过滤规则] 应用失败:', error);
+      return articles; // 失败时返回原列表，不影响正常使用
+    }
+  }
+
+  /**
    * 保存文章到数据库
    */
   private async saveArticle(article: Omit<Article, 'id'>): Promise<Article | null> {
@@ -669,6 +745,9 @@ export class LocalRSSService {
         'UPDATE rss_sources SET last_updated = ?, article_count = ?, unread_count = ? WHERE id = ?',
         [new Date().toISOString(), articleCount, unreadCount, sourceId]
       );
+      
+      // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
+      cacheEventEmitter.updateRSSStats();
     } catch (error) {
       logger.error('Error updating source stats:', error);
     }

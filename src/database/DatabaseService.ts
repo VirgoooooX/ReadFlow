@@ -54,6 +54,9 @@ export class DatabaseService {
       this.db = await SQLite.openDatabaseAsync(this.config.name);
       console.log('✅ 数据库打开成功:', this.config.name);
 
+      // 设置 PRAGMA 配置
+      await this.configurePragma();
+
       // 创建表结构
       await this.createTables();
       console.log('✅ 表创建成功');
@@ -74,6 +77,39 @@ export class DatabaseService {
         details: error,
         timestamp: new Date(),
       });
+    }
+  }
+
+  /**
+   * 配置数据库 PRAGMA 设置
+   */
+  private async configurePragma(): Promise<void> {
+    if (!this.db) return;
+
+    // 【关键】busy_timeout 必须设置，多次重试
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.db.execAsync('PRAGMA busy_timeout = 10000;'); // 10秒超时
+        console.log('✅ busy_timeout 已设置 (10s)');
+        break;
+      } catch (e) {
+        if (attempt < 2) {
+          console.warn(`⚠️ busy_timeout 设置失败，重试中... (${attempt + 1}/3)`);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } else {
+          console.warn('⚠️ busy_timeout 设置失败，使用默认值');
+        }
+      }
+    }
+
+    // 【可选】其他优化，失败不影响正常使用
+    try {
+      await this.db.execAsync('PRAGMA journal_mode = WAL;');
+      await this.db.execAsync('PRAGMA synchronous = NORMAL;');
+      await this.db.execAsync('PRAGMA cache_size = -10000;');
+      console.log('✅ 数据库性能优化已应用');
+    } catch (e) {
+      console.warn('⚠️ 部分性能优化未应用');
     }
   }
 
@@ -348,6 +384,25 @@ export class DatabaseService {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`,
+
+      // 🔥 过滤规则定义表 (支持全局/指定源)
+      `CREATE TABLE IF NOT EXISTS filter_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        keyword TEXT NOT NULL,
+        is_regex INTEGER DEFAULT 0,
+        mode TEXT DEFAULT 'exclude',
+        scope TEXT DEFAULT 'specific',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+
+      // 🔗 规则与源的绑定表 (多对多)
+      `CREATE TABLE IF NOT EXISTS filter_bindings (
+        rule_id INTEGER,
+        rss_source_id INTEGER,
+        PRIMARY KEY (rule_id, rss_source_id),
+        FOREIGN KEY(rule_id) REFERENCES filter_rules(id) ON DELETE CASCADE,
+        FOREIGN KEY(rss_source_id) REFERENCES rss_sources(id) ON DELETE CASCADE
+      )`,
     ];
 
     // 创建索引
@@ -366,6 +421,9 @@ export class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_llm_usage_stats_type ON llm_usage_stats(request_type)',
       'CREATE INDEX IF NOT EXISTS idx_llm_usage_stats_created ON llm_usage_stats(created_at)',
       'CREATE INDEX IF NOT EXISTS idx_rss_groups_sort_order ON rss_groups(sort_order)',
+      'CREATE INDEX IF NOT EXISTS idx_filter_rules_scope ON filter_rules(scope)',
+      'CREATE INDEX IF NOT EXISTS idx_filter_bindings_rule_id ON filter_bindings(rule_id)',
+      'CREATE INDEX IF NOT EXISTS idx_filter_bindings_source_id ON filter_bindings(rss_source_id)',
       // 注意: idx_rss_sources_group_id 移动到 migrateDatabase() 中创建,
       // 因为 group_id 列是通过迁移添加的,此时可能不存在
     ];
@@ -753,6 +811,138 @@ export class DatabaseService {
       console.log('Database reset successfully');
     } catch (error) {
       console.error('Error resetting database:', error);
+      throw error;
+    }
+  }
+
+  // =================== 过滤规则管理 ===================
+
+  /**
+   * 🔥 获取某源生效的所有规则 (全局 + 绑定给该源的规则)
+   */
+  public async getEffectiveRules(sourceId: number): Promise<any[]> {
+    await this.ensureInitialized();
+    
+    const sql = `
+      SELECT * FROM filter_rules 
+      WHERE scope = 'global' 
+      OR id IN (
+        SELECT rule_id FROM filter_bindings WHERE rss_source_id = ?
+      )
+      ORDER BY id DESC
+    `;
+    
+    return await this.executeQuery(sql, [sourceId]);
+  }
+
+  /**
+   * 获取所有规则 (用于管理界面)
+   */
+  public async getAllRules(): Promise<any[]> {
+    await this.ensureInitialized();
+    return await this.executeQuery('SELECT * FROM filter_rules ORDER BY id DESC');
+  }
+
+  /**
+   * 获取规则的绑定源列表
+   */
+  public async getRuleBindings(ruleId: number): Promise<number[]> {
+    await this.ensureInitialized();
+    const results = await this.executeQuery(
+      'SELECT rss_source_id FROM filter_bindings WHERE rule_id = ?',
+      [ruleId]
+    );
+    return results.map((row: any) => row.rss_source_id);
+  }
+
+  /**
+   * 新增规则 (带绑定逻辑)
+   */
+  public async createRule(
+    keyword: string,
+    isRegex: boolean,
+    mode: 'include' | 'exclude',
+    scope: 'global' | 'specific',
+    targetSourceIds: number[] = []
+  ): Promise<number> {
+    await this.ensureInitialized();
+
+    if (!this.db) {
+      throw new Error('Database not available');
+    }
+
+    try {
+      // 1. 插入规则
+      const result = await this.executeInsert(
+        'INSERT INTO filter_rules (keyword, is_regex, mode, scope) VALUES (?, ?, ?, ?)',
+        [keyword, isRegex ? 1 : 0, mode, scope]
+      );
+      
+      const ruleId = result.insertId;
+
+      // 2. 如果是特定源，插入绑定关系
+      if (scope === 'specific' && targetSourceIds.length > 0) {
+        for (const sourceId of targetSourceIds) {
+          await this.executeStatement(
+            'INSERT INTO filter_bindings (rule_id, rss_source_id) VALUES (?, ?)',
+            [ruleId, sourceId]
+          );
+        }
+      }
+
+      console.log(`✅ 规则创建成功: ID=${ruleId}, scope=${scope}, 绑定源数=${targetSourceIds.length}`);
+      return ruleId;
+    } catch (error) {
+      console.error('Error creating rule:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 删除规则 (bindings 会自动级联删除)
+   */
+  public async deleteRule(ruleId: number): Promise<void> {
+    await this.ensureInitialized();
+    await this.executeStatement('DELETE FROM filter_rules WHERE id = ?', [ruleId]);
+    console.log(`✅ 规则已删除: ID=${ruleId}`);
+  }
+
+  /**
+   * 更新规则
+   */
+  public async updateRule(
+    ruleId: number,
+    keyword: string,
+    isRegex: boolean,
+    mode: 'include' | 'exclude',
+    scope: 'global' | 'specific',
+    targetSourceIds: number[] = []
+  ): Promise<void> {
+    await this.ensureInitialized();
+
+    try {
+      // 1. 更新规则
+      await this.executeStatement(
+        'UPDATE filter_rules SET keyword = ?, is_regex = ?, mode = ?, scope = ? WHERE id = ?',
+        [keyword, isRegex ? 1 : 0, mode, scope, ruleId]
+      );
+
+      // 2. 删除旧的绑定
+      await this.executeStatement('DELETE FROM filter_bindings WHERE rule_id = ?', [ruleId]);
+
+      // 3. 重新绑定
+      if (scope === 'specific' && targetSourceIds.length > 0) {
+        for (const sourceId of targetSourceIds) {
+          await this.executeStatement(
+            'INSERT INTO filter_bindings (rule_id, rss_source_id) VALUES (?, ?)',
+            [ruleId, sourceId]
+          );
+        }
+      }
+
+      console.log(`✅ 规则更新成功: ID=${ruleId}`);
+    } catch (error) {
+      console.error('Error updating rule:', error);
       throw error;
     }
   }

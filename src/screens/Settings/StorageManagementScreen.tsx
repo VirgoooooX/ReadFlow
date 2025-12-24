@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import { imageCacheService, DatabaseService } from '../../services';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 
 const StorageManagementScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
@@ -97,6 +98,14 @@ const StorageManagementScreen: React.FC = () => {
       // 3. 重置 RSS 源的文章计数
       await db.executeStatement('UPDATE rss_sources SET article_count = 0, unread_count = 0');
       console.log('✅ RSS源计数已重置');
+
+      // 4. 【新增】触发全局清除缓存事件，通知 HomeScreen 清除 tabDataMap
+      cacheEventEmitter.clearAll();
+      console.log('✅ 缓存清除事件已触发');
+
+      // 5. 【修复】触发 RSS 统计更新事件，通知订阅源页面刷新
+      cacheEventEmitter.updateRSSStats();
+      console.log('✅ RSS统计更新事件已触发');
 
       await updateCacheSize();
 

@@ -47,6 +47,9 @@ export interface RSSSource {
   // 📁 分组相关字段
   groupId: number | null;        // 所属分组 ID（null = 未分组）
   groupSortOrder?: number;       // 在分组内的排序
+  
+  // 🌐 图标相关字段
+  iconUrl?: string;              // RSS源图标URL（本地缓存或网络URL）
 }
 
 // 📁 RSS分组类型
@@ -150,6 +153,7 @@ export interface ReadingSettings {
   sepia: boolean;
   brightness: number;
   showAllTab: boolean;     // 是否显示"全部"标签
+  autoRefreshInterval: number; // 后台自动刷新间隔（分钟），0表示关闭自动刷新
 }
 
 export interface AppSettings {

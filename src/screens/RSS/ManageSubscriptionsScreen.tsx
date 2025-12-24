@@ -11,15 +11,19 @@ import {
   useWindowDimensions,
   InteractionManager,
   ActivityIndicator,
+  Vibration,
+  BackHandler,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { typography } from '../../theme/typography';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
 import { DatabaseService } from '../../database/DatabaseService';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 import type { RSSSource } from '../../types';
 import { VIRTUAL_GROUPS } from '../../types';
 import * as StyleUtils from '../../utils/styleUtils';
@@ -33,19 +37,35 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
   const { rssSources, refreshRSSSources, syncAllSources, syncSource } = useRSSSource();
-  const { groups, moveSourcesToGroup, refreshGroups } = useRSSGroup();
+  const { groups, moveSourcesToGroup } = useRSSGroup();
   const { width: screenWidth } = useWindowDimensions();
   const tabContentRef = useRef<CustomTabContentHandle>(null);
   const scrollX = useSharedValue(0);
 
   const [refreshing, setRefreshing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [loading, setLoading] = useState(false); // 🚀 直接使用 Context 数据，无需加载等待
-  const [selectionMode, setSelectionMode] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  
+  // 模式控制：普通浏览 vs 管理模式
+  const [isEditMode, setIsEditMode] = useState(false);
   const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
-  const [isReady, setIsReady] = useState(false); // 🚀 用于控制是否开始渲染重型列表
 
-  // 📦 构建 Tab 列表（全部 + 分组们 + 未分组）
+  // 1. 计算全局统计数据
+  const stats = useMemo(() => {
+    const total = rssSources.length;
+    const unread = rssSources.reduce((acc, s) => acc + (s.unread_count || 0), 0);
+    // 简单的今日更新计算 (过去24小时)
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+    const active = rssSources.filter(s => {
+      const last = s.last_updated ? new Date(s.last_updated).getTime() : 0;
+      return (now - last) < oneDay;
+    }).length;
+    
+    return { total, unread, active };
+  }, [rssSources]);
+
+  // 2. 构建 Tab 列表
   const routes = useMemo(() => {
     const tabs = [
       { key: 'all', title: '全部', groupId: VIRTUAL_GROUPS.ALL.id },
@@ -55,7 +75,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
     return tabs;
   }, [groups]);
 
-  // 根据当前 Tab 获取过滤后的源
+  // 3. 过滤源
   const getFilteredSources = useCallback((tabIndex: number): RSSSource[] => {
     const route = routes[tabIndex];
     if (!route) return rssSources;
@@ -70,29 +90,61 @@ const ManageSubscriptionsScreen: React.FC = () => {
   }, [routes, rssSources]);
 
   const filteredSources = useMemo(() => getFilteredSources(activeIndex), [getFilteredSources, activeIndex]);
-
   const styles = createStyles(isDark, theme);
 
-  const handleTabPress = useCallback((tabIndex: number) => {
-    setActiveIndex(tabIndex);
-    tabContentRef.current?.scrollToIndex(tabIndex);
-    // 切换 Tab 时取消选择模式
-    if (selectionMode) {
-      setSelectionMode(false);
-      setSelectedSources(new Set());
-    }
-  }, [selectionMode]);
-
-  const handleIndexChange = useCallback((newIndex: number) => {
-    setActiveIndex(newIndex);
-  }, []);
-
-  // 🚀 关键优化：在转场动画结束后再渲染列表
+  // 初始化
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       setIsReady(true);
     });
     return () => task.cancel();
+  }, []);
+
+  // 处理返回按钮：编辑模式下拦截返回，退出编辑模式
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!isEditMode) {
+        // 非编辑模式，允许正常返回
+        return;
+      }
+
+      // 编辑模式下，阻止返回行为
+      e.preventDefault();
+
+      // 退出编辑模式
+      setIsEditMode(false);
+      setSelectedSources(new Set());
+    });
+
+    return unsubscribe;
+  }, [navigation, isEditMode]);
+
+  // 处理 Android 硬件返回键
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isEditMode) {
+        // 编辑模式下，拦截返回键，退出编辑模式
+        setIsEditMode(false);
+        setSelectedSources(new Set());
+        return true; // 阻止默认返回行为
+      }
+      return false; // 允许默认返回行为
+    });
+
+    return () => backHandler.remove();
+  }, [isEditMode]);
+
+  const handleTabPress = useCallback((tabIndex: number) => {
+    setActiveIndex(tabIndex);
+    tabContentRef.current?.scrollToIndex(tabIndex);
+    if (isEditMode) {
+      setIsEditMode(false);
+      setSelectedSources(new Set());
+    }
+  }, [isEditMode]);
+
+  const handleIndexChange = useCallback((newIndex: number) => {
+    setActiveIndex(newIndex);
   }, []);
 
   const onRefresh = async () => {
@@ -107,20 +159,14 @@ const ManageSubscriptionsScreen: React.FC = () => {
     }
   };
 
+  // --- 业务逻辑 (完整保留) ---
   const toggleSourceStatus = async (sourceId: number) => {
     try {
       const source = rssSources.find(s => s.id === sourceId);
       if (!source) return;
-
       const newStatus = !source.isActive;
-      console.log(`Toggling source ${sourceId} from ${source.isActive} to ${newStatus}`);
-
       await rssService.updateRSSSource(sourceId, { isActive: newStatus });
-      console.log(`Database update completed for source ${sourceId}`);
-
       await refreshRSSSources();
-
-      console.log(`Local state updated for source ${sourceId}`);
     } catch (error) {
       console.error('Error toggling source status:', error);
       Alert.alert('操作失败', '无法更新RSS源状态');
@@ -140,6 +186,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await rssService.deleteRSSSource(sourceId);
+              // 【优化】触发更细粒度的源删除事件
+              cacheEventEmitter.sourceDeleted(sourceId, source?.name);
+              console.log(`✅ 已触发源删除事件: ${source?.name}`);
               await refreshRSSSources();
             } catch (error) {
               console.error('Error deleting source:', error);
@@ -165,11 +214,15 @@ const ManageSubscriptionsScreen: React.FC = () => {
             try {
               const db = DatabaseService.getInstance();
               await db.executeStatement('DELETE FROM articles WHERE rss_source_id = ?', [sourceId]);
-              // 更新计数
               await db.executeStatement(
                 'UPDATE rss_sources SET article_count = 0, unread_count = 0 WHERE id = ?',
                 [sourceId]
               );
+              // 【优化】触发更细粒度的清除单源缓存事件
+              cacheEventEmitter.clearSourceArticles(sourceId, source?.name);
+              // 同时触发统计更新事件，刷新订阅源页面的未读数量
+              cacheEventEmitter.updateRSSStats();
+              console.log(`✅ 已触发清除单源缓存事件: ${source?.name}`);
               await refreshRSSSources();
               Alert.alert('成功', `已清除 "${source?.name}" 的所有文章`);
             } catch (error) {
@@ -188,23 +241,20 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
   const handleSyncSingleSource = async (sourceId: number) => {
     try {
-      setLoading(true);
       await syncSource(sourceId);
       Alert.alert('刷新完成', '该源已成功更新');
     } catch (error) {
       console.error('Sync single source failed:', error);
       Alert.alert('刷新失败', '无法更新该RSS源');
-    } finally {
-      setLoading(false);
     }
   };
-
+  
   const handleMoveSource = async (sourceId: number, direction: 'up' | 'down') => {
     try {
       const currentIndex = filteredSources.findIndex(s => s.id === sourceId);
       if ((direction === 'up' && currentIndex === 0) ||
         (direction === 'down' && currentIndex === filteredSources.length - 1)) {
-        return; // 已经是首/尾
+        return;
       }
 
       const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
@@ -212,7 +262,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
       [sortedSources[currentIndex], sortedSources[newIndex]] =
         [sortedSources[newIndex], sortedSources[currentIndex]];
 
-      // 更新排序
       const updates = sortedSources.map((s, idx) => ({
         id: s.id,
         sortOrder: idx,
@@ -226,20 +275,18 @@ const ManageSubscriptionsScreen: React.FC = () => {
     }
   };
 
-  // 批量操作相关方法
-  const toggleSelectionMode = () => {
-    setSelectionMode(!selectionMode);
+  // --- 批量操作逻辑 (完整保留) ---
+  const toggleEditMode = () => {
+    Vibration.vibrate(50);
+    setIsEditMode(!isEditMode);
     setSelectedSources(new Set());
   };
 
-  const toggleSourceSelection = (sourceId: number) => {
-    const newSelection = new Set(selectedSources);
-    if (newSelection.has(sourceId)) {
-      newSelection.delete(sourceId);
-    } else {
-      newSelection.add(sourceId);
-    }
-    setSelectedSources(newSelection);
+  const toggleSelection = (id: number) => {
+    const newSet = new Set(selectedSources);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedSources(newSet);
   };
 
   const selectAllSources = () => {
@@ -268,7 +315,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
             try {
               await moveSourcesToGroup(Array.from(selectedSources), null);
               Alert.alert('成功', '已移动到未分组');
-              setSelectionMode(false);
+              setIsEditMode(false);
               setSelectedSources(new Set());
               await refreshRSSSources();
             } catch (error) {
@@ -283,7 +330,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
             try {
               await moveSourcesToGroup(Array.from(selectedSources), group.id);
               Alert.alert('成功', `已移动到 "${group.name}"`);
-              setSelectionMode(false);
+              setIsEditMode(false);
               setSelectedSources(new Set());
               await refreshRSSSources();
             } catch (error) {
@@ -314,9 +361,12 @@ const ManageSubscriptionsScreen: React.FC = () => {
             try {
               for (const sourceId of selectedSources) {
                 await rssService.deleteRSSSource(sourceId);
+                // 触发每个源的删除事件
+                cacheEventEmitter.sourceDeleted(sourceId);
               }
+              console.log(`✅ 已触发批量删除事件: ${selectedSources.size} 个源`);
               Alert.alert('成功', `已删除 ${selectedSources.size} 个源`);
-              setSelectionMode(false);
+              setIsEditMode(false);
               setSelectedSources(new Set());
               await refreshRSSSources();
             } catch (error) {
@@ -329,366 +379,225 @@ const ManageSubscriptionsScreen: React.FC = () => {
     );
   };
 
-  const formatLastUpdated = (date: Date) => {
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return '从未更新';
+    const date = new Date(dateStr);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 60) {
-      return `${diffMins}分钟前`;
-    } else if (diffHours < 24) {
-      return `${diffHours}小时前`;
-    } else {
-      return `${diffDays}天前`;
-    }
+    const diff = (now.getTime() - date.getTime()) / 1000; // seconds
+    
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+    return `${Math.floor(diff / 86400)}天前`;
   };
 
-  // 🎬 渲染每个 Tab 页面的内容
-  const renderScene = useCallback(({ route, index: tabIndex }: { route: { key: string; title: string }; index: number }) => {
-    // 从 routes 中查找对应的 groupId
-    const routeData = routes[tabIndex];
+  // --- 组件渲染 ---
+
+  // 1. 顶部统计卡片 (复用 MineScreen 风格)
+  const StatCard = ({ icon, value, label, color }: any) => (
+    <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
+      <View style={[styles.statIconCircle, { backgroundColor: `${color}15` }]}>
+        <MaterialIcons name={icon} size={20} color={color} />
+      </View>
+      <View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+
+  const renderDashboard = () => (
+    <View style={styles.dashboardContainer}>
+      <StatCard icon="rss-feed" value={stats.total} label="总订阅" color={theme.colors.primary} />
+      <StatCard icon="mark-email-unread" value={stats.unread} label="总未读" color={theme.colors.error} />
+      <StatCard icon="update" value={stats.active} label="近日更新" color={theme.colors.tertiary} />
+    </View>
+  );
+
+  const renderFooter = () => (
+    <View style={styles.footerContainer}>
+      <View style={{ height: 60 }} /> 
+      {/* 底部留白给批量操作栏 */}
+    </View>
+  );
+
+  // 3. 核心：源卡片 (浏览模式 & 管理模式)
+  const SourceCard = React.memo(({ source, index, total }: { source: RSSSource, index: number, total: number }) => {
+    const isSelected = selectedSources.has(source.id);
+    // 生成伪随机颜色
+    const iconColor = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'][source.id % 5];
+
+    // 浏览模式点击 -> 进文章页
+    const handlePress = () => {
+      if (isEditMode) {
+        toggleSelection(source.id);
+      } else {
+        navigation.navigate('Articles' as any, { 
+          screen: 'HomeMain', 
+          params: { sourceId: source.id, sourceName: source.name } 
+        } as any);
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.card,
+          isEditMode && isSelected && styles.cardSelected
+        ]}
+        onPress={handlePress}
+        onLongPress={() => !isEditMode && toggleEditMode()}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardInner}>
+          {/* 左侧：选择框（编辑模式）或RSS图标（普通模式） */}
+          <View style={styles.cardLeft}>
+             {isEditMode ? (
+               <MaterialIcons 
+                 name={isSelected ? "check-circle" : "radio-button-unchecked"} 
+                 size={24} 
+                 color={isSelected ? theme.colors.primary : theme.colors.outline} 
+               />
+             ) : (
+               <View style={[styles.iconBox, { backgroundColor: `${iconColor}15` }]}>
+                 <MaterialIcons name="rss-feed" size={20} color={iconColor} />
+               </View>
+             )}
+          </View>
+
+          {/* 中间：信息 */}
+          <View style={styles.cardCenter}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{source.name}</Text>
+            <View style={styles.cardMetaRow}>
+              <Text style={styles.metaText}>
+                {formatTime(source.last_updated)}更新
+              </Text>
+            </View>
+          </View>
+
+          {/* 右侧：未读数字或交互按钮 */}
+          <View style={styles.cardRight}>
+            {isEditMode ? (
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                 <TouchableOpacity onPress={() => handleMoveSource(source.id, 'up')} disabled={index===0} style={{padding:4}}>
+                   <MaterialIcons name="arrow-upward" size={20} color={theme.colors.outline} />
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={() => handleMoveSource(source.id, 'down')} disabled={index===total-1} style={{padding:4}}>
+                   <MaterialIcons name="arrow-downward" size={20} color={theme.colors.outline} />
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={() => editSource(source.id)} style={{padding:4, marginLeft:4}}>
+                   <MaterialIcons name="edit" size={20} color={theme.colors.primary} />
+                 </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                {/* 显示未读计数：醒目的数字徽章 */}
+                {(source.unread_count ?? 0) > 0 && (
+                  <View style={[styles.unreadBadge, { backgroundColor: theme.colors.error }]}>
+                    <Text style={styles.unreadBadgeText}>
+                      {(source.unread_count ?? 0) > 99 ? '99+' : source.unread_count}
+                    </Text>
+                  </View>
+                )}
+                {/* 右箭头 */}
+                <MaterialIcons name="chevron-right" size={20} color={theme.colors.outline} />
+              </View>
+            )}
+          </View>
+        </View>
+        
+        {/* 管理模式下的额外操作栏 */}
+        {isEditMode && (
+          <View style={styles.editActionBar}>
+             <View style={{flexDirection:'row', alignItems:'center'}}>
+                <Text style={{fontSize:12, color:theme.colors.onSurfaceVariant, marginRight: 8}}>启用</Text>
+                <Switch 
+                  value={source.isActive} 
+                  onValueChange={() => toggleSourceStatus(source.id)}
+                  trackColor={{ false: theme.colors.outlineVariant, true: theme.colors.primary }}
+                  thumbColor={'#FFF'}
+                  style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }} 
+                />
+             </View>
+             
+             <View style={{flexDirection:'row', gap: 12}}>
+                 <TouchableOpacity onPress={() => handleSyncSingleSource(source.id)} style={styles.actionBtnSmall}>
+                    <Text style={{fontSize:12, color: theme.colors.primary}}>刷新</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={() => clearSourceArticles(source.id)} style={styles.actionBtnSmall}>
+                    <Text style={{fontSize:12, color: theme.colors.onSurfaceVariant}}>清空</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={() => deleteSource(source.id)} style={[styles.actionBtnSmall, {backgroundColor: theme.colors.errorContainer}]}>
+                    <Text style={{fontSize:12, color: theme.colors.error}}>删除</Text>
+                 </TouchableOpacity>
+             </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  });
+
+  // 4. 列表渲染
+  const renderScene = useCallback(({ route, index: tabIndex }: any) => {
     const sourcesForTab = getFilteredSources(tabIndex);
-    
-    // 🚀 关键优化 1：如果页面还没准备好（动画未结束），显示 Loading
+
     if (!isReady) {
       return (
-        <View style={{ width: screenWidth, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={theme?.colors?.primary} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       );
     }
 
-    // 🚀 关键优化 2：使用 FlatList 替代 ScrollView
     return (
       <View style={{ width: screenWidth, flex: 1 }}>
         <FlatList
           data={sourcesForTab}
           keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item, index }) => {
-            const isSelected = selectedSources.has(item.id);
-            return (
-              <View style={{ paddingHorizontal: 16 }}>
-                {renderSourceItem(item, index, isSelected, sourcesForTab.length)}
-              </View>
-            );
-          }}
-          // 将头部内容放入 ListHeaderComponent
+          renderItem={({ item, index }) => (
+            <SourceCard source={item} index={index} total={sourcesForTab.length} />
+          )}
           ListHeaderComponent={() => (
-            <View style={styles.sourcesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{route.title}</Text>
-                <View style={styles.headerButtons}>
-                  {/* 分组管理按钮 */}
-                  <TouchableOpacity
-                    style={styles.groupManageButton}
-                    onPress={() => navigation.navigate('GroupManagement')}
-                  >
-                    <MaterialIcons
-                      name="folder"
-                      size={20}
-                      color={theme?.colors?.primary}
-                    />
-                    <Text style={styles.groupManageButtonText}>分组</Text>
-                  </TouchableOpacity>
-                  
-                  {/* 批量操作按钮 */}
-                  <TouchableOpacity
-                    style={[
-                      styles.batchButton,
-                      selectionMode && styles.batchButtonActive
-                    ]}
-                    onPress={toggleSelectionMode}
-                  >
-                    <MaterialIcons
-                      name={selectionMode ? 'close' : 'checklist'}
-                      size={20}
-                      color={selectionMode ? theme?.colors?.onPrimary : theme?.colors?.primary}
-                    />
-                    <Text style={[
-                      styles.batchButtonText,
-                      selectionMode && styles.batchButtonTextActive
-                    ]}>
-                      {selectionMode ? '取消' : '批量'}
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => navigation.navigate('AddRSSSource')}
-                  >
-                    <MaterialIcons name="add" size={20} color={theme?.colors?.primary} />
-                    <Text style={styles.addButtonText}>添加</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* 批量操作工具栏 */}
-              {selectionMode && (
-                <View style={styles.batchToolbar}>
-                  <View style={styles.batchInfo}>
-                    <Text style={styles.batchInfoText}>
-                      已选 {selectedSources.size} / {sourcesForTab.length}
-                    </Text>
-                    <TouchableOpacity onPress={selectedSources.size === sourcesForTab.length ? deselectAllSources : selectAllSources}>
-                      <Text style={styles.batchSelectAllText}>
+            <View style={styles.listHeader}>
+              {isEditMode && (
+                <View style={styles.batchHeader}>
+                   <Text style={{fontSize:13, color: theme.colors.onSurfaceVariant}}>
+                     已选 {selectedSources.size} 项
+                   </Text>
+                   <TouchableOpacity onPress={selectedSources.size === sourcesForTab.length ? deselectAllSources : selectAllSources}>
+                      <Text style={{fontSize:13, color: theme.colors.primary, fontWeight:'600'}}>
                         {selectedSources.size === sourcesForTab.length ? '取消全选' : '全选'}
                       </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.batchActions}>
-                    <TouchableOpacity
-                      style={styles.batchActionButton}
-                      onPress={handleBatchMoveToGroup}
-                      disabled={selectedSources.size === 0}
-                    >
-                      <MaterialIcons name="folder" size={20} color={theme?.colors?.primary} />
-                      <Text style={styles.batchActionText}>移动</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.batchActionButton, styles.batchDeleteButton]}
-                      onPress={handleBatchDelete}
-                      disabled={selectedSources.size === 0}
-                    >
-                      <MaterialIcons name="delete" size={20} color={theme?.colors?.error} />
-                      <Text style={[styles.batchActionText, styles.batchDeleteText]}>删除</Text>
-                    </TouchableOpacity>
-                  </View>
+                   </TouchableOpacity>
                 </View>
               )}
             </View>
           )}
-          // 将空状态放入 ListEmptyComponent
           ListEmptyComponent={() => (
             <View style={styles.emptyState}>
-              <MaterialIcons
-                name="rss-feed"
-                size={48}
-                color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
-              />
-              <Text style={styles.emptyStateTitle}>暂无订阅源</Text>
-              <Text style={styles.emptyStateText}>
-                {routeData?.key === 'all' ? '还没有添加任何RSS源' : `${route.title}下暂无订阅源`}
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={() => navigation.navigate('AddRSSSource')}
-              >
-                <Text style={styles.emptyStateButtonText}>添加第一个RSS源</Text>
-              </TouchableOpacity>
+              <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
+              <Text style={styles.emptyText}>暂无订阅源</Text>
             </View>
           )}
-          // 性能优化属性
-          initialNumToRender={8}
+          ListFooterComponent={renderFooter}
+          // 优化滚动性能
+          initialNumToRender={10}
           windowSize={5}
           maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
           removeClippedSubviews={true}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 80 }}
-          ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
         />
       </View>
     );
-  }, [getFilteredSources, screenWidth, isReady, refreshing, onRefresh, selectionMode, selectedSources, styles, theme, isDark, navigation, groups, routes]);
-
-  // 🎬 渲染单个源项
-  const handleSourcePress = (source: RSSSource) => {
-    if (selectionMode) {
-      toggleSourceSelection(source.id);
-    } else {
-      // 🔀 穿透到首页，显示该源的标签
-      navigation.navigate('Articles' as any, { 
-        screen: 'HomeMain',
-        params: {
-          sourceId: source.id,
-          sourceName: source.name
-        }
-      } as any);
-    }
-  };
-
-  const renderSourceItem = (source: RSSSource, index: number, isSelected: boolean, totalCount: number) => (
-    <TouchableOpacity
-      key={source.id}
-      style={[
-        styles.sourceItem,
-        selectionMode && isSelected && styles.sourceItemSelected,
-      ]}
-      onPress={() => handleSourcePress(source)}
-      onLongPress={() => !selectionMode && toggleSelectionMode()}
-      activeOpacity={selectionMode ? 0.7 : 1}
-    >
-      {/* 选择框 */}
-      {selectionMode && (
-        <View style={styles.selectionCheckbox}>
-          <MaterialIcons
-            name={isSelected ? 'check-box' : 'check-box-outline-blank'}
-            size={24}
-            color={isSelected ? theme?.colors?.primary : theme?.colors?.outline}
-          />
-        </View>
-      )}
-      
-      {/* 主内容区域 */}
-      <View style={styles.sourceContent}>
-        <View style={styles.sourceHeader}>
-          <View style={styles.sourceInfo}>
-            <View style={styles.sourceTitleRow}>
-              <View style={styles.sourceNameContainer}>
-                <Text style={styles.sourceName}>{source.name}</Text>
-                <View style={styles.contentTypeBadge}>
-                  <MaterialIcons
-                    name={source.contentType === 'text' ? 'text-fields' : 'image'}
-                    size={12}
-                    color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
-                  />
-                  <Text style={styles.contentTypeText}>
-                    {source.contentType === 'text' ? '纯文本' : '多媒体'}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.badgesRow}>
-                {source.sourceMode === 'proxy' && (
-                  <View style={[styles.statusBadge, styles.proxyBadge]}>
-                    <Text style={[styles.statusText, styles.proxyText]}>代理</Text>
-                  </View>
-                )}
-                <View style={[
-                  styles.statusBadge,
-                  source.isActive ? styles.activeBadge : styles.inactiveBadge
-                ]}>
-                  <Text style={[
-                    styles.statusText,
-                    source.isActive ? styles.activeText : styles.inactiveText
-                  ]}>
-                    {source.isActive ? '活跃' : '暂停'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <Text style={styles.sourceUrl}>{source.url}</Text>
-            {source.description && (
-              <Text style={styles.sourceDescription}>{source.description}</Text>
-            )}
-
-            {(source.errorCount || 0) > 0 && (
-              <View style={styles.sourceMetaRow}>
-                <View style={styles.errorBadge}>
-                  <MaterialIcons name="error" size={12} color={theme?.colors?.error} />
-                  <Text style={styles.errorBadgeText}>{source.errorCount} 错误</Text>
-                </View>
-              </View>
-            )}
-
-            <View style={styles.sourceStats}>
-              <Text style={styles.sourceStatsText}>
-                {source.article_count || 0} 篇文章 • {source.unread_count || 0} 篇未读 • {formatLastUpdated(new Date(source.last_updated || Date.now()))}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sourceActions}>
-          <View style={styles.sortMoveContainer}>
-            <TouchableOpacity
-              style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
-              onPress={() => handleMoveSource(source.id, 'up')}
-              disabled={index === 0}
-            >
-              <MaterialIcons
-                name="arrow-upward"
-                size={18}
-                color={index === 0 ? theme?.colors?.outline : theme?.colors?.primary}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.moveButton, index === totalCount - 1 && styles.moveButtonDisabled]}
-              onPress={() => handleMoveSource(source.id, 'down')}
-              disabled={index === totalCount - 1}
-            >
-              <MaterialIcons
-                name="arrow-downward"
-                size={18}
-                color={index === totalCount - 1 ? theme?.colors?.outline : theme?.colors?.primary}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>启用</Text>
-            <Switch
-              value={source.isActive}
-              onValueChange={() => toggleSourceStatus(source.id)}
-              trackColor={{
-                false: theme?.colors?.outline || (isDark ? '#79747E' : '#79747E'),
-                true: theme?.colors?.primary || '#3B82F6'
-              }}
-              thumbColor={source.isActive ? theme?.colors?.onPrimary : theme?.colors?.onSurfaceVariant}
-            />
-          </View>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => clearSourceArticles(source.id)}
-            >
-              <MaterialIcons
-                name="clear-all"
-                size={20}
-                color={theme?.colors?.onSurfaceVariant}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleSyncSingleSource(source.id!)}
-            >
-              <MaterialIcons
-                name="refresh"
-                size={20}
-                color={theme?.colors?.primary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => editSource(source.id)}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={theme?.colors?.onSurfaceVariant}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => deleteSource(source.id)}
-            >
-              <MaterialIcons
-                name="delete"
-                size={20}
-                color={theme?.colors?.error || '#B3261E'}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // 在 renderScene 之后不再重复声明 styles
-  // const styles = createStyles(isDark, theme); // 已移至前面
+  }, [getFilteredSources, screenWidth, isReady, refreshing, isEditMode, selectedSources, styles, theme]);
 
   return (
     <View style={styles.container}>
-      {/* 📌 固定 TabBar */}
+      {/* 顶部统计区 (固定) */}
+      {renderDashboard()}
+
+      {/* Tab 栏 */}
       <CustomTabBar
         tabs={routes}
         scrollX={scrollX}
@@ -697,7 +606,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
         onTabPress={handleTabPress}
       />
 
-      {/* 👉 滑动内容区域 */}
+      {/* 列表内容 */}
       <CustomTabContent
         ref={tabContentRef}
         tabs={routes}
@@ -706,6 +615,23 @@ const ManageSubscriptionsScreen: React.FC = () => {
         onIndexChange={handleIndexChange}
         initialIndex={0}
       />
+      
+      {/* 底部批量操作栏 (编辑模式显示) */}
+      {isEditMode && selectedSources.size > 0 && (
+         <View style={styles.bottomActionBar}>
+            <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchMoveToGroup}>
+               <MaterialIcons name="folder" size={20} color="#FFF" />
+               <Text style={styles.bottomActionText}>移动</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.verticalDivider} />
+            
+            <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchDelete}>
+               <MaterialIcons name="delete" size={20} color="#FF8A80" />
+               <Text style={[styles.bottomActionText, {color: '#FF8A80'}]}>删除</Text>
+            </TouchableOpacity>
+         </View>
+      )}
     </View>
   );
 };
@@ -713,376 +639,234 @@ const ManageSubscriptionsScreen: React.FC = () => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#FFFFFF'),
+    backgroundColor: theme.colors.background,
   },
-  statsSection: {},
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    height: 36,  // 🎯 匹配 sectionHeader 高度
-    lineHeight: 36,  // 垂直居中
+  loadingContainer: {
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center'
   },
-  statsGrid: {},
-  statCard: {},
-  statNumber: {},
-  statLabel: {},
-  errorAlert: {},
-  errorText: {},
-  filterSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  filterChip: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  filterChipSelected: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
-  },
-  filterChipText: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-  },
-  filterChipTextSelected: {
-    color: theme?.colors?.onPrimary || '#FFFFFF',
-    fontWeight: '500',
-  },
-  sourcesSection: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 0,  // 移除下边距，靠 ItemSeparatorComponent 处理
-  },
-  sectionHeader: {
+  
+  // Dashboard
+  dashboardContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    height: 36,  // 🎯 固定高度，与按钮对齐
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',  // 垂直居中
-    height: 36,  // 🎯 与 sectionHeader 对齐
-    gap: 8,
-  },
-  groupManageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme?.colors?.tertiaryContainer || (isDark ? '#633B48' : '#FFD8E4'),
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  groupManageButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.onTertiaryContainer || (isDark ? '#FFD8E4' : '#31111D'),
-  },
-  batchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  batchButtonActive: {
-    backgroundColor: theme?.colors?.primary || '#6750A4',
-  },
-  batchButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.primary || '#6750A4',
-  },
-  batchButtonTextActive: {
-    color: theme?.colors?.onPrimary || '#FFFFFF',
-  },
-  batchToolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 12,
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  batchInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  batchInfoText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.onPrimaryContainer || (isDark ? '#E8DEF8' : '#21005D'),
-  },
-  batchSelectAllText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.primary || '#6750A4',
-    textDecorationLine: 'underline',
-  },
-  batchActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  batchActionButton: {
+  statCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    padding: 12,
+    borderRadius: 12,
+    // 阴影
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0 : 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statIconCircle: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
-    gap: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
-  batchActionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.primary || '#6750A4',
+  statValue: {
+    ...typography.bodyLarge,
+    fontWeight: '700',
+    color: theme.colors.onSurface,
   },
-  batchDeleteButton: {
-    // 特殊样式（可选）
+  statLabel: {
+    ...typography.labelSmall,
+    color: theme.colors.onSurfaceVariant,
   },
-  batchDeleteText: {
-    color: theme?.colors?.error || '#BA1A1A',
+
+  // List Header
+  listHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
-  sortButton: {
+  batchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.outlineVariant,
+  },
+
+  // Source Card
+  card: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    // 阴影
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: isDark ? 0 : 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  cardSelected: {
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surfaceContainer,
+  },
+  cardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF'),
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
   },
-  sortButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.primary || '#3B82F6',
-  },
-  sortButtonDisabled: {
-    opacity: 0.3,
-  },
-  sortMoveContainer: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  moveButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F5F5F5'),
+  cardLeft: {
+    marginRight: 12,
+    width: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  moveButtonDisabled: {
-    opacity: 0.3,
-  },
-  addButton: {
-    flexDirection: 'row',
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF'),
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
   },
-  addButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.primary || '#3B82F6',
-  },
-  sourcesList: {
-    gap: 12,
-  },
-  sourceItem: {
-    ...StyleUtils.createCardStyle(isDark, theme),
-    borderRadius: 16,  // 从 12 增加到 16
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  sourceItemSelected: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
-    borderWidth: 2,
-    borderColor: theme?.colors?.primary || '#6750A4',
-  },
-  selectionCheckbox: {
-    marginRight: 12,
-    paddingTop: 4,
-  },
-  sourceContent: {
+  cardCenter: {
     flex: 1,
+    justifyContent: 'center',
   },
-  sourceHeader: {
-    marginBottom: 6,  // 从 8 减到 6，更紧凑
-  },
-  sourceInfo: {
-    flex: 1,
-  },
-  sourceTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sourceNameContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sourceName: {
-    fontSize: 16,
+  cardTitle: {
+    ...typography.bodyLarge,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  activeBadge: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF'),
-  },
-  inactiveBadge: {
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  activeText: {
-    color: theme?.colors?.primary || '#3B82F6',
-  },
-  inactiveText: {
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-  },
-  sourceUrl: {
-    fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurface,
     marginBottom: 4,
   },
-  sourceDescription: {
-    fontSize: 14,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 8,
-  },
-  sourceMetaRow: {
+  cardMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 12,
   },
-  contentTypeBadge: {
+  metaText: {
+    ...typography.bodySmall,
+    color: theme.colors.onSurfaceVariant,
+  },
+  cardRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    gap: 3,
   },
-  contentTypeText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error,
+    marginRight: 8,
   },
-  proxyBadge: {
-    backgroundColor: isDark ? '#2D2640' : '#EDE9FE',
-  },
-  proxyText: {
-    color: '#8B5CF6',
-  },
-  sourceStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sourceStatsText: {
-    fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    flex: 1,
-  },
-  errorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme?.colors?.errorContainer || (isDark ? '#601410' : '#F9DEDC'),
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
-  },
-  errorBadgeText: {
-    fontSize: 10,
-    color: theme?.colors?.onErrorContainer || (isDark ? '#F2B8B5' : '#601410'),
-  },
-  sourceActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 4,  // 从 8 减到 6
-    borderTopWidth: 1,
-    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  switchLabel: {
-    fontSize: 14,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 8,
+  // 未读数量徽章
+  unreadBadge: {
+    width: 25,
+    height: 25,
     borderRadius: 20,
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  unreadBadgeText: {
+    ...typography.labelSmall,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  editActionBar: {
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.outlineVariant,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  actionBtnSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: theme.colors.surfaceContainer,
+    borderRadius: 4,
+  },
+
+  // Footer Menu
+  footerContainer: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  menuGroup: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  menuBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.outlineVariant,
+  },
+  menuLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuText: {
+    ...typography.bodyLarge,
+    fontWeight: '500',
+    color: theme.colors.onSurface,
+  },
+
+  // Empty State
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingTop: 40,
   },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginTop: 16,
+  emptyText: {
+    marginTop: 12,
+    color: theme.colors.onSurfaceVariant,
   },
-  emptyStateText: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  emptyStateButton: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
-    paddingHorizontal: 24,
+
+  // Bottom Action Bar
+  bottomActionBar: {
+    position: 'absolute',
+    bottom: 30,
+    left: 40,
+    right: 40,
+    backgroundColor: '#333',
+    borderRadius: 28,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
     paddingVertical: 12,
-    borderRadius: 24,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
-  emptyStateButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+  bottomActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
   },
+  bottomActionText: {
+    color: '#FFF',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  verticalDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  }
 });
 
 export default ManageSubscriptionsScreen;

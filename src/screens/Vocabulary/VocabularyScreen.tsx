@@ -16,6 +16,7 @@ import { useThemeContext } from '../../theme';
 import { DatabaseService } from '../../database/DatabaseService';
 import { translationService } from '../../services/TranslationService';
 import { vocabularyService } from '../../services/VocabularyService';
+import { typography } from '../../theme/typography';
 import { VocabularyEntry } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
 import * as StyleUtils from '../../utils/styleUtils';
@@ -320,14 +321,14 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingHorizontal: 8,
   },
   statValue: {
-    fontSize: 24,
+    ...typography.titleLarge,
     fontWeight: '800' as any,
     color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', // 数字用等宽字体更有质感
     lineHeight: 28,
   },
   statTitle: {
-    fontSize: 13,
+    ...typography.bodySmall,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
     marginTop: 4,
     fontWeight: '500' as any,
@@ -365,12 +366,12 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginRight: 12,
   },
   reviewTitle: {
-    fontSize: 20,
+    ...typography.titleMedium,
     fontWeight: '600',
     color: theme?.colors?.onSurface || '#333',
   },
   reviewSubtitle: {
-    fontSize: 14,
+    ...typography.bodyMedium,
     color: theme?.colors?.primary || '#6750A4',
     marginTop: 2,
   },
@@ -397,14 +398,14 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     // 活跃状态样式（可选）
   },
   tabText: {
-    fontSize: 15,
+    ...typography.bodyMedium,
     color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
     fontWeight: '500' as any,
   },
   tabTextActive: {
     color: theme?.colors?.primary || '#6750A4',
     fontWeight: '600' as any,
-    fontSize: 15,
+    ...typography.bodyMedium,
   },
   tabIndicator: {
     position: 'absolute' as any,
@@ -454,7 +455,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     letterSpacing: 0.5,
   },
   phoneticText: {
-    fontSize: 14,
+    ...typography.labelSmall,
     color: theme?.colors?.secondary || '#666',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontStyle: 'italic',
@@ -480,7 +481,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   meaningText: {
     flex: 1,
-    fontSize: 15,
+    ...typography.bodyMedium,
     color: theme?.colors?.onSurfaceVariant || '#666',
     lineHeight: 22,
     marginRight: 10,
@@ -499,7 +500,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 11,
+    ...typography.labelSmall,
     fontWeight: '600',
   },
 
@@ -519,16 +520,16 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 4,
   },
   simpleWord: {
-    fontSize: 16,
+    ...typography.bodyLarge,
     fontWeight: '600',
     color: theme?.colors?.onSurface || '#333',
   },
   simpleTime: {
-    fontSize: 12,
+    ...typography.bodySmall,
     color: theme?.colors?.outline || '#AAA',
   },
   simpleMeaning: {
-    fontSize: 13,
+    ...typography.bodySmall,
     color: theme?.colors?.onSurfaceVariant || '#666',
   },
 
@@ -540,7 +541,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 12,
   },
   transOriginal: {
-    fontSize: 15,
+    ...typography.bodyMedium,
     color: theme?.colors?.onSurface || '#333',
     lineHeight: 22,
   },
@@ -550,7 +551,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginVertical: 8,
   },
   transResult: {
-    fontSize: 15,
+    ...typography.bodyMedium,
     color: theme?.colors?.primary || '#6750A4',
     lineHeight: 22,
     fontWeight: '500',
@@ -564,7 +565,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 15,
+    ...typography.bodyMedium,
     color: theme?.colors?.outline || '#999',
   },
 });

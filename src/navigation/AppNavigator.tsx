@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -31,6 +31,8 @@ import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
 import EditRSSSourceScreen from '../screens/RSS/EditRSSSourceScreen';
 import GroupManagementScreen from '../screens/RSS/GroupManagementScreen';
+import FilterRuleEditorScreen from '../screens/RSS/FilterRuleEditorScreen';
+import FilterManagementScreen from '../screens/RSS/FilterManagementScreen';
 import MineScreen from '../screens/Mine/MineScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
@@ -263,10 +265,23 @@ function RSSStackNavigator() {
         name="RSSMain"
         options={{ title: '订阅源' }}
       >
-        {() => (
+        {({ navigation }: any) => (
           <ScreenWithCustomHeader
             title="订阅源"
             showBackButton={false}
+            rightComponent={
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AddRSSSource')}
+                style={{ padding: 4, marginRight: 8 }}
+                activeOpacity={0.6}
+              >
+                <MaterialIcons 
+                  name="add" 
+                  size={26} 
+                  color={isDark ? theme.colors.onSurface : theme.colors.onPrimary} 
+                />
+              </TouchableOpacity>
+            }
           >
             <ManageSubscriptionsScreen />
           </ScreenWithCustomHeader>
@@ -308,6 +323,34 @@ function RSSStackNavigator() {
             showBackButton={true}
           >
             <GroupManagementScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="FilterManagement"
+        options={{ title: '过滤规则' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="过滤规则"
+            showBackButton={true}
+          >
+            <FilterManagementScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="FilterRuleEditor"
+        options={({ route }: any) => ({ 
+          title: route?.params?.ruleId ? '编辑规则' : '新建规则' 
+        })}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title={props.route?.params?.ruleId ? '编辑规则' : '新建规则'}
+            showBackButton={true}
+          >
+            <FilterRuleEditorScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </RSSStack.Screen>
@@ -516,6 +559,36 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
 
+      <UserStack.Screen
+        name="FilterManagement"
+        options={{ title: '过滤规则' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="过滤规则"
+            showBackButton={true}
+          >
+            <FilterManagementScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
+        name="FilterRuleEditor"
+        options={({ route }: any) => ({ 
+          title: route?.params?.ruleId ? '编辑规则' : '新建规则' 
+        })}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title={props.route?.params?.ruleId ? '编辑规则' : '新建规则'}
+            showBackButton={true}
+          >
+            <FilterRuleEditorScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
     </UserStack.Navigator>
   );
 }
@@ -587,14 +660,14 @@ function MainTabNavigator() {
         options={{ tabBarLabel: '文章' }}
       />
       <MainTab.Screen
-        name="Vocabulary"
-        component={VocabularyStackNavigator}
-        options={{ tabBarLabel: '词汇本' }}
-      />
-      <MainTab.Screen
         name="RSS"
         component={RSSStackNavigator}
         options={{ tabBarLabel: 'RSS' }}
+      />
+      <MainTab.Screen
+        name="Vocabulary"
+        component={VocabularyStackNavigator}
+        options={{ tabBarLabel: '词汇本' }}
       />
       <MainTab.Screen
         name="User"
