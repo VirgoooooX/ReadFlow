@@ -162,6 +162,18 @@ const MineScreen: React.FC = () => {
             label="阅读偏好"
             onPress={() => navigation.navigate('ReadingSettings')}
             color={theme?.colors?.primary || '#3B82F6'}
+          />
+          <MenuItem
+            icon="folder"
+            label="分组管理"
+            onPress={() => navigation.navigate('GroupManagement')}
+            color="#8B5CF6"
+          />
+          <MenuItem
+            icon="filter-list"
+            label="过滤规则"
+            onPress={() => navigation.navigate('FilterManagement')}
+            color="#F59E0B"
             isLast
           />
         </View>

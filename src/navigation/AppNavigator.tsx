@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -265,10 +265,23 @@ function RSSStackNavigator() {
         name="RSSMain"
         options={{ title: '订阅源' }}
       >
-        {() => (
+        {({ navigation }: any) => (
           <ScreenWithCustomHeader
             title="订阅源"
             showBackButton={false}
+            rightComponent={
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AddRSSSource')}
+                style={{ padding: 4, marginRight: 8 }}
+                activeOpacity={0.6}
+              >
+                <MaterialIcons 
+                  name="add" 
+                  size={26} 
+                  color={isDark ? theme.colors.onSurface : theme.colors.onPrimary} 
+                />
+              </TouchableOpacity>
+            }
           >
             <ManageSubscriptionsScreen />
           </ScreenWithCustomHeader>

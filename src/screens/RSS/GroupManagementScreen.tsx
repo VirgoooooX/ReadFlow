@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
+import { typography } from '../../theme/typography';
 import { useNavigation } from '@react-navigation/native';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { RSSGroup } from '../../types';
@@ -93,114 +94,118 @@ const GroupManagementScreen: React.FC = () => {
 
   const styles = createStyles(isDark, theme);
 
+  // 分组标题组件
+  const SectionTitle = ({ title }: { title: string }) => (
+    <Text style={styles.sectionTitle}>{title}</Text>
+  );
+
+  // 分组菜单项组件
+  const GroupMenuItem = ({ group, isLast }: { group: RSSGroup; isLast?: boolean }) => (
+    <>
+      <View style={styles.menuItem}>
+        <View style={styles.menuLeft}>
+          {/* 分组颜色图标 */}
+          <View style={[styles.menuIconBox, { backgroundColor: group.color || theme?.colors?.primary }]}>
+            <MaterialIcons name="folder" size={20} color="#FFFFFF" />
+          </View>
+          
+          <View style={styles.groupInfo}>
+            <Text style={styles.menuText}>{group.name}</Text>
+            <View style={styles.groupStats}>
+              <Text style={styles.statText}>
+                {group.sourceCount || 0} 个源
+              </Text>
+              {(group.unreadCount || 0) > 0 && (
+                <>
+                  <Text style={styles.statDivider}>·</Text>
+                  <Text style={[styles.statText, { color: theme?.colors?.error || '#EF4444' }]}>
+                    {group.unreadCount} 篇未读
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.menuRight}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleEditGroup(group)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialIcons
+              name="edit"
+              size={18}
+              color={theme?.colors?.onSurfaceVariant || '#666'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => handleDeleteGroup(group)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialIcons
+              name="delete"
+              size={18}
+              color={theme?.colors?.error || '#EF4444'}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+      {!isLast && <View style={styles.menuDivider} />}
+    </>
+  );
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <MaterialIcons
-            name="folder"
-            size={48}
-            color={theme?.colors?.primary || '#6750A4'}
-          />
-          <Text style={styles.title}>分组管理</Text>
-          <Text style={styles.subtitle}>管理您的RSS订阅分组</Text>
-        </View>
-
-        <View style={styles.content}>
-          {/* 分组列表 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>我的分组 ({groups.length}个)</Text>
-            
+        {/* 分组列表 */}
+        <View style={styles.menuGroupContainer}>
+          <SectionTitle title={`我的分组 (${groups.length})`} />
+          <View style={styles.menuGroupCard}>
             {groups.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <MaterialIcons
                   name="folder-open"
                   size={48}
-                  color={theme?.colors?.onSurfaceVariant || '#938F99'}
+                  color={theme?.colors?.onSurfaceVariant || '#999'}
                 />
                 <Text style={styles.emptyText}>暂无分组</Text>
                 <Text style={styles.emptyHint}>点击下方按钮创建您的第一个分组</Text>
               </View>
             ) : (
-              <View style={styles.groupList}>
-                {groups.map((group) => (
-                  <View key={group.id} style={styles.groupCard}>
-                    {/* 分组颜色条 */}
-                    {group.color && (
-                      <View
-                        style={[
-                          styles.colorBar,
-                          { backgroundColor: group.color },
-                        ]}
-                      />
-                    )}
-                    
-                    <View style={styles.groupContent}>
-                      <View style={styles.groupHeader}>
-                        <Text style={styles.groupName}>{group.name}</Text>
-                        <View style={styles.groupActions}>
-                          <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleEditGroup(group)}
-                          >
-                            <MaterialIcons
-                              name="edit"
-                              size={20}
-                              color={theme?.colors?.primary || '#6750A4'}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleDeleteGroup(group)}
-                          >
-                            <MaterialIcons
-                              name="delete"
-                              size={20}
-                              color={theme?.colors?.error || '#BA1A1A'}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.groupStats}>
-                        <View style={styles.statItem}>
-                          <MaterialIcons
-                            name="rss-feed"
-                            size={16}
-                            color={theme?.colors?.onSurfaceVariant || '#938F99'}
-                          />
-                          <Text style={styles.statText}>
-                            {group.sourceCount || 0} 个源
-                          </Text>
-                        </View>
-                        {(group.unreadCount || 0) > 0 && (
-                          <View style={styles.statItem}>
-                            <MaterialIcons
-                              name="fiber-manual-record"
-                              size={16}
-                              color={theme?.colors?.error || '#BA1A1A'}
-                            />
-                            <Text style={styles.statText}>
-                              {group.unreadCount} 篇未读
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
+              groups.map((group, index) => (
+                <GroupMenuItem
+                  key={group.id}
+                  group={group}
+                  isLast={index === groups.length - 1}
+                />
+              ))
             )}
           </View>
+        </View>
 
-          {/* 提示信息 */}
-          <View style={styles.tipsSection}>
-            <Text style={styles.tipsTitle}>💡 使用提示</Text>
-            <Text style={styles.tipsText}>• 点击编辑按钮可修改分组名称和颜色</Text>
-            <Text style={styles.tipsText}>• 删除分组时可选择是否同时删除源</Text>
-            <Text style={styles.tipsText}>• 在添加RSS源时可选择所属分组</Text>
+        {/* 提示信息 */}
+        <View style={styles.menuGroupContainer}>
+          <SectionTitle title="使用提示" />
+          <View style={styles.tipsCard}>
+            <View style={styles.tipItem}>
+              <MaterialIcons name="edit" size={16} color={theme?.colors?.onSurfaceVariant || '#666'} />
+              <Text style={styles.tipText}>点击编辑按钮可修改分组名称和颜色</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <MaterialIcons name="delete" size={16} color={theme?.colors?.onSurfaceVariant || '#666'} />
+              <Text style={styles.tipText}>删除分组时可选择是否同时删除源</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <MaterialIcons name="add" size={16} color={theme?.colors?.onSurfaceVariant || '#666'} />
+              <Text style={styles.tipText}>在添加RSS源时可选择所属分组</Text>
+            </View>
           </View>
         </View>
+
+        {/* 底部留白 */}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* 底部创建按钮 */}
@@ -208,6 +213,7 @@ const GroupManagementScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.createButton}
           onPress={() => setShowCreateModal(true)}
+          activeOpacity={0.8}
         >
           <MaterialIcons
             name="add"
@@ -473,134 +479,141 @@ const editModalStyles = StyleSheet.create({
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
   },
   scrollView: {
     flex: 1,
+    paddingHorizontal: 16,
   },
-  header: {
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+
+  // 菜单分组布局
+  menuGroupContainer: {
+    marginBottom: 20,
+    marginTop: 12,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-  },
-  content: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 16,
-  },
-  groupList: {
-    gap: 12,
-  },
-  groupCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFFFF'),
-    borderRadius: 16,
+  menuGroupCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  colorBar: {
-    height: 4,
-    width: '100%',
-  },
-  groupContent: {
-    padding: 16,
-  },
-  groupHeader: {
+  menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  groupName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    marginHorizontal: 14,
+  },
+  menuLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  groupActions: {
-    flexDirection: 'row',
-    gap: 8,
+  menuIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
-  actionButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+  groupInfo: {
+    flex: 1,
+  },
+  menuText: {
+    ...typography.bodyLarge,
+    fontWeight: '500',
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    marginBottom: 2,
   },
   groupStats: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
   },
-  statItem: {
+  statText: {
+    ...typography.bodySmall,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+  },
+  statDivider: {
+    ...typography.bodySmall,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    marginHorizontal: 6,
+  },
+  menuRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  statText: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+  iconButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
   },
+  sectionTitle: {
+    ...typography.titleMedium,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    marginBottom: 10,
+    marginTop: -5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+
+  // 空状态
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 48,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    ...typography.titleMedium,
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
     marginTop: 16,
-  },
-  emptyHint: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  tipsSection: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-  },
-  tipsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-    marginBottom: 12,
-  },
-  tipsText: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-    lineHeight: 20,
     marginBottom: 4,
   },
+  emptyHint: {
+    ...typography.bodySmall,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    textAlign: 'center',
+  },
+
+  // 提示卡片
+  tipsCard: {
+    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  tipText: {
+    ...typography.bodySmall,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    marginLeft: 8,
+    flex: 1,
+  },
+
+  // 底部按钮
   bottomActions: {
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
-    borderTopWidth: 1,
-    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
   },
   createButton: {
     flexDirection: 'row',
@@ -608,11 +621,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: theme?.colors?.primary || '#6750A4',
     borderRadius: 24,
-    paddingVertical: 16,
+    paddingVertical: 14,
     gap: 8,
+    shadowColor: theme?.colors?.primary || '#6750A4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   createButtonText: {
-    fontSize: 16,
+    ...typography.labelLarge,
     fontWeight: '600',
     color: theme?.colors?.onPrimary || '#FFFFFF',
   },
