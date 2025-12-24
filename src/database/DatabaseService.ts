@@ -54,6 +54,9 @@ export class DatabaseService {
       this.db = await SQLite.openDatabaseAsync(this.config.name);
       console.log('✅ 数据库打开成功:', this.config.name);
 
+      // 设置 PRAGMA 配置
+      await this.configurePragma();
+
       // 创建表结构
       await this.createTables();
       console.log('✅ 表创建成功');
@@ -74,6 +77,39 @@ export class DatabaseService {
         details: error,
         timestamp: new Date(),
       });
+    }
+  }
+
+  /**
+   * 配置数据库 PRAGMA 设置
+   */
+  private async configurePragma(): Promise<void> {
+    if (!this.db) return;
+
+    // 【关键】busy_timeout 必须设置，多次重试
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.db.execAsync('PRAGMA busy_timeout = 10000;'); // 10秒超时
+        console.log('✅ busy_timeout 已设置 (10s)');
+        break;
+      } catch (e) {
+        if (attempt < 2) {
+          console.warn(`⚠️ busy_timeout 设置失败，重试中... (${attempt + 1}/3)`);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } else {
+          console.warn('⚠️ busy_timeout 设置失败，使用默认值');
+        }
+      }
+    }
+
+    // 【可选】其他优化，失败不影响正常使用
+    try {
+      await this.db.execAsync('PRAGMA journal_mode = WAL;');
+      await this.db.execAsync('PRAGMA synchronous = NORMAL;');
+      await this.db.execAsync('PRAGMA cache_size = -10000;');
+      console.log('✅ 数据库性能优化已应用');
+    } catch (e) {
+      console.warn('⚠️ 部分性能优化未应用');
     }
   }
 

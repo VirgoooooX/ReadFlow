@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   TouchableOpacity,
   Platform, // 新增
+  ActivityIndicator, // 【新增】用于加载更多指示器
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,6 +18,7 @@ import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { articleService, RSSService } from '../../services';
 import { SettingsService } from '../../services/SettingsService';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import type { Article } from '../../types';
 import CustomTabBar from '../../components/CustomTabBar';
@@ -53,6 +55,7 @@ function toProxyUrl(url: string, proxyServerUrl: string): string {
 export let lastViewedArticleId: number | null = null;
 export let didSwitchArticle: boolean = false; // 【新增】标记是否在详情页切换过文章
 export let initialArticleId: number | null = null; // 【新增】记录初始打开的文章ID
+export let needRefreshOnReturn: boolean = false; // 【新增】标记从详情页返回时需要刷新
 
 export const setLastViewedArticleId = (id: number | null) => {
   if (initialArticleId === null) {
@@ -64,16 +67,19 @@ export const setLastViewedArticleId = (id: number | null) => {
     didSwitchArticle = true;
   }
   lastViewedArticleId = id;
+  needRefreshOnReturn = true; // 【新增】进入详情页后，返回时需要刷新
 };
 
 export const getPendingScrollInfo = () => {
   const shouldScroll = didSwitchArticle;
   const articleId = lastViewedArticleId;
+  const shouldRefresh = needRefreshOnReturn; // 【新增】获取是否需要刷新
   // 清空状态
   didSwitchArticle = false;
   initialArticleId = null;
   lastViewedArticleId = null;
-  return { shouldScroll, articleId };
+  needRefreshOnReturn = false; // 【新增】清空刷新标记
+  return { shouldScroll, articleId, shouldRefresh };
 };
 
 type Props = HomeStackScreenProps<'HomeMain'>;
@@ -159,6 +165,9 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   isActive,
   isNeighbor,
   proxyServerUrl,
+  onLoadMore, // 【新增】加载更多回调
+  isLoadingMore, // 【新增】加载更多状态
+  hasMore, // 【新增】是否还有更多
 }: any, ref: React.Ref<any>) {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
   const flatListRef = useRef<FlatList>(null);
@@ -190,7 +199,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
     <FlatList
       ref={flatListRef}
       data={articles}
-      keyExtractor={(item) => item.id.toString()}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       contentContainerStyle={styles.articleListContainer}
       showsVerticalScrollIndicator={false}
       getItemLayout={(data, index) => ({
@@ -216,6 +225,15 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
           titleColor={theme?.colors?.outline}
           tintColor={theme?.colors?.primary}
         />
+      }
+      onEndReached={hasMore && !isLoadingMore ? onLoadMore : null} // 【新增】滚动到底部时加载更多
+      onEndReachedThreshold={0.5} // 【新增】提前加载（距离底部50%时）
+      ListFooterComponent={() => // 【新增】列表底部加载指示器
+        isLoadingMore ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={theme?.colors?.primary} />
+          </View>
+        ) : null
       }
       renderItem={({ item }) => (
         <ArticleItem
@@ -257,9 +275,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [index, setIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [articles, setArticles] = useState<Article[]>([]);
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
   const [proxyServerUrl, setProxyServerUrl] = useState<string>(''); // 🔥 新增
+  
+  // 【重构】每个标签页独立管理文章数据和分页状态
+  const [tabDataMap, setTabDataMap] = useState<Map<string, {
+    articles: Article[];
+    offset: number;
+    hasMore: boolean;
+    isLoadingMore: boolean;
+  }>>(new Map());
   // 【删除】不再需要 scrollToArticleId 状态
 
   const styles = createStyles(isDark, theme);
@@ -276,18 +301,76 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     return [...baseRoutes, ...sourceRoutes];
   }, [rssSources, settings?.showAllTab]);
 
-  const loadArticles = async () => {
+  // 【重构】获取或初始化标签页数据
+  const getTabData = useCallback((tabKey: string) => {
+    if (!tabDataMap.has(tabKey)) {
+      return {
+        articles: [],
+        offset: 0,
+        hasMore: true,
+        isLoadingMore: false,
+      };
+    }
+    return tabDataMap.get(tabKey)!;
+  }, [tabDataMap]);
+
+  // 【重构】加载文章（支持每个标签独立分页）
+  const loadArticles = async (tabKey: string, append: boolean = false) => {
     try {
-      // 🌟 优化点：对聚合页使用公平聚合查询
-      const allArticles = await articleService.getInitialFairFeed(10);
-      setArticles(allArticles);
-      console.log('[HomeScreen] Loaded articles with fair feed:', allArticles.length);
+      const tabData = getTabData(tabKey);
+      const offset = append ? tabData.articles.length : 0;
+      const limit = 20;
+      
+      let newArticles: Article[];
+      
+      // 根据 tabKey 决定加载哪个源的数据
+      if (tabKey === 'all') {
+        // 全部标签：加载所有源的文章
+        newArticles = await articleService.getArticles({
+          limit,
+          offset,
+          sortBy: 'published_at',
+          sortOrder: 'DESC',
+        });
+      } else if (tabKey.startsWith('source-')) {
+        // 特定源标签：加载该源的文章
+        const sourceId = parseInt(tabKey.replace('source-', ''), 10);
+        newArticles = await articleService.getArticles({
+          rssSourceId: sourceId,
+          limit,
+          offset,
+          sortBy: 'published_at',
+          sortOrder: 'DESC',
+        });
+      } else {
+        newArticles = [];
+      }
+      
+      // 更新该标签的数据
+      setTabDataMap(prev => {
+        const updated = new Map(prev);
+        const currentData = updated.get(tabKey) || getTabData(tabKey);
+        updated.set(tabKey, {
+          articles: append ? [...currentData.articles, ...newArticles] : newArticles,
+          offset: offset + newArticles.length,
+          hasMore: newArticles.length >= limit,
+          isLoadingMore: false,
+        });
+        return updated;
+      });
+      
+      console.log(`[HomeScreen] Loaded ${newArticles.length} articles for tab "${tabKey}", append: ${append}`);
     } catch (error) {
-      console.error('Failed to load articles:', error);
+      console.error(`Failed to load articles for tab "${tabKey}":`, error);
     }
   };
 
-  useEffect(() => { loadArticles(); }, []);
+  // 【修改】初始化时加载第一个标签的数据
+  useEffect(() => {
+    if (routes.length > 0 && !tabDataMap.has(routes[0].key)) {
+      loadArticles(routes[0].key);
+    }
+  }, [routes]);
   
   // 🔥 获取代理配置
   useEffect(() => {
@@ -304,16 +387,22 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     loadProxyConfig();
   }, []);
   
-  // 🌟 【新增】第四层优化：启动时静默后台刷新 RSS 源
+  // 🌟 【修复】后台刷新定时器：只在组件挂载时启动一次，避免频繁重置
   useEffect(() => {
+    let refreshTimer: NodeJS.Timeout | null = null;
+    let refreshInterval: NodeJS.Timeout | null = null;
+    
     const triggerBackgroundSync = async () => {
+      // 检查是否有活跃源（避免在无源时刷新）
+      if (rssSources.length === 0) {
+        console.log('[HomeScreen] ⚠️ 无活跃源，跳过后台刷新');
+        return;
+      }
+      
       console.log('[HomeScreen] 🔄 启动静默后台刷新...');
       try {
-        const { rssSources, refreshAllSourcesBackground } = require('../../contexts/RSSSourceContext');
-        // 注意：这里需要从 RSSSourceContext 中导出 refreshAllSourcesBackground
-        // 或直接调用 RSSService.getInstance().refreshAllSourcesBackground()
         await RSSService.getInstance().refreshAllSourcesBackground({
-          maxConcurrent: 3, // 核心并发控制
+          maxConcurrent: 3,
           onProgress: (current, total, sourceName) => {
             console.log(`[HomeScreen] 🔄 正在刷新: ${sourceName} (${current}/${total})`);
           },
@@ -321,25 +410,92 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             console.log(`[HomeScreen] ✅ ${sourceName} 刷新完成，新增 ${articles.length} 篇文章`);
           },
         });
-        // 后台刷新完成后，重新加载前台数据
-        await loadArticles();
-        console.log('[HomeScreen] ✅ 后台刷新完成，前台数据已更新');
+        
+        // 【修改】后台刷新完成后，清空所有标签缓存，下次访问时重新加载
+        console.log('[HomeScreen] 🔄 清空标签缓存，等待用户触发刷新');
+        setTabDataMap(new Map());
+        
+        console.log('[HomeScreen] ✅ 后台刷新完成');
       } catch (error) {
-        console.warn('[HomeScreen] ⚠️ 后台刷新失败（可忽略，已有缓存）:', error);
+        console.warn('[HomeScreen] ⚠️ 后台刷新失败（可忽略）:', error);
       }
     };
 
-    // 仅在首页加载完成且有活跃源时，才启动后台刷新
+    // 【修复】只在组件挂载时启动定时器，不依赖 rssSources 变化
     if (rssSources.length > 0) {
-      // 延迟 500ms 启动，给 UI 充分时间展示缓存数据
-      const timer = setTimeout(triggerBackgroundSync, 500);
-      return () => clearTimeout(timer);
+      // 延迟 500ms 启动首次刷新
+      refreshTimer = setTimeout(triggerBackgroundSync, 500);
+      
+      // 每 10 分钟刷新一次（600000ms）
+      refreshInterval = setInterval(triggerBackgroundSync, 10 * 60 * 1000);
+      
+      console.log('[HomeScreen] ⏰ 后台刷新定时器已启动（10分钟一次）');
     }
+    
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      if (refreshInterval) clearInterval(refreshInterval);
+      console.log('[HomeScreen] ⏰ 后台刷新定时器已清理');
+    };
+  }, []); // 【关键修复】空依赖数组，只在挂载/卸载时执行
+  
+ // 【新增】监听 rssSources 变化，清理已删除源的缓存和"全部"标签缓存
+  useEffect(() => {
+    const currentSourceKeys = new Set([
+      'all',
+      ...rssSources.map(source => `source-${source.id}`)
+    ]);
+    
+    // 清理不存在的源的缓存
+    setTabDataMap(prev => {
+      const updated = new Map(prev);
+      let hasChanges = false;
+      
+      for (const key of updated.keys()) {
+        if (!currentSourceKeys.has(key)) {
+          console.log(`[HomeScreen] 🗑️ 清理已删除源的缓存: ${key}`);
+          updated.delete(key);
+          hasChanges = true;
+        }
+      }
+      
+      // 【关键修复】如果有源被删除，也清理"全部"标签的缓存
+      if (hasChanges && updated.has('all')) {
+        console.log(`[HomeScreen] 🗑️ 清理"全部"标签缓存（源已变更）`);
+        updated.delete('all');
+      }
+      
+      return hasChanges ? updated : prev;
+    });
   }, [rssSources]);
   
-  // 【修改】返回时检查是否需要重定位
-  useFocusEffect(useCallback(() => { 
-    loadArticles();
+  // 【新增】监听全局缓存清除事件
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((event) => {
+      if (event === 'clearAll') {
+        console.log('[HomeScreen] 🧹 收到全局清除缓存事件，清除 tabDataMap');
+        setTabDataMap(new Map());
+      } else if (event === 'clearArticles') {
+        console.log('[HomeScreen] 🧹 收到清除文章缓存事件，清除所有标签的文章数据');
+        setTabDataMap(new Map());
+      }
+    });
+    
+    return unsubscribe; // 组件卸载时自动取消订阅
+  }, []);
+  useFocusEffect(useCallback(() => {
+    // 获取滚动信息和刷新标记
+    const { shouldScroll, articleId, shouldRefresh } = getPendingScrollInfo();
+    console.log('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId, 'shouldRefresh:', shouldRefresh);
+    
+    // 【新增】如果从详情页返回，刷新当前标签的数据以更新已读状态
+    if (shouldRefresh) {
+      const currentRoute = routes[index];
+      if (currentRoute) {
+        console.log('[HomeScreen] Refreshing articles after returning from detail page');
+        loadArticles(currentRoute.key, false);
+      }
+    }
     
     // 🔀 检查是否从订阅源管理页穿透过来
     const sourceId = (route?.params as any)?.sourceId;
@@ -362,10 +518,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
     
-    // 获取滚动信息
-    const { shouldScroll, articleId } = getPendingScrollInfo();
-    console.log('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId);
-    
     if (shouldScroll && articleId !== null) {
       console.log('[HomeScreen] Article was switched, scrolling to:', articleId);
       // 直接调用当前 tab 的 scene ref 滚动
@@ -379,16 +531,8 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           });
         }
       }
-    } else {
-      console.log('[HomeScreen] No article switch, skip scrolling');
     }
   }, [index, routes, sceneRefsMap, navigation, route]));
-
-  const getFilteredArticles = useCallback((tabIndex: number) => {
-    const route = routes[tabIndex];
-    if (!route || route.key === 'all') return articles;
-    return articles.filter(article => article.sourceName === route.title);
-  }, [articles, routes]);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -402,41 +546,74 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           const sourceId = parseInt(currentRoute.key.replace('source-', ''), 10);
           if (!isNaN(sourceId)) await syncSource(sourceId);
         }
+        // 重新加载当前标签的数据
+        await loadArticles(currentRoute.key, false);
       }
-      await loadArticles();
     } catch (error) {
       console.error('Refresh failed:', error);
     } finally {
       setIsRefreshing(false);
     }
   }, [index, routes, syncAllSources, syncSource]);
+  
+  // 【重构】加载更多回调（支持每个标签独立加载）
+  const handleLoadMore = useCallback(async (tabKey: string) => {
+    const tabData = getTabData(tabKey);
+    if (tabData.isLoadingMore || !tabData.hasMore || isRefreshing) return;
+    
+    console.log(`[HomeScreen] Loading more articles for tab "${tabKey}"...`);
+    
+    // 设置加载状态
+    setTabDataMap(prev => {
+      const updated = new Map(prev);
+      const currentData = updated.get(tabKey) || getTabData(tabKey);
+      updated.set(tabKey, { ...currentData, isLoadingMore: true });
+      return updated;
+    });
+    
+    try {
+      await loadArticles(tabKey, true); // 追加加载
+    } catch (error) {
+      console.error('Load more failed:', error);
+    }
+  }, [isRefreshing, getTabData]);
 
   const handleIndexChange = useCallback((newIndex: number) => {
     setIndex(newIndex);
     setLoadedTabs(prev => new Set(prev).add(newIndex));
-  }, []);
+    
+    // 切换标签时，如果该标签还没加载过数据，则加载
+    const route = routes[newIndex];
+    if (route && !tabDataMap.has(route.key)) {
+      loadArticles(route.key);
+    }
+  }, [routes, tabDataMap]);
 
   const handleTabPress = useCallback((tabIndex: number) => {
     setIndex(tabIndex);
     setLoadedTabs(prev => new Set(prev).add(tabIndex));
     tabContentRef.current?.scrollToIndex(tabIndex);
-  }, []);
+    
+    // 点击标签时，如果该标签还没加载过数据，则加载
+    const route = routes[tabIndex];
+    if (route && !tabDataMap.has(route.key)) {
+      loadArticles(route.key);
+    }
+  }, [routes, tabDataMap]);
 
   const renderScene = useCallback(({ route, index: tabIndex }: { route: { key: string; title: string }; index: number }) => {
     const isActive = loadedTabs.has(tabIndex);
-    // 🌟 中間层优化：计算是否是主页灾邻页（预加载）
     const isCloseToFocus = Math.abs(index - tabIndex) <= 1;
-    const isNeighbor = !isActive && isCloseToFocus; // 预加载标记
+    const isNeighbor = !isActive && isCloseToFocus;
   
     if (!isActive && !isCloseToFocus) {
       return <View style={[styles.lazyPlaceholder, { width: screenWidth }]} />;
     }
   
-    const filteredArticles = getFilteredArticles(tabIndex);
-    const articleIds = filteredArticles.map(a => a.id);
+    // 【修改】从 tabDataMap 获取该标签的数据
+    const tabData = getTabData(route.key);
+    const articleIds = tabData.articles.map(a => a.id);
       
-    // 【修改】推送 isNeighbor 参数直接给 ArticleListScene
-  
     return (
       <View style={{ width: screenWidth }}>
         <ArticleListScene
@@ -444,7 +621,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             if (ref) sceneRefsMap.set(route.key, ref);
           }}
           sourceName={route.title}
-          articles={filteredArticles}
+          articles={tabData.articles}
           isRefreshing={isRefreshing && index === tabIndex}
           onRefresh={handleRefresh}
           onArticlePress={(id: number) => {
@@ -461,10 +638,13 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           isActive={isActive}
           isNeighbor={isNeighbor}
           proxyServerUrl={proxyServerUrl}
+          onLoadMore={() => handleLoadMore(route.key)}
+          isLoadingMore={tabData.isLoadingMore}
+          hasMore={tabData.hasMore}
         />
       </View>
     );
-  }, [routes, loadedTabs, getFilteredArticles, isRefreshing, index, handleRefresh, isDark, theme, navigation, screenWidth]);
+  }, [routes, loadedTabs, isRefreshing, index, handleRefresh, isDark, theme, navigation, screenWidth, tabDataMap, handleLoadMore, getTabData]);
 
   return (
     <View style={styles.container}>

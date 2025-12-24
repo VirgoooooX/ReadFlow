@@ -175,6 +175,18 @@ const SettingsScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>RSS设置</Text>
           <TouchableOpacity
             style={styles.settingItem}
+            onPress={() => navigation.navigate('RSSRefreshSettings')}
+          >
+            <View style={styles.settingItemLeft}>
+              <MaterialIcons name="schedule" size={24} color={theme?.colors?.primary || '#3B82F6'} />
+              <View style={styles.settingItemContent}>
+                <Text style={styles.settingItemText}>刷新间隔设置</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#666'} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.settingItem}
             onPress={() => navigation.navigate('ManageSubscriptions')}
           >
             <View style={styles.settingItemLeft}>

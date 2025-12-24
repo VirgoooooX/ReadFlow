@@ -38,6 +38,7 @@ import EditProfileScreen from '../screens/User/EditProfileScreen';
 import ReadingSettingsScreen from '../screens/Settings/ReadingSettingsScreen';
 import LLMSettingsScreen from '../screens/Settings/LLMSettingsScreen';
 import ThemeSettingsScreen from '../screens/Settings/ThemeSettingsScreen';
+import RSSRefreshSettingsScreen from '../screens/Settings/RSSRefreshSettingsScreen';
 import { ProxyServerSettingsScreen } from '../screens/Settings/ProxyServerSettingsScreen';
 import { AddEditProxyServerScreen } from '../screens/Settings/AddEditProxyServerScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';

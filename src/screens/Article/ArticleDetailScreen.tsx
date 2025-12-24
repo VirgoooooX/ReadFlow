@@ -730,29 +730,17 @@ const ArticleDetailScreen: React.FC = () => {
   }, [handleWordPress, handleSentenceDoubleTap, showRefTitle, hasNextArticle, navigateToNextArticle, showLastArticleHint, noUnreadArticle]);
 
   // 【关键修改】在组件卸载（用户退出页面）时，统一保存一次
+  // 滚动位置实时记录在 currentScrollYRef 中，只在退出时写入数据库
+  // 这样可以避免频繁写入数据库导致的并发冲突
   useEffect(() => {
     // 这个 cleanup 函数会在组件卸载（返回上一页）时执行
     return () => {
       if (hasScrolledRef.current && articleId) {
         console.log('[ArticleDetail] Saving final scroll position on exit:', currentScrollYRef.current);
-        articleService.saveScrollPosition(articleId, currentScrollYRef.current).catch(err => {
-          console.error('Failed to save scroll position on exit:', err);
-        });
+        // saveScrollPosition 会静默处理数据库锁定错误，不需要 catch
+        articleService.saveScrollPosition(articleId, currentScrollYRef.current);
       }
     };
-  }, [articleId]);
-
-  // 【可选优化】为了防止 App 意外崩溃导致数据丢失，加一个低频的定时保存（每 3 秒）
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hasScrolledRef.current && articleId) {
-        console.log('[ArticleDetail] Periodic save of scroll position:', currentScrollYRef.current);
-        articleService.saveScrollPosition(articleId, currentScrollYRef.current).catch(error => {
-          console.error('Failed to save scroll position periodically:', error);
-        });
-      }
-    }, 3000); // 每 3 秒存一次库，作为双重保险
-    return () => clearInterval(interval);
   }, [articleId]);
 
   // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
@@ -890,7 +878,7 @@ const ArticleDetailScreen: React.FC = () => {
           originWhitelist={['*']}
           source={{ html: htmlContent }}
           onMessage={handleWebViewMessage}
-          style={styles.webView}
+          style={[styles.webView, { opacity: 0.99 }]}
           showsVerticalScrollIndicator={false}
           javaScriptEnabled={true}
           domStorageEnabled={true}

@@ -94,7 +94,7 @@ export class ArticleService {
       await this.databaseService.initializeDatabase();
       
       const {
-        limit = 20,
+        limit = 10,
         offset = 0,
         rssSourceId,
         isRead,
@@ -552,7 +552,8 @@ export class ArticleService {
   }
 
   /**
-   * 【新增】保存滚动位置
+   * 【新增】保存滚动位置 - 静默执行，失败不重试
+   * 滚动位置不是关键数据，失败不影响用户体验
    */
   public async saveScrollPosition(id: number, scrollY: number): Promise<void> {
     try {
@@ -561,9 +562,14 @@ export class ArticleService {
         'UPDATE articles SET scroll_position = ? WHERE id = ?',
         [Math.round(scrollY), id]
       );
-    } catch (error) {
-      console.error('Error saving scroll position:', error);
-      throw error;
+    } catch (error: any) {
+      // 静默失败：滚动位置不是关键数据，不值得重试或报错
+      // 只在非数据库锁定错误时记录，避免日志刷屏
+      const isDbLocked = error?.message?.includes('database is locked') ||
+                        error?.toString?.()?.includes('database is locked');
+      if (!isDbLocked) {
+        console.warn(`[ScrollPosition] Failed to save for article ${id}:`, error);
+      }
     }
   }
 

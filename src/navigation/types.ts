@@ -76,6 +76,7 @@ export type UserStackParamList = {
   GroupManagement: undefined;
   AddRSSSource: undefined;
   EditRSSSource: { sourceId: number };
+  RSSRefreshSettings: undefined;
 };
 
 // 屏幕属性类型定义
