@@ -18,6 +18,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { typography } from '../../theme/typography';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
@@ -43,6 +44,15 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  
+  // FAB 动画值 - 主按钮旋转
+  const fabRotation = useRef(new Animated.Value(0)).current;
+  // 每个按钮独立的动画值
+  const button1Anim = useRef(new Animated.Value(0)).current;  // 同步
+  const button2Anim = useRef(new Animated.Value(0)).current;  // 分组
+  const button3Anim = useRef(new Animated.Value(0)).current;  // 添加
+  const buttonAnims = [button1Anim, button2Anim, button3Anim];
   
   // 模式控制：普通浏览 vs 管理模式
   const [isEditMode, setIsEditMode] = useState(false);
@@ -120,6 +130,79 @@ const ManageSubscriptionsScreen: React.FC = () => {
       Alert.alert('刷新失败', '同步RSS源时出现错误');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // 切换设置菜单 - 丝滑交错动画
+  const toggleSettingsMenu = () => {
+    const isOpening = !showSettingsMenu;
+    
+    if (isOpening) {
+      // 展开动画：主按钮旋转 + 按钮依次弹出
+      setShowSettingsMenu(true);
+      
+      // 主按钮旋转
+      Animated.spring(fabRotation, {
+        toValue: 1,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }).start();
+      
+      // 按钮依次弹出 - 交错延迟 80ms
+      Animated.stagger(80, [
+        Animated.spring(button1Anim, {
+          toValue: 1,
+          friction: 5,
+          tension: 60,
+          useNativeDriver: true,
+        }),
+        Animated.spring(button2Anim, {
+          toValue: 1,
+          friction: 5,
+          tension: 60,
+          useNativeDriver: true,
+        }),
+        Animated.spring(button3Anim, {
+          toValue: 1,
+          friction: 5,
+          tension: 60,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // 收起动画：按钮先收回，再旋转主按钮
+      // 按钮从远到近依次收回
+      Animated.stagger(60, [
+        Animated.timing(button3Anim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(button2Anim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(button1Anim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      // 主按钮旋转回去
+      Animated.spring(fabRotation, {
+        toValue: 0,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }).start();
+      
+      // 延迟隐藏菜单
+      setTimeout(() => {
+        setShowSettingsMenu(false);
+      }, 200);
     }
   };
 
@@ -367,28 +450,51 @@ const ManageSubscriptionsScreen: React.FC = () => {
     </View>
   );
 
-  // 2. 底部设置入口
-  const MenuItem = ({ icon, label, onPress, isLast }: any) => (
-    <TouchableOpacity style={[styles.menuItem, !isLast && styles.menuBorder]} onPress={onPress}>
-      <View style={styles.menuLeft}>
-        <MaterialIcons name={icon} size={22} color={theme.colors.onSurfaceVariant} style={{marginRight: 12}} />
-        <Text style={styles.menuText}>{label}</Text>
-      </View>
-      <MaterialIcons name="chevron-right" size={20} color={theme.colors.outline} />
-    </TouchableOpacity>
-  );
+  // 单个动作按钮 - 独立动画控制
+  const ActionButton = ({ icon, onPress, animValue }: any) => {
+    // 缩放动画 - 带过冲效果
+    const scale = animValue.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 1.15, 1],
+    });
+    
+    // 透明度动画
+    const opacity = animValue.interpolate({
+      inputRange: [0, 0.3, 1],
+      outputRange: [0, 0.8, 1],
+    });
+    
+    // 水平位移动画 - 从右边滑入
+    const translateX = animValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [40, 0],
+    });
+
+    return (
+      <Animated.View 
+        style={[
+          styles.actionButton,
+          {
+            transform: [{ translateX }, { scale }],
+            opacity,
+          }
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.actionButtonInner}
+          onPress={onPress}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name={icon} size={24} color="#FFF" />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   const renderFooter = () => (
     <View style={styles.footerContainer}>
-      <Text style={styles.sectionTitle}>管理与设置</Text>
-      <View style={styles.menuGroup}>
-        <MenuItem icon="add-circle-outline" label="添加订阅源" onPress={() => navigation.navigate('AddRSSSource')} />
-        <MenuItem icon="folder-open" label="分组管理" onPress={() => navigation.navigate('GroupManagement')} />
-        {/* 这里可以加更多入口，如导入OPML */}
-        <MenuItem icon="settings" label="同步设置" onPress={() => {}} isLast />
-      </View>
       <View style={{ height: 120 }} /> 
-      {/* 底部留白给 FAB 和 BottomBar */}
+      {/* 底部留白给批量操作栏 */}
     </View>
   );
 
@@ -597,15 +703,63 @@ const ManageSubscriptionsScreen: React.FC = () => {
         initialIndex={0}
       />
 
-      {/* FAB 添加按钮 (非编辑模式显示) */}
+      {/* FAB 设置按钮 (非编辑模式显示) */}
       {!isEditMode && (
-        <TouchableOpacity 
-          style={styles.fab} 
-          onPress={() => navigation.navigate('AddRSSSource')}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="add" size={28} color="#FFF" />
-        </TouchableOpacity>
+        <View style={styles.fabContainer}>
+          {/* 主FAB按钮 - 放第一个，因为 row-reverse 所以它在最右边 */}
+          <Animated.View
+            style={[
+              styles.fabWrapper,
+              {
+                transform: [
+                  {
+                    rotate: fabRotation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '135deg'],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.fabInner}
+              onPress={toggleSettingsMenu}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="add" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </Animated.View>
+          
+          {/* 展开的动作按钮 - 从右到左：同步、分组、添加 */}
+          {showSettingsMenu && (
+            <>
+              <ActionButton 
+                icon="sync"
+                animValue={button1Anim}
+                onPress={() => {
+                  toggleSettingsMenu();
+                }}
+              />
+              <ActionButton 
+                icon="folder-open"
+                animValue={button2Anim}
+                onPress={() => {
+                  navigation.navigate('GroupManagement');
+                  toggleSettingsMenu();
+                }}
+              />
+              <ActionButton 
+                icon="add-circle-outline"
+                animValue={button3Anim}
+                onPress={() => {
+                  navigation.navigate('AddRSSSource');
+                  toggleSettingsMenu();
+                }}
+              />
+            </>
+          )}
+        </View>
       )}
       
       {/* 底部批量操作栏 (编辑模式显示) */}
@@ -667,12 +821,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginRight: 8,
   },
   statValue: {
-    fontSize: 16,
+    ...typography.bodyLarge,
     fontWeight: '700',
     color: theme.colors.onSurface,
   },
   statLabel: {
-    fontSize: 10,
+    ...typography.labelSmall,
     color: theme.colors.onSurfaceVariant,
   },
 
@@ -688,8 +842,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.titleMedium,
     color: theme.colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -701,7 +854,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     borderRadius: 12,
   },
   manageBtnText: {
-    fontSize: 12,
+    ...typography.labelMedium,
     fontWeight: '600',
     color: theme.colors.primary,
   },
@@ -755,7 +908,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   cardTitle: {
-    fontSize: 15,
+    ...typography.bodyLarge,
     fontWeight: '600',
     color: theme.colors.onSurface,
     marginBottom: 4,
@@ -765,7 +918,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
   },
   metaText: {
-    fontSize: 12,
+    ...typography.bodySmall,
     color: theme.colors.onSurfaceVariant,
   },
   cardRight: {
@@ -788,7 +941,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
   },
   unreadBadgeText: {
-    fontSize: 10,
+    ...typography.labelSmall,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -834,11 +987,57 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
   },
   menuText: {
-    fontSize: 15,
+    ...typography.bodyLarge,
     fontWeight: '500',
     color: theme.colors.onSurface,
   },
 
+  // FAB Container - 包含主按钮和展开按钮
+  fabContainer: {
+    position: 'absolute',
+    right: 20,
+    bottom: 30,
+    flexDirection: 'row-reverse',  // 从右到左排列
+    alignItems: 'center',
+    gap: 12,  // 按钮间距
+    zIndex: 100,
+  },
+  fabWrapper: {
+    // 用于动画包装
+  },
+  fabInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  
+  // Action Buttons - 与主FAB一致的样式
+  actionButton: {
+    // 简单布局
+  },
+  actionButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+
+  
   // Empty State
   emptyState: {
     alignItems: 'center',
@@ -849,23 +1048,6 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     color: theme.colors.onSurfaceVariant,
   },
 
-  // FAB
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 30,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 6,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
   // Bottom Action Bar
   bottomActionBar: {
     position: 'absolute',

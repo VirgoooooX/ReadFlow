@@ -11,6 +11,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useThemeContext } from '../../theme';
+import { typography } from '../../theme/typography';
 import { useUser } from '../../contexts/UserContext';
 import { SettingsService } from '../../services';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -270,7 +271,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginBottom: 4,
     },
     userEmail: {
-      fontSize: 13,
+      ...typography.bodySmall,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
       marginBottom: 6,
     },
@@ -344,7 +345,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginRight: 10,
     },
     menuText: {
-      fontSize: 15,
+      ...typography.bodyLarge,
       fontWeight: '500',
       color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
     },
@@ -354,13 +355,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       gap: 8,
     },
     menuValueText: {
-      fontSize: 13,
+      ...typography.bodySmall,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
       fontWeight: '500',
     },
     sectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
+      ...typography.titleMedium,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
       marginBottom: 10,
       marginTop: -5,  // 👈 增加与上方容器的距离

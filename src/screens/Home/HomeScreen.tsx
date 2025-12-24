@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
+import { typography } from '../../theme/typography';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { articleService, RSSService } from '../../services';
 import { SettingsService } from '../../services/SettingsService';
@@ -727,9 +728,8 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     articleTitle: {
       flex: 1,
-      fontSize: 16,
+      ...typography.bodyLarge,
       fontWeight: '600',
-      lineHeight: 22,
       color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
       opacity: 0.6, // 已读文章稍微淡一点
     },
@@ -738,8 +738,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       opacity: 1,
     },
     articleSubtitle: {
-      fontSize: 14,
-      lineHeight: 20,
+      ...typography.bodyMedium,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
       marginBottom: 10,
     },
@@ -750,18 +749,18 @@ const createStyles = (isDark: boolean, theme: any) =>
       flexWrap: 'wrap',
     },
     sourceTag: {
-      fontSize: 12,
+      ...typography.bodySmall,
       fontWeight: '500',
       color: theme?.colors?.primary || '#3B82F6',
       maxWidth: 100,
     },
     metaDivider: {
-      fontSize: 12,
+      ...typography.bodySmall,
       color: theme?.colors?.outline || '#999',
       marginHorizontal: 6,
     },
     metaText: {
-      fontSize: 12,
+      ...typography.bodySmall,
       color: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
     },
     // 图片样式
@@ -790,7 +789,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginBottom: 24,
     },
     emptyText: {
-      fontSize: 16,
+      ...typography.bodyLarge,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
       marginBottom: 24,
     },
@@ -801,7 +800,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       backgroundColor: theme?.colors?.primaryContainer,
     },
     refreshButtonText: {
-      fontSize: 14,
+      ...typography.labelMedium,
       fontWeight: '600',
       color: theme?.colors?.onPrimaryContainer,
     },
