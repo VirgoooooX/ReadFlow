@@ -103,6 +103,10 @@ const StorageManagementScreen: React.FC = () => {
       cacheEventEmitter.clearAll();
       console.log('✅ 缓存清除事件已触发');
 
+      // 5. 【修复】触发 RSS 统计更新事件，通知订阅源页面刷新
+      cacheEventEmitter.updateRSSStats();
+      console.log('✅ RSS统计更新事件已触发');
+
       await updateCacheSize();
 
       Alert.alert(

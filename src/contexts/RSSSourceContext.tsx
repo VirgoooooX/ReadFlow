@@ -30,12 +30,53 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     loadRSSSources();
   }, []);
 
-  // 监听 RSS 统计更新事件，武触发刷新
+  // 【升级】监听全局事件，支持多种事件类型
   useEffect(() => {
-    const unsubscribe = cacheEventEmitter.subscribe((event) => {
-      if (event === 'updateRSSStats') {
-        console.log('[RSSSourceContext] 接收到 updateRSSStats 事件，刚新加载 RSS 源');
-        loadRSSSources();
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      const { type, sourceId, sourceName } = eventData;
+      
+      switch (type) {
+        case 'updateRSSStats':
+          // RSS统计更新：重新加载RSS源列表（包含未读数量）
+          console.log('[RSSSourceContext] 接收到 updateRSSStats 事件，刷新加载 RSS 源');
+          loadRSSSources();
+          break;
+          
+        case 'clearAll':
+          // 清除所有数据：重新加载RSS源列表（未读数量已被重置）
+          console.log('[RSSSourceContext] 接收到 clearAll 事件，刷新加载 RSS 源');
+          loadRSSSources();
+          break;
+          
+        case 'refreshSource':
+          // 单个源刷新完成：重新加载RSS源列表（更新统计数据）
+          console.log(`[RSSSourceContext] 接收到 refreshSource 事件: ${sourceName || sourceId}`);
+          loadRSSSources();
+          break;
+          
+        case 'refreshAllSources':
+          // 所有源刷新完成：重新加载RSS源列表
+          console.log('[RSSSourceContext] 接收到 refreshAllSources 事件，刷新加载 RSS 源');
+          loadRSSSources();
+          break;
+          
+        case 'clearSourceArticles':
+          // 清除单个源的文章：重新加载RSS源列表（更新统计数据）
+          console.log(`[RSSSourceContext] 接收到 clearSourceArticles 事件: ${sourceName || sourceId}`);
+          loadRSSSources();
+          break;
+          
+        case 'sourceDeleted':
+          // 源被删除：重新加载RSS源列表
+          console.log(`[RSSSourceContext] 接收到 sourceDeleted 事件: ${sourceName || sourceId}`);
+          loadRSSSources();
+          break;
+          
+        case 'sourceUpdated':
+          // 源被更新：重新加载RSS源列表
+          console.log(`[RSSSourceContext] 接收到 sourceUpdated 事件: ${sourceName || sourceId}`);
+          loadRSSSources();
+          break;
       }
     });
     

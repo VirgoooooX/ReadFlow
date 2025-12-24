@@ -548,6 +548,7 @@ export class SettingsService {
       sepia: false,
       brightness: 1,
       showAllTab: true,
+      autoRefreshInterval: 10, // 默认10分钟自动刷新
     };
   }
 

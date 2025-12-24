@@ -16,11 +16,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { HomeStackScreenProps } from '../../navigation/types';
 import { useThemeContext } from '../../theme';
 import { typography } from '../../theme/typography';
+import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { articleService, RSSService } from '../../services';
 import { SettingsService } from '../../services/SettingsService';
 import cacheEventEmitter from '../../services/CacheEventEmitter';
-import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import type { Article } from '../../types';
 import CustomTabBar from '../../components/CustomTabBar';
 import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
@@ -266,6 +266,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
 const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { theme, isDark } = useThemeContext();
   const { rssSources, syncAllSources, syncSource } = useRSSSource();
+  const { settings: readingSettings } = useReadingSettings();
   const { settings } = useReadingSettings();
   const tabContentRef = useRef<CustomTabContentHandle>(null);
   const sceneRefsMap = useRef<Map<string, any>>(new Map()).current;
@@ -427,10 +428,15 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       // 延迟 500ms 启动首次刷新
       refreshTimer = setTimeout(triggerBackgroundSync, 500);
       
-      // 每 10 分钟刷新一次（600000ms）
-      refreshInterval = setInterval(triggerBackgroundSync, 10 * 60 * 1000);
-      
-      console.log('[HomeScreen] ⏰ 后台刷新定时器已启动（10分钟一次）');
+      // 【修复】使用用户配置的刷新间隔（分钟），默认10分钟，0表示关闭自动刷新
+      const intervalMinutes = readingSettings?.autoRefreshInterval ?? 10;
+      if (intervalMinutes > 0) {
+        const intervalMs = intervalMinutes * 60 * 1000;
+        refreshInterval = setInterval(triggerBackgroundSync, intervalMs);
+        console.log(`[HomeScreen] ⏰ 后台刷新定时器已启动（${intervalMinutes}分钟一次）`);
+      } else {
+        console.log('[HomeScreen] ⏰ 自动刷新已关闭，仅手动刷新');
+      }
     }
     
     return () => {
@@ -438,7 +444,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       if (refreshInterval) clearInterval(refreshInterval);
       console.log('[HomeScreen] ⏰ 后台刷新定时器已清理');
     };
-  }, []); // 【关键修复】空依赖数组，只在挂载/卸载时执行
+  }, [readingSettings?.autoRefreshInterval]); // 【关键修复】监听配置变化，配置变更时重启定时器
   
  // 【新增】监听 rssSources 变化，清理已删除源的缓存和"全部"标签缓存
   useEffect(() => {
@@ -470,15 +476,85 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [rssSources]);
   
-  // 【新增】监听全局缓存清除事件
+  // 【升级】监听全局缓存事件，支持细粒度刷新
   useEffect(() => {
-    const unsubscribe = cacheEventEmitter.subscribe((event) => {
-      if (event === 'clearAll') {
-        console.log('[HomeScreen] 🧹 收到全局清除缓存事件，清除 tabDataMap');
-        setTabDataMap(new Map());
-      } else if (event === 'clearArticles') {
-        console.log('[HomeScreen] 🧹 收到清除文章缓存事件，清除所有标签的文章数据');
-        setTabDataMap(new Map());
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      const { type, sourceId, sourceName } = eventData;
+      
+      switch (type) {
+        case 'clearAll':
+          // 清除所有缓存：清空所有标签数据
+          console.log('[HomeScreen] 🧹 收到全局清除缓存事件，清除 tabDataMap');
+          setTabDataMap(new Map());
+          break;
+          
+        case 'clearArticles':
+          // 清除所有文章缓存
+          console.log('[HomeScreen] 🧹 收到清除文章缓存事件，清除所有标签的文章数据');
+          setTabDataMap(new Map());
+          break;
+          
+        case 'clearSourceArticles':
+          // 清除单个源的文章缓存：同时刷新该源tab和"全部"tab
+          if (sourceId) {
+            console.log(`[HomeScreen] 🧹 收到清除单源缓存事件: ${sourceName || sourceId}`);
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              updated.delete(`source-${sourceId}`);
+              updated.delete('all'); // 同时刷新"全部"tab
+              return updated;
+            });
+          }
+          break;
+          
+        case 'refreshSource':
+          // 单个源刷新完成：刷新该源tab和"全部"tab
+          if (sourceId) {
+            console.log(`[HomeScreen] 🔄 收到单源刷新事件: ${sourceName || sourceId}`);
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              updated.delete(`source-${sourceId}`);
+              updated.delete('all'); // 同时刷新"全部"tab
+              return updated;
+            });
+          }
+          break;
+          
+        case 'refreshAllSources':
+          // 所有源刷新完成：清空所有缓存
+          console.log('[HomeScreen] 🔄 收到全部刷新事件，清除所有标签缓存');
+          setTabDataMap(new Map());
+          break;
+          
+        case 'sourceDeleted':
+          // 源被删除：移除该源缓存，刷新"全部"tab
+          if (sourceId) {
+            console.log(`[HomeScreen] 🗑️ 收到源删除事件: ${sourceName || sourceId}`);
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              updated.delete(`source-${sourceId}`);
+              updated.delete('all'); // 同时刷新"全部"tab
+              return updated;
+            });
+          }
+          break;
+          
+        case 'sourceUpdated':
+          // 源被更新：刷新该源tab
+          if (sourceId) {
+            console.log(`[HomeScreen] ✏️ 收到源更新事件: ${sourceName || sourceId}`);
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              updated.delete(`source-${sourceId}`);
+              return updated;
+            });
+          }
+          break;
+          
+        case 'updateRSSStats':
+          // RSS统计更新：不需要刷新文章列表，只是统计数据变更
+          console.log('[HomeScreen] 📊 收到RSS统计更新事件');
+          break;
       }
     });
     

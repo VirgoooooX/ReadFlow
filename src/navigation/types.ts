@@ -59,6 +59,8 @@ export type RSSStackParamList = {
   AddRSSSource: undefined;
   EditRSSSource: { sourceId: number };
   GroupManagement: undefined;  // 分组管理
+  FilterManagement: undefined;  // 过滤规则管理
+  FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器
 };
 
 // 用户堆栈参数列表
@@ -73,10 +75,13 @@ export type UserStackParamList = {
   AddEditProxyServer: { serverId?: string };
   About: undefined;
   StorageManagement: undefined;
+  ManageSubscriptions: undefined;  // 管理订阅源
   GroupManagement: undefined;
   AddRSSSource: undefined;
   EditRSSSource: { sourceId: number };
   RSSRefreshSettings: undefined;
+  FilterManagement: undefined;  // 过滤规则管理
+  FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器
 };
 
 // 屏幕属性类型定义

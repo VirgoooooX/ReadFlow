@@ -23,6 +23,7 @@ import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
 import { DatabaseService } from '../../database/DatabaseService';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 import type { RSSSource } from '../../types';
 import { VIRTUAL_GROUPS } from '../../types';
 import * as StyleUtils from '../../utils/styleUtils';
@@ -52,7 +53,8 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const button1Anim = useRef(new Animated.Value(0)).current;  // 同步
   const button2Anim = useRef(new Animated.Value(0)).current;  // 分组
   const button3Anim = useRef(new Animated.Value(0)).current;  // 添加
-  const buttonAnims = [button1Anim, button2Anim, button3Anim];
+  const button4Anim = useRef(new Animated.Value(0)).current;  // 过滤规则
+  const buttonAnims = [button1Anim, button2Anim, button3Anim, button4Anim];
   
   // 模式控制：普通浏览 vs 管理模式
   const [isEditMode, setIsEditMode] = useState(false);
@@ -182,6 +184,12 @@ const ManageSubscriptionsScreen: React.FC = () => {
           tension: 60,
           useNativeDriver: true,
         }),
+        Animated.spring(button4Anim, {
+          toValue: 1,
+          friction: 5,
+          tension: 60,
+          useNativeDriver: true,
+        }),
       ]).start();
     } else {
       // 立即隐藏（导航时）或动画收起（点击蒙层）
@@ -191,11 +199,17 @@ const ManageSubscriptionsScreen: React.FC = () => {
         button1Anim.setValue(0);
         button2Anim.setValue(0);
         button3Anim.setValue(0);
+        button4Anim.setValue(0);
         fabRotation.setValue(0);
       } else {
         // 收起动画：按钮先收回，再旋转主按钮
         // 按钮从远到近依次收回
         Animated.stagger(60, [
+          Animated.timing(button4Anim, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
           Animated.timing(button3Anim, {
             toValue: 0,
             duration: 150,
@@ -256,6 +270,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await rssService.deleteRSSSource(sourceId);
+              // 【优化】触发更细粒度的源删除事件
+              cacheEventEmitter.sourceDeleted(sourceId, source?.name);
+              console.log(`✅ 已触发源删除事件: ${source?.name}`);
               await refreshRSSSources();
             } catch (error) {
               console.error('Error deleting source:', error);
@@ -285,6 +302,11 @@ const ManageSubscriptionsScreen: React.FC = () => {
                 'UPDATE rss_sources SET article_count = 0, unread_count = 0 WHERE id = ?',
                 [sourceId]
               );
+              // 【优化】触发更细粒度的清除单源缓存事件
+              cacheEventEmitter.clearSourceArticles(sourceId, source?.name);
+              // 同时触发统计更新事件，刷新订阅源页面的未读数量
+              cacheEventEmitter.updateRSSStats();
+              console.log(`✅ 已触发清除单源缓存事件: ${source?.name}`);
               await refreshRSSSources();
               Alert.alert('成功', `已清除 "${source?.name}" 的所有文章`);
             } catch (error) {
@@ -423,7 +445,10 @@ const ManageSubscriptionsScreen: React.FC = () => {
             try {
               for (const sourceId of selectedSources) {
                 await rssService.deleteRSSSource(sourceId);
+                // 触发每个源的删除事件
+                cacheEventEmitter.sourceDeleted(sourceId);
               }
+              console.log(`✅ 已触发批量删除事件: ${selectedSources.size} 个源`);
               Alert.alert('成功', `已删除 ${selectedSources.size} 个源`);
               setIsEditMode(false);
               setSelectedSources(new Set());
@@ -764,7 +789,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
               </TouchableOpacity>
             </Animated.View>
             
-            {/* 展开的动作按钮 - 从右到左：同步、分组、添加 */}
+            {/* 展开的动作按钮 - 从右到左：同步、分组、添加、过滤 */}
             {showSettingsMenu && (
               <>
                 <ActionButton 
@@ -790,6 +815,15 @@ const ManageSubscriptionsScreen: React.FC = () => {
                     // 立即隐藏 FAB，避免与导航动画冲突
                     toggleSettingsMenu(true);
                     navigation.navigate('AddRSSSource');
+                  }}
+                />
+                <ActionButton 
+                  icon="filter-list"
+                  animValue={button4Anim}
+                  onPress={() => {
+                    // 立即隐藏 FAB，避免与导航动画冲突
+                    toggleSettingsMenu(true);
+                    navigation.navigate('FilterManagement');
                   }}
                 />
               </>

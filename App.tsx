@@ -23,6 +23,7 @@ import { UserProvider } from './src/contexts/UserContext';
 import { RSSSourceProvider } from './src/contexts/RSSSourceContext';
 import { RSSGroupProvider } from './src/contexts/RSSGroupContext';
 import { ReadingSettingsProvider } from './src/contexts/ReadingSettingsContext';
+import { AppSettingsProvider } from './src/contexts/AppSettingsContext';
 import { AppNavigator } from './src/navigation';
 
 // 导入数据库初始化和认证服务
@@ -139,20 +140,22 @@ function App(): React.JSX.Element {
       <SafeAreaProvider>
         <ThemeProvider initialTheme="system">
           <UserProvider>
-            <RSSSourceProvider>
-              <RSSGroupProvider>
-                <ReadingSettingsProvider>
-                  <View style={styles.container}>
-                    <StatusBar
-                      barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                      backgroundColor="transparent"
-                      translucent
-                    />
-                    <AppNavigator />
-                  </View>
-                </ReadingSettingsProvider>
-              </RSSGroupProvider>
-            </RSSSourceProvider>
+            <AppSettingsProvider>
+              <RSSSourceProvider>
+                <RSSGroupProvider>
+                  <ReadingSettingsProvider>
+                    <View style={styles.container}>
+                      <StatusBar
+                        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                        backgroundColor="transparent"
+                        translucent
+                      />
+                      <AppNavigator />
+                    </View>
+                  </ReadingSettingsProvider>
+                </RSSGroupProvider>
+              </RSSSourceProvider>
+            </AppSettingsProvider>
           </UserProvider>
         </ThemeProvider>
       </SafeAreaProvider>

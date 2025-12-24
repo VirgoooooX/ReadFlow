@@ -31,6 +31,8 @@ import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
 import EditRSSSourceScreen from '../screens/RSS/EditRSSSourceScreen';
 import GroupManagementScreen from '../screens/RSS/GroupManagementScreen';
+import FilterRuleEditorScreen from '../screens/RSS/FilterRuleEditorScreen';
+import FilterManagementScreen from '../screens/RSS/FilterManagementScreen';
 import MineScreen from '../screens/Mine/MineScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
@@ -38,7 +40,6 @@ import EditProfileScreen from '../screens/User/EditProfileScreen';
 import ReadingSettingsScreen from '../screens/Settings/ReadingSettingsScreen';
 import LLMSettingsScreen from '../screens/Settings/LLMSettingsScreen';
 import ThemeSettingsScreen from '../screens/Settings/ThemeSettingsScreen';
-import RSSRefreshSettingsScreen from '../screens/Settings/RSSRefreshSettingsScreen';
 import { ProxyServerSettingsScreen } from '../screens/Settings/ProxyServerSettingsScreen';
 import { AddEditProxyServerScreen } from '../screens/Settings/AddEditProxyServerScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
@@ -312,6 +313,34 @@ function RSSStackNavigator() {
           </ScreenWithCustomHeader>
         )}
       </RSSStack.Screen>
+      <RSSStack.Screen
+        name="FilterManagement"
+        options={{ title: '过滤规则' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="过滤规则"
+            showBackButton={true}
+          >
+            <FilterManagementScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="FilterRuleEditor"
+        options={({ route }: any) => ({ 
+          title: route?.params?.ruleId ? '编辑规则' : '新建规则' 
+        })}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title={props.route?.params?.ruleId ? '编辑规则' : '新建规则'}
+            showBackButton={true}
+          >
+            <FilterRuleEditorScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
     </RSSStack.Navigator>
   );
 }
@@ -517,6 +546,36 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
 
+      <UserStack.Screen
+        name="FilterManagement"
+        options={{ title: '过滤规则' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="过滤规则"
+            showBackButton={true}
+          >
+            <FilterManagementScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
+        name="FilterRuleEditor"
+        options={({ route }: any) => ({ 
+          title: route?.params?.ruleId ? '编辑规则' : '新建规则' 
+        })}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title={props.route?.params?.ruleId ? '编辑规则' : '新建规则'}
+            showBackButton={true}
+          >
+            <FilterRuleEditorScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
     </UserStack.Navigator>
   );
 }
@@ -588,14 +647,14 @@ function MainTabNavigator() {
         options={{ tabBarLabel: '文章' }}
       />
       <MainTab.Screen
-        name="Vocabulary"
-        component={VocabularyStackNavigator}
-        options={{ tabBarLabel: '词汇本' }}
-      />
-      <MainTab.Screen
         name="RSS"
         component={RSSStackNavigator}
         options={{ tabBarLabel: 'RSS' }}
+      />
+      <MainTab.Screen
+        name="Vocabulary"
+        component={VocabularyStackNavigator}
+        options={{ tabBarLabel: '词汇本' }}
       />
       <MainTab.Screen
         name="User"
