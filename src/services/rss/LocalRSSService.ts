@@ -21,6 +21,7 @@ import {
 } from './RSSUtils';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
+import cacheEventEmitter from '../CacheEventEmitter';
 
 export class LocalRSSService {
   private static instance: LocalRSSService;
@@ -669,6 +670,9 @@ export class LocalRSSService {
         'UPDATE rss_sources SET last_updated = ?, article_count = ?, unread_count = ? WHERE id = ?',
         [new Date().toISOString(), articleCount, unreadCount, sourceId]
       );
+      
+      // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
+      cacheEventEmitter.updateRSSStats();
     } catch (error) {
       logger.error('Error updating source stats:', error);
     }

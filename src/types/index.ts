@@ -47,6 +47,9 @@ export interface RSSSource {
   // 📁 分组相关字段
   groupId: number | null;        // 所属分组 ID（null = 未分组）
   groupSortOrder?: number;       // 在分组内的排序
+  
+  // 🌐 图标相关字段
+  iconUrl?: string;              // RSS源图标URL（本地缓存或网络URL）
 }
 
 // 📁 RSS分组类型

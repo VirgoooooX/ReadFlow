@@ -12,7 +12,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useThemeContext } from '../../theme';
 import { useUser } from '../../contexts/UserContext';
-import { userStatsService, UserStats } from '../../services/UserStatsService';
 import { SettingsService } from '../../services';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { UserStackParamList } from '../../navigation/types';
@@ -27,8 +26,6 @@ const MineScreen: React.FC = () => {
   const styles = createStyles(isDark, theme);
 
   // 状态管理
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(false);
   const [proxyStatus, setProxyStatus] = useState<{ enabled: boolean; connected: boolean }>({
     enabled: false,
     connected: false,
@@ -37,29 +34,9 @@ const MineScreen: React.FC = () => {
   // 获取焦点时刷新数据
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      checkProxyStatus();
     }, [])
   );
-
-  const loadData = async () => {
-    // 并行加载数据
-    await Promise.all([
-      loadUserStats(),
-      checkProxyStatus(),
-    ]);
-  };
-
-  const loadUserStats = async () => {
-    try {
-      setLoading(true);
-      const stats = await userStatsService.getUserStats();
-      setUserStats(stats);
-    } catch (error) {
-      console.error('加载统计数据失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const checkProxyStatus = async () => {
     try {
@@ -81,28 +58,8 @@ const MineScreen: React.FC = () => {
   };
 
   // 统计卡片组件
-  const StatCard = ({ icon, value, label, onPress, color, isLast }: any) => {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.statCard,
-          !isLast && styles.statCardBorder,
-        ]}
-        onPress={onPress}
-        activeOpacity={0.6}
-      >
-        <View style={[styles.statIconCircle, { backgroundColor: `${color}15` }]}>
-          <MaterialIcons name={icon} size={18} color={color} />
-        </View>
-        <Text style={styles.statValue} numberOfLines={1}>
-          {value || 0}
-        </Text>
-        <Text style={styles.statLabel} numberOfLines={1}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  // };
+  // 已删除 StatCard 组件（不再使用）
 
   // 菜单项组件
   const MenuItem = ({
@@ -193,40 +150,7 @@ const MineScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* --- 统计数据区域 --- */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statsRow}>
-          <StatCard
-            icon="book"
-            value={userStats?.vocabularyWords}
-            label="单词积累"
-            color={theme?.colors?.primary || '#3B82F6'}
-            onPress={() => navigation.navigate('Vocabulary' as any)}
-          />
-          <StatCard
-            icon="rss-feed"
-            value={userStats?.rssSources}
-            label="订阅源"
-            color={theme?.colors?.tertiary || '#7D5260'}
-            onPress={() => navigation.navigate('ManageSubscriptions' as any)}
-          />
-          <StatCard
-            icon="article"
-            value={userStats?.totalArticles}
-            label="已读文章"
-            color={theme?.colors?.secondary || '#625B71'}
-            onPress={() => navigation.navigate('Articles' as any)}
-          />
-          <StatCard
-            icon="favorite"
-            value={userStats?.favoriteArticles}
-            label="收藏夹"
-            color="#E91E63"
-            onPress={() => navigation.navigate('Articles' as any)}
-            isLast
-          />
-        </View>
-      </View>
+      {/* --- 用户头部信息区域结束 --- */}
 
       {/* 第1组: 阅读与内容 */}
       <View style={styles.menuGroupContainer}>
@@ -372,49 +296,13 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
 
     // Stats - 整体卡片容器
-    statsContainer: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
-      borderRadius: 16,
-      marginBottom: 20,
-      paddingVertical: 8,
-      // 投影效果
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.1,
-      shadowRadius: 12,
-      elevation: 4,
-    },
-    statsRow: {
-      flexDirection: 'row',
-    },
-    statCard: {
-      flex: 1,
-      alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 4,
-    },
-    statCardBorder: {
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E0E0E0'),
-    },
-    statIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    statValue: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
-      marginBottom: 2,
-    },
-    statLabel: {
-      fontSize: 11,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-    },
+    // statsContainer: { ... }, // 已删除
+    // statsRow: { ... }, // 已删除
+    // statCard: { ... }, // 已删除
+    // statCardBorder: { ... }, // 已删除
+    // statIconCircle: { ... }, // 已删除
+    // statValue: { ... }, // 已删除
+    // statLabel: { ... }, // 已删除
 
     // Menu - 新的分组布局
     menuGroupContainer: {

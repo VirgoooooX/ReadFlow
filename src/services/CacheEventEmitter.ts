@@ -3,7 +3,7 @@
  * 用于通知应用不同部分的缓存清除事件
  */
 
-type CacheEventListener = (event: 'clearAll' | 'clearArticles') => void;
+type CacheEventListener = (event: 'clearAll' | 'clearArticles' | 'updateRSSStats') => void;
 
 class CacheEventEmitter {
   private static instance: CacheEventEmitter;
@@ -33,7 +33,7 @@ class CacheEventEmitter {
    * 发射缓存清除事件
    * @param event 事件类型
    */
-  emit(event: 'clearAll' | 'clearArticles'): void {
+  emit(event: 'clearAll' | 'clearArticles' | 'updateRSSStats'): void {
     console.log(`[CacheEventEmitter] 发射事件: ${event}`);
     this.listeners.forEach(listener => {
       try {
@@ -56,6 +56,13 @@ class CacheEventEmitter {
    */
   clearArticles(): void {
     this.emit('clearArticles');
+  }
+
+  /**
+   * 通知 RSS 源统计信息已更新（未读计数变更）
+   */
+  updateRSSStats(): void {
+    this.emit('updateRSSStats');
   }
 
   /**

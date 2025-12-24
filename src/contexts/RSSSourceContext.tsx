@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { RSSSource } from '../types';
 import { RSSService } from '../services/rss';
+import cacheEventEmitter from '../services/CacheEventEmitter';
 
 interface RSSSourceContextType {
   rssSources: RSSSource[];
@@ -27,6 +28,18 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
   // 初始化加载RSS源
   useEffect(() => {
     loadRSSSources();
+  }, []);
+
+  // 监听 RSS 统计更新事件，武触发刷新
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((event) => {
+      if (event === 'updateRSSStats') {
+        console.log('[RSSSourceContext] 接收到 updateRSSStats 事件，刚新加载 RSS 源');
+        loadRSSSources();
+      }
+    });
+    
+    return unsubscribe;
   }, []);
 
   const loadRSSSources = async () => {

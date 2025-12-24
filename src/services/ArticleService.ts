@@ -1,5 +1,6 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { Article, ReadingSettings } from '../types';
+import cacheEventEmitter from './CacheEventEmitter';
 
 export class ArticleService {
   private static instance: ArticleService;
@@ -226,8 +227,37 @@ export class ArticleService {
         'UPDATE articles SET is_read = 1, read_progress = ?, read_at = ? WHERE id = ?',
         [progress, new Date().toISOString(), id]
       );
+      
+      // 获取文章的源ID，并更新该源的未读数量
+      const article = await this.getArticleById(id);
+      if (article && article.sourceId) {
+        await this.updateSourceStats(article.sourceId);
+      }
     } catch (error) {
       console.error('Error marking article as read:', error);
+    }
+  }
+  
+  /**
+   * 更新 RSS 源统计信息 (已读计数)
+   */
+  private async updateSourceStats(sourceId: number): Promise<void> {
+    try {
+      const unreadCountResult = await this.databaseService.executeQuery(
+        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0',
+        [sourceId]
+      );
+      const unreadCount = unreadCountResult[0]?.count || 0;
+      
+      await this.databaseService.executeStatement(
+        'UPDATE rss_sources SET unread_count = ? WHERE id = ?',
+        [unreadCount, sourceId]
+      );
+      
+      // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
+      cacheEventEmitter.updateRSSStats();
+    } catch (error) {
+      console.error('Error updating source stats:', error);
     }
   }
 
@@ -241,6 +271,12 @@ export class ArticleService {
         'UPDATE articles SET is_read = 0, read_progress = 0, read_at = NULL WHERE id = ?',
         [id]
       );
+      
+      // 获取文章的源ID，并更新该源的未读数量
+      const article = await this.getArticleById(id);
+      if (article && article.sourceId) {
+        await this.updateSourceStats(article.sourceId);
+      }
     } catch (error) {
       console.error('Error marking article as unread:', error);
     }
