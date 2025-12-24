@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { typography } from '../../theme/typography';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
@@ -108,6 +108,19 @@ const ManageSubscriptionsScreen: React.FC = () => {
     return () => task.cancel();
   }, []);
 
+  // 页面失去焦点时自动收起 FAB
+  useFocusEffect(
+    useCallback(() => {
+      // 页面获得焦点时不做任何操作
+      return () => {
+        // 页面失去焦点时收起菜单
+        if (showSettingsMenu) {
+          toggleSettingsMenu();
+        }
+      };
+    }, [showSettingsMenu])
+  );
+
   const handleTabPress = useCallback((tabIndex: number) => {
     setActiveIndex(tabIndex);
     tabContentRef.current?.scrollToIndex(tabIndex);
@@ -134,7 +147,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   };
 
   // 切换设置菜单 - 丝滑交错动画
-  const toggleSettingsMenu = () => {
+  const toggleSettingsMenu = (immediate = false) => {
     const isOpening = !showSettingsMenu;
     
     if (isOpening) {
@@ -171,38 +184,48 @@ const ManageSubscriptionsScreen: React.FC = () => {
         }),
       ]).start();
     } else {
-      // 收起动画：按钮先收回，再旋转主按钮
-      // 按钮从远到近依次收回
-      Animated.stagger(60, [
-        Animated.timing(button3Anim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(button2Anim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(button1Anim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      
-      // 主按钮旋转回去
-      Animated.spring(fabRotation, {
-        toValue: 0,
-        friction: 6,
-        tension: 80,
-        useNativeDriver: true,
-      }).start();
-      
-      // 延迟隐藏菜单
-      setTimeout(() => {
+      // 立即隐藏（导航时）或动画收起（点击蒙层）
+      if (immediate) {
+        // 立即隐藏，不播放动画
         setShowSettingsMenu(false);
-      }, 200);
+        button1Anim.setValue(0);
+        button2Anim.setValue(0);
+        button3Anim.setValue(0);
+        fabRotation.setValue(0);
+      } else {
+        // 收起动画：按钮先收回，再旋转主按钮
+        // 按钮从远到近依次收回
+        Animated.stagger(60, [
+          Animated.timing(button3Anim, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(button2Anim, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(button1Anim, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        
+        // 主按钮旋转回去
+        Animated.spring(fabRotation, {
+          toValue: 0,
+          friction: 6,
+          tension: 80,
+          useNativeDriver: true,
+        }).start();
+        
+        // 延迟隐藏菜单
+        setTimeout(() => {
+          setShowSettingsMenu(false);
+        }, 200);
+      }
     }
   };
 
@@ -705,61 +728,74 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
       {/* FAB 设置按钮 (非编辑模式显示) */}
       {!isEditMode && (
-        <View style={styles.fabContainer}>
-          {/* 主FAB按钮 - 放第一个，因为 row-reverse 所以它在最右边 */}
-          <Animated.View
-            style={[
-              styles.fabWrapper,
-              {
-                transform: [
-                  {
-                    rotate: fabRotation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '135deg'],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.fabInner}
-              onPress={toggleSettingsMenu}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="add" size={24} color="#FFF" />
-            </TouchableOpacity>
-          </Animated.View>
-          
-          {/* 展开的动作按钮 - 从右到左：同步、分组、添加 */}
+        <>
+          {/* 背景蒸层 - 展开时显示，点击收起 */}
           {showSettingsMenu && (
-            <>
-              <ActionButton 
-                icon="sync"
-                animValue={button1Anim}
-                onPress={() => {
-                  toggleSettingsMenu();
-                }}
-              />
-              <ActionButton 
-                icon="folder-open"
-                animValue={button2Anim}
-                onPress={() => {
-                  navigation.navigate('GroupManagement');
-                  toggleSettingsMenu();
-                }}
-              />
-              <ActionButton 
-                icon="add-circle-outline"
-                animValue={button3Anim}
-                onPress={() => {
-                  navigation.navigate('AddRSSSource');
-                  toggleSettingsMenu();
-                }}
-              />
-            </>
+            <TouchableOpacity
+              style={styles.fabOverlay}
+              activeOpacity={1}
+              onPress={() => toggleSettingsMenu()}
+            />
           )}
-        </View>
+          
+          <View style={styles.fabContainer}>
+            {/* 主FAB按钮 */}
+            <Animated.View
+              style={[
+                styles.fabWrapper,
+                {
+                  transform: [
+                    {
+                      rotate: fabRotation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '135deg'],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.fabInner}
+                onPress={() => toggleSettingsMenu()}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="add" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </Animated.View>
+            
+            {/* 展开的动作按钮 - 从右到左：同步、分组、添加 */}
+            {showSettingsMenu && (
+              <>
+                <ActionButton 
+                  icon="sync"
+                  animValue={button1Anim}
+                  onPress={() => {
+                    toggleSettingsMenu();
+                  }}
+                />
+                <ActionButton 
+                  icon="folder-open"
+                  animValue={button2Anim}
+                  onPress={() => {
+                    // 立即隐藏 FAB，避免与导航动画冲突
+                    toggleSettingsMenu(true);
+                    navigation.navigate('GroupManagement');
+                  }}
+                />
+                <ActionButton 
+                  icon="add-circle-outline"
+                  animValue={button3Anim}
+                  onPress={() => {
+                    // 立即隐藏 FAB，避免与导航动画冲突
+                    toggleSettingsMenu(true);
+                    navigation.navigate('AddRSSSource');
+                  }}
+                />
+              </>
+            )}
+          </View>
+        </>
       )}
       
       {/* 底部批量操作栏 (编辑模式显示) */}
@@ -990,6 +1026,17 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     ...typography.bodyLarge,
     fontWeight: '500',
     color: theme.colors.onSurface,
+  },
+
+  // FAB Overlay - 透明背景层，点击收起菜单
+  fabOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 99,
   },
 
   // FAB Container - 包含主按钮和展开按钮
