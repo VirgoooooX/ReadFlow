@@ -321,7 +321,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       const tabData = getTabData(tabKey);
       const offset = append ? tabData.articles.length : 0;
-      const limit = 20;
+      const limit = 15;
       
       let newArticles: Article[];
       
