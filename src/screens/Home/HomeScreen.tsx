@@ -249,6 +249,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
     <FlashList
       ref={flatListRef}
       data={articles}
+      // @ts-ignore - estimatedItemSize is required by FlashList but may have type conflicts in some environments
       estimatedItemSize={ITEM_HEIGHT}
       keyExtractor={(item: Article) => item.id.toString()}
       contentContainerStyle={styles.articleListContainer}
@@ -950,7 +951,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               borderRadius: 10,
               marginRight: 10,
               // 描边风格
-              borderWidth: 2,
+              borderWidth: 0,
               borderColor: showOnlyUnread ? (isDark ? theme.colors.primary : '#FFFFFF') : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'),
               backgroundColor: showOnlyUnread ? (isDark ? theme.colors.primary : '#FFFFFF') : 'transparent',
             }}
@@ -972,7 +973,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               justifyContent: 'center',
               borderRadius: 10,
               // 描边风格
-              borderWidth: 2,
+              borderWidth: 0,
               borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)',
               backgroundColor: 'transparent',
             }}

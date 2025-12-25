@@ -11,6 +11,10 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useThemeContext } from '../../theme';
+import { 
+  SettingItem, 
+  SettingSection 
+} from '../../components/ui';
 import { typography } from '../../theme/typography';
 import { useUser } from '../../contexts/UserContext';
 import { SettingsService } from '../../services';
@@ -62,61 +66,6 @@ const MineScreen: React.FC = () => {
   // };
   // 已删除 StatCard 组件（不再使用）
 
-  // 菜单项组件
-  const MenuItem = ({
-    icon,
-    label,
-    onPress,
-    color,
-    valueText,
-    showArrow = true,
-    isDestructive = false,
-    isLast = false,
-  }: any) => (
-    <>
-      <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.6}>
-        <View style={styles.menuLeft}>
-          <View style={styles.menuIconBox}>
-            <MaterialIcons
-              name={icon}
-              size={20}
-              color={
-                isDestructive
-                  ? theme?.colors?.error || '#EF4444'
-                  : color || theme?.colors?.onSurfaceVariant || '#666'
-              }
-            />
-          </View>
-          <Text
-            style={[
-              styles.menuText,
-              isDestructive && { color: theme?.colors?.error || '#EF4444' },
-            ]}
-          >
-            {label}
-          </Text>
-        </View>
-
-        <View style={styles.menuRight}>
-          {valueText && <Text style={styles.menuValueText}>{valueText}</Text>}
-          {showArrow && (
-            <MaterialIcons
-              name="chevron-right"
-              size={20}
-              color={theme?.colors?.outline || '#999'}
-            />
-          )}
-        </View>
-      </TouchableOpacity>
-      {!isLast && <View style={styles.menuDivider} />}
-    </>
-  );
-
-  // 分组标题
-  const SectionTitle = ({ title }: { title: string }) => (
-    <Text style={styles.sectionTitle}>{title}</Text>
-  );
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* --- 头部用户信息区域 --- */}
@@ -154,84 +103,75 @@ const MineScreen: React.FC = () => {
       {/* --- 用户头部信息区域结束 --- */}
 
       {/* 第1组: 阅读与内容 */}
-      <View style={styles.menuGroupContainer}>
-        <SectionTitle title="阅读与内容" />
-        <View style={styles.menuGroupCard}>
-          <MenuItem
-            icon="chrome-reader-mode"
-            label="阅读偏好"
-            onPress={() => navigation.navigate('ReadingSettings')}
-            color={theme?.colors?.primary || '#3B82F6'}
-          />
-          <MenuItem
-            icon="folder"
-            label="分组管理"
-            onPress={() => navigation.navigate('GroupManagement')}
-            color="#8B5CF6"
-          />
-          <MenuItem
-            icon="filter-list"
-            label="过滤规则"
-            onPress={() => navigation.navigate('FilterManagement')}
-            color="#F59E0B"
-            isLast
-          />
-        </View>
-      </View>
+      <SettingSection title="阅读与内容">
+        <SettingItem
+          icon="chrome-reader-mode"
+          label="阅读偏好"
+          onPress={() => navigation.navigate('ReadingSettings')}
+          color={theme?.colors?.primary || '#3B82F6'}
+        />
+        <SettingItem
+          icon="folder"
+          label="分组管理"
+          onPress={() => navigation.navigate('GroupManagement')}
+          color="#8B5CF6"
+        />
+        <SettingItem
+          icon="filter-list"
+          label="过滤规则"
+          onPress={() => navigation.navigate('FilterManagement')}
+          color="#F59E0B"
+          isLast
+        />
+      </SettingSection>
 
       {/* 第2组: 工具与服务 */}
-      <View style={styles.menuGroupContainer}>
-        <SectionTitle title="工具与服务" />
-        <View style={styles.menuGroupCard}>
-          <MenuItem
-            icon="psychology"
-            label="AI 助手配置"
-            onPress={() => navigation.navigate('LLMSettings')}
-            color="#8B5CF6"
-          />
-          <MenuItem
-            icon="cloud-queue"
-            label="代理服务器"
-            onPress={() => navigation.navigate('ProxyServerSettings')}
-            color={proxyStatus.enabled ? '#10B981' : '#6B7280'}
-            valueText={proxyStatus.enabled ? '已启用' : '未启用'}
-          />
-          <MenuItem
-            icon="palette"
-            label="主题设置"
-            onPress={() => navigation.navigate('ThemeSettings')}
-            color="#EC4899"
-            valueText={isDark ? '深色' : '浅色'}
-            isLast
-          />
-        </View>
-      </View>
+      <SettingSection title="工具与服务">
+        <SettingItem
+          icon="psychology"
+          label="AI 助手配置"
+          onPress={() => navigation.navigate('LLMSettings')}
+          color="#8B5CF6"
+        />
+        <SettingItem
+          icon="cloud-queue"
+          label="代理服务器"
+          onPress={() => navigation.navigate('ProxyServerSettings')}
+          color={proxyStatus.enabled ? '#10B981' : '#6B7280'}
+          valueText={proxyStatus.enabled ? '已启用' : '未启用'}
+        />
+        <SettingItem
+          icon="palette"
+          label="主题设置"
+          onPress={() => navigation.navigate('ThemeSettings')}
+          color="#EC4899"
+          valueText={isDark ? '深色' : '浅色'}
+          isLast
+        />
+      </SettingSection>
 
       {/* 第3组: 系统与数据 */}
-      <View style={styles.menuGroupContainer}>
-        <SectionTitle title="系统与数据" />
-        <View style={styles.menuGroupCard}>
-          <MenuItem
-            icon="storage"
-            label="存储空间管理"
-            onPress={() => navigation.navigate('StorageManagement')}
-            color="#64748B"
-          />
-          <MenuItem
-            icon="info"
-            label="关于应用"
-            onPress={() => navigation.navigate('About')}
-            color="#64748B"
-          />
-          <MenuItem
-            icon="logout"
-            label="退出登录"
-            isDestructive
-            onPress={handleLogout}
-            isLast
-          />
-        </View>
-      </View>
+      <SettingSection title="系统与数据">
+        <SettingItem
+          icon="storage"
+          label="存储空间管理"
+          onPress={() => navigation.navigate('StorageManagement')}
+          color="#64748B"
+        />
+        <SettingItem
+          icon="info"
+          label="关于应用"
+          onPress={() => navigation.navigate('About')}
+          color="#64748B"
+        />
+        <SettingItem
+          icon="logout"
+          label="退出登录"
+          isDestructive
+          onPress={handleLogout}
+          isLast
+        />
+      </SettingSection>
 
       {/* 底部留白 */}
       <View style={{ height: 20 }} />
@@ -258,9 +198,9 @@ const createStyles = (isDark: boolean, theme: any) =>
       alignItems: 'center',
     },
     avatar: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
+      width: 90,
+      height: 90,
+      borderRadius: 30,
       borderWidth: 2,
       borderColor: theme?.colors?.surface || '#FFF',
     },
@@ -277,107 +217,20 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginLeft: 16,
     },
     userName: {
-      fontSize: 20,
+      fontSize: 25,
       fontWeight: '700',
       color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
-      marginBottom: 4,
+      marginBottom: 10,
     },
     userEmail: {
       ...typography.bodySmall,
       color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
       marginBottom: 6,
     },
-    levelBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: `${theme?.colors?.primary || '#3B82F6'}15`,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 6,
-      alignSelf: 'flex-start',
-    },
-    levelText: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: theme?.colors?.primary || '#3B82F6',
-      marginLeft: 4,
-    },
     iconButton: {
       padding: 8,
       backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#1E1E1E' : '#FFFFFF'),
       borderRadius: 20,
-    },
-
-    // Stats - 整体卡片容器
-    // statsContainer: { ... }, // 已删除
-    // statsRow: { ... }, // 已删除
-    // statCard: { ... }, // 已删除
-    // statCardBorder: { ... }, // 已删除
-    // statIconCircle: { ... }, // 已删除
-    // statValue: { ... }, // 已删除
-    // statLabel: { ... }, // 已删除
-
-    // Menu - 新的分组布局
-    menuGroupContainer: {
-      marginBottom: 20,
-    },
-    menuGroupCard: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
-      borderRadius: 12,
-      overflow: 'hidden',
-      // 投影效果
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-    },
-    menuDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
-      marginHorizontal: 14,
-    },
-    menuLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    menuIconBox: {
-      width: 36,
-      height: 36,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 10,
-    },
-    menuText: {
-      ...typography.bodyLarge,
-      fontWeight: '500',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
-    },
-    menuRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    menuValueText: {
-      ...typography.bodySmall,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-      fontWeight: '500',
-    },
-    sectionTitle: {
-      ...typography.titleMedium,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-      marginBottom: 10,
-      marginTop: -5,  // 👈 增加与上方容器的距离
-      textTransform: 'uppercase',
-      letterSpacing: 0.3,
     },
   });
 
