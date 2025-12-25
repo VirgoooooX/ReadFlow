@@ -44,10 +44,13 @@ export class ArticleService {
       // 原因：SQLite 对 UNION ALL 的限制多，改在 JS 做排序更灵活且性能也不差
       const allArticles: Article[] = [];
       
+      // 优化：不查询 content 字段，减少内存占用
+      const columns = 'a.id, a.title, a.title_cn, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
+
       // 逐个源查询（利用 Promise.all 并行查询）
       const queries = sources.map(source =>
         this.databaseService.executeQuery(
-          `SELECT a.*, r.title as source_title, r.url as source_url 
+          `SELECT ${columns}, r.title as source_title, r.url as source_url 
            FROM articles a 
            LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
            WHERE a.rss_source_id = ${source.id} 
@@ -130,8 +133,11 @@ export class ArticleService {
 
       params.push(limit, offset);
 
+      // 优化：不查询 content 字段
+      const columns = 'a.id, a.title, a.title_cn, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
+
       const results = await this.databaseService.executeQuery(
-        `SELECT a.*, r.title as source_title, r.url as source_url 
+        `SELECT ${columns}, r.title as source_title, r.url as source_url 
          FROM articles a 
          LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
          WHERE ${whereClause} 
@@ -200,8 +206,11 @@ export class ArticleService {
 
       params.push(limit, offset);
 
+      // 优化：不查询 content 字段
+      const columns = 'a.id, a.title, a.title_cn, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
+
       const results = await this.databaseService.executeQuery(
-        `SELECT a.*, r.title as source_title, r.url as source_url 
+        `SELECT ${columns}, r.title as source_title, r.url as source_url 
          FROM articles a 
          LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
          WHERE ${whereClause} 
@@ -446,8 +455,11 @@ export class ArticleService {
     try {
       const { limit = 20, offset = 0 } = options;
       
+      // 优化：不查询 content 字段
+      const columns = 'a.id, a.title, a.title_cn, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
+
       const results = await this.databaseService.executeQuery(
-        `SELECT a.*, r.title as source_title, r.url as source_url 
+        `SELECT ${columns}, r.title as source_title, r.url as source_url 
          FROM articles a 
          LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
          WHERE a.tags LIKE ? 
@@ -667,8 +679,11 @@ export class ArticleService {
    */
   public async getCurrentlyReading(limit: number = 5): Promise<Article[]> {
     try {
+      // 优化：不查询 content 字段
+      const columns = 'a.id, a.title, a.title_cn, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
+
       const results = await this.databaseService.executeQuery(
-        `SELECT a.*, r.title as source_title, r.url as source_url 
+        `SELECT ${columns}, r.title as source_title, r.url as source_url 
          FROM articles a 
          LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
          WHERE a.read_progress > 0 AND a.read_progress < 100

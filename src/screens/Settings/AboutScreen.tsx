@@ -4,10 +4,15 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { APP_VERSION, APP_INFO } from '../../constants/appVersion';
+import { 
+  SettingItem, 
+  SettingSection 
+} from '../../components/ui';
 
 const AboutScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
@@ -29,36 +34,63 @@ const AboutScreen: React.FC = () => {
         </View>
 
         {/* 版本信息 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>版本信息</Text>
-          <View style={styles.card}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>版本号</Text>
-              <Text style={styles.infoValue}>{APP_VERSION.version}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>构建号</Text>
-              <Text style={styles.infoValue}>{APP_VERSION.buildNumber}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>更新时间</Text>
-              <Text style={styles.infoValue}>{APP_VERSION.updateTime}</Text>
-            </View>
-          </View>
-        </View>
+        <SettingSection title="版本信息">
+          <SettingItem
+            label="版本号"
+            valueText={APP_VERSION.version}
+            showArrow={false}
+          />
+          <SettingItem
+            label="构建号"
+            valueText={APP_VERSION.buildNumber.toString()}
+            showArrow={false}
+          />
+          <SettingItem
+            label="更新时间"
+            valueText={APP_VERSION.updateTime}
+            showArrow={false}
+            isLast
+          />
+        </SettingSection>
 
         {/* 更新内容 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>更新内容</Text>
-          <View style={styles.card}>
-            {APP_VERSION.changelog.map((item, index) => (
-              <View key={index} style={styles.changelogItem}>
-                <MaterialIcons name="check-circle" size={18} color={theme?.colors?.primary} />
-                <Text style={styles.changelogText}>{item}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        <SettingSection title="最近更新">
+          {APP_VERSION.changelog.map((item, index) => (
+            <SettingItem
+              key={index}
+              label={item}
+              showArrow={false}
+              isLast={index === APP_VERSION.changelog.length - 1}
+              disabled
+            />
+          ))}
+        </SettingSection>
+
+        {/* 其他信息 */}
+        <SettingSection title="更多">
+          <SettingItem
+            icon="public"
+            label="官方网站"
+            onPress={() => Linking.openURL('https://github.com/techflow')}
+            color="#3B82F6"
+          />
+          <SettingItem
+            icon="security"
+            label="隐私政策"
+            onPress={() => {}}
+            color="#10B981"
+          />
+          <SettingItem
+            icon="description"
+            label="用户协议"
+            onPress={() => {}}
+            color="#F59E0B"
+            isLast
+          />
+        </SettingSection>
+
+        {/* 底部留白 */}
+        <View style={{ height: 20 }} />
       </View>
     </ScrollView>
   );
@@ -115,58 +147,6 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: theme?.colors?.primary || '#3B82F6',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-      marginBottom: 10,
-      marginTop: -5,  // 👈 增加与上方容器的距离
-      textTransform: 'uppercase',
-      letterSpacing: 0.3,
-  },
-  card: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
-    borderRadius: 12,
-    padding: 14,
-    // 投影效果
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
-  },
-  changelogItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 5,
-    gap: 10,
-  },
-  changelogText: {
-    flex: 1,
-    fontSize: 13,
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
-    lineHeight: 18,
   },
 });
 

@@ -393,7 +393,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   serverCard: {
     backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
     borderRadius: 12,
-    padding: 14,
+    padding: 10,
     borderWidth: 2,
     borderColor: 'transparent',
     // 投影效果
@@ -489,7 +489,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
-    padding: 14,
+    padding: 10,
     borderRadius: 12,
     gap: 12,
     // 投影效果
@@ -525,7 +525,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   infoBox: {
     backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
-    padding: 14,
+    padding: 10,
     borderRadius: 12,
     gap: 14,
     // 投影效果

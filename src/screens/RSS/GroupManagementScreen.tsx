@@ -533,7 +533,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 14,
   },
   menuDivider: {
@@ -547,9 +547,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
   },
   menuIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,

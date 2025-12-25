@@ -9,6 +9,7 @@ import { SettingsService } from '../SettingsService';
 import { localRSSService } from './LocalRSSService';
 import { proxyRSSService } from './ProxyRSSService';
 import { logger } from './RSSUtils';
+import { InteractionManager } from 'react-native';
 
 export class RSSService {
   private static instance: RSSService;
@@ -435,27 +436,34 @@ export class RSSService {
 
     const tasks = sources.map(source => 
       limiter(() => 
-        this.fetchArticlesFromSource(source)
-          .then((articles) => {
-            success++;
-            totalArticles += articles.length;
-            completed++;
-            
-            if (onArticlesReady && articles.length > 0) {
-              onArticlesReady(articles, source.name);
-            }
-            
-            onProgress?.(completed, sources.length, source.name);
-          })
-          .catch((error) => {
-            failed++;
-            completed++;
-            const errorMsg = error.message || '未知错误';
-            errors.push({ source: source.name, error: errorMsg });
-            
-            onError?.(error, source.name);
-            onProgress?.(completed, sources.length, source.name);
-          })
+        new Promise<void>((resolve, reject) => {
+          InteractionManager.runAfterInteractions(() => {
+            this.fetchArticlesFromSource(source)
+              .then((articles) => {
+                success++;
+                totalArticles += articles.length;
+                completed++;
+                
+                if (onArticlesReady && articles.length > 0) {
+                  onArticlesReady(articles, source.name);
+                }
+                
+                onProgress?.(completed, sources.length, source.name);
+                resolve();
+              })
+              .catch((error) => {
+                failed++;
+                completed++;
+                const errorMsg = error.message || '未知错误';
+                errors.push({ source: source.name, error: errorMsg });
+                
+                onError?.(error, source.name);
+                onProgress?.(completed, sources.length, source.name);
+                // 即使失败也 resolve，避免中断整个 Promise.all
+                resolve(); 
+              });
+          });
+        })
       )
     );
 

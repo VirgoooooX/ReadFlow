@@ -100,3 +100,5 @@ out/
 .gitignore
 .trae/documents/分组增强与问题修复开发计划.md
 .qoder/quests/group-feature-enhancement-and-issues-fix.md
+.trae/documents/深度项目复盘与性能优化建议.md
+.trae/documents/UI_UX 深度优化与风格统一.md

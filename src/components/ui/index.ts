@@ -24,6 +24,14 @@ export {
   type CleanButtonSize,
 } from './CleanButton';
 
+// 设置选项组件
+export {
+  SettingItem,
+  SettingSliderItem,
+  SettingGroup,
+  SettingSection,
+} from './SettingItem';
+
 // 卡片组件
 export {
   Card,
@@ -106,13 +114,5 @@ export {
   type CleanInputSize,
 } from './CleanInput';
 
-// 默认导出（可选）
-export default {
-  Button,
-  Card,
-  TextInput,
-  CleanButton,
-  CleanCard,
-  CleanText,
-  CleanInput,
-};
+// 导出类型 (如果需要)
+// export type { ... } from './...';

@@ -1084,7 +1084,8 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
   menuBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,

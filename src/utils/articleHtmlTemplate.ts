@@ -368,27 +368,48 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     /* 引用块优化 */
     blockquote {
       margin: 2em 0;
-      padding: 16px 20px;
+      padding: 10px 10px;
       background-color: var(--color-blockquote-bg);
-      border-left: 4px solid var(--color-blockquote-border);
-      border-radius: 4px;
-      font-family: "Georgia", serif;
-      font-style: italic;
+      border-left: 3px solid var(--color-blockquote-border);
+      border-radius: 8px;
+      font-style: normal;
+      line-height: 1.75;
       color: var(--color-text);
     }
     
     blockquote p {
-      margin: 0.5em 0;
+      margin: 0.8em 0;
+    }
+
+    blockquote > :first-child {
+      margin-top: 0;
+    }
+
+    blockquote > :last-child {
+      margin-bottom: 0;
+    }
+
+    blockquote cite,
+    blockquote footer {
+      display: block;
+      margin-top: 12px;
+      font-size: 0.85em;
+      color: var(--color-secondary);
+      text-align: right;
     }
     
     /* 代码 */
     code {
-      font-family: 'Courier New', Courier, monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 0.9em;
       background-color: var(--color-code-bg);
       color: var(--color-code-text);
       padding: 2px 6px;
       border-radius: 4px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
 
     pre {
@@ -397,11 +418,19 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       background-color: var(--color-code-bg);
       border-radius: 8px;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--color-table-border);
+      line-height: 1.5;
+      tab-size: 2;
     }
 
     pre code {
       padding: 0;
       background-color: transparent;
+      overflow-wrap: normal;
+      word-break: normal;
+      -webkit-box-decoration-break: slice;
+      box-decoration-break: slice;
     }
     
     /* 表格 */
