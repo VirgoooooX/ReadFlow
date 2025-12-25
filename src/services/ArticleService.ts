@@ -237,6 +237,37 @@ export class ArticleService {
       console.error('Error marking article as read:', error);
     }
   }
+
+  /**
+   * 标记所有（或指定源）文章为已读
+   */
+  public async markAllAsRead(sourceId?: number): Promise<void> {
+    try {
+      await this.databaseService.initializeDatabase();
+      
+      let query = 'UPDATE articles SET is_read = 1, read_progress = 100, read_at = ? WHERE is_read = 0';
+      const params: any[] = [new Date().toISOString()];
+      
+      if (sourceId !== undefined) {
+        query += ' AND rss_source_id = ?';
+        params.push(sourceId);
+      }
+      
+      await this.databaseService.executeStatement(query, params);
+      
+      if (sourceId !== undefined) {
+        await this.updateSourceStats(sourceId);
+        cacheEventEmitter.clearSourceArticles(sourceId);
+      } else {
+        // 更新所有源的统计为 0
+        await this.databaseService.executeStatement('UPDATE rss_sources SET unread_count = 0');
+        cacheEventEmitter.updateRSSStats();
+        cacheEventEmitter.clearArticles();
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  }
   
   /**
    * 更新 RSS 源统计信息 (已读计数)

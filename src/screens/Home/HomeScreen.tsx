@@ -8,8 +8,8 @@ import {
   Image,
   useWindowDimensions,
   TouchableOpacity,
-  Platform, // 新增
   ActivityIndicator, // 【新增】用于加载更多指示器
+  Modal, // 新增
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,6 +25,8 @@ import type { Article } from '../../types';
 import CustomTabBar from '../../components/CustomTabBar';
 import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
 import { useSharedValue } from 'react-native-reanimated';
+import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
+import { Alert, ToastAndroid, Platform } from 'react-native'; // 新增 Alert, ToastAndroid, Platform
 
 // 🔥 防盗链域名列表
 const ANTI_HOTLINK_DOMAINS = [
@@ -145,11 +147,14 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl
 
       {/* 图片区域：固定尺寸，右侧展示 */}
       {imageUri && (
-        <Image
-          source={{ uri: imageUri }}
-          style={styles.articleImage}
-          resizeMode="cover"
-        />
+        <View style={styles.imageShadowWrapper}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.articleImage}
+            />
+          </View>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -169,6 +174,8 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   onLoadMore, // 【新增】加载更多回调
   isLoadingMore, // 【新增】加载更多状态
   hasMore, // 【新增】是否还有更多
+  autoMarkReadOnScroll, // 【新增】滚动自动标记已读
+  onMarkRead, // 【新增】标记已读回调
 }: any, ref: React.Ref<any>) {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
   const flatListRef = useRef<FlatList>(null);
@@ -177,8 +184,31 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   // 🌟 中間层优化：传入 isNeighbor 下，得以组件本身接收 props
   const hasTriedLoad = useRef(false);
 
-  // 【删除】不再需要跟踪可见项和滚动位置
-  
+  // 【新增】滚动自动标记已读逻辑
+  const onViewableItemsChanged = useCallback(({ changed, viewableItems }: any) => {
+    if (!autoMarkReadOnScroll) return;
+
+    const firstViewable = viewableItems[0];
+    if (!firstViewable) return;
+
+    changed.forEach((change: any) => {
+      // 如果项变为不可见，且未读，且在当前可视区域上方（index更小）
+      if (!change.isViewable && !change.item.isRead && change.index < firstViewable.index) {
+        // 静默标记为已读
+        articleService.markAsRead(change.item.id).catch(err => console.error('Auto mark read failed:', err));
+        // 通知父组件更新UI
+        if (onMarkRead) {
+          onMarkRead(change.item.id);
+        }
+      }
+    });
+  }, [autoMarkReadOnScroll, onMarkRead]);
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 0, // 完全移出视口才触发
+    minimumViewTime: 100, // 停留一小会儿才算（防止快速滑动误触，可选）
+  }).current;
+
   // 【简化】直接滚动到指定文章，不做任何检查
   React.useImperativeHandle(ref, () => ({
     scrollToArticleId: (articleId: number) => {
@@ -192,6 +222,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   }), [articles]);
   
   // 【删除】不再需要 onViewableItemsChanged 和 handleScroll
+  // -> 恢复用于 autoMarkReadOnScroll
 
   // 🌟 优化点：仅当是主页面或预加载时才渲染内容
   if (!isActive && !isNeighbor) return <View style={styles.lazyPlaceholder} />;
@@ -203,6 +234,8 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       keyExtractor={(item, index) => `${item.id}-${index}`}
       contentContainerStyle={styles.articleListContainer}
       showsVerticalScrollIndicator={false}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
       getItemLayout={(data, index) => ({
         length: ITEM_HEIGHT,
         offset: ITEM_HEIGHT * index,
@@ -279,7 +312,8 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
   const [proxyServerUrl, setProxyServerUrl] = useState<string>(''); // 🔥 新增
-  
+  const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+
   // 【重构】每个标签页独立管理文章数据和分页状态
   const [tabDataMap, setTabDataMap] = useState<Map<string, {
     articles: Article[];
@@ -324,28 +358,51 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       const limit = 15;
       
       let newArticles: Article[];
+
+      // 【新增】构建过滤条件
+      const filterOptions: any = {
+        limit,
+        offset,
+        sortBy: 'published_at',
+        sortOrder: 'DESC',
+      };
+      
+      if (showOnlyUnread) {
+        filterOptions.isRead = false;
+      }
       
       // 根据 tabKey 决定加载哪个源的数据
       if (tabKey === 'all') {
         // 全部标签：加载所有源的文章
         newArticles = await articleService.getArticles({
-          limit,
-          offset,
-          sortBy: 'published_at',
-          sortOrder: 'DESC',
+          ...filterOptions
         });
       } else if (tabKey.startsWith('source-')) {
         // 特定源标签：加载该源的文章
         const sourceId = parseInt(tabKey.replace('source-', ''), 10);
         newArticles = await articleService.getArticles({
           rssSourceId: sourceId,
-          limit,
-          offset,
-          sortBy: 'published_at',
-          sortOrder: 'DESC',
+          ...filterOptions
         });
       } else {
         newArticles = [];
+      }
+
+      // 2. 检查是否有新内容（Head Check 优化）
+      if (!append && tabData.articles.length > 0 && newArticles.length > 0) {
+        const latestExistingId = tabData.articles[0].id;
+        const latestNewId = newArticles[0].id;
+        
+        if (latestExistingId === latestNewId) {
+          console.log(`[LoadArticles] Tab ${tabKey}: 无新内容 (Head ID: ${latestExistingId})，跳过刷新`);
+          
+          if (Platform.OS === 'android') {
+             ToastAndroid.show('已经是最新内容了', ToastAndroid.SHORT);
+          }
+          
+          setIsRefreshing(false); // 确保结束下拉刷新状态
+          return; // 🔥 直接结束，不更新 State，避免闪烁
+        }
       }
       
       // 更新该标签的数据
@@ -555,6 +612,30 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           // RSS统计更新：不需要刷新文章列表，只是统计数据变更
           console.log('[HomeScreen] 📊 收到RSS统计更新事件');
           break;
+          
+        case 'articleRead':
+          // 单篇文章标记为已读：更新本地状态，避免刷新列表
+          if (eventData.articleId) {
+            const id = eventData.articleId;
+            console.log(`[HomeScreen] 📖 收到文章已读事件: ${id}`);
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              
+              // 遍历所有 tab，找到包含该文章的列表并更新
+              for (const [key, data] of updated.entries()) {
+                const articleIndex = data.articles.findIndex(a => a.id === id);
+                if (articleIndex !== -1) {
+                  // 创建新的文章数组
+                  const newArticles = [...data.articles];
+                  newArticles[articleIndex] = { ...newArticles[articleIndex], isRead: true };
+                  updated.set(key, { ...data, articles: newArticles });
+                  console.log(`[HomeScreen] ✅ 更新了 Tab ${key} 中的文章状态`);
+                }
+              }
+              return updated;
+            });
+          }
+          break;
       }
     });
     
@@ -565,13 +646,32 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     const { shouldScroll, articleId, shouldRefresh } = getPendingScrollInfo();
     console.log('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId, 'shouldRefresh:', shouldRefresh);
     
-    // 【新增】如果从详情页返回，刷新当前标签的数据以更新已读状态
-    if (shouldRefresh) {
-      const currentRoute = routes[index];
-      if (currentRoute) {
-        console.log('[HomeScreen] Refreshing articles after returning from detail page');
-        loadArticles(currentRoute.key, false);
+    const currentRoute = routes[index];
+    
+    // 定义滚动操作
+    const performScroll = () => {
+      if (shouldScroll && articleId !== null && currentRoute) {
+        console.log('[HomeScreen] Article was switched, scrolling to:', articleId);
+        const sceneRef = sceneRefsMap.get(currentRoute.key);
+        if (sceneRef) {
+          // 延时确保列表渲染完成
+          setTimeout(() => {
+            sceneRef.scrollToArticleId(articleId);
+          }, 200);
+        }
       }
+    };
+
+    // 【新增】如果从详情页返回，刷新当前标签的数据以更新已读状态
+    if (shouldRefresh && currentRoute) {
+      console.log('[HomeScreen] Refreshing articles after returning from detail page');
+      loadArticles(currentRoute.key, false).then(() => {
+        // 刷新完成后再滚动
+        performScroll();
+      });
+    } else {
+      // 不需要刷新，直接滚动
+      performScroll();
     }
     
     // 🔀 检查是否从订阅源管理页穿透过来
@@ -593,21 +693,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       // 清除参数，避免重复触发
       navigation.setParams({ sourceId: null, sourceName: null } as any);
       return;
-    }
-    
-    if (shouldScroll && articleId !== null) {
-      console.log('[HomeScreen] Article was switched, scrolling to:', articleId);
-      // 直接调用当前 tab 的 scene ref 滚动
-      const currentRoute = routes[index];
-      if (currentRoute) {
-        const sceneRef = sceneRefsMap.get(currentRoute.key);
-        if (sceneRef) {
-          // 使用 setImmediate 确保 scene 已经渲染
-          setImmediate(() => {
-            sceneRef.scrollToArticleId(articleId);
-          });
-        }
-      }
     }
   }, [index, routes, sceneRefsMap, navigation, route]));
 
@@ -702,6 +787,32 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           isRefreshing={isRefreshing && index === tabIndex}
           onRefresh={handleRefresh}
           onArticlePress={(id: number) => {
+            // 立即在本地标记为已读（乐观更新），无需等待返回刷新
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              const currentData = updated.get(route.key);
+              if (currentData) {
+                const newArticles = currentData.articles.map(a => 
+                  a.id === id ? { ...a, isRead: true } : a
+                );
+                updated.set(route.key, { ...currentData, articles: newArticles });
+              }
+              // 同时更新"全部"标签中的状态
+              if (route.key !== 'all' && updated.has('all')) {
+                const allData = updated.get('all');
+                if (allData) {
+                  const newAllArticles = allData.articles.map(a => 
+                    a.id === id ? { ...a, isRead: true } : a
+                  );
+                  updated.set('all', { ...allData, articles: newAllArticles });
+                }
+              }
+              return updated;
+            });
+
+            // 异步调用服务标记已读
+            articleService.markAsRead(id).catch(e => console.error('Failed to mark read:', e));
+
             const currentIndex = articleIds.indexOf(id);
             setLastViewedArticleId(id);
             navigation.navigate('ArticleDetail', { 
@@ -718,29 +829,159 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           onLoadMore={() => handleLoadMore(route.key)}
           isLoadingMore={tabData.isLoadingMore}
           hasMore={tabData.hasMore}
+          autoMarkReadOnScroll={settings?.autoMarkReadOnScroll}
+          onMarkRead={(id: number) => {
+            setTabDataMap(prev => {
+              const updated = new Map(prev);
+              const currentData = updated.get(route.key);
+              if (currentData) {
+                const newArticles = currentData.articles.map(a => 
+                  a.id === id ? { ...a, isRead: true } : a
+                );
+                updated.set(route.key, { ...currentData, articles: newArticles });
+              }
+              // 同时更新"全部"标签中的状态
+              if (route.key !== 'all' && updated.has('all')) {
+                const allData = updated.get('all');
+                if (allData) {
+                  const newAllArticles = allData.articles.map(a => 
+                    a.id === id ? { ...a, isRead: true } : a
+                  );
+                  updated.set('all', { ...allData, articles: newAllArticles });
+                }
+              }
+              return updated;
+            });
+          }}
         />
       </View>
     );
-  }, [routes, loadedTabs, isRefreshing, index, handleRefresh, isDark, theme, navigation, screenWidth, tabDataMap, handleLoadMore, getTabData]);
+  }, [routes, loadedTabs, isRefreshing, index, handleRefresh, isDark, theme, navigation, screenWidth, tabDataMap, handleLoadMore, getTabData, settings]);
+
+  const handleMarkAllRead = useCallback(async () => {
+    Alert.alert(
+      '全部标记已读',
+      '确定要将当前列表中的所有文章标记为已读吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确定',
+          onPress: async () => {
+            try {
+              const currentRoute = routes[index];
+              let sourceId: number | undefined;
+              
+              if (currentRoute.key.startsWith('source-')) {
+                sourceId = parseInt(currentRoute.key.replace('source-', ''), 10);
+              }
+              
+              await articleService.markAllAsRead(sourceId);
+              
+              // 刷新列表
+              setTabDataMap(new Map());
+              loadArticles(currentRoute.key, false);
+            } catch (error) {
+              console.error('Mark all read failed:', error);
+            }
+          }
+        }
+      ]
+    );
+  }, [index, routes, loadArticles]);
+
+  const toggleShowOnlyUnread = useCallback(() => {
+    setShowOnlyUnread(prev => !prev);
+  }, []);
+
+  // 监听过滤条件变化重新加载
+  useEffect(() => {
+    setTabDataMap(new Map());
+    const currentRoute = routes[index];
+    if (currentRoute) {
+      loadArticles(currentRoute.key, false);
+    }
+  }, [showOnlyUnread]);
 
   return (
-    <View style={styles.container}>
-      <CustomTabBar
-        tabs={routes}
-        scrollX={scrollX}
-        screenWidth={screenWidth}
-        activeIndex={index}
-        onTabPress={handleTabPress}
-      />
-      <CustomTabContent
-        ref={tabContentRef}
-        tabs={routes}
-        renderScene={renderScene}
-        scrollX={scrollX}
-        onIndexChange={handleIndexChange}
-        initialIndex={0}
-      />
-    </View>
+    <ScreenWithCustomHeader
+      title="文章"
+      showBackButton={false}
+      rightComponent={
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          height: '100%', 
+          paddingRight: 12, 
+          marginTop: -1.5 
+        }}>
+          <TouchableOpacity
+            onPress={toggleShowOnlyUnread}
+            style={{ 
+              width: 24, 
+              height: 24, 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              borderRadius: 10,
+              marginRight: 10,
+              // 描边风格
+              borderWidth: 2,
+              borderColor: showOnlyUnread ? (isDark ? theme.colors.primary : '#FFFFFF') : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'),
+              backgroundColor: showOnlyUnread ? (isDark ? theme.colors.primary : '#FFFFFF') : 'transparent',
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+          >
+            <MaterialIcons 
+              name={showOnlyUnread ? "filter-list" : "filter-list-off"} 
+              size={18} 
+              color={showOnlyUnread ? (isDark ? theme.colors.onPrimary : theme.colors.primary) : (isDark ? theme.colors.onSurfaceVariant : '#FFFFFF')} 
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleMarkAllRead}
+            style={{ 
+              width: 24, 
+              height: 24, 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              borderRadius: 10,
+              // 描边风格
+              borderWidth: 2,
+              borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)',
+              backgroundColor: 'transparent',
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+          >
+            <MaterialIcons 
+              name="done-all" 
+              size={18} 
+              color={isDark ? theme.colors.onSurface : '#FFFFFF'} 
+            />
+          </TouchableOpacity>
+        </View>
+      }
+    >
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <CustomTabBar
+            tabs={routes}
+            scrollX={scrollX}
+            screenWidth={screenWidth}
+            activeIndex={index}
+            onTabPress={handleTabPress}
+          />
+        </View>
+        
+        <CustomTabContent
+          ref={tabContentRef}
+          tabs={routes}
+          renderScene={renderScene}
+          scrollX={scrollX}
+          onIndexChange={handleIndexChange}
+          initialIndex={0}
+        />
+      </View>
+    </ScreenWithCustomHeader>
   );
 };
 
@@ -750,6 +991,50 @@ const createStyles = (isDark: boolean, theme: any) =>
     container: {
       flex: 1,
       backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      // 移除 paddingHorizontal 和高度限制，让 TabBar 撑开
+    },
+    menuButton: {
+      paddingHorizontal: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-end',
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingRight: 10,
+    },
+    menuContainer: {
+      width: 160,
+      borderRadius: 8,
+      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      paddingVertical: 4,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+    },
+    menuText: {
+      marginLeft: 12,
+      fontSize: 16,
+    },
+    menuDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+      marginHorizontal: 12,
     },
     lazyPlaceholder: {
       flex: 1,
@@ -839,14 +1124,31 @@ const createStyles = (isDark: boolean, theme: any) =>
       ...typography.bodySmall,
       color: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
     },
-    // 图片样式
-    articleImage: {
+    // 图片容器
+    imageShadowWrapper: {
       width: 80,
       height: 80,
       borderRadius: 12,
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
-      borderWidth: 0.5,
-      borderColor: theme?.colors?.outlineVariant || 'rgba(0,0,0,0.05)',
+      backgroundColor: isDark ? 'transparent' : theme?.colors?.surface, // 必须有背景色阴影才会生效
+      // iOS 阴影
+      shadowColor: isDark ? '#000000' : (theme?.colors?.primary || '#000000'),
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.6 : 0.25,
+      shadowRadius: 8,
+      // Android 阴影
+      elevation: 6,
+    },
+    imageContainer: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 12,
+      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#36343B' : '#F2F0F4'),
+      overflow: 'hidden',
+    },
+    articleImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
     },
     // 空状态
     emptyContainer: {

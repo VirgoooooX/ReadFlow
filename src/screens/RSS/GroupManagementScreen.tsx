@@ -14,6 +14,7 @@ import { useThemeContext } from '../../theme';
 import { typography } from '../../theme/typography';
 import { useNavigation } from '@react-navigation/native';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
+import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { RSSGroup } from '../../types';
 import CreateGroupModal from '../../components/CreateGroupModal';
 
@@ -21,6 +22,7 @@ const GroupManagementScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation();
   const { groups, createGroup, updateGroup, deleteGroup, refreshGroups } = useRSSGroup();
+  const { rssSources } = useRSSSource();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<RSSGroup | null>(null);
@@ -68,7 +70,7 @@ const GroupManagementScreen: React.FC = () => {
           onPress: async () => {
             try {
               await deleteGroup(group.id, false);
-              Alert.alert('删除成功', '分组已删除，源已移至未分组');
+              Alert.alert('删除成功', '分组已删除，源已移至默认分组');
             } catch (error) {
               console.error('Failed to delete group:', error);
               Alert.alert('删除失败', '删除分组时发生错误');
@@ -94,6 +96,10 @@ const GroupManagementScreen: React.FC = () => {
 
   const styles = createStyles(isDark, theme);
 
+  // 计算默认分组统计
+  const uncategorizedSources = rssSources.filter(s => !s.groupId);
+  const uncategorizedCount = uncategorizedSources.length;
+
   // 分组标题组件
   const SectionTitle = ({ title }: { title: string }) => (
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -115,14 +121,6 @@ const GroupManagementScreen: React.FC = () => {
               <Text style={styles.statText}>
                 {group.sourceCount || 0} 个源
               </Text>
-              {(group.unreadCount || 0) > 0 && (
-                <>
-                  <Text style={styles.statDivider}>·</Text>
-                  <Text style={[styles.statText, { color: theme?.colors?.error || '#EF4444' }]}>
-                    {group.unreadCount} 篇未读
-                  </Text>
-                </>
-              )}
             </View>
           </View>
         </View>
@@ -161,7 +159,7 @@ const GroupManagementScreen: React.FC = () => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* 分组列表 */}
         <View style={styles.menuGroupContainer}>
-          <SectionTitle title={`我的分组 (${groups.length})`} />
+          <SectionTitle title={`我的分组 (${groups.length + 1})`} />
           <View style={styles.menuGroupCard}>
             {groups.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -170,7 +168,7 @@ const GroupManagementScreen: React.FC = () => {
                   size={48}
                   color={theme?.colors?.onSurfaceVariant || '#999'}
                 />
-                <Text style={styles.emptyText}>暂无分组</Text>
+                <Text style={styles.emptyText}>暂无自定义分组</Text>
                 <Text style={styles.emptyHint}>点击下方按钮创建您的第一个分组</Text>
               </View>
             ) : (
@@ -178,10 +176,34 @@ const GroupManagementScreen: React.FC = () => {
                 <GroupMenuItem
                   key={group.id}
                   group={group}
-                  isLast={index === groups.length - 1}
+                  isLast={false}
                 />
               ))
             )}
+
+            <View style={styles.menuDivider} />
+
+            {/* 默认分组 */}
+            <View style={styles.menuItem}>
+              <View style={styles.menuLeft}>
+                <View style={[styles.menuIconBox, { backgroundColor: theme?.colors?.surfaceVariant }]}>
+                  <MaterialIcons name="folder-open" size={20} color={theme?.colors?.onSurfaceVariant} />
+                </View>
+                
+                <View style={styles.groupInfo}>
+                  <Text style={styles.menuText}>默认</Text>
+                  <View style={styles.groupStats}>
+                    <Text style={styles.statText}>
+                      {uncategorizedCount} 个源
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.menuRight}>
+                 <Text style={[styles.statText, { fontSize: 12, color: theme?.colors?.outline, marginRight: 8 }]}>系统默认</Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -268,6 +290,12 @@ const PRESET_COLORS = [
   '#C77700', // Orange
   '#BA1A1A', // Red
   '#8E4585', // Pink
+  '#00696C', // Teal
+  '#3949AB', // Indigo
+  '#7CB342', // Lime
+  '#FFA000', // Amber
+  '#F4511E', // Deep Orange
+  '#6D4C41', // Brown
 ];
 
 const EditGroupModal: React.FC<EditGroupModalProps> = ({

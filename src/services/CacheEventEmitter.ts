@@ -11,6 +11,7 @@
  * - refreshAllSources: 所有源刷新完成
  * - sourceDeleted: 源被删除（带 sourceId）
  * - sourceUpdated: 源被更新（带 sourceId）
+ * - articleRead: 文章标记为已读（带 articleId）
  */
 
 // 事件类型定义
@@ -22,13 +23,15 @@ export type CacheEventType =
   | 'refreshSource'
   | 'refreshAllSources'
   | 'sourceDeleted'
-  | 'sourceUpdated';
+  | 'sourceUpdated'
+  | 'articleRead';
 
 // 事件数据接口
 export interface CacheEventData {
   type: CacheEventType;
   sourceId?: number;  // 可选的源ID，用于细粒度操作
   sourceName?: string; // 可选的源名称，用于日志
+  articleId?: number; // 可选的文章ID，用于单篇文章操作
 }
 
 // 监听函数类型
@@ -92,6 +95,14 @@ class CacheEventEmitter {
    */
   clearArticles(): void {
     this.emit({ type: 'clearArticles' });
+  }
+
+  /**
+   * 文章标记为已读
+   * @param articleId 文章ID
+   */
+  emitArticleRead(articleId: number): void {
+    this.emit({ type: 'articleRead', articleId });
   }
 
   /**

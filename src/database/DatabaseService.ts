@@ -142,6 +142,7 @@ export class DatabaseService {
         { name: 'source_mode', sql: 'ALTER TABLE rss_sources ADD COLUMN source_mode TEXT DEFAULT "direct"' },
         { name: 'group_id', sql: 'ALTER TABLE rss_sources ADD COLUMN group_id INTEGER' },
         { name: 'group_sort_order', sql: 'ALTER TABLE rss_sources ADD COLUMN group_sort_order INTEGER DEFAULT 0' },
+        { name: 'max_articles', sql: 'ALTER TABLE rss_sources ADD COLUMN max_articles INTEGER DEFAULT 20' },
       ];
 
       for (const column of columnsToAdd) {

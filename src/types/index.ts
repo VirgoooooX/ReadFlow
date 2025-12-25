@@ -50,6 +50,8 @@ export interface RSSSource {
   
   // 🌐 图标相关字段
   iconUrl?: string;              // RSS源图标URL（本地缓存或网络URL）
+  
+  maxArticles?: number;          // 最大文章保留数量
 }
 
 // 📁 RSS分组类型
@@ -70,7 +72,7 @@ export interface RSSGroup {
 // 🆚️ 虚拟分组（前端概念）
 export const VIRTUAL_GROUPS = {
   ALL: { id: -1, name: '全部' },
-  UNCATEGORIZED: { id: 0, name: '未分组' },  // 对应 groupId = NULL
+  UNCATEGORIZED: { id: 0, name: '默认' },  // 对应 groupId = NULL
 } as const;
 
 // 词典相关类型
@@ -154,6 +156,7 @@ export interface ReadingSettings {
   brightness: number;
   showAllTab: boolean;     // 是否显示"全部"标签
   autoRefreshInterval: number; // 后台自动刷新间隔（分钟），0表示关闭自动刷新
+  autoMarkReadOnScroll?: boolean; // 列表滚动自动标记已读
 }
 
 export interface AppSettings {

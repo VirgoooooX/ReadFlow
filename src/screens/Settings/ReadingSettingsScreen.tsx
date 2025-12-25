@@ -25,6 +25,7 @@ const ReadingSettingsScreen: React.FC = () => {
   const [lineHeight, setLineHeight] = useState(1.5);
   const [showAllTab, setShowAllTab] = useState(true);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(10);
+  const [autoMarkReadOnScroll, setAutoMarkReadOnScroll] = useState(false);
   const [showFontDropdown, setShowFontDropdown] = useState(false);
 
   // 从设置中初始化本地状态（仅在首次加载时）
@@ -36,6 +37,7 @@ const ReadingSettingsScreen: React.FC = () => {
       setLineHeight(settings.lineHeight);
       setShowAllTab(settings.showAllTab ?? true);
       setAutoRefreshInterval(settings.autoRefreshInterval ?? 10);
+      setAutoMarkReadOnScroll(settings.autoMarkReadOnScroll ?? false);
       setInitialized(true);
     }
   }, [settings, initialized]);
@@ -157,6 +159,17 @@ const ReadingSettingsScreen: React.FC = () => {
       }
     }, 300, autoRefreshTimeoutRef);
   }, [debounce, updateSetting, settings]);
+
+  // 处理滚动自动标记已读开关
+  const handleAutoMarkReadOnScrollChange = async (value: boolean) => {
+    setAutoMarkReadOnScroll(value);
+    try {
+      await updateSetting('autoMarkReadOnScroll', value);
+    } catch (error) {
+      console.error('Failed to update autoMarkReadOnScroll:', error);
+      setAutoMarkReadOnScroll(!value);
+    }
+  };
 
   // 菜单项组件 - 选择效果借鉴 LLM 设置
   const MenuItem = ({
@@ -354,6 +367,13 @@ const ReadingSettingsScreen: React.FC = () => {
           '显示"全部"标签',
           showAllTab,
           handleShowAllTabChange
+        )}
+
+        {/* 滚动自动标记已读 */}
+        {renderSwitch(
+          '列表滚动自动标记已读',
+          autoMarkReadOnScroll,
+          handleAutoMarkReadOnScrollChange
         )}
 
         {/* 后台自动刷新间隔 */}

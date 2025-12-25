@@ -27,6 +27,7 @@ import { dictionaryService } from '../../services/DictionaryService';
 import { vocabularyService } from '../../services/VocabularyService';
 import { translationService } from '../../services/TranslationService';
 import { SettingsService } from '../../services/SettingsService';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 import type { RootStackParamList } from '../../navigation/types';
 import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
 import { getFontStackForWebView } from '../../theme/typography';
@@ -282,6 +283,7 @@ const ArticleDetailScreen: React.FC = () => {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [vocabularyWords, setVocabularyWords] = useState<string[]>([]); // 单词本单词数组
+  const vocabularyWordsRef = useRef<string[]>([]); // 使用 Ref 存储最新单词列表，避免重渲染
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
   const [webViewReady, setWebViewReady] = useState(false); // WebView 准备就绪
   const [initialScrollY, setInitialScrollY] = useState(0);
@@ -349,17 +351,29 @@ const ArticleDetailScreen: React.FC = () => {
         setArticle(articleData);
         setIsFavorite(articleData?.isFavorite || false);
 
+        // 【新增】更新最后查看的文章ID，用于返回列表时刷新状态
+        setLastViewedArticleId(articleId);
+
         // 【新增】设置滚动位置和生词表
         setInitialScrollY(savedScrollY || 0);
         console.log('[ArticleDetail] Prepared scroll position:', savedScrollY);
 
         const words = vocabularyEntries.map((entry: any) => entry.word.toLowerCase());
         setVocabularyWords(words);
+        vocabularyWordsRef.current = words;
         console.log('[ArticleDetail] Prepared vocabulary words count:', words.length);
+
+// import cacheEventEmitter from '../../services/CacheEventEmitter'; // Removed duplicate import
+
+// ... (existing imports)
+
+// ...
 
         // 自动标记为已读
         if (articleData && !articleData.isRead) {
           articleService.markAsRead(articleId);
+          // 立即通知列表更新状态
+          cacheEventEmitter.emitArticleRead(articleId);
         }
         
         // 【新增】查找下一篇未读文章
@@ -572,9 +586,10 @@ const ArticleDetailScreen: React.FC = () => {
 
       // 更新高亮单词数组
       const newWord = selectedWord.toLowerCase();
-      if (!vocabularyWords.includes(newWord)) {
-        const updatedWords = [...vocabularyWords, newWord];
-        setVocabularyWords(updatedWords);
+      if (!vocabularyWordsRef.current.includes(newWord)) {
+        const updatedWords = [...vocabularyWordsRef.current, newWord];
+        vocabularyWordsRef.current = updatedWords;
+        // setVocabularyWords(updatedWords); // 移除 State 更新以避免 WebView 重载
 
         // 【修改】在添加单词时直接调用注入函数，而不是依赖 useEffect
         if (webViewRef.current) {

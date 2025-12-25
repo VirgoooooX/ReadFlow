@@ -26,6 +26,12 @@ const PRESET_COLORS = [
   '#C77700', // Orange
   '#BA1A1A', // Red
   '#8E4585', // Pink
+  '#00696C', // Teal
+  '#3949AB', // Indigo
+  '#7CB342', // Lime
+  '#FFA000', // Amber
+  '#F4511E', // Deep Orange
+  '#6D4C41', // Brown
 ];
 
 const CreateGroupModal: React.FC<CreateGroupModalProps> = ({

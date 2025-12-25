@@ -276,7 +276,7 @@ const AddRSSSourceScreen: React.FC = () => {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>所属分组（可选）</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                  {/* 未分组选项 */}
+                  {/* 默认分组选项 */}
                   <TouchableOpacity
                     style={[
                       styles.categoryChip,
@@ -288,7 +288,7 @@ const AddRSSSourceScreen: React.FC = () => {
                       styles.categoryChipText,
                       selectedGroupId === null && styles.categoryChipTextSelected
                     ]}>
-                      未分组
+                      默认
                     </Text>
                   </TouchableOpacity>
                   

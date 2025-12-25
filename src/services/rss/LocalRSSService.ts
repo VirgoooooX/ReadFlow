@@ -335,10 +335,18 @@ export class LocalRSSService {
       
       const rss = await parseEnhancedRSS(xmlText);
       
+      // 根据设置截断文章列表
+      const maxArticles = source.maxArticles || 20; // 默认 20 篇
+      const itemsCount = maxArticles > 0 ? Math.min(rss.items.length, maxArticles) : rss.items.length;
+      
+      if (maxArticles > 0 && rss.items.length > maxArticles) {
+        logger.info(`[RSS] 限制文章数量: ${rss.items.length} -> ${maxArticles}`);
+      }
+      
       // 快速解析基本信息，找分界点
       const basicItems: { url: string; title: string; publishedAt: Date; index: number }[] = [];
       
-      for (let i = 0; i < rss.items.length; i++) {
+      for (let i = 0; i < itemsCount; i++) {
         const item = rss.items[i];
         const itemLink = item.links?.[0]?.url || item.id || '';
         

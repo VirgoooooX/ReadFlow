@@ -96,3 +96,7 @@ coverage/
 
 # Production
 out/
+.trae/documents/TechFlowMobile 深度复盘与优化计划.md
+.gitignore
+.trae/documents/分组增强与问题修复开发计划.md
+.qoder/quests/group-feature-enhancement-and-issues-fix.md

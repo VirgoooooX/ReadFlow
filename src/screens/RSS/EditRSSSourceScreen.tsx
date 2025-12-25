@@ -36,6 +36,7 @@ interface FormData {
   contentType: 'text' | 'image_text';
   sourceMode: 'direct' | 'proxy';
   updateFrequency: number;
+  maxArticles: number; // 新增
   isActive: boolean;
 }
 
@@ -43,6 +44,7 @@ interface FormErrors {
   name?: string;
   url?: string;
   category?: string;
+  maxArticles?: string; // 新增
 }
 
 const EditRSSSourceScreen: React.FC = () => {
@@ -64,6 +66,7 @@ const EditRSSSourceScreen: React.FC = () => {
     contentType: 'image_text',
     sourceMode: 'direct',
     updateFrequency: 3600,
+    maxArticles: 20, // 默认 20
     isActive: true,
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -104,6 +107,7 @@ const EditRSSSourceScreen: React.FC = () => {
         contentType: source.contentType || 'image_text',
         sourceMode: source.sourceMode || 'direct',
         updateFrequency: source.updateFrequency || 3600,
+        maxArticles: source.maxArticles || 20,
         isActive: source.isActive,
       });
     } catch (error) {
@@ -412,6 +416,55 @@ const EditRSSSourceScreen: React.FC = () => {
               </View>
             </View>
 
+            {/* 更新频率 */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>更新频率</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                {frequencyOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.categoryChip,
+                      formData.updateFrequency === option.value && styles.categoryChipSelected,
+                    ]}
+                    onPress={() => updateFormData('updateFrequency', option.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        formData.updateFrequency === option.value && styles.categoryChipTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 文章数量限制 */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>文章数量限制</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={String(formData.maxArticles || 0)}
+                  onChangeText={(text) => {
+                    const value = parseInt(text, 10);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFormData('maxArticles', value);
+                    } else if (text === '') {
+                       updateFormData('maxArticles', 0);
+                    }
+                  }}
+                  placeholder="例如: 20"
+                  placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+                  keyboardType="number-pad"
+                />
+              </View>
+              <Text style={styles.proxyHint}>每次抓取保留的最新文章数量 (0为不限制，建议 20-50 篇)</Text>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.label}>描述（可选）</Text>
               <TextInput
@@ -623,10 +676,10 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   cancelButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 24,
     alignItems: 'center' as any,
     justifyContent: 'center' as any,
     ...StyleUtils.createCardStyle(isDark, theme),
+    borderRadius: 24,
   },
   cancelButtonText: {
     fontSize: 16,

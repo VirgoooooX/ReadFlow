@@ -549,6 +549,7 @@ export class SettingsService {
       brightness: 1,
       showAllTab: true,
       autoRefreshInterval: 10, // 默认10分钟自动刷新
+      autoMarkReadOnScroll: false, // 默认关闭滚动自动标记已读
     };
   }
 

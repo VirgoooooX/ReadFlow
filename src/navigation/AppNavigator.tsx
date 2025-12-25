@@ -137,17 +137,9 @@ function HomeStackNavigator() {
     >
       <HomeStack.Screen
         name="HomeMain"
+        component={HomeScreen}
         options={{ title: '文章' }}
-      >
-        {(props) => (
-          <ScreenWithCustomHeader
-            title="文章"
-            showBackButton={false}
-          >
-            <HomeScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </HomeStack.Screen>
+      />
 
       <HomeStack.Screen
         name="Search"

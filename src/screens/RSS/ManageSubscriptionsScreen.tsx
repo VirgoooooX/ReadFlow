@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Vibration,
   BackHandler,
+  Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
@@ -29,6 +30,7 @@ import { VIRTUAL_GROUPS } from '../../types';
 import * as StyleUtils from '../../utils/styleUtils';
 import CustomTabBar from '../../components/CustomTabBar';
 import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
+import GroupSelectionModal from '../../components/GroupSelectionModal';
 import { useSharedValue } from 'react-native-reanimated';
 
 type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
@@ -49,6 +51,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
   // 模式控制：普通浏览 vs 管理模式
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
+  const [showMoveGroupModal, setShowMoveGroupModal] = useState(false);
+  const [activeSourceId, setActiveSourceId] = useState<number | null>(null); // 用于 ActionSheet
+  const [showActionSheet, setShowActionSheet] = useState(false); // ActionSheet 显示状态
 
   // 1. 计算全局统计数据
   const stats = useMemo(() => {
@@ -70,7 +75,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
     const tabs = [
       { key: 'all', title: '全部', groupId: VIRTUAL_GROUPS.ALL.id },
       ...groups.map(g => ({ key: `group-${g.id}`, title: g.name, groupId: g.id })),
-      { key: 'uncategorized', title: '未分组', groupId: VIRTUAL_GROUPS.UNCATEGORIZED.id },
+      { key: 'uncategorized', title: VIRTUAL_GROUPS.UNCATEGORIZED.name, groupId: VIRTUAL_GROUPS.UNCATEGORIZED.id },
     ];
     return tabs;
   }, [groups]);
@@ -137,9 +142,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const handleTabPress = useCallback((tabIndex: number) => {
     setActiveIndex(tabIndex);
     tabContentRef.current?.scrollToIndex(tabIndex);
+    // 编辑模式下切换标签，保持编辑状态和选中项（可选，或者清除选中）
     if (isEditMode) {
-      setIsEditMode(false);
-      setSelectedSources(new Set());
+       // 用户可能想跨分组批量操作，这里暂时不清空
     }
   }, [isEditMode]);
 
@@ -303,44 +308,74 @@ const ManageSubscriptionsScreen: React.FC = () => {
       Alert.alert('提示', '请选择至少一个源');
       return;
     }
+    setShowMoveGroupModal(true);
+  };
 
-    Alert.alert(
-      '移动到分组',
-      `选择目标分组（已选 ${selectedSources.size} 个源）`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '未分组',
-          onPress: async () => {
-            try {
-              await moveSourcesToGroup(Array.from(selectedSources), null);
-              Alert.alert('成功', '已移动到未分组');
-              setIsEditMode(false);
-              setSelectedSources(new Set());
-              await refreshRSSSources();
-            } catch (error) {
-              console.error('Failed to move sources:', error);
-              Alert.alert('失败', '移动源时出现错误');
+  const handleBatchToggleStatus = async () => {
+    if (selectedSources.size === 0) return;
+
+    // 获取选中源的当前状态（如果大部分是开启的，则全部关闭，反之亦然）
+    const sources = rssSources.filter(s => selectedSources.has(s.id));
+    const activeCount = sources.filter(s => s.isActive).length;
+    const shouldActivate = activeCount < sources.length / 2; // 超过一半关闭才开启，否则全部关闭
+
+    try {
+      // 并行更新
+      const updates = sources.map(s => 
+        rssService.updateRSSSource(s.id, { isActive: shouldActivate })
+      );
+      await Promise.all(updates);
+      
+      // 批量刷新
+      await refreshRSSSources();
+      
+      Alert.alert('成功', `已${shouldActivate ? '启用' : '停用'} ${sources.length} 个源`);
+      setIsEditMode(false);
+      setSelectedSources(new Set());
+    } catch (error) {
+      console.error('Batch toggle failed:', error);
+      Alert.alert('操作失败', '无法更新源状态');
+    }
+  };
+
+  const handleBatchRefresh = async () => {
+    if (selectedSources.size === 0) return;
+    
+    Alert.alert('提示', `准备刷新 ${selectedSources.size} 个源，这可能需要一点时间`, [
+      { text: '取消', style: 'cancel' },
+      { 
+        text: '开始刷新', 
+        onPress: async () => {
+          setIsEditMode(false);
+          setSelectedSources(new Set());
+          // 触发批量刷新逻辑 (可以是循环 syncSource 或者专门的 batch API)
+          try {
+            // 这里为了简单，我们循环调用，实际应该有个 batch API
+            for (const id of selectedSources) {
+              await syncSource(id);
             }
-          },
-        },
-        ...groups.map(group => ({
-          text: group.name,
-          onPress: async () => {
-            try {
-              await moveSourcesToGroup(Array.from(selectedSources), group.id);
-              Alert.alert('成功', `已移动到 "${group.name}"`);
-              setIsEditMode(false);
-              setSelectedSources(new Set());
-              await refreshRSSSources();
-            } catch (error) {
-              console.error('Failed to move sources:', error);
-              Alert.alert('失败', '移动源时出现错误');
-            }
-          },
-        })),
-      ]
-    );
+          } catch (e) {
+            console.error(e);
+          }
+        } 
+      }
+    ]);
+  };
+
+  const handleMoveToGroup = async (groupId: number | null) => {
+    try {
+      await moveSourcesToGroup(Array.from(selectedSources), groupId);
+      const groupName = groupId === null ? VIRTUAL_GROUPS.UNCATEGORIZED.name : groups.find(g => g.id === groupId)?.name || '目标分组';
+      Alert.alert('成功', `已移动到 "${groupName}"`);
+      setIsEditMode(false);
+      setSelectedSources(new Set());
+      setShowMoveGroupModal(false);
+      await refreshRSSSources();
+    } catch (error) {
+      console.error('Failed to move sources:', error);
+      Alert.alert('失败', '移动源时出现错误');
+      setShowMoveGroupModal(false);
+    }
   };
 
   const handleBatchDelete = () => {
@@ -406,6 +441,53 @@ const ManageSubscriptionsScreen: React.FC = () => {
     </View>
   );
 
+  const renderToolbar = () => (
+    <View style={styles.toolbar}>
+      {isEditMode ? (
+        <View style={{flexDirection: 'row', alignItems: 'center', height: '100%'}}>
+          <TouchableOpacity 
+             onPress={selectedSources.size === filteredSources.length ? deselectAllSources : selectAllSources}
+             style={{flexDirection: 'row', alignItems: 'center', height: '100%', paddingRight: 8}}
+          >
+            <MaterialIcons 
+               name={selectedSources.size === filteredSources.length ? "check-box" : "check-box-outline-blank"} 
+               size={22} 
+               color={theme.colors.primary} 
+            />
+            <Text style={{fontSize: 16, color: theme.colors.primary, fontWeight: '700', marginLeft: 6}}>
+              全选
+            </Text>
+          </TouchableOpacity>
+          <Text style={{fontSize: 14, color: theme.colors.onSurfaceVariant, marginLeft: 8}}>
+            (已选 {selectedSources.size})
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.sectionTitle}>订阅列表</Text>
+      )}
+
+      <TouchableOpacity 
+        style={styles.manageButton}
+        onPress={() => {
+           if (isEditMode) {
+             setIsEditMode(false);
+             setSelectedSources(new Set());
+           } else {
+             setIsEditMode(true);
+             Vibration.vibrate(50);
+           }
+        }}
+      >
+        <Text style={styles.manageButtonText}>
+          {isEditMode ? '完成' : '批量管理'}
+        </Text>
+        {!isEditMode && <MaterialIcons name="playlist-add-check" size={20} color={theme.colors.primary} style={{marginLeft: 4}} />}
+        {/* 为了保持高度一致，编辑模式下添加一个透明的Icon占位，或者不做处理依靠flex布局 */}
+        {isEditMode && <View style={{width: 24}} />} 
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderDashboard = () => (
     <View style={styles.dashboardContainer}>
       <StatCard icon="rss-feed" value={stats.total} label="总订阅" color={theme.colors.primary} />
@@ -427,7 +509,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
     // 生成伪随机颜色
     const iconColor = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'][source.id % 5];
 
-    // 浏览模式点击 -> 进文章页
+    // 浏览模式点击 -> 进文章页；编辑模式点击 -> 选中
     const handlePress = () => {
       if (isEditMode) {
         toggleSelection(source.id);
@@ -439,35 +521,55 @@ const ManageSubscriptionsScreen: React.FC = () => {
       }
     };
 
+    // 长按 -> 弹出操作菜单 (仅非编辑模式)
+    const handleLongPress = () => {
+      if (!isEditMode) {
+        setActiveSourceId(source.id);
+        setShowActionSheet(true);
+        Vibration.vibrate(50);
+      }
+    };
+
     return (
       <TouchableOpacity
         style={[
           styles.card,
-          isEditMode && isSelected && styles.cardSelected
+          isEditMode && isSelected && styles.cardSelected,
+          // 禁用/停用状态样式
+          !source.isActive && { opacity: 0.6 }
         ]}
         onPress={handlePress}
-        onLongPress={() => !isEditMode && toggleEditMode()}
+        onLongPress={handleLongPress}
         activeOpacity={0.7}
       >
         <View style={styles.cardInner}>
-          {/* 左侧：选择框（编辑模式）或RSS图标（普通模式） */}
+          {/* 左侧图标或 Checkbox */}
           <View style={styles.cardLeft}>
-             {isEditMode ? (
-               <MaterialIcons 
-                 name={isSelected ? "check-circle" : "radio-button-unchecked"} 
-                 size={24} 
-                 color={isSelected ? theme.colors.primary : theme.colors.outline} 
-               />
-             ) : (
-               <View style={[styles.iconBox, { backgroundColor: `${iconColor}15` }]}>
-                 <MaterialIcons name="rss-feed" size={20} color={iconColor} />
-               </View>
-             )}
+            {isEditMode ? (
+              <MaterialIcons 
+                name={isSelected ? "check-circle" : "radio-button-unchecked"} 
+                size={24} 
+                color={isSelected ? theme.colors.primary : theme.colors.outline} 
+              />
+            ) : (
+              <View style={[styles.iconBox, { backgroundColor: `${iconColor}15` }]}>
+                <MaterialIcons name="rss-feed" size={20} color={iconColor} />
+              </View>
+            )}
           </View>
 
           {/* 中间：信息 */}
           <View style={styles.cardCenter}>
-            <Text style={styles.cardTitle} numberOfLines={1}>{source.name}</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+               <Text style={[styles.cardTitle, !source.isActive && {color: theme.colors.outline}]} numberOfLines={1}>
+                 {source.name}
+               </Text>
+               {!source.isActive && (
+                 <View style={styles.inactiveBadge}>
+                   <Text style={styles.inactiveBadgeText}>已停用</Text>
+                 </View>
+               )}
+            </View>
             <View style={styles.cardMetaRow}>
               <Text style={styles.metaText}>
                 {formatTime(source.last_updated)}更新
@@ -475,24 +577,33 @@ const ManageSubscriptionsScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* 右侧：未读数字或交互按钮 */}
+          {/* 右侧：未读数字或排序按钮 */}
           <View style={styles.cardRight}>
             {isEditMode ? (
+              // 编辑模式显示排序箭头
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                 <TouchableOpacity onPress={() => handleMoveSource(source.id, 'up')} disabled={index===0} style={{padding:4}}>
-                   <MaterialIcons name="arrow-upward" size={20} color={theme.colors.outline} />
+                 <TouchableOpacity 
+                   onPress={() => handleMoveSource(source.id, 'up')} 
+                   disabled={index===0} 
+                   style={styles.sortBtn}
+                   hitSlop={{top:10, bottom:10, left:10, right:10}}
+                 >
+                   <MaterialIcons name="arrow-upward" size={20} color={index===0 ? theme.colors.outlineVariant : theme.colors.onSurfaceVariant} />
                  </TouchableOpacity>
-                 <TouchableOpacity onPress={() => handleMoveSource(source.id, 'down')} disabled={index===total-1} style={{padding:4}}>
-                   <MaterialIcons name="arrow-downward" size={20} color={theme.colors.outline} />
-                 </TouchableOpacity>
-                 <TouchableOpacity onPress={() => editSource(source.id)} style={{padding:4, marginLeft:4}}>
-                   <MaterialIcons name="edit" size={20} color={theme.colors.primary} />
+                 <TouchableOpacity 
+                   onPress={() => handleMoveSource(source.id, 'down')} 
+                   disabled={index===total-1} 
+                   style={styles.sortBtn}
+                   hitSlop={{top:10, bottom:10, left:10, right:10}}
+                 >
+                   <MaterialIcons name="arrow-downward" size={20} color={index===total-1 ? theme.colors.outlineVariant : theme.colors.onSurfaceVariant} />
                  </TouchableOpacity>
               </View>
             ) : (
+              // 浏览模式显示未读数或箭头
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                {/* 显示未读计数：醒目的数字徽章 */}
-                {(source.unread_count ?? 0) > 0 && (
+                {/* 显示未读计数 */}
+                {(source.unread_count ?? 0) > 0 && source.isActive && (
                   <View style={[styles.unreadBadge, { backgroundColor: theme.colors.error }]}>
                     <Text style={styles.unreadBadgeText}>
                       {(source.unread_count ?? 0) > 99 ? '99+' : source.unread_count}
@@ -505,37 +616,79 @@ const ManageSubscriptionsScreen: React.FC = () => {
             )}
           </View>
         </View>
-        
-        {/* 管理模式下的额外操作栏 */}
-        {isEditMode && (
-          <View style={styles.editActionBar}>
-             <View style={{flexDirection:'row', alignItems:'center'}}>
-                <Text style={{fontSize:12, color:theme.colors.onSurfaceVariant, marginRight: 8}}>启用</Text>
-                <Switch 
-                  value={source.isActive} 
-                  onValueChange={() => toggleSourceStatus(source.id)}
-                  trackColor={{ false: theme.colors.outlineVariant, true: theme.colors.primary }}
-                  thumbColor={'#FFF'}
-                  style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }} 
-                />
-             </View>
-             
-             <View style={{flexDirection:'row', gap: 12}}>
-                 <TouchableOpacity onPress={() => handleSyncSingleSource(source.id)} style={styles.actionBtnSmall}>
-                    <Text style={{fontSize:12, color: theme.colors.primary}}>刷新</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity onPress={() => clearSourceArticles(source.id)} style={styles.actionBtnSmall}>
-                    <Text style={{fontSize:12, color: theme.colors.onSurfaceVariant}}>清空</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity onPress={() => deleteSource(source.id)} style={[styles.actionBtnSmall, {backgroundColor: theme.colors.errorContainer}]}>
-                    <Text style={{fontSize:12, color: theme.colors.error}}>删除</Text>
-                 </TouchableOpacity>
-             </View>
-          </View>
-        )}
       </TouchableOpacity>
     );
   });
+
+  const SourceActionSheet = ({ sourceId, visible, onClose }: { sourceId: number | null, visible: boolean, onClose: () => void }) => {
+    if (!sourceId || !visible) return null;
+    const source = rssSources.find(s => s.id === sourceId);
+    if (!source) return null;
+
+    const actions = [
+      {
+        icon: 'edit',
+        label: '编辑源',
+        onPress: () => {
+          onClose();
+          editSource(sourceId);
+        }
+      },
+      {
+        icon: 'sync',
+        label: '立即刷新',
+        onPress: () => {
+          onClose();
+          handleSyncSingleSource(sourceId);
+        }
+      },
+      {
+        icon: source.isActive ? 'toggle-on' : 'toggle-off',
+        label: source.isActive ? '停用源' : '启用源',
+        color: source.isActive ? theme.colors.primary : theme.colors.outline,
+        onPress: () => {
+          onClose();
+          toggleSourceStatus(sourceId);
+        }
+      },
+      {
+        icon: 'cleaning-services',
+        label: '清空文章缓存',
+        onPress: () => {
+          onClose();
+          clearSourceArticles(sourceId);
+        }
+      },
+      {
+        icon: 'delete',
+        label: '删除源',
+        color: theme.colors.error,
+        onPress: () => {
+          onClose();
+          setTimeout(() => deleteSource(sourceId), 200);
+        }
+      }
+    ];
+
+    return (
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+          <View style={styles.actionSheetContainer}>
+            <View style={styles.actionSheetHeader}>
+              <Text style={styles.actionSheetTitle} numberOfLines={1}>{source.name}</Text>
+            </View>
+            {actions.map((action, idx) => (
+              <TouchableOpacity key={idx} style={styles.actionSheetItem} onPress={action.onPress}>
+                <MaterialIcons name={action.icon as any} size={24} color={action.color || theme.colors.onSurface} />
+                <Text style={[styles.actionSheetText, action.color && { color: action.color }]}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{height: 20}} />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
 
   // 4. 列表渲染
   const renderScene = useCallback(({ route, index: tabIndex }: any) => {
@@ -558,20 +711,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
             <SourceCard source={item} index={index} total={sourcesForTab.length} />
           )}
           ListHeaderComponent={() => (
-            <View style={styles.listHeader}>
-              {isEditMode && (
-                <View style={styles.batchHeader}>
-                   <Text style={{fontSize:13, color: theme.colors.onSurfaceVariant}}>
-                     已选 {selectedSources.size} 项
-                   </Text>
-                   <TouchableOpacity onPress={selectedSources.size === sourcesForTab.length ? deselectAllSources : selectAllSources}>
-                      <Text style={{fontSize:13, color: theme.colors.primary, fontWeight:'600'}}>
-                        {selectedSources.size === sourcesForTab.length ? '取消全选' : '全选'}
-                      </Text>
-                   </TouchableOpacity>
-                </View>
-              )}
-            </View>
+            <View style={styles.listHeader} />
           )}
           ListEmptyComponent={() => (
             <View style={styles.emptyState}>
@@ -596,6 +736,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
     <View style={styles.container}>
       {/* 顶部统计区 (固定) */}
       {renderDashboard()}
+      
+      {/* 工具栏 (订阅列表标题 / 批量操作控制) */}
+      {renderToolbar()}
 
       {/* Tab 栏 */}
       <CustomTabBar
@@ -625,6 +768,20 @@ const ManageSubscriptionsScreen: React.FC = () => {
             </TouchableOpacity>
             
             <View style={styles.verticalDivider} />
+
+            <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchToggleStatus}>
+               <MaterialIcons name="toggle-on" size={20} color="#FFF" />
+               <Text style={styles.bottomActionText}>启/停</Text>
+            </TouchableOpacity>
+
+            <View style={styles.verticalDivider} />
+
+            <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchRefresh}>
+               <MaterialIcons name="sync" size={20} color="#FFF" />
+               <Text style={styles.bottomActionText}>刷新</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.verticalDivider} />
             
             <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchDelete}>
                <MaterialIcons name="delete" size={20} color="#FF8A80" />
@@ -632,6 +789,23 @@ const ManageSubscriptionsScreen: React.FC = () => {
             </TouchableOpacity>
          </View>
       )}
+
+      {/* 分组选择弹窗 */}
+      <GroupSelectionModal
+        visible={showMoveGroupModal}
+        groups={groups}
+        onClose={() => setShowMoveGroupModal(false)}
+        onSelect={handleMoveToGroup}
+        theme={theme}
+        isDark={isDark}
+      />
+
+      {/* 动作菜单 ActionSheet */}
+      <SourceActionSheet 
+        sourceId={activeSourceId} 
+        visible={showActionSheet} 
+        onClose={() => setShowActionSheet(false)} 
+      />
     </View>
   );
 };
@@ -641,10 +815,111 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.onSurface,
+  },
+  addButton: {
+    padding: 8,
+    marginRight: -8,
+  },
+  // Toolbar
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    height: 44, // 固定高度
+    marginTop: -12, // 移除顶部间距，紧贴 Dashboard
+    marginBottom: 0, // 稍微留一点底部间距
+  },
+  sectionTitle: {
+    fontSize: 16, // 调整为与编辑模式一致的大小
+    fontWeight: '700',
+    color: theme.colors.onSurface,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%', // 充满容器高度
+    paddingLeft: 12, // 增加点击区域
+  },
+  manageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+
   loadingContainer: {
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center'
+  },
+  // Action Sheet 样式
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContainer: {
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  actionSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.outlineVariant,
+    marginBottom: 8,
+  },
+  actionSheetTitle: {
+    ...typography.titleMedium,
+    color: theme.colors.onSurface,
+    fontWeight: '600',
+  },
+  actionSheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  actionSheetText: {
+    ...typography.bodyLarge,
+    color: theme.colors.onSurface,
+    marginLeft: 16,
+  },
+  // 停用标记
+  inactiveBadge: {
+    backgroundColor: theme.colors.surfaceVariant,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  inactiveBadgeText: {
+    ...typography.labelSmall,
+    color: theme.colors.onSurfaceVariant,
+    fontSize: 10,
+  },
+  // 排序按钮
+  sortBtn: {
+    padding: 8,
   },
   
   // Dashboard
@@ -687,7 +962,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   // List Header
   listHeader: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 8,
   },
   batchHeader: {
@@ -701,23 +976,24 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
 
   // Source Card
   card: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    padding: 12,
-    // 阴影
-    shadowColor: '#000',
+      marginHorizontal: 16,
+      marginBottom: 10,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      padding: 12,
+      borderWidth: 2, // 始终保留 2px 边框，但平时透明
+      borderColor: 'transparent',
+      // 阴影
+      shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: isDark ? 0 : 0.05,
     shadowRadius: 2,
     elevation: 1,
   },
   cardSelected: {
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.surfaceContainer,
-  },
+      backgroundColor: isDark ? theme.colors.surfaceContainerHigh : theme.colors.primaryContainer,
+      borderColor: theme.colors.primary, // 选中时显示边框，但因为基准样式已有2px，所以不会撑开
+    },
   cardInner: {
     flexDirection: 'row',
     alignItems: 'center',
