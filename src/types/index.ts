@@ -78,6 +78,7 @@ export const VIRTUAL_GROUPS = {
 // 词典相关类型
 export interface WordDefinition {
   word: string;              // 当前词形
+  context?: string;          // 出现语境
   baseWord?: string;         // 原始单词（如 running -> run）
   wordForm?: string;         // 词形说明（如 "过去式", "现在分词"）
   phonetic?: string;

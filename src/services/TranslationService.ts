@@ -1,5 +1,6 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { SettingsService } from './SettingsService';
+import { logger } from './rss/RSSUtils';
 
 /**
  * 翻译缓存条目
@@ -48,12 +49,12 @@ export class TranslationService {
       // 1. 首先尝试从本地缓存查询
       const cachedResult = await this.getCachedTranslation(normalizedText, sourceLang, targetLang);
       if (cachedResult) {
-        console.log(`✅ 从缓存获取翻译: ${normalizedText.substring(0, 50)}...`);
+        logger.info(`✅ 从缓存获取翻译: ${normalizedText.substring(0, 50)}...`);
         return cachedResult.translatedText;
       }
 
       // 2. 本地缓存没有，调用LLM翻译
-      console.log(`🔍 调用LLM翻译: ${normalizedText.substring(0, 50)}...`);
+      logger.info(`🔍 调用LLM翻译: ${normalizedText.substring(0, 50)}...`);
       const translation = await this.translateWithLLM(normalizedText, sourceLang, targetLang);
       
       if (translation) {
@@ -71,10 +72,11 @@ export class TranslationService {
 
       return null;
     } catch (error) {
-      console.error('Error translating sentence:', error);
+      logger.error('Error translating sentence:', error);
       return null;
     }
   }
+
 
   /**
    * 从本地缓存获取翻译
@@ -105,7 +107,7 @@ export class TranslationService {
 
       return null;
     } catch (error) {
-      console.error('Error getting cached translation:', error);
+      logger.error('Error getting cached translation:', error);
       return null;
     }
   }
@@ -123,9 +125,9 @@ export class TranslationService {
         [entry.originalText, entry.translatedText, entry.sourceLang, entry.targetLang, entry.source, now]
       );
       
-      console.log(`💾 已缓存翻译: ${entry.originalText.substring(0, 50)}...`);
+      logger.info(`💾 已缓存翻译: ${entry.originalText.substring(0, 50)}...`);
     } catch (error) {
-      console.error('Error caching translation:', error);
+      logger.error('Error caching translation:', error);
     }
   }
 
@@ -141,7 +143,7 @@ export class TranslationService {
       const llmSettings = await this.settingsService.getLLMSettings();
       
       if (!llmSettings?.apiKey) {
-        console.warn('LLM API key not configured');
+        logger.warn('LLM API key not configured');
         return null;
       }
 
@@ -158,7 +160,7 @@ export class TranslationService {
 
       return null;
     } catch (error) {
-      console.error('Error translating with LLM:', error);
+      logger.error('Error translating with LLM:', error);
       // 记录失败统计
       const llmSettings = await this.settingsService.getLLMSettings();
       if (llmSettings) {
@@ -167,6 +169,7 @@ export class TranslationService {
       return null;
     }
   }
+
 
   /**
    * 构建翻译提示词
@@ -210,7 +213,7 @@ export class TranslationService {
         return await this.callOpenAICompatibleAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
       }
     } catch (error) {
-      console.error('Error calling LLM API:', error);
+      logger.error('Error calling LLM API:', error);
       return null;
     }
   }
@@ -229,9 +232,9 @@ export class TranslationService {
     // 确保baseUrl格式正确，移除末尾斜杠
     const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
     
-    console.log('🔍 调用LLM翻译:', prompt.substring(0, 50) + '...');
-    console.log('🎯 API地址:', `${cleanBaseUrl}/chat/completions`);
-    console.log('🤖 模型:', model);
+    logger.info('🔍 调用LLM翻译:' + prompt.substring(0, 50) + '...');
+    logger.info('🎯 API地址:' + `${cleanBaseUrl}/chat/completions`);
+    logger.info('🤖 模型:' + model);
     
     const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
       method: 'POST',
@@ -252,15 +255,16 @@ export class TranslationService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('❌ API请求失败:', response.status, errorText);
+      logger.error('❌ API请求失败:', response.status, errorText);
       throw new Error(`API request failed: ${response.status}`);
     }
 
     const data = await response.json();
     const result = data.choices?.[0]?.message?.content || null;
-    console.log('✅ 翻译结果:', result?.substring(0, 50) + '...');
+    logger.info('✅ 翻译结果:' + result?.substring(0, 50) + '...');
     return result;
   }
+
 
   /**
    * 调用Anthropic API
@@ -315,7 +319,7 @@ export class TranslationService {
         [requestType, provider, model, success ? 1 : 0, now]
       );
     } catch (error) {
-      console.error('Error logging usage:', error);
+      logger.error('Error logging usage:', error);
     }
   }
 
@@ -359,7 +363,7 @@ export class TranslationService {
         byType,
       };
     } catch (error) {
-      console.error('Error getting usage stats:', error);
+      logger.error('Error getting usage stats:', error);
       return { total: 0, monthly: 0, byType: {} };
     }
   }
@@ -387,7 +391,7 @@ export class TranslationService {
         createdAt: row.created_at ? new Date(row.created_at * 1000) : undefined,
       }));
     } catch (error) {
-      console.error('Error getting translation history:', error);
+      logger.error('Error getting translation history:', error);
       return [];
     }
   }
@@ -398,11 +402,12 @@ export class TranslationService {
   public async clearCache(): Promise<void> {
     try {
       await this.databaseService.executeStatement('DELETE FROM translation_cache');
-      console.log('翻译缓存已清除');
+      logger.info('翻译缓存已清除');
     } catch (error) {
-      console.error('Error clearing translation cache:', error);
+      logger.error('Error clearing translation cache:', error);
     }
   }
+
 }
 
 // 导出单例实例

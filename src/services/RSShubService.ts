@@ -1,4 +1,5 @@
 import { AppError } from '../types';
+import { logger } from './rss/RSSUtils';
 
 /**
  * RSSHUB服务 - 处理rsshub://协议的URL转换
@@ -102,7 +103,7 @@ export class RSShubService {
       clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
-      console.warn(`RSSHUB instance ${instanceUrl} is not available:`, error);
+      logger.warn(`RSSHUB instance ${instanceUrl} is not available:`, error);
       return false;
     }
   }
@@ -119,7 +120,7 @@ export class RSShubService {
     }
     
     // 如果所有实例都不可用，返回默认实例
-    console.warn('No RSSHUB instances are available, using default');
+    logger.warn('No RSSHUB instances are available, using default');
     return RSShubService.DEFAULT_RSSHUB_INSTANCE;
   }
 

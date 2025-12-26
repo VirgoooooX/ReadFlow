@@ -1,5 +1,6 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { RSSGroup, RSSSource } from '../types';
+import { logger } from './rss/RSSUtils';
 
 /**
  * RSS 分组管理服务
@@ -309,7 +310,7 @@ export class RSSGroupService {
    * 检测所有唯一的 category，为每个创建对应的 group，并关联源
    */
   async migrateCategoryToGroups(): Promise<{ created: number; mapped: number }> {
-    console.log('📦 [分组迁移] 开始检测 category -> group 迁移...');
+    logger.info('📦 [分组迁移] 开始检测 category -> group 迁移...');
     
     // 1. 获取所有唯一的 category
     const categoriesResult: any[] = await this.dbService.executeQuery(
@@ -318,11 +319,11 @@ export class RSSGroupService {
     const categories = categoriesResult.map(r => r.category).filter(Boolean);
     
     if (categories.length === 0) {
-      console.log('📦 [分组迁移] 没有找到需要迁移的 category');
+      logger.info('📦 [分组迁移] 没有找到需要迁移的 category');
       return { created: 0, mapped: 0 };
     }
     
-    console.log(`📦 [分组迁移] 发现 ${categories.length} 个 category: ${categories.join(', ')}`);
+    logger.info(`📦 [分组迁移] 发现 ${categories.length} 个 category: ${categories.join(', ')}`);
     
     // 2. 获取现有分组
     const existingGroups = await this.getAllGroups();
@@ -339,7 +340,7 @@ export class RSSGroupService {
         // 分组已存在，获取 ID
         const existing = existingGroups.find(g => g.name === category);
         groupId = existing!.id;
-        console.log(`📦 [分组迁移] 分组 "${category}" 已存在 (ID: ${groupId})`);
+        logger.info(`📦 [分组迁移] 分组 "${category}" 已存在 (ID: ${groupId})`);
       } else {
         // 创建新分组
         const newGroup = await this.createGroup({
@@ -349,7 +350,7 @@ export class RSSGroupService {
         });
         groupId = newGroup.id;
         createdCount++;
-        console.log(`📦 [分组迁移] 创建新分组 "${category}" (ID: ${groupId})`);
+        logger.info(`📦 [分组迁移] 创建新分组 "${category}" (ID: ${groupId})`);
       }
       
       // 4. 将该 category 下的所有源关联到分组（仅当 group_id 为空时）
@@ -366,11 +367,11 @@ export class RSSGroupService {
           [groupId, category]
         );
         mappedCount += countToMigrate;
-        console.log(`📦 [分组迁移] 将 ${countToMigrate} 个源关联到分组 "${category}"`);
+        logger.info(`📦 [分组迁移] 将 ${countToMigrate} 个源关联到分组 "${category}"`);
       }
     }
     
-    console.log(`✅ [分组迁移] 完成！创建 ${createdCount} 个分组，关联 ${mappedCount} 个源`);
+    logger.info(`✅ [分组迁移] 完成！创建 ${createdCount} 个分组，关联 ${mappedCount} 个源`);
     return { created: createdCount, mapped: mappedCount };
   }
 

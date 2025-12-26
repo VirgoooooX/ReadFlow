@@ -23,6 +23,7 @@ import { typography } from '../../theme/typography';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
+import { logger } from '../../services/rss/RSSUtils';
 import { DatabaseService } from '../../database/DatabaseService';
 import cacheEventEmitter from '../../services/CacheEventEmitter';
 import type { RSSSource } from '../../types';
@@ -38,7 +39,7 @@ type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
 const ManageSubscriptionsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
-  const { rssSources, refreshRSSSources, syncAllSources, syncSource } = useRSSSource();
+  const { rssSources, refreshRSSSources, syncAllSources, syncSource, syncSources } = useRSSSource();
   const { groups, moveSourcesToGroup } = useRSSGroup();
   const { width: screenWidth } = useWindowDimensions();
   const tabContentRef = useRef<CustomTabContentHandle>(null);
@@ -155,7 +156,26 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await syncAllSources();
+      // 获取当前 Tab 对应的源列表
+      const currentSources = getFilteredSources(activeIndex);
+      // 过滤出活跃的源 ID
+      const activeSourceIds = currentSources
+        .filter(s => s.isActive)
+        .map(s => s.id);
+
+      if (activeSourceIds.length === 0) {
+        console.log('[ManageSubscriptions] 当前分组没有活跃源，跳过刷新');
+        setRefreshing(false);
+        return;
+      }
+
+      console.log(`[ManageSubscriptions] 正在刷新当前分组 (${activeSourceIds.length} 个源)...`);
+      
+      // 使用批量同步方法
+      await syncSources(activeSourceIds, (current, total, name) => {
+         logger.info(`[ManageSubscriptions] 进度: ${current}/${total} - ${name}`);
+      });
+      
     } catch (error) {
       console.error('Refresh failed:', error);
       Alert.alert('刷新失败', '同步RSS源时出现错误');
@@ -346,14 +366,13 @@ const ManageSubscriptionsScreen: React.FC = () => {
       { 
         text: '开始刷新', 
         onPress: async () => {
+          const sourceIds = Array.from(selectedSources);
           setIsEditMode(false);
           setSelectedSources(new Set());
-          // 触发批量刷新逻辑 (可以是循环 syncSource 或者专门的 batch API)
           try {
-            // 这里为了简单，我们循环调用，实际应该有个 batch API
-            for (const id of selectedSources) {
-              await syncSource(id);
-            }
+            await syncSources(sourceIds, (current, total, name) => {
+              logger.info(`[ManageSubscriptions] 进度: ${current}/${total} - ${name}`);
+            });
           } catch (e) {
             console.error(e);
           }

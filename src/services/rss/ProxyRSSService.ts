@@ -92,12 +92,12 @@ export class ProxyRSSService {
         return;
       }
       
-      console.log('\n' + '='.repeat(60));
-      console.log('[Proxy Sync] 🚀 开始批量同步订阅源到服务端');
-      console.log('='.repeat(60));
-      console.log(`[Proxy Sync] 服务器地址: ${config.serverUrl}`);
-      console.log(`[Proxy Sync] 待同步源数: ${sources.length}`);
-      console.log('-'.repeat(60));
+      logger.info('\n' + '='.repeat(60));
+      logger.info('[Proxy Sync] 🚀 开始批量同步订阅源到服务端');
+      logger.info('='.repeat(60));
+      logger.info(`[Proxy Sync] 服务器地址: ${config.serverUrl}`);
+      logger.info(`[Proxy Sync] 待同步源数: ${sources.length}`);
+      logger.info('-'.repeat(60));
       
       let successCount = 0;
       let failCount = 0;
@@ -107,7 +107,7 @@ export class ProxyRSSService {
         const source = sources[i];
         try {
           const progress = `[${i + 1}/${sources.length}]`;
-          console.log(`${progress} 正在同步: ${source.name}`);
+          logger.info(`${progress} 正在同步: ${source.name}`);
           
           const response = await fetch(`${config.serverUrl}/api/subscribe`, {
             method: 'POST',
@@ -123,32 +123,32 @@ export class ProxyRSSService {
           
           if (!response.ok) {
             const errorText = await response.text();
-            console.warn(`${progress} ❌ 同步失败 (HTTP ${response.status}): ${source.name}`);
+            logger.warn(`${progress} ❌ 同步失败 (HTTP ${response.status}): ${source.name}`);
             failCount++;
             failedSources.push({ name: source.name, error: `HTTP ${response.status}` });
             continue;
           }
           
           successCount++;
-          console.log(`${progress} ✅ 同步成功: ${source.name}`);
+          logger.info(`${progress} ✅ 同步成功: ${source.name}`);
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          console.warn(`[${i + 1}/${sources.length}] ❌ 同步异常: ${source.name}`);
+          logger.warn(`[${i + 1}/${sources.length}] ❌ 同步异常: ${source.name}`);
           failCount++;
           failedSources.push({ name: source.name, error: errorMsg });
         }
       }
       
       const duration = Date.now() - startTime;
-      console.log('-'.repeat(60));
-      console.log('[Proxy Sync] 📊 同步总结');
-      console.log(`[Proxy Sync] ✅ 成功: ${successCount}/${sources.length}`);
-      console.log(`[Proxy Sync] ❌ 失败: ${failCount}/${sources.length}`);
-      console.log(`[Proxy Sync] ⏱️  耗时: ${(duration / 1000).toFixed(2)}s`);
-      console.log('='.repeat(60) + '\n');
+      logger.info('-'.repeat(60));
+      logger.info('[Proxy Sync] 📊 同步总结');
+      logger.info(`[Proxy Sync] ✅ 成功: ${successCount}/${sources.length}`);
+      logger.info(`[Proxy Sync] ❌ 失败: ${failCount}/${sources.length}`);
+      logger.info(`[Proxy Sync] ⏱️  耗时: ${(duration / 1000).toFixed(2)}s`);
+      logger.info('='.repeat(60) + '\n');
       
     } catch (error) {
-      console.error('[Proxy Sync] 💥 同步过程出错:', error);
+      logger.error('[Proxy Sync] 💥 同步过程出错:', error);
       throw error;
     }
   }
@@ -185,7 +185,7 @@ export class ProxyRSSService {
         return { success: 0, failed: 0, totalArticles: 0, errors: [] };
       }
 
-      console.log(`[syncFromProxyServer] 极简代理模式，待同步源数: ${sources.length}`);
+      logger.info(`[syncFromProxyServer] 极简代理模式，待同步源数: ${sources.length}`);
 
       let success = 0;
       let failed = 0;
@@ -196,12 +196,14 @@ export class ProxyRSSService {
         const row = sources[i];
         const source: RSSSource = {
           id: row.id,
-          name: row.title,
+          name: row.title || row.name,
           url: row.url,
           category: row.category || 'General',
           contentType: row.content_type || 'image_text',
           isActive: true,
           sortOrder: row.sort_order || 0,
+          errorCount: row.error_count || 0,
+          groupId: row.group_id || null,
         };
 
         try {
@@ -211,14 +213,14 @@ export class ProxyRSSService {
           success++;
           totalArticles += articles.length;
           
-          console.log(`[syncFromProxyServer] ✅ ${source.name}: ${articles.length} 篇`);
+          logger.info(`[syncFromProxyServer] ✅ ${source.name}: ${articles.length} 篇`);
         } catch (error) {
           failed++;
           const errorMsg = error instanceof Error ? error.message : String(error);
           errors.push({ source: source.name, error: errorMsg });
           options.onError?.(error as Error, source.name);
           
-          console.error(`[syncFromProxyServer] ❌ ${source.name}: ${errorMsg}`);
+          logger.error(`[syncFromProxyServer] ❌ ${source.name}: ${errorMsg}`);
         }
       }
 
@@ -258,7 +260,7 @@ export class ProxyRSSService {
     config: ProxyModeConfig
   ): Promise<Article[]> {
     try {
-      console.log(`[fetchArticlesViaProxy] 🚀 通过代理获取: ${source.name}`);
+      logger.info(`[fetchArticlesViaProxy] 🚀 通过代理获取: ${source.name}`);
       
       // 调用代理服务器的 RSS 代理接口
       const proxyUrl = `${config.serverUrl}/api/rss?url=${encodeURIComponent(source.url)}`;
@@ -275,16 +277,16 @@ export class ProxyRSSService {
       }
 
       const xmlText = await response.text();
-      console.log(`[fetchArticlesViaProxy] 收到 XML: ${xmlText.length} bytes`);
+      logger.info(`[fetchArticlesViaProxy] 收到 XML: ${xmlText.length} bytes`);
 
       // 复用本地解析逻辑（LocalRSSService 的 parseRSSFeedAndSave）
       const articles = await localRSSService.parseRSSFeedAndSave(xmlText, source);
       
-      console.log(`[fetchArticlesViaProxy] ✅ ${source.name}: 解析到 ${articles.length} 篇文章`);
+      logger.info(`[fetchArticlesViaProxy] ✅ ${source.name}: 解析到 ${articles.length} 篇文章`);
       
       return articles;
     } catch (error) {
-      console.error(`[fetchArticlesViaProxy] ❌ ${source.name}:`, error);
+      logger.error(`[fetchArticlesViaProxy] ❌ ${source.name}:`, error);
       throw error;
     }
   }

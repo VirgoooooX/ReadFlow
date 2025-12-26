@@ -6,7 +6,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { useThemeContext } from '../theme';
+import { logger } from '../services/rss/RSSUtils';
 import { useUser } from '../contexts/UserContext';
+import { useRSSSource } from '../contexts/RSSSourceContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTabBarHeight, getTabBarPaddingVertical, getHeaderHeight, HEADER_TITLE_STYLE } from '../constants/navigation';
 import CustomHeader from '../components/CustomHeader';
@@ -591,6 +593,10 @@ function UserStackNavigator() {
 function MainTabNavigator() {
   const { theme, isDark } = useThemeContext();
   const insets = useSafeAreaInsets();
+  const { rssSources } = useRSSSource();
+
+  // 计算所有未读文章总数
+  const unreadCount = rssSources.reduce((acc, source) => acc + (source.unread_count || 0), 0);
 
   // 计算实际的标签栏高度，包含底部安全区域
   const tabBarHeight = getTabBarHeight();
@@ -654,7 +660,15 @@ function MainTabNavigator() {
       <MainTab.Screen
         name="RSS"
         component={RSSStackNavigator}
-        options={{ tabBarLabel: 'RSS' }}
+        options={{ 
+          tabBarLabel: 'RSS',
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.error,
+            color: theme.colors.onError,
+            fontSize: 10,
+          }
+        }}
       />
       <MainTab.Screen
         name="Vocabulary"
@@ -681,7 +695,7 @@ function RootNavigator() {
     if (!state.isLoading) {
       // 稍微延时（100-200ms）确保 React Navigation 的第一帧画面已经渲染到屏幕上
       const timer = setTimeout(() => {
-        console.log('🏁 业务就绪，正式通过 Navigator 触发隐藏启动页');
+        logger.info('🏁 业务就绪，正式通过 Navigator 触发隐藏启动页');
         SplashScreen.hideAsync().catch(() => { });
       }, 100);
       return () => clearTimeout(timer);

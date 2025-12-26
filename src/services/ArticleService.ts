@@ -1,6 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { Article, ReadingSettings } from '../types';
 import cacheEventEmitter from './CacheEventEmitter';
+import { logger } from './rss/RSSUtils';
 
 export class ArticleService {
   private static instance: ArticleService;
@@ -75,7 +76,7 @@ export class ArticleService {
       
       return allArticles;
     } catch (error) {
-      console.error('Error getting initial fair feed:', error);
+      logger.error('Error getting initial fair feed:', error);
       return [];
     }
   }
@@ -148,7 +149,7 @@ export class ArticleService {
 
       return results.map(this.mapArticleRow);
     } catch (error) {
-      console.error('Error getting articles:', error);
+      logger.error('Error getting articles:', error);
       return [];
     }
   }
@@ -168,7 +169,7 @@ export class ArticleService {
          WHERE a.id = ?`,
         [id]
       ).catch((err) => {
-        console.error('Error getting article by ID:', err);
+        logger.error('Error getting article by ID:', err);
         return [];
       });
 
@@ -178,7 +179,7 @@ export class ArticleService {
 
       return this.mapArticleRow(results[0]);
     } catch (error) {
-      console.error('Error getting article by ID:', error);
+      logger.error('Error getting article by ID:', error);
       return null;
     }
   }
@@ -221,7 +222,7 @@ export class ArticleService {
 
       return results.map(this.mapArticleRow);
     } catch (error) {
-      console.error('Error searching articles:', error);
+      logger.error('Error searching articles:', error);
       return [];
     }
   }
@@ -243,7 +244,7 @@ export class ArticleService {
         await this.updateSourceStats(article.sourceId);
       }
     } catch (error) {
-      console.error('Error marking article as read:', error);
+      logger.error('Error marking article as read:', error);
     }
   }
 
@@ -274,7 +275,7 @@ export class ArticleService {
         cacheEventEmitter.clearArticles();
       }
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      logger.error('Error marking all as read:', error);
     }
   }
   
@@ -297,7 +298,7 @@ export class ArticleService {
       // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
       cacheEventEmitter.updateRSSStats();
     } catch (error) {
-      console.error('Error updating source stats:', error);
+      logger.error('Error updating source stats:', error);
     }
   }
 
@@ -318,7 +319,7 @@ export class ArticleService {
         await this.updateSourceStats(article.sourceId);
       }
     } catch (error) {
-      console.error('Error marking article as unread:', error);
+      logger.error('Error marking article as unread:', error);
     }
   }
 
@@ -342,7 +343,7 @@ export class ArticleService {
 
       return newFavoriteStatus;
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      logger.error('Error toggling favorite:', error);
       return false;
     }
   }
@@ -365,7 +366,7 @@ export class ArticleService {
         await this.markAsRead(id, clampedProgress);
       }
     } catch (error) {
-      console.error('Error updating reading progress:', error);
+      logger.error('Error updating reading progress:', error);
     }
   }
 
@@ -390,7 +391,7 @@ export class ArticleService {
         );
       }
     } catch (error) {
-      console.error('Error adding tag:', error);
+      logger.error('Error adding tag:', error);
     }
   }
 
@@ -412,7 +413,7 @@ export class ArticleService {
         [JSON.stringify(tags), id]
       );
     } catch (error) {
-      console.error('Error removing tag:', error);
+      logger.error('Error removing tag:', error);
     }
   }
 
@@ -440,7 +441,7 @@ export class ArticleService {
 
       return Array.from(allTags).sort();
     } catch (error) {
-      console.error('Error getting all tags:', error);
+      logger.error('Error getting all tags:', error);
       return [];
     }
   }
@@ -470,7 +471,7 @@ export class ArticleService {
 
       return results.map(this.mapArticleRow);
     } catch (error) {
-      console.error('Error getting articles by tag:', error);
+      logger.error('Error getting articles by tag:', error);
       return [];
     }
   }
@@ -526,7 +527,7 @@ export class ArticleService {
         averageReadingTime,
       };
     } catch (error) {
-      console.error('Error getting reading stats:', error);
+      logger.error('Error getting reading stats:', error);
       return {
         totalArticles: 0,
         readArticles: 0,
@@ -549,7 +550,7 @@ export class ArticleService {
         [id]
       );
     } catch (error) {
-      console.error('Error deleting article:', error);
+      logger.error('Error deleting article:', error);
     }
   }
 
@@ -569,7 +570,7 @@ export class ArticleService {
       
       return result.changes || 0;
     } catch (error) {
-      console.error('Error deleting old articles:', error);
+      logger.error('Error deleting old articles:', error);
       return 0;
     }
   }
@@ -625,7 +626,7 @@ export class ArticleService {
 
       return results.map(this.mapArticleRow);
     } catch (error) {
-      console.error('Error getting recently read articles:', error);
+      logger.error('Error getting recently read articles:', error);
       return [];
     }
   }
@@ -647,7 +648,7 @@ export class ArticleService {
       const isDbLocked = error?.message?.includes('database is locked') ||
                         error?.toString?.()?.includes('database is locked');
       if (!isDbLocked) {
-        console.warn(`[ScrollPosition] Failed to save for article ${id}:`, error);
+        logger.warn(`[ScrollPosition] Failed to save for article ${id}:`, error);
       }
     }
   }
@@ -669,7 +670,7 @@ export class ArticleService {
       
       return results[0].scroll_position || 0;
     } catch (error) {
-      console.error('Error getting scroll position:', error);
+      logger.error('Error getting scroll position:', error);
       return 0;
     }
   }
@@ -694,7 +695,7 @@ export class ArticleService {
 
       return results.map(this.mapArticleRow);
     } catch (error) {
-      console.error('Error getting currently reading articles:', error);
+      logger.error('Error getting currently reading articles:', error);
       return [];
     }
   }

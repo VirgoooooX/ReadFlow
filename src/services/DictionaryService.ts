@@ -1,6 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { WordDefinition, DictionaryCacheEntry } from '../types';
 import { SettingsService } from './SettingsService';
+import { logger } from './rss/RSSUtils';
 import { stripHtmlTags } from '../utils/stringUtils';
 /**
  * 词典服务 - 使用LLM查询单词释义，并缓存到本地数据库
@@ -33,12 +34,12 @@ export class DictionaryService {
       // 1. 首先尝试从本地缓存查询
       const cachedResult = await this.getCachedDefinition(searchWord);
       if (cachedResult) {
-        console.log(`✅ 从缓存获取单词: ${searchWord}`);
+        logger.info(`✅ 从缓存获取单词: ${searchWord}`);
         return cachedResult;
       }
 
       // 2. 本地缓存没有，调用LLM查询
-      console.log(`🔍 调用LLM查询单词: ${searchWord}`);
+      logger.info(`🔍 调用LLM查询单词: ${searchWord}`);
       const llmResult = await this.queryLLM(searchWord, context);
       
       if (llmResult) {
@@ -55,7 +56,7 @@ export class DictionaryService {
 
       return null;
     } catch (error) {
-      console.error('Error looking up word:', error);
+      logger.error('Error looking up word:', error);
       throw new Error(`Failed to lookup word: ${word}`);
     }
   }
@@ -76,7 +77,7 @@ export class DictionaryService {
 
       return null;
     } catch (error) {
-      console.error('Error getting cached definition:', error);
+      logger.error('Error getting cached definition:', error);
       return null;
     }
   }
@@ -120,9 +121,9 @@ export class DictionaryService {
         );
       }
       
-      console.log(`💾 已缓存单词: ${cleanDefinition.word}`);
+      logger.info(`💾 已缓存单词: ${cleanDefinition.word}`);
     } catch (error) {
-      console.error('Error caching definition:', error);
+      logger.error('Error caching definition:', error);
     }
   }
   /**
@@ -154,10 +155,10 @@ export class DictionaryService {
           [baseWord, null, null, cleanDefinition.phonetic || null, definitionsJson, 'llm', now, now]
         );
         
-        console.log(`💾 已缓存原始单词: ${baseWord}`);
+        logger.info(`💾 已缓存原始单词: ${baseWord}`);
       }
     } catch (error) {
-      console.error('Error caching base word:', error);
+      logger.error('Error caching base word:', error);
     }
   }
 
@@ -168,21 +169,21 @@ export class DictionaryService {
     return {
       ...def,
       // 清理直接属性
-      word: clean(def.word)!,
+      word: clean(def.word) || '',
       context: clean(def.context),
     
       // 清理定义数组
-      definitions: def.definitions?.map(d => ({
+      definitions: (def.definitions || []).map(d => ({
         ...d,
-        definition: clean(d.definition),
+        definition: clean(d.definition) || '',
         translation: clean(d.translation),
         example: clean(d.example)
       })),
     
       // 清理原形定义
-      baseWordDefinitions: def.baseWordDefinitions?.map(d => ({
+      baseWordDefinitions: (def.baseWordDefinitions || []).map(d => ({
         ...d,
-        definition: clean(d.definition),
+        definition: clean(d.definition) || '',
         translation: clean(d.translation)
       }))
     };
@@ -196,7 +197,7 @@ export class DictionaryService {
       const llmSettings = await this.settingsService.getLLMSettings();
       
       if (!llmSettings?.apiKey) {
-        console.warn('LLM API key not configured');
+        logger.warn('LLM API key not configured');
         return null;
       }
 
@@ -213,7 +214,7 @@ export class DictionaryService {
 
       return null;
     } catch (error) {
-      console.error('Error querying LLM:', error);
+      logger.error('Error querying LLM:', error);
       // 记录失败统计
       const llmSettings = await this.settingsService.getLLMSettings();
       if (llmSettings) {
@@ -284,7 +285,7 @@ export class DictionaryService {
         return await this.callOpenAICompatibleAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
       }
     } catch (error) {
-      console.error('Error calling LLM API:', error);
+      logger.error('Error calling LLM API:', error);
       return null;
     }
   }
@@ -395,8 +396,8 @@ export class DictionaryService {
         source: 'llm',
       };
     } catch (error) {
-      console.error('❌ Error parsing LLM response:', error);
-      console.error('   Response preview:', response.substring(0, 200));
+      logger.error('❌ Error parsing LLM response:', error);
+      logger.error('   Response preview:', response.substring(0, 200));
       return null;
     }
   }
@@ -436,7 +437,7 @@ export class DictionaryService {
       
       return results.map(row => row.word);
     } catch (error) {
-      console.error('Error getting suggestions:', error);
+      logger.error('Error getting suggestions:', error);
       return [];
     }
   }
@@ -452,7 +453,7 @@ export class DictionaryService {
       );
       return results.length > 0;
     } catch (error) {
-      console.error('Error checking word existence:', error);
+      logger.error('Error checking word existence:', error);
       return false;
     }
   }
@@ -475,7 +476,7 @@ export class DictionaryService {
         lastUpdated: lastResult[0]?.last_updated ? new Date(lastResult[0].last_updated) : undefined,
       };
     } catch (error) {
-      console.error('Error getting cache stats:', error);
+      logger.error('Error getting cache stats:', error);
       return { totalWords: 0 };
     }
   }
@@ -499,7 +500,7 @@ export class DictionaryService {
         [requestType, provider, model, success ? 1 : 0, now]
       );
     } catch (error) {
-      console.error('Error logging usage:', error);
+      logger.error('Error logging usage:', error);
     }
   }
 
@@ -509,9 +510,9 @@ export class DictionaryService {
   public async clearCache(): Promise<void> {
     try {
       await this.databaseService.executeStatement('DELETE FROM dictionary_cache');
-      console.log('词典缓存已清除');
+      logger.info('词典缓存已清除');
     } catch (error) {
-      console.error('Error clearing cache:', error);
+      logger.error('Error clearing cache:', error);
     }
   }
 }

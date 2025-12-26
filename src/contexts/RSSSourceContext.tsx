@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { RSSSource } from '../types';
 import { RSSService } from '../services/rss';
+import { logger } from '../services/rss/RSSUtils';
 import cacheEventEmitter from '../services/CacheEventEmitter';
 
 interface RSSSourceContextType {
@@ -12,6 +13,7 @@ interface RSSSourceContextType {
   deleteRSSSource: (sourceId: number) => void;
   syncAllSources: (onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
   syncSource: (sourceId: number) => Promise<void>;
+  syncSources: (sourceIds: number[], onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
 }
 
 const RSSSourceContext = createContext<RSSSourceContextType | undefined>(undefined);
@@ -117,6 +119,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     setRssSources(prev => prev.filter(source => source.id !== sourceId));
   };
   const syncAllSources = async (onProgress?: (current: number, total: number, sourceName: string) => void) => {
+    cacheEventEmitter.batchSyncStart();
     try {
       console.log('[RSSSourceContext.syncAllSources] 🚀 开始同步所有 RSS 源');
       setIsLoading(true);
@@ -124,16 +127,19 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       await rssService.refreshAllSources({ onProgress });
       console.log('[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成');
       await loadRSSSources();
+      cacheEventEmitter.refreshAllSources();
       console.log('[RSSSourceContext.syncAllSources] ✅ 所有源同步完成');
     } catch (error) {
       console.error('[RSSSourceContext.syncAllSources] 💥 同步失败:', error);
       throw error;
     } finally {
+      cacheEventEmitter.batchSyncEnd();
       setIsLoading(false);
     }
   };
 
   const syncSource = async (sourceId: number) => {
+    cacheEventEmitter.batchSyncStart();
     try {
       console.log(`[RSSSourceContext.syncSource] 🚀 开始同步单个源 ID: ${sourceId}`);
       setIsLoading(true);
@@ -141,6 +147,8 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       if (source) {
         // 直接调用 fetchArticlesFromSource，内部会自动判断代理模式
         await rssService.fetchArticlesFromSource(source);
+        cacheEventEmitter.refreshSources([sourceId]);
+        
         await loadRSSSources();
         console.log(`[RSSSourceContext.syncSource] ✅ 单个源同步完成: ${source.name}`);
       }
@@ -148,6 +156,27 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       console.error(`[RSSSourceContext.syncSource] 💥 同步失败:`, error);
       throw error;
     } finally {
+      cacheEventEmitter.batchSyncEnd();
+      setIsLoading(false);
+    }
+  };
+
+  const syncSources = async (sourceIds: number[], onProgress?: (current: number, total: number, sourceName: string) => void) => {
+    cacheEventEmitter.batchSyncStart();
+    try {
+      logger.info(`[RSSSourceContext.syncSources] 🚀 开始同步 ${sourceIds.length} 个 RSS 源`);
+      setIsLoading(true);
+      
+      await rssService.refreshSources(sourceIds, { onProgress });
+      
+      logger.info('[RSSSourceContext.syncSources] ✅ 批量同步完成');
+      await loadRSSSources();
+      cacheEventEmitter.refreshSources(sourceIds);
+    } catch (error) {
+      console.error('[RSSSourceContext.syncSources] 💥 同步失败:', error);
+      throw error;
+    } finally {
+      cacheEventEmitter.batchSyncEnd();
       setIsLoading(false);
     }
   };
@@ -161,6 +190,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     deleteRSSSource,
     syncAllSources,
     syncSource,
+    syncSources,
   };
 
   return (

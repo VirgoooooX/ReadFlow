@@ -22,10 +22,36 @@ import (
 
 // 配置
 var (
-	port      string
-	serverURL string
-	authToken string
+	port            string
+	serverURL       string
+	authToken       string
+	activeRSSHub    = "https://rsshub.app"
+	defaultRSSHub   = "https://rsshub.app"
 )
+
+// RSSHub 实例列表
+var rsshubInstances = []string{
+	"https://rsshub.app",
+	"https://rsshub.rssforever.com",
+	"https://rss.198909.xyz:37891",
+	"https://rsshub.speedcloud.one",
+	"https://rsshub.pseudoyu.com",
+}
+
+// RSSHub 平台描述映射
+var rsshubDescriptions = map[string]string{
+	"techcrunch": "TechCrunch 科技新闻",
+	"github":     "GitHub 仓库动态",
+	"twitter":    "Twitter 用户动态",
+	"weibo":      "微博用户动态",
+	"bilibili":   "B站UP主动态",
+	"zhihu":      "知乎专栏/用户动态",
+	"juejin":     "掘金用户文章",
+	"v2ex":       "V2EX 论坫",
+	"sspai":      "少数派文章",
+	"coolapk":    "酷安应用市场",
+	"cnbeta":     "cnBeta 科技资讯",
+}
 
 // Referer 映射表 - 用于绕过防盗链
 var refererMap = map[string]string{
@@ -93,10 +119,40 @@ var imageCdnHosts = []string{
 	"fbcdn.net", "cdninstagram.com", "medium.com", "unsplash.com",
 }
 
+// testRSSHubInstance 测试 RSSHub 实例是否可用
+func testRSSHubInstance(instanceURL string) bool {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Head(instanceURL + "/")
+	if err != nil {
+		log.Printf("[RSSHub] Instance %s is not available: %v", instanceURL, err)
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+// selectBestRSSHubInstance 自动选择最佳的 RSSHub 实例
+func selectBestRSSHubInstance() string {
+	for _, instance := range rsshubInstances {
+		if testRSSHubInstance(instance) {
+			activeRSSHub = instance
+			return instance
+		}
+	}
+	log.Printf("[RSSHub] No instances are available, using default: %s", defaultRSSHub)
+	activeRSSHub = defaultRSSHub
+	return defaultRSSHub
+}
+
 func init() {
 	port = getEnv("PORT", "3000")
 	serverURL = getEnv("SERVER_URL", "http://localhost:"+port)
 	authToken = getEnv("AUTH_TOKEN", "")
+
+	// 异步选择最佳 RSSHub 实例，避免阻塞启动
+	go selectBestRSSHubInstance()
 }
 
 func getEnv(key, fallback string) string {
@@ -326,6 +382,72 @@ func sendJSON(w http.ResponseWriter, statusCode int, data map[string]interface{}
 	fmt.Fprintf(w, "{%s}", strings.Join(parts, ","))
 }
 
+// isRSSHubURL 检查是否为 RSSHub 协议
+func isRSSHubURL(u string) bool {
+	return strings.HasPrefix(u, "rsshub://")
+}
+
+// validateRSSHubPath 验证 RSSHub 路径格式
+func validateRSSHubPath(rsshubURL string) bool {
+	if !isRSSHubURL(rsshubURL) {
+		return false
+	}
+
+	path := strings.TrimPrefix(rsshubURL, "rsshub://")
+	if path == "" {
+		return false
+	}
+
+	// 检查是否包含有效字符
+	validPathRegex := regexp.MustCompile(`^[a-zA-Z0-9\/_-]+$`)
+	return validPathRegex.MatchString(path)
+}
+
+// convertRSSHubURL 将 rsshub:// 转换为 HTTP URL
+func convertRSSHubURL(rsshubURL string) string {
+	if !isRSSHubURL(rsshubURL) {
+		return rsshubURL
+	}
+
+	path := strings.TrimPrefix(rsshubURL, "rsshub://")
+	// 允许路径中带 /，所以这里处理一下
+	cleanPath := strings.ReplaceAll(path, "/", "")
+	if cleanPath == "" {
+		return defaultRSSHub
+	}
+
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	return activeRSSHub + path
+}
+
+// parseRSSHubURL 解析 RSSHub URL
+func parseRSSHubURL(rsshubURL string) (platform, route, description string) {
+	if !isRSSHubURL(rsshubURL) {
+		return "", "", ""
+	}
+
+	path := strings.TrimPrefix(rsshubURL, "rsshub://")
+	segments := strings.Split(path, "/")
+
+	if len(segments) > 0 {
+		platform = segments[0]
+	}
+	if len(segments) > 1 {
+		route = strings.Join(segments[1:], "/")
+	}
+
+	desc, ok := rsshubDescriptions[platform]
+	if !ok {
+		desc = platform + " RSS源"
+	}
+	description = desc
+
+	return platform, route, description
+}
+
 // handleRSS 处理 RSS 代理请求
 func handleRSS(w http.ResponseWriter, r *http.Request) {
 	feedURL := r.URL.Query().Get("url")
@@ -335,6 +457,14 @@ func handleRSS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	feedURL = decodeHtmlEntities(feedURL)
+
+	// 处理 RSSHub 协议
+	if isRSSHubURL(feedURL) {
+		oldURL := feedURL
+		feedURL = convertRSSHubURL(feedURL)
+		log.Printf("[RSS] RSSHub converted: %s -> %s", oldURL, feedURL)
+	}
+
 	log.Printf("[RSS] Fetching: %s", feedURL)
 
 	// 创建请求
@@ -494,6 +624,21 @@ func handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, 200, map[string]interface{}{"success": true, "message": "Subscribed"})
 }
 
+// handleRSSHubInstances 返回可用的 RSSHub 实例
+func handleRSSHubInstances(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(200)
+
+	// 简单序列化
+	var instStrs []string
+	for _, inst := range rsshubInstances {
+		instStrs = append(instStrs, fmt.Sprintf(`"%s"`, inst))
+	}
+	fmt.Fprintf(w, `{"instances":[%s],"active":"%s","default":"%s"}`, 
+		strings.Join(instStrs, ","), activeRSSHub, defaultRSSHub)
+}
+
 // handleHealth 健康检查
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, 200, map[string]interface{}{
@@ -536,7 +681,8 @@ func min(a, b int) int {
 func main() {
 	// 路由
 	http.HandleFunc("/api/rss", authMiddleware(handleRSS, false))
-	http.HandleFunc("/api/image", authMiddleware(handleImage, true))          // 图片跳过认证
+	http.HandleFunc("/api/rsshub/instances", authMiddleware(handleRSSHubInstances, true)) // 公开实例列表
+	http.HandleFunc("/api/image", authMiddleware(handleImage, true))                      // 图片跳过认证
 	http.HandleFunc("/api/subscribe", authMiddleware(handleSubscribe, false)) // 订阅接口
 	http.HandleFunc("/health", authMiddleware(handleHealth, true))
 	http.HandleFunc("/", authMiddleware(handleHealth, true))

@@ -308,11 +308,11 @@ export class RSSService {
         return await localRSSService.fetchArticlesWithRetry(source, 3);
       }
       const mode = options.mode || 'refresh';
-      console.log(`[fetchArticlesFromSource] 🚀 代理模式: ${source.name} (mode: ${mode})`);
+      logger.info(`[fetchArticlesFromSource] 🚀 代理模式: ${source.name} (mode: ${mode})`);
       return await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
     } else {
       // 直连模式
-      console.log(`[fetchArticlesFromSource] 直连模式: ${source.name}`);
+      logger.info(`[fetchArticlesFromSource] 直连模式: ${source.name}`);
       return await localRSSService.fetchArticlesWithRetry(source, 3);
     }
   }
@@ -353,7 +353,7 @@ export class RSSService {
 
     // 处理直连源
     if (directSources.length > 0) {
-      console.log(`[RefreshAllSources] 直连模式: ${directSources.length} 个源`);
+      logger.info(`[RefreshAllSources] 直连模式: ${directSources.length} 个源`);
       const directResult = await localRSSService.refreshSources(directSources, {
         ...options,
         onProgress: (current, _, sourceName) => {
@@ -371,7 +371,7 @@ export class RSSService {
     if (proxySources.length > 0) {
       const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
       if (proxyConfig.serverUrl) {
-        console.log(`[RefreshAllSources] 代理模式: ${proxySources.length} 个源`);
+        logger.info(`[RefreshAllSources] 代理模式: ${proxySources.length} 个源`);
         const mode = options.mode || 'refresh';
         
         for (const source of proxySources) {
@@ -397,6 +397,83 @@ export class RSSService {
         }
       }
     }
+
+    return { success, failed, totalArticles, errors };
+  }
+
+  /**
+   * 刷新指定的 RSS 源列表
+   */
+  public async refreshSources(
+    sourceIds: number[],
+    options: {
+      maxConcurrent?: number;
+      onProgress?: (current: number, total: number, sourceName: string) => void;
+      onError?: (error: Error, sourceName: string) => void;
+      onArticlesReady?: (articles: Article[], sourceName: string) => void;
+    } = {}
+  ): Promise<{ 
+    success: number; 
+    failed: number; 
+    totalArticles: number;
+    errors: Array<{ source: string; error: string }>;
+  }> {
+    const { maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
+    
+    // 1. 获取所有活跃源
+    const allSources = await this.getActiveRSSSources();
+    
+    // 2. 过滤出需要刷新的源（且必须是活跃的）
+    const sourcesToRefresh = allSources.filter(s => sourceIds.includes(s.id));
+    
+    if (sourcesToRefresh.length === 0) {
+      return { success: 0, failed: 0, totalArticles: 0, errors: [] };
+    }
+
+    // 3. 复用并发逻辑
+    const limiter = this.createLimiter(maxConcurrent);
+    
+    let success = 0;
+    let failed = 0;
+    let totalArticles = 0;
+    const errors: Array<{ source: string; error: string }> = [];
+    let completed = 0;
+    const total = sourcesToRefresh.length;
+
+    const tasks = sourcesToRefresh.map(source => 
+      limiter(() => 
+        new Promise<void>((resolve, reject) => {
+          InteractionManager.runAfterInteractions(() => {
+            this.fetchArticlesFromSource(source)
+              .then((articles) => {
+                success++;
+                totalArticles += articles.length;
+                completed++;
+                
+                if (onArticlesReady && articles.length > 0) {
+                  onArticlesReady(articles, source.name);
+                }
+                
+                onProgress?.(completed, total, source.name);
+                resolve();
+              })
+              .catch((error) => {
+                failed++;
+                completed++;
+                const errorMsg = error.message || '未知错误';
+                errors.push({ source: source.name, error: errorMsg });
+                
+                onError?.(error, source.name);
+                onProgress?.(completed, total, source.name);
+                // 即使失败也 resolve，避免中断整个 Promise.all
+                resolve(); 
+              });
+          });
+        })
+      )
+    );
+
+    await Promise.all(tasks);
 
     return { success, failed, totalArticles, errors };
   }

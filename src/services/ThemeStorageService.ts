@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CustomColorConfig, ThemePreset } from '../theme';
+import { logger } from './rss/RSSUtils';
 
 // 存储键名
 const STORAGE_KEYS = {
@@ -36,7 +37,7 @@ class ThemeStorageService {
       if (value === null) return defaultValue;
       return parser ? parser(value) : (value as unknown as T);
     } catch (error) {
-      console.error(`Failed to get ${key}:`, error);
+      logger.error(`Failed to get ${key}:`, error);
       return defaultValue;
     }
   }
@@ -46,10 +47,11 @@ class ThemeStorageService {
       const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
       await AsyncStorage.setItem(key, stringValue);
     } catch (error) {
-      console.error(`Failed to set ${key}:`, error);
+      logger.error(`Failed to set ${key}:`, error);
       throw error;
     }
   }
+
 
   // --- 核心设置 ---
 
@@ -83,9 +85,10 @@ class ThemeStorageService {
     try {
       await AsyncStorage.removeItem(STORAGE_KEYS.CUSTOM_COLORS);
     } catch (error) {
-      console.error('Failed to clear custom colors:', error);
+      logger.error('Failed to clear custom colors:', error);
     }
   }
+
 
   // --- 组合操作 ---
 
@@ -184,7 +187,7 @@ class ThemeStorageService {
         // 注意：这里不删除保存的主题，用户可能还想要它们
       ]);
     } catch (error) {
-      console.error('Failed to reset theme settings:', error);
+      logger.error('Failed to reset theme settings:', error);
       throw error;
     }
   }
@@ -198,7 +201,7 @@ class ThemeStorageService {
         AsyncStorage.removeItem(STORAGE_KEYS.SAVED_THEMES),
       ]);
     } catch (error) {
-      console.error('Failed to clear all theme data:', error);
+      logger.error('Failed to clear all theme data:', error);
       throw error;
     }
   }
@@ -219,7 +222,7 @@ class ThemeStorageService {
 
       return JSON.stringify(exportData, null, 2);
     } catch (error) {
-      console.error('Failed to export theme data:', error);
+      logger.error('Failed to export theme data:', error);
       throw error;
     }
   }
@@ -266,10 +269,11 @@ class ThemeStorageService {
         await this.safeSet(STORAGE_KEYS.SAVED_THEMES, mergedThemes);
       }
     } catch (error) {
-      console.error('Failed to import theme data:', error);
+      logger.error('Failed to import theme data:', error);
       throw error;
     }
   }
+
 }
 
 // 导出单例实例

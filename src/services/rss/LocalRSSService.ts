@@ -216,7 +216,7 @@ export class LocalRSSService {
         await this.updateSourceStats(source.id.toString());
       }
       
-      logger.info(`[parseRSSFeedAndSave] ${source.name}: 保存 ${savedArticles.length} 篇新文章`);
+      // logger.info(`[parseRSSFeedAndSave] ${source.name}: 保存 ${savedArticles.length} 篇新文章`);
       return savedArticles;
     } catch (error) {
       logger.error(`[parseRSSFeedAndSave] 解析失败 ${source.name}:`, error);
@@ -385,7 +385,7 @@ export class LocalRSSService {
           
           if (existing) {
             newArticlesEndIndex = i;
-            logger.info(`检测到 ${i} 篇新文章`);
+            // logger.info(`检测到 ${i} 篇新文章`);
             break;
           }
         }
@@ -402,6 +402,9 @@ export class LocalRSSService {
       const articles: Omit<Article, 'id'>[] = [];
       
       for (const idx of newItemIndices) {
+        // ⚡️ 避免主线程阻塞：每解析一篇重型文章就让出控制权
+        await new Promise(resolve => setTimeout(resolve, 0));
+
         const item = rss.items[idx];
         const itemLink = item.links?.[0]?.url || item.id || '';
         
@@ -460,7 +463,7 @@ export class LocalRSSService {
               imageCaption = imageInfo.caption || imageInfo.alt;
               imageCredit = imageInfo.credit;
               if (imageCaption || imageCredit) {
-                logger.info(`[图片说明] ${imageCaption || ''}${imageCredit ? ` (来源: ${imageCredit})` : ''}`);
+                // logger.info(`[图片说明] ${imageCaption || ''}${imageCredit ? ` (来源: ${imageCredit})` : ''}`);
               }
             }
           } catch (error) {
@@ -482,7 +485,7 @@ export class LocalRSSService {
             try {
               imageUrl = await imageExtractionService.extractImageFromContent(content, itemLink);
               if (imageUrl) {
-                logger.info(`[图片提取] 从全文内容中提取到图片: ${imageUrl}`);
+                // logger.info(`[图片提取] 从全文内容中提取到图片: ${imageUrl}`);
               }
             } catch (error) {
               // 忽略
@@ -572,7 +575,16 @@ export class LocalRSSService {
       
       // 🔥 关键优化：处理懒加载图片（在 Readability 解析前）
       const imgs = document.querySelectorAll('img');
-      imgs.forEach((img: any) => {
+      // 将 NodeList 转换为数组以便遍历
+      const imgArray = Array.from(imgs);
+      
+      for (let i = 0; i < imgArray.length; i++) {
+        // 每处理 10 张图片让出一次主线程
+        if (i % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        const img = imgArray[i] as any;
         // 常见的懒加载属性
         const realSrc = img.getAttribute('data-src') || 
                        img.getAttribute('data-original') || 
@@ -581,7 +593,7 @@ export class LocalRSSService {
         
         if (realSrc) {
           img.setAttribute('src', realSrc);
-          logger.info(`[fetchFullContent] 修复懒加载图片: ${realSrc}`);
+          // logger.info(`[fetchFullContent] 修复懒加载图片: ${realSrc}`);
         }
         
         // 🔥 关键优化：修复相对路径
@@ -596,18 +608,19 @@ export class LocalRSSService {
             logger.warn(`[fetchFullContent] 无法解析 URL: ${url}`);
           }
         }
-      });
+      }
       
+      // 让出主线程给 UI 渲染
+      await new Promise(resolve => setTimeout(resolve, 0));
+
       // 🔥 使用 Readability 智能提取正文
       const reader = new Readability(document);
       const article = reader.parse();
       
       if (article && article.content) {
-        logger.info(`[Readability] 成功提取标题: ${article.title}, 内容长度: ${article.content.length}`);
         return article.content; // 返回清洗过、保留了格式的纯净 HTML
       }
       
-      logger.warn(`[Readability] 无法提取正文: ${url}`);
       return null;
 
     } catch (error) {
@@ -638,7 +651,16 @@ export class LocalRSSService {
       logger.info(`[过滤规则] 白名单: ${whitelist.length} 条, 黑名单: ${blacklist.length} 条`);
       
       // 3. 应用过滤
-      const filteredArticles = articles.filter(article => {
+      const filteredArticles: Omit<Article, 'id'>[] = [];
+      
+      for (let i = 0; i < articles.length; i++) {
+        const article = articles[i];
+        
+        // 每处理 5 篇文章让出一次主线程
+        if (i % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
         const title = (article.title || '').toLowerCase();
         const summary = (article.summary || '').toLowerCase();
         const content = (article.content || '').toLowerCase();
@@ -660,24 +682,28 @@ export class LocalRSSService {
           }
         };
         
+        let keep = true;
+
         // 🔥 白名单检查：如果存在白名单，文章**必须**命中至少一条
         if (whitelist.length > 0) {
           const hitsWhitelist = whitelist.some(rule => checkMatch(rule));
           if (!hitsWhitelist) {
-            return false; // 未命中白名单，直接丢弃
+            keep = false; // 未命中白名单，直接丢弃
           }
         }
         
         // 🔥 黑名单检查：如果命中任何一条黑名单，直接丢弃
-        if (blacklist.length > 0) {
+        if (keep && blacklist.length > 0) {
           const hitsBlacklist = blacklist.some(rule => checkMatch(rule));
           if (hitsBlacklist) {
-            return false; // 命中黑名单，丢弃
+            keep = false; // 命中黑名单，丢弃
           }
         }
         
-        return true; // 通过过滤
-      });
+        if (keep) {
+          filteredArticles.push(article);
+        }
+      }
       
       return filteredArticles;
     } catch (error) {
@@ -785,7 +811,8 @@ export class LocalRSSService {
     let completed = 0;
 
     const executeWithConcurrency = async (sources: RSSSource[]) => {
-      const executing: Promise<void>[] = [];
+      // 使用 Set 存储正在执行的 Promise，避免 Promise.race 的逻辑缺陷
+      const executing = new Set<Promise<void>>();
 
       for (const source of sources) {
         const promise = this.fetchArticlesWithRetry(source, 3)
@@ -804,19 +831,20 @@ export class LocalRSSService {
             onProgress?.(completed, sources.length, source.name);
           });
 
-        executing.push(promise);
+        // 包装 promise 以便在完成后从集合中移除自己
+        const wrappedPromise = promise.then(() => {
+          executing.delete(wrappedPromise);
+        });
 
-        if (executing.length >= maxConcurrent) {
+        executing.add(wrappedPromise);
+
+        if (executing.size >= maxConcurrent) {
+          // 等待任意一个任务完成
           await Promise.race(executing);
-          for (let i = executing.length - 1; i >= 0; i--) {
-            if (await Promise.race([executing[i].then(() => true), Promise.resolve(false)])) {
-              executing.splice(i, 1);
-              break;
-            }
-          }
         }
       }
 
+      // 等待剩余所有任务完成
       await Promise.all(executing);
     };
 

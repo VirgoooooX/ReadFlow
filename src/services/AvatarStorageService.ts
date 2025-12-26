@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from './rss/RSSUtils';
 
 export interface AvatarInfo {
   userId: string;
@@ -45,7 +46,7 @@ export class AvatarStorageService {
       
       return imageUri;
     } catch (error) {
-      console.error('保存头像失败:', error);
+      logger.error('保存头像失败:', error);
       return null;
     }
   }
@@ -61,7 +62,7 @@ export class AvatarStorageService {
       }
       return avatarInfo.uri;
     } catch (error) {
-      console.error('获取头像路径失败:', error);
+      logger.error('获取头像路径失败:', error);
       return null;
     }
   }
@@ -74,7 +75,7 @@ export class AvatarStorageService {
       await this.deleteAvatarInfo(userId);
       return true;
     } catch (error) {
-      console.error('删除头像失败:', error);
+      logger.error('删除头像失败:', error);
       return false;
     }
   }
@@ -88,7 +89,7 @@ export class AvatarStorageService {
       allAvatars[userId] = avatarInfo;
       await AsyncStorage.setItem(AvatarStorageService.AVATAR_STORAGE_KEY, JSON.stringify(allAvatars));
     } catch (error) {
-      console.error('保存头像信息失败:', error);
+      logger.error('保存头像信息失败:', error);
     }
   }
 
@@ -100,7 +101,7 @@ export class AvatarStorageService {
       const allAvatars = await this.getAllAvatarInfos();
       return allAvatars[userId] || null;
     } catch (error) {
-      console.error('获取头像信息失败:', error);
+      logger.error('获取头像信息失败:', error);
       return null;
     }
   }
@@ -114,7 +115,7 @@ export class AvatarStorageService {
       delete allAvatars[userId];
       await AsyncStorage.setItem(AvatarStorageService.AVATAR_STORAGE_KEY, JSON.stringify(allAvatars));
     } catch (error) {
-      console.error('删除头像信息失败:', error);
+      logger.error('删除头像信息失败:', error);
     }
   }
 
@@ -126,7 +127,7 @@ export class AvatarStorageService {
       const stored = await AsyncStorage.getItem(AvatarStorageService.AVATAR_STORAGE_KEY);
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
-      console.error('获取所有头像信息失败:', error);
+      logger.error('获取所有头像信息失败:', error);
       return {};
     }
   }
@@ -138,7 +139,7 @@ export class AvatarStorageService {
     try {
       await AsyncStorage.removeItem(AvatarStorageService.AVATAR_STORAGE_KEY);
     } catch (error) {
-      console.error('清理头像数据失败:', error);
+      logger.error('清理头像数据失败:', error);
     }
   }
 
@@ -154,7 +155,7 @@ export class AvatarStorageService {
         fileCount
       };
     } catch (error) {
-      console.error('获取存储使用情况失败:', error);
+      logger.error('获取存储使用情况失败:', error);
       return { totalSize: 0, fileCount: 0 };
     }
   }

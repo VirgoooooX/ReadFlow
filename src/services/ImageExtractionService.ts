@@ -1,4 +1,5 @@
 import { AppError } from '../types';
+import { logger } from './rss/RSSUtils';
 
 export interface ImageCandidate {
   url: string;
@@ -83,22 +84,22 @@ export class ImageExtractionService {
       // 直接从文章内容中的img标签提取图片
       const contentImage = await this.extractFromContentImages(content);
       if (contentImage) {
-        console.log(`✅ 从内容img标签提取到图片: ${contentImage}`);
+        // logger.info(`✅ 从内容img标签提取到图片: ${contentImage}`);
         return contentImage;
       }
       
       return undefined;
     } catch (error) {
-      console.warn('Image extraction failed:', error);
+      logger.warn('Image extraction failed:', error);
       return undefined;
     }
   }
 
   private async extractFromContentImages(content: string): Promise<string | null> {
     try {
-      console.log('🔍 检查内容中的img标签');
+      // logger.info('🔍 检查内容中的img标签');
       if (!content || content.length === 0) {
-        console.log('❌ 内容为空，无法提取img标签');
+        // logger.info('❌ 内容为空，无法提取img标签');
         return null;
       }
 
@@ -110,31 +111,31 @@ export class ImageExtractionService {
 
       if (match && match[1]) {
         const imageUrl = match[1];
-        console.log(`🔍 找到第一个候选图片: ${imageUrl}`);
+        // logger.info(`🔍 找到第一个候选图片: ${imageUrl}`);
 
         // 1. 基础同步检查
         if (this.looksLikeImageUrl(imageUrl) && this.isValidImageUrl(imageUrl)) {
           // 2. 异步文件大小检查
-          console.log(`⏳ 正在验证图片文件大小: ${imageUrl}`);
+          // logger.info(`⏳ 正在验证图片文件大小: ${imageUrl}`);
           const validationResult = await this.validateImage(imageUrl);
 
           if (validationResult.isValid) {
-            console.log(`✅ 图片验证通过: ${imageUrl}`);
+            // logger.info(`✅ 图片验证通过: ${imageUrl}`);
             return imageUrl; // 验证通过，返回URL
           } else {
-            console.log(`❌ 图片验证失败: ${imageUrl} (原因: ${validationResult.error})`);
+            // logger.info(`❌ 图片验证失败: ${imageUrl} (原因: ${validationResult.error})`);
             return null; // 验证失败，返回null
           }
         } else {
-          console.log(`❌ URL不符合基本要求: ${imageUrl}`);
+          // logger.info(`❌ URL不符合基本要求: ${imageUrl}`);
           return null; // 基础检查失败，返回null
         }
       }
 
-      console.log('❌ 未从内容中找到img标签');
+      // logger.info('❌ 未从内容中找到img标签');
       return null;
     } catch (error) {
-      console.warn('从内容img标签提取图片时出错:', error);
+      logger.warn('从内容img标签提取图片时出错:', error);
       return null;
     }
   }
@@ -143,11 +144,9 @@ export class ImageExtractionService {
    * HTML解码函数 - 增强版本
    */
   private decodeHtml(html: string): string {
-    console.log(`🔍 开始HTML解码，原始长度: ${html?.length || 0}`);
-    console.log(`📄 原始内容预览: ${html?.substring(0, 200) || ''}...`);
+    // logger.info(`🔍 开始HTML解码，原始长度: ${html?.length || 0}`);
     
     if (!html || typeof html !== 'string') {
-      console.log('❌ HTML内容为空或不是字符串');
       return '';
     }
     
@@ -175,7 +174,7 @@ export class ImageExtractionService {
         const char = String.fromCharCode(parseInt(code));
         return char;
       } catch (error) {
-        console.warn(`⚠️ 数字实体解码失败 ${match}:`, error);
+        logger.warn(`⚠️ 数字实体解码失败 ${match}:`, error);
         return match;
       }
     });
@@ -186,13 +185,13 @@ export class ImageExtractionService {
         const char = String.fromCharCode(parseInt(hex, 16));
         return char;
       } catch (error) {
-        console.warn(`⚠️ 十六进制实体解码失败 ${match}:`, error);
+        logger.warn(`⚠️ 十六进制实体解码失败 ${match}:`, error);
         return match;
       }
     });
     
-    console.log(`✅ HTML解码完成，解码后长度: ${decoded.length}`);
-    console.log(`📄 解码后内容预览: ${decoded.substring(0, 200)}...`);
+    // logger.info(`✅ HTML解码完成，解码后长度: ${decoded.length}`);
+    // logger.info(`📄 解码后内容预览: ${decoded.substring(0, 200)}...`);
     return decoded;
   }
 
@@ -200,24 +199,24 @@ export class ImageExtractionService {
    * 检查URL是否看起来像图片 - 增强版
    */
   private looksLikeImageUrl(url: string): boolean {
-    console.log(`🔍 检查URL是否像图片: ${url}`);
+    // logger.info(`🔍 检查URL是否像图片: ${url}`);
     
     if (!url || typeof url !== 'string') {
-      console.log('❌ URL为空或不是字符串');
+      // logger.info('❌ URL为空或不是字符串');
       return false;
     }
     
     const urlLower = url.toLowerCase();
-    console.log(`📄 URL转为小写: ${urlLower}`);
+    // logger.info(`📄 URL转为小写: ${urlLower}`);
     
     // 检查是否包含图片扩展名
     const hasImageExtension = this.ALLOWED_FORMATS.some(format => {
       const result = urlLower.includes(format);
-      console.log(`🔍 检查扩展名 ${format}: ${result}`);
+      // logger.info(`🔍 检查扩展名 ${format}: ${result}`);
       return result;
     });
     
-    console.log(`📄 是否包含图片扩展名: ${hasImageExtension}`);
+    // logger.info(`📄 是否包含图片扩展名: ${hasImageExtension}`);
     
     // 检查是否是已知的图片CDN域名
     const imageHostnames = [
@@ -239,15 +238,15 @@ export class ImageExtractionService {
     
     const isImageHost = imageHostnames.some(hostname => {
       const result = urlLower.includes(hostname);
-      console.log(`🔍 检查域名 ${hostname}: ${result}`);
+      // logger.info(`🔍 检查域名 ${hostname}: ${result}`);
       return result;
     });
     
-    console.log(`📄 是否来自图片CDN: ${isImageHost}`);
+    // logger.info(`📄 是否来自图片CDN: ${isImageHost}`);
     
-    // 如果包含图片扩展名或来自图片CDN，则认为是图片
+    // 如果包含图片扩展名 or 来自图片CDN，则认为是图片
     const result = hasImageExtension || isImageHost;
-    console.log(`✅ 最终判断结果: ${result}`);
+    // logger.info(`✅ 最终判断结果: ${result}`);
     return result;
   }
 
@@ -299,7 +298,6 @@ export class ImageExtractionService {
       // 🔥 对于防盗链域名，跳过 HEAD 验证（会被拒绝），直接返回成功
       // 这些图片会通过代理服务器加载
       if (this.isAntiHotlinkDomain(url)) {
-        console.log(`✅ 防盗链域名，跳过验证: ${url}`);
         return { isValid: true };
       }
       

@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { DatabaseService } from '../database/DatabaseService';
+import { logger } from './rss/RSSUtils';
 
 /**
  * 图片缓存服务 - 将网络图片下载到本地
@@ -244,10 +245,21 @@ class ImageCacheService {
       const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
       if (!dirInfo.exists) return;
 
+      // 🔥 优化：如果 maxAgeMs 为 0，说明是清除所有，直接删除整个目录
+      // 这比逐个删除文件快得多，且只消耗一次 Bridge 调用
+      if (maxAgeMs === 0) {
+         await FileSystem.deleteAsync(this.cacheDir, { idempotent: true });
+         await this.ensureCacheDir();
+         return;
+      }
+
       const files = await FileSystem.readDirectoryAsync(this.cacheDir);
       const now = Date.now();
 
       for (const file of files) {
+        // ⚡️ 避免主线程阻塞：每检查一个文件就让出控制权
+        await new Promise(resolve => setTimeout(resolve, 0));
+
         const filePath = `${this.cacheDir}${file}`;
         const fileInfo = await FileSystem.getInfoAsync(filePath);
         
@@ -259,7 +271,7 @@ class ImageCacheService {
         }
       }
     } catch (error) {
-      console.error('清理缓存失败:', error);
+      logger.error('清理缓存失败:', error);
     }
   }
 

@@ -2,6 +2,7 @@ import { DatabaseService } from '../database/DatabaseService';
 import { ArticleService } from './ArticleService';
 import { VocabularyService } from './VocabularyService';
 import { RSSService } from './rss';
+import { logger } from './rss/RSSUtils';
 
 export interface UserStats {
   articlesRead: number;
@@ -67,7 +68,7 @@ export class UserStatsService {
         activeRssSources: activeRssSources.length,
       };
     } catch (error) {
-      console.error('Error getting user stats:', error);
+      logger.error('Error getting user stats:', error);
       // 返回默认值
       return {
         articlesRead: 0,
@@ -103,7 +104,7 @@ export class UserStatsService {
       
       return 0;
     } catch (error) {
-      console.error('Error calculating study days:', error);
+      logger.error('Error calculating study days:', error);
       return 0;
     }
   }
@@ -148,7 +149,7 @@ export class UserStatsService {
         readingTimeThisWeek: readingTimeMinutes,
       };
     } catch (error) {
-      console.error('Error getting weekly stats:', error);
+      logger.error('Error getting weekly stats:', error);
       return {
         articlesReadThisWeek: 0,
         wordsAddedThisWeek: 0,
@@ -196,7 +197,7 @@ export class UserStatsService {
           });
         } catch (dayError) {
           // 不中止鐐取整个趨势数据，仅记录错误
-          console.error(`Error processing date ${dateISO}:`, dayError);
+          logger.error(`Error processing date ${dateISO}:`, dayError);
           results.push({
             date: date.toISOString().split('T')[0],
             articles: 0,
@@ -207,7 +208,7 @@ export class UserStatsService {
         
       return results;
     } catch (error) {
-      console.error('Error getting reading trend:', error);
+      logger.error('Error getting reading trend:', error);
       return [];
     }
   }

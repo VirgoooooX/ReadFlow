@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AvatarStorageService from './AvatarStorageService';
+import { logger } from './rss/RSSUtils';
 
 export interface User {
   id: string;
@@ -75,7 +76,7 @@ export class AuthService {
         await this.saveRegisteredUsers();
       }
     } catch (error) {
-      console.error('初始化用户数据失败:', error);
+      logger.error('初始化用户数据失败:', error);
     }
   }
 
@@ -87,9 +88,10 @@ export class AuthService {
       const usersObject = Object.fromEntries(this.registeredUsers);
       await AsyncStorage.setItem(AuthService.REGISTERED_USERS_KEY, JSON.stringify(usersObject));
     } catch (error) {
-      console.error('保存用户数据失败:', error);
+      logger.error('保存用户数据失败:', error);
     }
   }
+
 
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
@@ -129,7 +131,7 @@ export class AuthService {
         }
       }
     } catch (error) {
-      console.error('初始化认证服务失败:', error);
+      logger.error('初始化认证服务失败:', error);
       await this.logout();
     } finally {
       this.initialized = true;
@@ -159,7 +161,7 @@ export class AuthService {
 
       return response;
     } catch (error) {
-      console.error('登录失败:', error);
+      logger.error('登录失败:', error);
       return {
         success: false,
         message: '登录过程中出现错误，请重试'
@@ -177,7 +179,7 @@ export class AuthService {
 
       return response;
     } catch (error) {
-      console.error('注册失败:', error);
+      logger.error('注册失败:', error);
       return {
         success: false,
         message: '注册过程中出现错误，请重试'
@@ -198,7 +200,7 @@ export class AuthService {
 
       await AsyncStorage.multiRemove(['auth_token', 'current_user']);
     } catch (error) {
-      console.error('登出失败:', error);
+      logger.error('登出失败:', error);
     }
   }
 
@@ -224,7 +226,7 @@ export class AuthService {
 
       return response;
     } catch (error) {
-      console.error('更新用户信息失败:', error);
+      logger.error('更新用户信息失败:', error);
       return {
         success: false,
         message: '更新用户信息时出现错误，请重试'
@@ -249,7 +251,7 @@ export class AuthService {
 
       return response;
     } catch (error) {
-      console.error('修改密码失败:', error);
+      logger.error('修改密码失败:', error);
       return {
         success: false,
         message: '修改密码时出现错误，请重试'
@@ -265,10 +267,11 @@ export class AuthService {
       // TODO: 替换为实际的API调用
       return await this.mockValidateToken(token);
     } catch (error) {
-      console.error('验证token失败:', error);
+      logger.error('验证token失败:', error);
       return false;
     }
   }
+
 
   /**
    * 获取当前用户

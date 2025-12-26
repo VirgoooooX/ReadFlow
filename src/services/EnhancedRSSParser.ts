@@ -1,4 +1,5 @@
 import { parse as parseRSS } from 'react-native-rss-parser';
+import { logger } from './rss/RSSUtils';
 
 // =================== 类型定义 ===================
 
@@ -73,12 +74,25 @@ export async function parseEnhancedRSS(xmlText: string): Promise<EnhancedRSSFeed
   const itemRegex = /<item(?:\s+[^>]*)?>([\s\S]*?)<\/item>/gi;
   const itemsRaw: string[] = [];
   let match;
+  let matchCount = 0;
   while ((match = itemRegex.exec(xmlText)) !== null) {
     itemsRaw.push(match[1]);
+    matchCount++;
+    // 每匹配 10 个项目让出一次主线程
+    if (matchCount % 10 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
   }
   
   // 2. 遍历 item 并提取扩展信息
-  rss.items.forEach((item, index) => {
+  for (let index = 0; index < rss.items.length; index++) {
+    const item = rss.items[index];
+    
+    // 每处理 5 个项目让出一次主线程
+    if (index % 5 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
     // 只有当 raw items 数量匹配时才尝试匹配
     if (index < itemsRaw.length) {
       const itemXml = itemsRaw[index];
@@ -95,7 +109,7 @@ export async function parseEnhancedRSS(xmlText: string): Promise<EnhancedRSSFeed
         (item as EnhancedRSSItem).mediaThumbnail = thumbnail;
       }
     }
-  });
+  }
   
   return rss as EnhancedRSSFeed;
 }
@@ -172,7 +186,7 @@ function extractMediaContentFromXml(itemXml: string): MediaContentInfo[] {
     
     return mediaContents;
   } catch (error) {
-    console.warn('提取media:content信息时出错:', error);
+    logger.warn('提取media:content信息时出错:', error);
     return [];
   }
 }
@@ -234,7 +248,7 @@ export function extractBestImageWithCaption(
     const imageMedia = mediaList.find(media => media.medium === 'image') || mediaList.find(media => media.url);
     
     if (imageMedia && imageMedia.url) {
-      // console.log(`✅ 从media:content提取到图片: ${imageMedia.url}`);
+      // logger.info(`✅ 从media:content提取到图片: ${imageMedia.url}`);
       return {
         url: processImageUrl(imageMedia.url) || imageMedia.url,
         caption: imageMedia.description,
@@ -246,7 +260,7 @@ export function extractBestImageWithCaption(
   
   // 2. 检查 media:thumbnail
   if (item.mediaThumbnail && item.mediaThumbnail.url) {
-    // console.log(`✅ 从media:thumbnail提取到图片: ${item.mediaThumbnail.url}`);
+    // logger.info(`✅ 从media:thumbnail提取到图片: ${item.mediaThumbnail.url}`);
     // thumbnail 通常没有独立的说明，尝试从 mediaContent 获取
     const mediaDesc = item.mediaContent?.[0]?.description;
     const mediaCredit = item.mediaContent?.[0]?.credit;
@@ -267,7 +281,7 @@ export function extractBestImageWithCaption(
       enc.mimeType && enc.mimeType.startsWith('image/')
     );
     if (imageEnclosure && imageEnclosure.url) {
-      // console.log(`✅ 从enclosure提取到图片: ${imageEnclosure.url}`);
+      // logger.info(`✅ 从enclosure提取到图片: ${imageEnclosure.url}`);
       return {
         url: imageEnclosure.url,
         source: 'enclosure',
@@ -311,14 +325,14 @@ function isPlaceholderImage(url: string, alt?: string): boolean {
   
   for (const pattern of placeholderPatterns) {
     if (urlLower.includes(pattern)) {
-      // console.log(`⚠️ 检测到占位图URL: ${url} (匹配关键字: ${pattern})`);
+      // logger.warn(`⚠️ 检测到占位图URL: ${url} (匹配关键字: ${pattern})`);
       return true;
     }
   }
   
   // 检查 alt 属性特征
   if (altLower === 'loading' || altLower === 'image unavailable') {
-    // console.log(`⚠️ 检测到占位图alt: ${alt}`);
+    // logger.warn(`⚠️ 检测到占位图alt: ${alt}`);
     return true;
   }
   
@@ -419,7 +433,7 @@ function extractImageFromHtmlContent(content: string, skipFirst: boolean = false
     
     return undefined;
   } catch (error) {
-    console.warn('从HTML内容提取图片时出错:', error);
+    logger.warn('从HTML内容提取图片时出错:', error);
     return undefined;
   }
 }
@@ -470,7 +484,7 @@ function processImageUrl(url: string): string | undefined {
     
     return url;
   } catch (error) {
-    console.warn('处理图片URL时出错:', error);
+    // logger.warn('处理图片URL时出错:', error);
     return url; // 返回原始URL
   }
 }

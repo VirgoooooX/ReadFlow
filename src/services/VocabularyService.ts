@@ -2,6 +2,7 @@ import { DatabaseService } from '../database/DatabaseService';
 import { VocabularyEntry, WordDefinition, AppError, ProxyModeConfig } from '../types';
 import { DictionaryService } from './DictionaryService';
 import { SettingsService } from './SettingsService';
+import { logger } from './rss/RSSUtils';
 
 export class VocabularyService {
   private static instance: VocabularyService;
@@ -91,7 +92,7 @@ export class VocabularyService {
         ...vocabularyEntry,
       };
     } catch (error) {
-      console.error('Error adding word to vocabulary:', error);
+      logger.error('Error adding word to vocabulary:', error);
       throw new Error(`Failed to add word: ${word}`);
     }
   }
@@ -112,7 +113,7 @@ export class VocabularyService {
 
       return this.mapVocabularyRow(results[0]);
     } catch (error) {
-      console.error('Error getting word entry:', error);
+      logger.error('Error getting word entry:', error);
       return null;
     }
   }
@@ -170,7 +171,7 @@ export class VocabularyService {
 
       return results.map(this.mapVocabularyRow);
     } catch (error) {
-      console.error('Error getting all words:', error);
+      logger.error('Error getting all words:', error);
       return [];
     }
   }
@@ -190,7 +191,7 @@ export class VocabularyService {
 
       return results.map(this.mapVocabularyRow);
     } catch (error) {
-      console.error('Error searching words:', error);
+      logger.error('Error searching words:', error);
       return [];
     }
   }
@@ -212,7 +213,7 @@ export class VocabularyService {
 
       return results.map(this.mapVocabularyRow);
     } catch (error) {
-      console.error('Error getting words for review:', error);
+      logger.error('Error getting words for review:', error);
       return [];
     }
   }
@@ -261,7 +262,7 @@ export class VocabularyService {
       const updatedEntry = await this.getWordById(id);
       return updatedEntry!;
     } catch (error) {
-      console.error('Error recording review:', error);
+      logger.error('Error recording review:', error);
       throw new Error('Failed to record review');
     }
   }
@@ -276,7 +277,7 @@ export class VocabularyService {
         [notes, id]
       );
     } catch (error) {
-      console.error('Error updating notes:', error);
+      logger.error('Error updating notes:', error);
       throw new Error('Failed to update notes');
     }
   }
@@ -301,7 +302,7 @@ export class VocabularyService {
         );
       }
     } catch (error) {
-      console.error('Error adding tag:', error);
+      logger.error('Error adding tag:', error);
       throw new Error('Failed to add tag');
     }
   }
@@ -323,7 +324,7 @@ export class VocabularyService {
         [JSON.stringify(tags), id]
       );
     } catch (error) {
-      console.error('Error removing tag:', error);
+      logger.error('Error removing tag:', error);
       throw new Error('Failed to remove tag');
     }
   }
@@ -337,9 +338,9 @@ export class VocabularyService {
         'DELETE FROM vocabulary WHERE id = ?',
         [id]
       );
-      console.log(`✅ 已删除单词 ID: ${id}`);
+      logger.info(`✅ 已删除单词 ID: ${id}`);
     } catch (error) {
-      console.error('Error deleting word:', error);
+      logger.error('Error deleting word:', error);
       throw new Error('Failed to delete word');
     }
   }
@@ -377,7 +378,7 @@ export class VocabularyService {
         totalReviews: totalReviewsResult[0]?.total || 0,
       };
     } catch (error) {
-      console.error('Error getting study stats:', error);
+      logger.error('Error getting study stats:', error);
       return {
         totalWords: 0,
         masteredWords: 0,
@@ -413,7 +414,7 @@ export class VocabularyService {
 
       return Array.from(allTags).sort();
     } catch (error) {
-      console.error('Error getting all tags:', error);
+      logger.error('Error getting all tags:', error);
       return [];
     }
   }
@@ -429,7 +430,7 @@ export class VocabularyService {
 
       return results.map(this.mapVocabularyRow);
     } catch (error) {
-      console.error('Error exporting vocabulary:', error);
+      logger.error('Error exporting vocabulary:', error);
       return [];
     }
   }
@@ -446,7 +447,7 @@ export class VocabularyService {
         await this.addWord(word.trim());
         success++;
       } catch (error) {
-        console.error(`Failed to import word: ${word}`, error);
+        logger.error(`Failed to import word: ${word}`, error);
         failed++;
       }
     }
@@ -472,7 +473,7 @@ export class VocabularyService {
 
       return this.mapVocabularyRow(results[0]);
     } catch (error) {
-      console.error('Error getting word by ID:', error);
+      logger.error('Error getting word by ID:', error);
       return null;
     }
   }
@@ -515,7 +516,7 @@ export class VocabularyService {
       const updatedEntry = await this.getWordById(id);
       return updatedEntry!;
     } catch (error) {
-      console.error('Error updating word context:', error);
+      logger.error('Error updating word context:', error);
       throw error;
     }
   }
@@ -588,7 +589,7 @@ export class VocabularyService {
 
       return streak;
     } catch (error) {
-      console.error('Error calculating study streak:', error);
+      logger.error('Error calculating study streak:', error);
       return 0;
     }
   }
@@ -625,9 +626,9 @@ export class VocabularyService {
 
     try {
       const startTime = Date.now();
-      console.log('\n' + '='.repeat(60));
-      console.log('[Vocabulary Sync] 🚀 开始同步生词本到代理服务器...');
-      console.log('='.repeat(60));
+      logger.info('\n' + '='.repeat(60));
+      logger.info('[Vocabulary Sync] 🚀 开始同步生词本到代理服务器...');
+      logger.info('='.repeat(60));
 
       // 1. Push: 上传本地修改
       const pushResult = await this.pushToServer(config);
@@ -643,15 +644,15 @@ export class VocabularyService {
       });
 
       const duration = Date.now() - startTime;
-      console.log('-'.repeat(60));
-      console.log('[Vocabulary Sync] 📊 同步总结');
-      console.log(`[Vocabulary Sync] ⬆️  上传: ${pushResult.uploadedCount} 个单词`);
-      console.log(`[Vocabulary Sync] ⬇️  下载: ${pullResult.downloadedCount} 个单词`);
-      console.log(`[Vocabulary Sync] ⏱️  耗时: ${(duration / 1000).toFixed(2)}s`);
-      console.log(`[Vocabulary Sync] 🕐 最后同步: ${syncTime}`);
-      console.log('='.repeat(60) + '\n');
+      logger.info('-'.repeat(60));
+      logger.info('[Vocabulary Sync] 📊 同步总结');
+      logger.info(`[Vocabulary Sync] ⬆️  上传: ${pushResult.uploadedCount} 个单词`);
+      logger.info(`[Vocabulary Sync] ⬇️  下载: ${pullResult.downloadedCount} 个单词`);
+      logger.info(`[Vocabulary Sync] ⏱️  耗时: ${(duration / 1000).toFixed(2)}s`);
+      logger.info(`[Vocabulary Sync] 🕐 最后同步: ${syncTime}`);
+      logger.info('='.repeat(60) + '\n');
     } catch (error) {
-      console.error('[Vocabulary Sync] 💥 同步失败:', error);
+      logger.error('[Vocabulary Sync] 💥 同步失败:', error);
       // 静默失败，不影响本地使用
     }
   }
@@ -669,11 +670,11 @@ export class VocabularyService {
     );
 
     if (modifiedWords.length === 0) {
-      console.log('[Vocabulary Sync] ⚠️ 没有本地修改，跳过 Push');
+      logger.info('[Vocabulary Sync] ⚠️ 没有本地修改，跳过 Push');
       return { uploadedCount: 0 };
     }
 
-    console.log(`[Vocabulary Sync] ⬆️  准备上传 ${modifiedWords.length} 个单词`);
+    logger.info(`[Vocabulary Sync] ⬆️  准备上传 ${modifiedWords.length} 个单词`);
 
     // 转换时间戳为 ISO 字符串格式
     const convertToISO = (timestamp: any): string | null => {
@@ -744,7 +745,7 @@ export class VocabularyService {
 
     const data = await response.json();
     const uploadedCount = data.synced || modifiedWords.length;
-    console.log(`[Vocabulary Sync] ✅ Push 完成，成功 ${uploadedCount}/${modifiedWords.length} 个单词`);
+    logger.info(`[Vocabulary Sync] ✅ Push 完成，成功 ${uploadedCount}/${modifiedWords.length} 个单词`);
     
     return { uploadedCount };
   }
@@ -784,15 +785,15 @@ export class VocabularyService {
         serverTime = data.server_time;
       }
 
-      console.log(`[Vocabulary Sync] ⬇️  拉取批次 ${loopCount}: ${serverWords.length} 个单词, has_more: ${hasMore}`);
+      logger.info(`[Vocabulary Sync] ⬇️  拉取批次 ${loopCount}: ${serverWords.length} 个单词, has_more: ${hasMore}`);
     }
 
     if (allServerWords.length === 0) {
-      console.log('[Vocabulary Sync] ⚠️ 服务端没有更新，跳过 Pull');
+      logger.info('[Vocabulary Sync] ⚠️ 服务端没有更新，跳过 Pull');
       return { serverTime, downloadedCount: 0 };
     }
 
-    console.log(`[Vocabulary Sync] ⬇️  从服务端总共拉取 ${allServerWords.length} 个单词`);
+    logger.info(`[Vocabulary Sync] ⬇️  从服务端总共拉取 ${allServerWords.length} 个单词`);
 
     // Upsert 到本地数据库
     let upsertCount = 0;
@@ -810,7 +811,7 @@ export class VocabularyService {
       }
     }
 
-    console.log(`[Vocabulary Sync] ✅ Pull 完成，处理 ${upsertCount}/${allServerWords.length} 个`);
+    logger.info(`[Vocabulary Sync] ✅ Pull 完成，处理 ${upsertCount}/${allServerWords.length} 个`);
     return { serverTime, downloadedCount: upsertCount };
   }
 
@@ -830,14 +831,15 @@ export class VocabularyService {
           `UPDATE vocabulary SET definition = ?, context = ?, updated_at = ? WHERE word = ?`,
           [word.translation, word.context, word.updated_at, word.word]
         );
-        console.log(`更新单词: ${word.word}`);
+        logger.info(`更新单词: ${word.word}`);
       }
     } else {
       // 插入新单词
       await this.addWord(word.word, word.context, undefined, word.translation);
-      console.log(`新增单词: ${word.word}`);
+      logger.info(`新增单词: ${word.word}`);
     }
   }
+
 }
 
 // 导出单例实例

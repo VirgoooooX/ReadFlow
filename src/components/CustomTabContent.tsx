@@ -69,6 +69,8 @@ const CustomTabContent = forwardRef<CustomTabContentHandle, CustomTabContentProp
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1 }}
             onScroll={scrollHandler}
             scrollEventThrottle={16}
             onMomentumScrollEnd={onMomentumScrollEnd}

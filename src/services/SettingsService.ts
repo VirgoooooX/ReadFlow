@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ReadingSettings, AppSettings, AppError, ProxyModeConfig, ProxyServer, ProxyServersConfig } from '../types';
 import { DatabaseService } from '../database/DatabaseService';
+import { logger } from './rss/RSSUtils';
 
 export class SettingsService {
   private static instance: SettingsService;
@@ -41,7 +42,7 @@ export class SettingsService {
       // 返回默认设置
       return this.getDefaultReadingSettings();
     } catch (error) {
-      console.error('Error getting reading settings:', error);
+      logger.error('Error getting reading settings:', error);
       return this.getDefaultReadingSettings();
     }
   }
@@ -56,7 +57,7 @@ export class SettingsService {
         JSON.stringify(settings)
       );
     } catch (error) {
-      console.error('Error saving reading settings:', error);
+      logger.error('Error saving reading settings:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save reading settings',
@@ -80,7 +81,7 @@ export class SettingsService {
       // 返回默认设置
       return this.getDefaultAppSettings();
     } catch (error) {
-      console.error('Error getting app settings:', error);
+      logger.error('Error getting app settings:', error);
       return this.getDefaultAppSettings();
     }
   }
@@ -95,7 +96,7 @@ export class SettingsService {
         JSON.stringify(settings)
       );
     } catch (error) {
-      console.error('Error saving app settings:', error);
+      logger.error('Error saving app settings:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save app settings',
@@ -121,7 +122,7 @@ export class SettingsService {
 
       await this.saveReadingSettings(updatedSettings);
     } catch (error) {
-      console.error('Error updating reading setting:', error);
+      logger.error('Error updating reading setting:', error);
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
         message: `Failed to update reading setting: ${String(key)}`,
@@ -147,7 +148,7 @@ export class SettingsService {
 
       await this.saveAppSettings(updatedSettings);
     } catch (error) {
-      console.error('Error updating app setting:', error);
+      logger.error('Error updating app setting:', error);
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
         message: `Failed to update app setting: ${String(key)}`,
@@ -165,7 +166,7 @@ export class SettingsService {
       const defaultSettings = this.getDefaultReadingSettings();
       await this.saveReadingSettings(defaultSettings);
     } catch (error) {
-      console.error('Error resetting reading settings:', error);
+      logger.error('Error resetting reading settings:', error);
       throw new AppError({
         code: 'SETTINGS_RESET_ERROR',
         message: 'Failed to reset reading settings',
@@ -183,7 +184,7 @@ export class SettingsService {
       const defaultSettings = this.getDefaultAppSettings();
       await this.saveAppSettings(defaultSettings);
     } catch (error) {
-      console.error('Error resetting app settings:', error);
+      logger.error('Error resetting app settings:', error);
       throw new AppError({
         code: 'SETTINGS_RESET_ERROR',
         message: 'Failed to reset app settings',
@@ -209,7 +210,7 @@ export class SettingsService {
       }
       return this.getDefaultRSSSettings();
     } catch (error) {
-      console.error('Error getting RSS settings:', error);
+      logger.error('Error getting RSS settings:', error);
       return this.getDefaultRSSSettings();
     }
   }
@@ -226,7 +227,7 @@ export class SettingsService {
         translationTimeout: settings.translationTimeout,
       });
     } catch (error) {
-      console.error('Error saving RSS settings:', error);
+      logger.error('Error saving RSS settings:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save RSS settings',
@@ -254,7 +255,7 @@ export class SettingsService {
       }
       return this.getDefaultLLMSettings();
     } catch (error) {
-      console.error('Error getting LLM settings:', error);
+      logger.error('Error getting LLM settings:', error);
       return this.getDefaultLLMSettings();
     }
   }
@@ -269,7 +270,7 @@ export class SettingsService {
         JSON.stringify(settings)
       );
     } catch (error) {
-      console.error('Error saving LLM settings:', error);
+      logger.error('Error saving LLM settings:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save LLM settings',
@@ -290,7 +291,7 @@ export class SettingsService {
       }
       return this.getDefaultThemeSettings();
     } catch (error) {
-      console.error('Error getting theme settings:', error);
+      logger.error('Error getting theme settings:', error);
       return this.getDefaultThemeSettings();
     }
   }
@@ -305,7 +306,7 @@ export class SettingsService {
         JSON.stringify(settings)
       );
     } catch (error) {
-      console.error('Error saving theme settings:', error);
+      logger.error('Error saving theme settings:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save theme settings',
@@ -344,7 +345,7 @@ export class SettingsService {
         exportedAt: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('Error exporting settings:', error);
+      logger.error('Error exporting settings:', error);
       throw new AppError({
         code: 'SETTINGS_EXPORT_ERROR',
         message: 'Failed to export settings',
@@ -411,7 +412,7 @@ export class SettingsService {
         await this.saveAppSettings(data.appSettings);
       }
     } catch (error) {
-      console.error('Error importing settings:', error);
+      logger.error('Error importing settings:', error);
       throw new AppError({
         code: 'SETTINGS_IMPORT_ERROR',
         message: 'Failed to import settings',
@@ -432,7 +433,7 @@ export class SettingsService {
         AsyncStorage.removeItem(SettingsService.STORAGE_KEYS.USER_PREFERENCES),
       ]);
     } catch (error) {
-      console.error('Error clearing settings:', error);
+      logger.error('Error clearing settings:', error);
       throw new AppError({
         code: 'SETTINGS_CLEAR_ERROR',
         message: 'Failed to clear settings',
@@ -456,7 +457,7 @@ export class SettingsService {
 
       return defaultValue;
     } catch (error) {
-      console.error('Error getting user preference:', error);
+      logger.error('Error getting user preference:', error);
       return defaultValue;
     }
   }
@@ -476,7 +477,7 @@ export class SettingsService {
         JSON.stringify(preferences)
       );
     } catch (error) {
-      console.error('Error setting user preference:', error);
+      logger.error('Error setting user preference:', error);
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
         message: `Failed to set user preference: ${key}`,
@@ -513,7 +514,7 @@ export class SettingsService {
         total: readingSize + appSize + preferencesSize,
       };
     } catch (error) {
-      console.error('Error getting storage usage:', error);
+      logger.error('Error getting storage usage:', error);
       return {
         readingSettings: 0,
         appSettings: 0,
@@ -636,7 +637,7 @@ export class SettingsService {
 
       return true;
     } catch (error) {
-      console.error('Error validating reading settings:', error);
+      logger.error('Error validating reading settings:', error);
       return false;
     }
   }
@@ -663,7 +664,7 @@ export class SettingsService {
         sepia: readingSettings.sepia,
       };
     } catch (error) {
-      console.error('Error getting theme settings:', error);
+      logger.error('Error getting theme settings:', error);
       return {
         theme: 'light',
         backgroundColor: '#FFFFFF',
@@ -720,7 +721,7 @@ export class SettingsService {
       await this.saveReadingSettings(updatedSettings);
       await this.updateAppSetting('theme', preset);
     } catch (error) {
-      console.error('Error applying theme preset:', error);
+      logger.error('Error applying theme preset:', error);
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
         message: `Failed to apply theme preset: ${preset}`,
@@ -745,7 +746,7 @@ export class SettingsService {
       }
       return JSON.parse(configStr);
     } catch (error) {
-      console.error('Error getting proxy mode config:', error);
+      logger.error('Error getting proxy mode config:', error);
       return { 
         enabled: false, 
         serverUrl: '', 
@@ -764,7 +765,7 @@ export class SettingsService {
         JSON.stringify(config)
       );
     } catch (error) {
-      console.error('Error saving proxy mode config:', error);
+      logger.error('Error saving proxy mode config:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save proxy mode config',
@@ -783,9 +784,9 @@ export class SettingsService {
     username: string
   ): Promise<{ success: boolean; message?: string; token?: string; userId?: number }> {
     try {
-      console.log(`[Proxy Login] 尝试连接: ${serverUrl}/api/auth/login`);
-      console.log(`[Proxy Login] 用户名: ${username}`);
-      console.log(`[Proxy Login] 发送数据: {
+      logger.info(`[Proxy Login] 尝试连接: ${serverUrl}/api/auth/login`);
+      logger.info(`[Proxy Login] 用户名: ${username}`);
+      logger.info(`[Proxy Login] 发送数据: {
         username: "${username}",
         password: "${serverPassword}"
       }`);
@@ -800,17 +801,17 @@ export class SettingsService {
         timeout: 10000,
       } as any);
 
-      console.log(`[Proxy Login] 响应状态: ${response.status}`);
+      logger.info(`[Proxy Login] 响应状态: ${response.status}`);
 
       if (!response.ok) {
-        console.error(`[Proxy Login] HTTP ${response.status} 错误`);
+        logger.error(`[Proxy Login] HTTP ${response.status} 错误`);
         const errorText = await response.text();
-        console.error(`[Proxy Login] 错误响应: ${errorText}`);
+        logger.error(`[Proxy Login] 错误响应: ${errorText}`);
         return { success: false, message: `HTTP ${response.status}: ${errorText || '认证失败'}` };
       }
 
       const data = await response.json();
-      console.log(`[Proxy Login] 响应数据:`, { success: data.success, user_id: data.user_id });
+      logger.info(`[Proxy Login] 响应数据:`, { success: data.success, user_id: data.user_id });
 
       if (data.success) {
         // 保存配置
@@ -823,16 +824,16 @@ export class SettingsService {
         };
         
         await this.saveProxyModeConfig(config);
-        console.log('[Proxy Login] 登录成功，Token 已保存');
+        logger.info('[Proxy Login] 登录成功，Token 已保存');
         
 
         return { success: true, token: data.token, userId: data.user_id };
       } else {
-        console.error('[Proxy Login] 服务端返回失败:', data.message);
+        logger.error('[Proxy Login] 服务端返回失败:', data.message);
         return { success: false, message: data.message || '认证失败' };
       }
     } catch (error) {
-      console.error('[Proxy Login] 错误:', error);
+      logger.error('[Proxy Login] 错误:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
       return { success: false, message: `连接失败: ${errorMsg}` };
     }
@@ -852,7 +853,7 @@ export class SettingsService {
     let successCount = 0;
     let failedCount = 0;
 
-    console.log(`[SyncSubscriptions] 开始同步 ${sources.length} 个订阅源...`);
+    logger.info(`[SyncSubscriptions] 开始同步 ${sources.length} 个订阅源...`);
 
     for (const source of sources) {
       try {
@@ -872,23 +873,23 @@ export class SettingsService {
         const data = await response.json();
         if (data.success) {
           successCount++;
-          console.log(`[SyncSubscriptions] ✅ ${source.name}: 成功`);
+          logger.info(`[SyncSubscriptions] ✅ ${source.name}: 成功`);
         } else {
           failedCount++;
-          console.warn(`[SyncSubscriptions] ⚠️ ${source.name}: ${data.message || '失败'}`);
+          logger.warn(`[SyncSubscriptions] ⚠️ ${source.name}: ${data.message || '失败'}`);
         }
       } catch (error) {
         failedCount++;
-        console.error(`[SyncSubscriptions] ❗ ${source.name}:`, error);
+        logger.error(`[SyncSubscriptions] ❗ ${source.name}:`, error);
       }
     }
 
-    console.log(`[SyncSubscriptions] 完成: 成功 ${successCount}, 失败 ${failedCount}`);
+    logger.info(`[SyncSubscriptions] 完成: 成功 ${successCount}, 失败 ${failedCount}`);
     return { success: successCount, failed: failedCount };
   }
 
   /**
-   * 测试代理服务器连接
+   * 测试代理服务器 connection
    */
   public async testProxyServerConnection(serverUrl: string): Promise<boolean> {
     try {
@@ -898,7 +899,7 @@ export class SettingsService {
       } as any);
       return response.ok;
     } catch (error) {
-      console.error('Error testing proxy server connection:', error);
+      logger.error('Error testing proxy server connection:', error);
       return false;
     }
   }
@@ -936,7 +937,7 @@ export class SettingsService {
       
       return { servers: [], activeServerId: null };
     } catch (error) {
-      console.error('Error getting proxy servers config:', error);
+      logger.error('Error getting proxy servers config:', error);
       return { servers: [], activeServerId: null };
     }
   }
@@ -968,7 +969,7 @@ export class SettingsService {
         });
       }
     } catch (error) {
-      console.error('Error saving proxy servers config:', error);
+      logger.error('Error saving proxy servers config:', error);
       throw new AppError({
         code: 'SETTINGS_SAVE_ERROR',
         message: 'Failed to save proxy servers config',

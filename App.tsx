@@ -32,6 +32,7 @@ import AuthService from './src/services/AuthService';
 import { VocabularyService } from './src/services/VocabularyService';
 import { SettingsService } from './src/services/SettingsService';
 import { RSSService } from './src/services/rss';
+import { logger } from './src/services/rss/RSSUtils';
 
 // 阻止原生启动屏自动消失
 SplashScreen.preventAutoHideAsync();
@@ -44,7 +45,7 @@ function App(): React.JSX.Element {
   // 1. 保底机制：无论发生什么，5秒后必须尝试关闭启动页
   useEffect(() => {
     const timebomb = setTimeout(() => {
-      console.log('💣 触发保底隐藏启动页 (5s)');
+      logger.info('💣 触发保底隐藏启动页 (5s)');
       SplashScreen.hideAsync().catch(() => { });
     }, 5000);
     return () => clearTimeout(timebomb);
@@ -54,7 +55,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     async function prepare() {
       try {
-        console.log('🚀 开始应用初始化 (带有 3s 超时保护)...');
+        logger.info('🚀 开始应用初始化 (带有 3s 超时保护)...');
 
         // 并行加载核心服务，并设置 3 秒超时 Race
         const initTasks = Promise.all([
@@ -67,35 +68,35 @@ function App(): React.JSX.Element {
           new Promise(resolve => setTimeout(resolve, 3000))
         ]);
 
-        console.log('✅ 核心服务初始化完成');
+        logger.info('✅ 核心服务初始化完成');
         
         // 【暂时禁用】如果启用了代理模式，尝试同步单词本和文章
         // 保留代码逻辑，但暂不自动调用，等后续手动触发
         // try {
         //   const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
         //   if (proxyConfig.enabled && proxyConfig.token) {
-        //     console.log('🔄 开始同步单词本...');
+        //     logger.info('🔄 开始同步单词本...');
         //     const vocabService = VocabularyService.getInstance();
         //     // 异步同步单词本，不阻塞启动
         //     vocabService.syncToProxyServer().catch(err => {
-        //       console.warn('⚠️ 单词本同步失败:', err);
+        //       logger.warn('⚠️ 单词本同步失败:', err);
         //     });
         //     
         //     // 异步同步文章，不阻塞启动
-        //     console.log('📰 开始同步文章...');
+        //     logger.info('📰 开始同步文章...');
         //     RSSService.getInstance().refreshAllSources().then(result => {
-        //       console.log(`✅ 文章同步完成: 成功 ${result.success}, 失败 ${result.failed}, 新文章 ${result.totalArticles}`);
+        //       logger.info(`✅ 文章同步完成: 成功 ${result.success}, 失败 ${result.failed}, 新文章 ${result.totalArticles}`);
         //     }).catch(err => {
-        //       console.warn('⚠️ 文章同步失败:', err);
+        //       logger.warn('⚠️ 文章同步失败:', err);
         //     });
         //   }
         // } catch (syncError) {
-        //   console.warn('⚠️ 同步检查失败:', syncError);
+        //   logger.warn('⚠️ 同步检查失败:', syncError);
         // }
       } catch (e) {
-        console.warn('⚠️ 初始化阶段发生非致命错误:', e);
+        logger.warn('⚠️ 初始化阶段发生非致命错误:', e);
       } finally {
-        console.log('✨ 进入界面渲染阶段');
+        logger.info('✨ 进入界面渲染阶段');
         setAppIsReady(true);
       }
     }

@@ -12,15 +12,24 @@ export interface FetchWithRetryOptions extends RequestInit {
 
 // =================== 日志工具 ===================
 
+const getLogTime = () => {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const seconds = now.getSeconds().toString().padStart(2, '0');
+  const ms = now.getMilliseconds().toString().padStart(3, '0');
+  return `${hours}:${minutes}:${seconds}.${ms}`;
+};
+
 export const logger = {
-  error: (message: string, error?: any) => {
-    console.error(message, error);
+  error: (message: string, ...args: any[]) => {
+    console.error(`[${getLogTime()}] ${message}`, ...args);
   },
-  warn: (message: string, error?: any) => {
-    console.warn(message, error);
+  warn: (message: string, ...args: any[]) => {
+    console.warn(`[${getLogTime()}] ${message}`, ...args);
   },
-  info: (message: string) => {
-    console.log(message);
+  info: (message: string, ...args: any[]) => {
+    console.log(`[${getLogTime()}] ${message}`, ...args);
   }
 };
 
@@ -168,30 +177,24 @@ export function fixRelativeImageUrls(htmlContent: string, articleLink: string): 
     const urlObj = new URL(articleLink);
     const origin = urlObj.origin; // 结果如: "http://military.people.com.cn"
 
-    // 检查是否有相对路径图片
-    const hasRelativePath = /src=["']\/[^\/]/.test(htmlContent) || /(data-[\w-]+)=["']\/[^\/]/.test(htmlContent);
-    if (hasRelativePath) {
-      logger.info(`[fixRelativeImageUrls] 检测到相对路径图片，原始域名: ${origin}`);
-    }
-
     // 2. 修复 src="/..." 形式的相对路径
     let fixed = htmlContent.replace(/src="\/([^"]+)"/g, (match, path) => {
       const fixedUrl = `src="${origin}/${path}"`;
-      logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
+      // logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
       return fixedUrl;
     });
 
     // 3. 修复 src='/...' 形式的相对路径（单引号）
     fixed = fixed.replace(/src='\/([^']+)'/g, (match, path) => {
       const fixedUrl = `src='${origin}/${path}'`;
-      logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
+      // logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
       return fixedUrl;
     });
 
     // 4. 修复 data-src="/..." 等懒加载属性
     fixed = fixed.replace(/(data-[\w-]+)="\/([^"]+)"/g, (match, attr, path) => {
       const fixedUrl = `${attr}="${origin}/${path}"`;
-      logger.info(`[fixRelativeImageUrls] 修复懒加载: ${match} -> ${fixedUrl}`);
+      // logger.info(`[fixRelativeImageUrls] 修复懒加载: ${match} -> ${fixedUrl}`);
       return fixedUrl;
     });
 

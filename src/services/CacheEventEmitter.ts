@@ -14,6 +14,8 @@
  * - articleRead: 文章标记为已读（带 articleId）
  */
 
+import { logger } from './rss/RSSUtils';
+
 // 事件类型定义
 export type CacheEventType = 
   | 'clearAll' 
@@ -21,7 +23,10 @@ export type CacheEventType =
   | 'clearSourceArticles'
   | 'updateRSSStats'
   | 'refreshSource'
+  | 'refreshSources'
   | 'refreshAllSources'
+  | 'batchSyncStart'
+  | 'batchSyncEnd'
   | 'sourceDeleted'
   | 'sourceUpdated'
   | 'articleRead';
@@ -30,6 +35,7 @@ export type CacheEventType =
 export interface CacheEventData {
   type: CacheEventType;
   sourceId?: number;  // 可选的源ID，用于细粒度操作
+  sourceIds?: number[]; // 可选的源ID列表，用于批量刷新
   sourceName?: string; // 可选的源名称，用于日志
   articleId?: number; // 可选的文章ID，用于单篇文章操作
 }
@@ -66,16 +72,16 @@ class CacheEventEmitter {
    * @param eventData 事件数据
    */
   emit(eventData: CacheEventData): void {
-    const logInfo = eventData.sourceId 
-      ? `${eventData.type} (sourceId: ${eventData.sourceId})` 
-      : eventData.type;
-    console.log(`[CacheEventEmitter] 发射事件: ${logInfo}`);
+    const logInfo = eventData.sourceId !== undefined
+      ? `${eventData.type} (sourceId: ${eventData.sourceId})`
+      : (eventData.sourceIds ? `${eventData.type} (sourceIds: ${eventData.sourceIds.length})` : eventData.type);
+    logger.info(`[CacheEventEmitter] 发射事件: ${logInfo}`);
     
     this.listeners.forEach(listener => {
       try {
         listener(eventData);
       } catch (error) {
-        console.error('[CacheEventEmitter] 监听函数执行出错:', error);
+        logger.error('[CacheEventEmitter] 监听函数执行出错:', error);
       }
     });
   }
@@ -130,6 +136,18 @@ class CacheEventEmitter {
    */
   refreshSource(sourceId: number, sourceName?: string): void {
     this.emit({ type: 'refreshSource', sourceId, sourceName });
+  }
+
+  batchSyncStart(): void {
+    this.emit({ type: 'batchSyncStart' });
+  }
+
+  batchSyncEnd(): void {
+    this.emit({ type: 'batchSyncEnd' });
+  }
+
+  refreshSources(sourceIds: number[]): void {
+    this.emit({ type: 'refreshSources', sourceIds });
   }
 
   /**
