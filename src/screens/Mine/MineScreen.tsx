@@ -134,6 +134,12 @@ const MineScreen: React.FC = () => {
           color="#8B5CF6"
         />
         <SettingItem
+          icon="autorenew"
+          label="启动自动刷新"
+          onPress={() => navigation.navigate('RSSStartupSettings')}
+          color="#10B981"
+        />
+        <SettingItem
           icon="cloud-queue"
           label="代理服务器"
           onPress={() => navigation.navigate('ProxyServerSettings')}

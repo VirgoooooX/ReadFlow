@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { RSSSource } from '../types';
+import { RSSSource, RSSStartupSettings } from '../types';
 import { RSSService } from '../services/rss';
+import { SettingsService } from '../services/SettingsService';
 import { logger } from '../services/rss/RSSUtils';
 import cacheEventEmitter from '../services/CacheEventEmitter';
 
@@ -14,6 +15,11 @@ interface RSSSourceContextType {
   syncAllSources: (onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
   syncSource: (sourceId: number) => Promise<void>;
   syncSources: (sourceIds: number[], onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
+  
+  // 启动刷新配置
+  startupSettings: RSSStartupSettings;
+  updateStartupSettings: (settings: RSSStartupSettings) => Promise<void>;
+  triggerStartupRefresh: () => Promise<void>;
 }
 
 const RSSSourceContext = createContext<RSSSourceContextType | undefined>(undefined);
@@ -25,11 +31,14 @@ interface RSSSourceProviderProps {
 export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }) => {
   const [rssSources, setRssSources] = useState<RSSSource[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [startupSettings, setStartupSettings] = useState<RSSStartupSettings>({ enabled: false, sourceIds: [] });
   const rssService = RSSService.getInstance();
+  const settingsService = SettingsService.getInstance();
 
-  // 初始化加载RSS源
+  // 初始化加载RSS源和设置
   useEffect(() => {
     loadRSSSources();
+    loadStartupSettings();
   }, []);
 
   // 【升级】监听全局事件，支持多种事件类型
@@ -94,6 +103,53 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       logger.error('Failed to load RSS sources:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadStartupSettings = async () => {
+    try {
+      const settings = await settingsService.getRSSStartupSettings();
+      setStartupSettings(settings);
+    } catch (error) {
+      logger.error('Failed to load startup settings:', error);
+    }
+  };
+
+  const updateStartupSettings = async (settings: RSSStartupSettings) => {
+    try {
+      await settingsService.saveRSSStartupSettings(settings);
+      setStartupSettings(settings);
+    } catch (error) {
+      logger.error('Failed to update startup settings:', error);
+      throw error;
+    }
+  };
+
+  const triggerStartupRefresh = async () => {
+    try {
+      const settings = await settingsService.getRSSStartupSettings();
+      
+      if (!settings.enabled) {
+        logger.info('[RSSStartup] 启动刷新未启用，跳过');
+        return;
+      }
+
+      logger.info('[RSSStartup] 触发启动自动刷新...');
+      
+      if (settings.sourceIds.length === 0) {
+        logger.info('[RSSStartup] 未选择任何源进行启动刷新');
+        return;
+      }
+
+      logger.info(`[RSSStartup] 将刷新 ${settings.sourceIds.length} 个源`);
+      
+      // 非阻塞执行
+      syncSources(settings.sourceIds).catch(err => {
+        logger.error('[RSSStartup] 启动刷新失败:', err);
+      });
+      
+    } catch (error) {
+      logger.error('[RSSStartup] 触发启动刷新出错:', error);
     }
   };
 
@@ -217,6 +273,9 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     syncAllSources,
     syncSource,
     syncSources,
+    startupSettings,
+    updateStartupSettings,
+    triggerStartupRefresh,
   };
 
   return (

@@ -223,6 +223,12 @@ export interface RefreshConfig {
   translationTimeout: number;
 }
 
+// RSS启动刷新配置
+export interface RSSStartupSettings {
+  enabled: boolean;
+  sourceIds: number[]; // 需要刷新的源ID列表
+}
+
 // 文章加载状态
 export interface ArticleLoadingState {
   isLoading: boolean;

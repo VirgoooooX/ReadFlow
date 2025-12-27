@@ -47,6 +47,7 @@ import { AddEditProxyServerScreen } from '../screens/Settings/AddEditProxyServer
 import AboutScreen from '../screens/Settings/AboutScreen';
 import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
 import CustomColorScreen from '../screens/Settings/CustomColorScreen';
+import RSSStartupSettingsScreen from '../screens/Settings/RSSStartupSettingsScreen';
 
 // 导入类型定义
 export type RootStackParamList = {
@@ -554,6 +555,20 @@ function UserStackNavigator() {
       </UserStack.Screen>
 
       <UserStack.Screen
+        name="RSSStartupSettings"
+        options={{ title: '启动自动刷新' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="启动自动刷新"
+            showBackButton={true}
+          >
+            <RSSStartupSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
         name="FilterManagement"
         options={{ title: '过滤规则' }}
       >
@@ -689,10 +704,14 @@ function RootNavigator() {
   const { theme } = useThemeContext();
   const isDark = theme.isDark;
   const { state } = useUser();
+  const { triggerStartupRefresh } = useRSSSource();
 
   // 核心逻辑：直到用户信息加载完成（确定是去登录页还是主页）后，才允许关闭原生启动页
   React.useEffect(() => {
     if (!state.isLoading) {
+      // 触发启动自动刷新 (非阻塞)
+      triggerStartupRefresh();
+
       // 稍微延时（100-200ms）确保 React Navigation 的第一帧画面已经渲染到屏幕上
       const timer = setTimeout(() => {
         logger.info('🏁 业务就绪，正式通过 Navigator 触发隐藏启动页');

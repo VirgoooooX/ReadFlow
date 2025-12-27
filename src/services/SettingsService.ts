@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ReadingSettings, AppSettings, AppError, ProxyModeConfig, ProxyServer, ProxyServersConfig } from '../types';
+import { ReadingSettings, AppSettings, AppError, ProxyModeConfig, ProxyServer, ProxyServersConfig, RSSStartupSettings } from '../types';
 import { DatabaseService } from '../database/DatabaseService';
 import { logger } from './rss/RSSUtils';
 
@@ -15,6 +15,7 @@ export class SettingsService {
     THEME_SETTINGS: 'theme_settings',
     PROXY_MODE_CONFIG: 'proxy_mode_config',  // 新增：代理模式配置
     PROXY_SERVERS_CONFIG: 'proxy_servers_config',  // 多代理服务器配置
+    RSS_STARTUP_SETTINGS: 'rss_startup_settings', // 新增：RSS启动刷新设置
   };
 
   private constructor() {
@@ -729,6 +730,52 @@ export class SettingsService {
         timestamp: new Date(),
       });
     }
+  }
+
+  /**
+   * 获取RSS启动刷新设置
+   */
+  public async getRSSStartupSettings(): Promise<RSSStartupSettings> {
+    try {
+      const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.RSS_STARTUP_SETTINGS);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      return this.getDefaultRSSStartupSettings();
+    } catch (error) {
+      logger.error('Error getting RSS startup settings:', error);
+      return this.getDefaultRSSStartupSettings();
+    }
+  }
+
+  /**
+   * 保存RSS启动刷新设置
+   */
+  public async saveRSSStartupSettings(settings: RSSStartupSettings): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        SettingsService.STORAGE_KEYS.RSS_STARTUP_SETTINGS,
+        JSON.stringify(settings)
+      );
+    } catch (error) {
+      logger.error('Error saving RSS startup settings:', error);
+      throw new AppError({
+        code: 'SETTINGS_SAVE_ERROR',
+        message: 'Failed to save RSS startup settings',
+        details: error,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  /**
+   * 获取默认RSS启动刷新设置
+   */
+  private getDefaultRSSStartupSettings(): RSSStartupSettings {
+    return {
+      enabled: false,
+      sourceIds: [],
+    };
   }
 
   /**

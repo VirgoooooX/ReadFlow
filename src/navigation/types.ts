@@ -79,6 +79,7 @@ export type UserStackParamList = {
   GroupManagement: undefined;
   AddRSSSource: undefined;
   EditRSSSource: { sourceId: number };
+  RSSStartupSettings: undefined; // RSS启动刷新设置
   RSSRefreshSettings: undefined;
   FilterManagement: undefined;  // 过滤规则管理
   FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器

@@ -505,51 +505,9 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     loadProxyConfig();
   }, []);
   
-  // 🌟 【修复】后台刷新定时器：只在组件挂载时启动一次，避免频繁重置
-  useEffect(() => {
-    let refreshTimer: NodeJS.Timeout | null = null;
-    let refreshInterval: NodeJS.Timeout | null = null;
-    
-    const triggerBackgroundSync = async () => {
-      // 检查是否有活跃源（避免在无源时刷新）
-      if (rssSources.length === 0) {
-        logger.info('[HomeScreen] ⚠️ 无活跃源，跳过后台刷新');
-        return;
-      }
-      
-      logger.info('[HomeScreen] 🔄 启动静默后台刷新...');
-      cacheEventEmitter.batchSyncStart();
-      
-      try {
-        await RSSService.getInstance().refreshAllSourcesBackground({
-          maxConcurrent: 3,
-          onProgress: (current, total, sourceName) => {
-            logger.info(`[HomeScreen] 🔄 正在刷新: ${sourceName} (${current}/${total})`);
-          },
-          onArticlesReady: (articles, sourceName) => {
-            logger.info(`[HomeScreen] ✅ ${sourceName} 刷新完成，新增 ${articles.length} 篇文章`);
-          },
-        });
-        cacheEventEmitter.refreshAllSources();
-        logger.info('[HomeScreen] ✅ 后台刷新完成');
-      } catch (error) {
-        logger.warn('[HomeScreen] ⚠️ 后台刷新失败（可忽略）:', error);
-      } finally {
-        cacheEventEmitter.batchSyncEnd();
-      }
-    };
-
-    // 【修复】只在组件挂载时启动一次初始刷新，不依赖配置变化
-    // 使用 setTimeout 是为了让 UI 先渲染出来
-    if (rssSources.length > 0) {
-       refreshTimer = setTimeout(triggerBackgroundSync, 500);
-    }
-    
-    return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-    };
-  }, []); // 空依赖数组，确保只执行一次
-
+  // 🌟 【已移除】原有的强制后台刷新逻辑已移除，改由 RSSStartupSettings 控制
+  // 详见 AppNavigator.tsx 中的 triggerStartupRefresh 调用
+  
   // 【分离】监听配置变化，仅管理定时器，不触发立即刷新
   useEffect(() => {
     let refreshInterval: NodeJS.Timeout | null = null;
