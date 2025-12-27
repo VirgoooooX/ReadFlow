@@ -30,7 +30,7 @@ export class RSShubService {
    * 检查URL是否为RSSHUB协议
    */
   public isRSSHubUrl(url: string): boolean {
-    return url.startsWith('rsshub://');
+    return url.toLowerCase().startsWith('rsshub://');
   }
 
   /**
@@ -48,8 +48,8 @@ export class RSShubService {
       });
     }
 
-    // 移除rsshub://前缀
-    const path = rsshubUrl.replace('rsshub://', '');
+    // 移除rsshub://前缀 (忽略大小写)
+    const path = rsshubUrl.substring('rsshub://'.length);
     
     // 使用指定的实例或默认实例
     const baseUrl = instanceUrl || RSShubService.DEFAULT_RSSHUB_INSTANCE;
@@ -68,15 +68,15 @@ export class RSShubService {
       return false;
     }
 
-    const path = rsshubUrl.replace('rsshub://', '');
+    const path = rsshubUrl.substring('rsshub://'.length);
     
     // 基本格式验证：应该包含至少一个路径段
-    if (!path || path.length === 0) {
+    if (!path || path.length === 0 || path === '/') {
       return false;
     }
 
-    // 检查是否包含有效字符
-    const validPathRegex = /^[a-zA-Z0-9\/_-]+$/;
+    // 检查是否包含有效字符（允许路径、查询参数、点、百分号、减号、加号等）
+    const validPathRegex = /^[a-zA-Z0-9\/._\%\?\&\=\+-]+$/;
     return validPathRegex.test(path);
   }
 
@@ -140,7 +140,7 @@ export class RSShubService {
       });
     }
 
-    const path = rsshubUrl.replace('rsshub://', '');
+    const path = rsshubUrl.substring('rsshub://'.length);
     const segments = path.split('/');
     const platform = segments[0] || 'unknown';
     const route = segments.slice(1).join('/') || '';

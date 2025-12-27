@@ -240,8 +240,17 @@ export class ArticleService {
       
       // 获取文章的源ID，并更新该源的未读数量
       const article = await this.getArticleById(id);
-      if (article && article.sourceId) {
-        await this.updateSourceStats(article.sourceId);
+      if (article) {
+        // 🔥 发送文章已读事件，供 UI 乐观更新
+        cacheEventEmitter.emit({ 
+          type: 'articleRead', 
+          articleId: id,
+          sourceId: article.sourceId 
+        });
+
+        if (article.sourceId) {
+          await this.updateSourceStats(article.sourceId, { reason: 'markRead' });
+        }
       }
     } catch (error) {
       logger.error('Error marking article as read:', error);
@@ -266,12 +275,12 @@ export class ArticleService {
       await this.databaseService.executeStatement(query, params);
       
       if (sourceId !== undefined) {
-        await this.updateSourceStats(sourceId);
+        await this.updateSourceStats(sourceId, { reason: 'markAllRead' });
         cacheEventEmitter.clearSourceArticles(sourceId);
       } else {
         // 更新所有源的统计为 0
         await this.databaseService.executeStatement('UPDATE rss_sources SET unread_count = 0');
-        cacheEventEmitter.updateRSSStats();
+        cacheEventEmitter.updateRSSStats(); // 全局刷新，不需要 reason，反正都要刷
         cacheEventEmitter.clearArticles();
       }
     } catch (error) {
@@ -282,7 +291,7 @@ export class ArticleService {
   /**
    * 更新 RSS 源统计信息 (已读计数)
    */
-  private async updateSourceStats(sourceId: number): Promise<void> {
+  private async updateSourceStats(sourceId: number, options: { reason?: string } = {}): Promise<void> {
     try {
       const unreadCountResult = await this.databaseService.executeQuery(
         'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0',
@@ -296,7 +305,12 @@ export class ArticleService {
       );
       
       // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
-      cacheEventEmitter.updateRSSStats();
+      // 附带 reason，供监听者（如 HomeScreen）决定是否需要重载列表
+      cacheEventEmitter.emit({ 
+        type: 'updateRSSStats', 
+        reason: options.reason,
+        sourceId 
+      });
     } catch (error) {
       logger.error('Error updating source stats:', error);
     }
@@ -316,7 +330,7 @@ export class ArticleService {
       // 获取文章的源ID，并更新该源的未读数量
       const article = await this.getArticleById(id);
       if (article && article.sourceId) {
-        await this.updateSourceStats(article.sourceId);
+        await this.updateSourceStats(article.sourceId, { reason: 'markUnread' });
       }
     } catch (error) {
       logger.error('Error marking article as unread:', error);

@@ -38,6 +38,7 @@ export interface CacheEventData {
   sourceIds?: number[]; // 可选的源ID列表，用于批量刷新
   sourceName?: string; // 可选的源名称，用于日志
   articleId?: number; // 可选的文章ID，用于单篇文章操作
+  reason?: string;    // 可选的原因，用于记录刷新触发原因
 }
 
 // 监听函数类型
