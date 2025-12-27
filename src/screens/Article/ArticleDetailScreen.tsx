@@ -28,6 +28,7 @@ import { vocabularyService } from '../../services/VocabularyService';
 import { translationService } from '../../services/TranslationService';
 import { SettingsService } from '../../services/SettingsService';
 import cacheEventEmitter from '../../services/CacheEventEmitter';
+import { logger } from '../../services/rss/RSSUtils';
 import type { RootStackParamList } from '../../navigation/types';
 import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
 import { getFontStackForWebView } from '../../theme/typography';
@@ -356,12 +357,11 @@ const ArticleDetailScreen: React.FC = () => {
 
         // 【新增】设置滚动位置和生词表
         setInitialScrollY(savedScrollY || 0);
-        console.log('[ArticleDetail] Prepared scroll position:', savedScrollY);
 
         const words = vocabularyEntries.map((entry: any) => entry.word.toLowerCase());
         setVocabularyWords(words);
         vocabularyWordsRef.current = words;
-        console.log('[ArticleDetail] Prepared vocabulary words count:', words.length);
+        logger.info('[ArticleDetail] Prepared vocabulary words count:', words.length);
 
 // import cacheEventEmitter from '../../services/CacheEventEmitter'; // Removed duplicate import
 
@@ -385,11 +385,11 @@ const ArticleDetailScreen: React.FC = () => {
               if (nextArticle && !nextArticle.isRead) {
                 setNextUnreadIndex(i);
                 foundNextUnread = true;
-                console.log('[ArticleDetail] Found next unread article at index:', i);
+                logger.info('[ArticleDetail] Found next unread article at index:', i);
                 break;
               }
             } catch (e) {
-              console.log('[ArticleDetail] Failed to check article:', articleIds[i]);
+              logger.warn('[ArticleDetail] Failed to check article:', articleIds[i]);
             }
           }
           if (!foundNextUnread) {
@@ -400,7 +400,7 @@ const ArticleDetailScreen: React.FC = () => {
             } else {
               setNoUnreadArticle(true);
             }
-            console.log('[ArticleDetail] No more unread articles');
+            logger.info('[ArticleDetail] No more unread articles');
           }
         }
       } catch (error) {
@@ -430,7 +430,7 @@ const ArticleDetailScreen: React.FC = () => {
       // 关键修复：延迟 400ms 执行，确保 Fade 动画（200ms）先播放完
       // 这样返回按钮才能使用 slide 动画，同时不影响进场的 fade 效果
       const timer = setTimeout(() => {
-        console.log('[ArticleDetail] 🎬 Restoring slide animation for back action');
+        logger.info('[ArticleDetail] 🎬 Restoring slide animation for back action');
         navigation.setOptions({
           animation: 'slide_from_right',
           animationDuration: 200,
@@ -454,7 +454,7 @@ const ArticleDetailScreen: React.FC = () => {
   // 【新增函数】提取注入逻辑为独立函数，方便复用
   const injectHighlights = useCallback((words: string[]) => {
     if (webViewRef.current && words.length > 0) {
-      console.log('[ArticleDetail] Injecting highlights immediately, words count:', words.length);
+      logger.info('[ArticleDetail] Injecting highlights immediately, words count:', words.length);
       const script = `window.highlightVocabularyWords(${JSON.stringify(words)}); true;`;
       webViewRef.current.injectJavaScript(script);
     }
@@ -593,7 +593,7 @@ const ArticleDetailScreen: React.FC = () => {
 
         // 【修改】在添加单词时直接调用注入函数，而不是依赖 useEffect
         if (webViewRef.current) {
-          console.log('[ArticleDetail] Adding word and injecting highlight with updated words:', updatedWords);
+          logger.info('[ArticleDetail] Adding word and injecting highlight with updated words:', updatedWords);
           injectHighlights(updatedWords);
         }
       }
@@ -617,7 +617,7 @@ const ArticleDetailScreen: React.FC = () => {
     }
 
     const thumbnailUrl = article.imageUrl;
-    console.log(`[shouldShowHeaderImage] 封面图片URL: ${thumbnailUrl}`);
+    logger.info(`[shouldShowHeaderImage] 封面图片URL: ${thumbnailUrl}`);
     
     for (const imgTag of contentImages) {
       const srcMatch = imgTag.match(/src=["']([^"']*)["']/i);
@@ -626,26 +626,26 @@ const ArticleDetailScreen: React.FC = () => {
           const contentImageUrl = decodeURIComponent(srcMatch[1]);
           const thumbnailImageUrl = decodeURIComponent(thumbnailUrl);
           
-          console.log(`[shouldShowHeaderImage] 内容图片URL: ${contentImageUrl}`);
-          console.log(`[shouldShowHeaderImage] 解码后封面URL: ${thumbnailImageUrl}`);
+          logger.info(`[shouldShowHeaderImage] 内容图片URL: ${contentImageUrl}`);
+          logger.info(`[shouldShowHeaderImage] 解码后封面URL: ${thumbnailImageUrl}`);
 
           if (contentImageUrl === thumbnailImageUrl ||
             contentImageUrl.includes(thumbnailImageUrl) ||
             thumbnailImageUrl.includes(contentImageUrl)) {
-            console.log(`[shouldShowHeaderImage] 图片重复，不显示封面`);
+            logger.info(`[shouldShowHeaderImage] 图片重复，不显示封面`);
             return false;
           }
         } catch (e) {
-          console.log(`[shouldShowHeaderImage] URL解码失败，直接比较`);
+          logger.info(`[shouldShowHeaderImage] URL解码失败，直接比较`);
           if (srcMatch[1] === thumbnailUrl) {
-            console.log(`[shouldShowHeaderImage] 图片重复(未解码)，不显示封面`);
+            logger.info(`[shouldShowHeaderImage] 图片重复(未解码)，不显示封面`);
             return false;
           }
         }
       }
     }
 
-    console.log(`[shouldShowHeaderImage] 图片不重复，显示封面`);
+    logger.info(`[shouldShowHeaderImage] 图片不重复，显示封面`);
     return true;
   };
 
@@ -653,17 +653,16 @@ const ArticleDetailScreen: React.FC = () => {
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('[ArticleDetail] WebView message received:', data);
 
       switch (data.type) {
         case 'debug':
           // WebView 端的调试消息
-          console.log('[WebView Debug]', data.debugType, ':', data.message);
+          logger.info(`[WebView Debug] ${data.debugType}: ${data.message}`);
           break;
 
         case 'ready':
           // WebView 已准备就绪
-          console.log('[ArticleDetail] WebView ready event received');
+          logger.info('[ArticleDetail] WebView ready event received');
           setWebViewReady(true);
           // 【关键修改】此时不再需要注入高亮或滚动位置，因为 HTML 内部已经处理了
           // 仅保留 injectHighlights 以便在用户添加新单词时使用
@@ -697,7 +696,6 @@ const ArticleDetailScreen: React.FC = () => {
           if (data.scrollY !== undefined) {
             currentScrollYRef.current = data.scrollY;
             hasScrolledRef.current = true;
-            console.log('[ArticleDetail] Updated scroll position in memory:', data.scrollY);
 
             // 简单的防抖/节流逻辑，根据滚动距离决定是否显示标题
             if (data.scrollY > 60 && !showRefTitle) {
@@ -729,7 +727,7 @@ const ArticleDetailScreen: React.FC = () => {
         
         // 【新增】处理底部上滑切换下一篇
         case 'swipeToNext':
-          console.log('[ArticleDetail] Swipe to next article triggered');
+          logger.info('[ArticleDetail] Swipe to next article triggered');
           if (hasNextArticle) {
             navigateToNextArticle();
           } else {
@@ -751,7 +749,6 @@ const ArticleDetailScreen: React.FC = () => {
     // 这个 cleanup 函数会在组件卸载（返回上一页）时执行
     return () => {
       if (hasScrolledRef.current && articleId) {
-        console.log('[ArticleDetail] Saving final scroll position on exit:', currentScrollYRef.current);
         // saveScrollPosition 会静默处理数据库锁定错误，不需要 catch
         articleService.saveScrollPosition(articleId, currentScrollYRef.current);
       }
@@ -760,21 +757,21 @@ const ArticleDetailScreen: React.FC = () => {
 
   // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
   const htmlContent = useMemo(() => {
-    console.log('[ArticleDetail] Generating HTML, article exists:', !!article);
-    console.log('[ArticleDetail] article.content exists:', !!article?.content);
-    console.log('[ArticleDetail] readingSettings exists:', !!readingSettings);
+    logger.info('[ArticleDetail] Generating HTML, article exists:', !!article);
+    logger.info('[ArticleDetail] article.content exists:', !!article?.content);
+    logger.info('[ArticleDetail] readingSettings exists:', !!readingSettings);
     
     if (!article?.content || !readingSettings) {
-      console.log('[ArticleDetail] ❌ HTML generation skipped - missing article.content or readingSettings');
+      logger.info('[ArticleDetail] ❌ HTML generation skipped - missing article.content or readingSettings');
       return '';
     }
   
     // 【调试日志】空急论证 imageUrl
-    console.log(`[ArticleDetail] article.imageUrl = ${article.imageUrl}`);
-    console.log(`[ArticleDetail] shouldShowHeaderImage() = ${shouldShowHeaderImage()}`);
+    logger.info(`[ArticleDetail] article.imageUrl = ${article.imageUrl}`);
+    logger.info(`[ArticleDetail] shouldShowHeaderImage() = ${shouldShowHeaderImage()}`);
       
     const finalImageUrl = shouldShowHeaderImage() ? article.imageUrl : undefined;
-    console.log(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
+    logger.info(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
   
     const html = generateArticleHtml({
       content: article.content,
@@ -803,7 +800,7 @@ const ArticleDetailScreen: React.FC = () => {
       proxyServerUrl,
     });
     
-    console.log('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);
+    logger.info('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);
     return html;
   }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, vocabularyWords, proxyServerUrl]);
 

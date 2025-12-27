@@ -22,11 +22,11 @@ import (
 
 // 配置
 var (
-	port            string
-	serverURL       string
-	authToken       string
-	activeRSSHub    = "https://rsshub.app"
-	defaultRSSHub   = "https://rsshub.app"
+	port          string
+	serverURL     string
+	authToken     string
+	activeRSSHub  = "https://rsshub.app"
+	defaultRSSHub = "https://rsshub.app"
 )
 
 // RSSHub 实例列表
@@ -384,7 +384,7 @@ func sendJSON(w http.ResponseWriter, statusCode int, data map[string]interface{}
 
 // isRSSHubURL 检查是否为 RSSHub 协议
 func isRSSHubURL(u string) bool {
-	return strings.HasPrefix(u, "rsshub://")
+	return strings.HasPrefix(strings.ToLower(u), "rsshub://")
 }
 
 // validateRSSHubPath 验证 RSSHub 路径格式
@@ -393,13 +393,13 @@ func validateRSSHubPath(rsshubURL string) bool {
 		return false
 	}
 
-	path := strings.TrimPrefix(rsshubURL, "rsshub://")
-	if path == "" {
+	path := rsshubURL[len("rsshub://"):]
+	if path == "" || path == "/" {
 		return false
 	}
 
 	// 检查是否包含有效字符
-	validPathRegex := regexp.MustCompile(`^[a-zA-Z0-9\/_-]+$`)
+	validPathRegex := regexp.MustCompile(`^[a-zA-Z0-9\/._\%\?\&\=\+-]+$`)
 	return validPathRegex.MatchString(path)
 }
 
@@ -409,10 +409,8 @@ func convertRSSHubURL(rsshubURL string) string {
 		return rsshubURL
 	}
 
-	path := strings.TrimPrefix(rsshubURL, "rsshub://")
-	// 允许路径中带 /，所以这里处理一下
-	cleanPath := strings.ReplaceAll(path, "/", "")
-	if cleanPath == "" {
+	path := rsshubURL[len("rsshub://"):]
+	if path == "" || path == "/" {
 		return defaultRSSHub
 	}
 
@@ -450,7 +448,24 @@ func parseRSSHubURL(rsshubURL string) (platform, route, description string) {
 
 // handleRSS 处理 RSS 代理请求
 func handleRSS(w http.ResponseWriter, r *http.Request) {
-	feedURL := r.URL.Query().Get("url")
+	// 从 RawQuery 手动提取 url 参数，避免自动解码导致的 & 截断问题
+	rawQuery := r.URL.RawQuery
+	feedURL := ""
+
+	// 查找 url= 参数（取所有内容，不在 & 处截断）
+	if idx := strings.Index(rawQuery, "url="); idx != -1 {
+		feedURL = rawQuery[idx+4:]
+		// URL 解码
+		if decoded, err := url.QueryUnescape(feedURL); err == nil {
+			feedURL = decoded
+		}
+	}
+
+	if feedURL == "" {
+		// 备选方案：尝试从标准参数获取
+		feedURL = r.URL.Query().Get("url")
+	}
+
 	if feedURL == "" {
 		sendJSON(w, 400, map[string]interface{}{"error": "Missing url parameter"})
 		return
@@ -479,16 +494,25 @@ func handleRSS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; RSSProxy/1.0)")
-	req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml, */*")
+	// 设置请求头，模拟真实浏览器
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml, application/atom+xml, */*")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	req.Header.Set("Cache-Control", "no-cache")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[RSS] Error fetching: %v", err)
-		sendJSON(w, 502, map[string]interface{}{"error": "Failed to fetch RSS"})
+		log.Printf("[RSS] Error fetching %s: %v", feedURL, err)
+		sendJSON(w, 502, map[string]interface{}{"error": "Failed to fetch RSS feed"})
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[RSS] Unexpected status %d for %s", resp.StatusCode, feedURL)
+		sendJSON(w, resp.StatusCode, map[string]interface{}{"error": fmt.Sprintf("Server returned status %d", resp.StatusCode)})
+		return
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -635,7 +659,7 @@ func handleRSSHubInstances(w http.ResponseWriter, r *http.Request) {
 	for _, inst := range rsshubInstances {
 		instStrs = append(instStrs, fmt.Sprintf(`"%s"`, inst))
 	}
-	fmt.Fprintf(w, `{"instances":[%s],"active":"%s","default":"%s"}`, 
+	fmt.Fprintf(w, `{"instances":[%s],"active":"%s","default":"%s"}`,
 		strings.Join(instStrs, ","), activeRSSHub, defaultRSSHub)
 }
 
@@ -683,7 +707,7 @@ func main() {
 	http.HandleFunc("/api/rss", authMiddleware(handleRSS, false))
 	http.HandleFunc("/api/rsshub/instances", authMiddleware(handleRSSHubInstances, true)) // 公开实例列表
 	http.HandleFunc("/api/image", authMiddleware(handleImage, true))                      // 图片跳过认证
-	http.HandleFunc("/api/subscribe", authMiddleware(handleSubscribe, false)) // 订阅接口
+	http.HandleFunc("/api/subscribe", authMiddleware(handleSubscribe, false))             // 订阅接口
 	http.HandleFunc("/health", authMiddleware(handleHealth, true))
 	http.HandleFunc("/", authMiddleware(handleHealth, true))
 

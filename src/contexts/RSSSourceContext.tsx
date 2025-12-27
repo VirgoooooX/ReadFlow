@@ -40,43 +40,43 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       switch (type) {
         case 'updateRSSStats':
           // RSS统计更新：重新加载RSS源列表（包含未读数量）
-          console.log('[RSSSourceContext] 接收到 updateRSSStats 事件，刷新加载 RSS 源');
+          logger.info('[RSSSourceContext] 接收到 updateRSSStats 事件，刷新加载 RSS 源');
           loadRSSSources();
           break;
           
         case 'clearAll':
           // 清除所有数据：重新加载RSS源列表（未读数量已被重置）
-          console.log('[RSSSourceContext] 接收到 clearAll 事件，刷新加载 RSS 源');
+          logger.info('[RSSSourceContext] 接收到 clearAll 事件，刷新加载 RSS 源');
           loadRSSSources();
           break;
           
         case 'refreshSource':
           // 单个源刷新完成：重新加载RSS源列表（更新统计数据）
-          console.log(`[RSSSourceContext] 接收到 refreshSource 事件: ${sourceName || sourceId}`);
+          logger.info(`[RSSSourceContext] 接收到 refreshSource 事件: ${sourceName || sourceId}`);
           loadRSSSources();
           break;
           
         case 'refreshAllSources':
           // 所有源刷新完成：重新加载RSS源列表
-          console.log('[RSSSourceContext] 接收到 refreshAllSources 事件，刷新加载 RSS 源');
+          logger.info('[RSSSourceContext] 接收到 refreshAllSources 事件，刷新加载 RSS 源');
           loadRSSSources();
           break;
           
         case 'clearSourceArticles':
           // 清除单个源的文章：重新加载RSS源列表（更新统计数据）
-          console.log(`[RSSSourceContext] 接收到 clearSourceArticles 事件: ${sourceName || sourceId}`);
+          logger.info(`[RSSSourceContext] 接收到 clearSourceArticles 事件: ${sourceName || sourceId}`);
           loadRSSSources();
           break;
           
         case 'sourceDeleted':
           // 源被删除：重新加载RSS源列表
-          console.log(`[RSSSourceContext] 接收到 sourceDeleted 事件: ${sourceName || sourceId}`);
+          logger.info(`[RSSSourceContext] 接收到 sourceDeleted 事件: ${sourceName || sourceId}`);
           loadRSSSources();
           break;
           
         case 'sourceUpdated':
           // 源被更新：重新加载RSS源列表
-          console.log(`[RSSSourceContext] 接收到 sourceUpdated 事件: ${sourceName || sourceId}`);
+          logger.info(`[RSSSourceContext] 接收到 sourceUpdated 事件: ${sourceName || sourceId}`);
           loadRSSSources();
           break;
       }
@@ -91,7 +91,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       const sources = await rssService.getAllRSSSources();
       setRssSources(sources);
     } catch (error) {
-      console.error('Failed to load RSS sources:', error);
+      logger.error('Failed to load RSS sources:', error);
     } finally {
       setIsLoading(false);
     }
@@ -124,10 +124,19 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       console.log('[RSSSourceContext.syncAllSources] 🚀 开始同步所有 RSS 源');
       setIsLoading(true);
       console.log('[RSSSourceContext.syncAllSources] 调用 rssService.refreshAllSources()');
-      await rssService.refreshAllSources({ onProgress });
-      console.log('[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成');
+      const result = await rssService.refreshAllSources({ onProgress });
+      console.log(`[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成，新增文章: ${result.totalArticles}`);
+      
       await loadRSSSources();
-      cacheEventEmitter.refreshAllSources();
+      
+      // 只有当有新文章时才触发全局刷新，避免无意义的列表重载
+      if (result.totalArticles > 0) {
+        cacheEventEmitter.refreshAllSources();
+        console.log('[RSSSourceContext.syncAllSources] 📢 触发 refreshAllSources 事件');
+      } else {
+        console.log('[RSSSourceContext.syncAllSources] 🔕 无新文章，跳过 refreshAllSources 事件');
+      }
+      
       console.log('[RSSSourceContext.syncAllSources] ✅ 所有源同步完成');
     } catch (error) {
       console.error('[RSSSourceContext.syncAllSources] 💥 同步失败:', error);
@@ -146,10 +155,20 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       const source = rssSources.find(s => s.id === sourceId);
       if (source) {
         // 直接调用 fetchArticlesFromSource，内部会自动判断代理模式
-        await rssService.fetchArticlesFromSource(source);
-        cacheEventEmitter.refreshSources([sourceId]);
+        const newArticles = await rssService.fetchArticlesFromSource(source);
         
         await loadRSSSources();
+
+        // 只有当有新文章时才触发刷新
+        if (newArticles && newArticles.length > 0) {
+          cacheEventEmitter.refreshSources([sourceId]);
+          // 同时也触发单源刷新事件，保持兼容性
+          cacheEventEmitter.refreshSource(sourceId, source.name);
+          console.log(`[RSSSourceContext.syncSource] 📢 触发 refreshSource 事件，新增: ${newArticles.length}`);
+        } else {
+          console.log(`[RSSSourceContext.syncSource] 🔕 无新文章，跳过 refreshSource 事件`);
+        }
+        
         console.log(`[RSSSourceContext.syncSource] ✅ 单个源同步完成: ${source.name}`);
       }
     } catch (error) {
@@ -167,11 +186,18 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       logger.info(`[RSSSourceContext.syncSources] 🚀 开始同步 ${sourceIds.length} 个 RSS 源`);
       setIsLoading(true);
       
-      await rssService.refreshSources(sourceIds, { onProgress });
+      const result = await rssService.refreshSources(sourceIds, { onProgress });
       
-      logger.info('[RSSSourceContext.syncSources] ✅ 批量同步完成');
+      logger.info(`[RSSSourceContext.syncSources] ✅ 批量同步完成，新增文章: ${result.totalArticles}`);
       await loadRSSSources();
-      cacheEventEmitter.refreshSources(sourceIds);
+      
+      // 只有当有新文章时才触发刷新
+      if (result.totalArticles > 0) {
+        cacheEventEmitter.refreshSources(sourceIds);
+        logger.info('[RSSSourceContext.syncSources] 📢 触发 refreshSources 事件');
+      } else {
+        logger.info('[RSSSourceContext.syncSources] 🔕 无新文章，跳过 refreshSources 事件');
+      }
     } catch (error) {
       console.error('[RSSSourceContext.syncSources] 💥 同步失败:', error);
       throw error;
