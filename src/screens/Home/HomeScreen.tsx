@@ -630,6 +630,13 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         const currentRoute = routesRef.current[currentIndexRef.current];
         if (currentRoute && shouldReload(currentRoute.key)) {
           logger.info(`[HomeScreen] 🔄 事件触发自动刷新: ${currentRoute.title}`);
+          
+          // 【优化】如果有正在等待的防抖刷新，取消它，因为我们要立即刷新了
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+          }
+
           // 稍微延迟一下确保 map 已清空（虽然 React 批处理通常会处理好，但为了保险）
           setTimeout(() => {
              loadArticlesRef.current(currentRoute.key, false);
@@ -1061,10 +1068,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               }
               
               await articleService.markAllAsRead(sourceId);
-              
-              // 刷新列表
-              setTabDataMap(new Map());
-              loadArticles(currentRoute.key, false);
             } catch (error) {
               logger.error('Mark all read failed:', error);
             }
@@ -1072,7 +1075,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       ]
     );
-  }, [index, routes, loadArticles]);
+  }, [routes, index]); // loadArticles removed from deps as it's no longer used here
 
   const toggleShowOnlyUnread = useCallback(() => {
     setShowOnlyUnread(prev => !prev);
