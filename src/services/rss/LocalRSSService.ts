@@ -47,6 +47,7 @@ export class LocalRSSService {
     title?: string;
     description?: string;
     language?: string;
+    url?: string;
   }> {
     try {
       // 🔥 清理 URL：去除空格和末尾多余斜杠
@@ -95,12 +96,36 @@ export class LocalRSSService {
       }
       
       // 使用重试机制和超时控制
-      const response = await fetchWithRetry(finalUrl, {
-        ...fetchOptions,
-        retries: 3,
-        retryDelay: 1500,
-        timeout: 20000  // 增加超时时间到20秒
-      });
+      let response: Response;
+      try {
+        response = await fetchWithRetry(finalUrl, {
+          ...fetchOptions,
+          retries: 3,
+          retryDelay: 1500,
+          timeout: 20000  // 增加超时时间到20秒
+        });
+      } catch (error) {
+        // 🔥 如果是 HTTPS 请求失败，尝试降级到 HTTP
+        if (actualUrl.startsWith('https://') && !useCorsProxy) {
+          const httpUrl = actualUrl.replace('https://', 'http://');
+          logger.info(`[validateRSSFeed] HTTPS failed, trying HTTP fallback: ${httpUrl}`);
+          try {
+            response = await fetchWithRetry(httpUrl, {
+              ...fetchOptions,
+              retries: 2,
+              retryDelay: 1000,
+              timeout: 10000
+            });
+            // 如果 HTTP 成功，更新 actualUrl
+            actualUrl = httpUrl;
+          } catch (httpError) {
+            // 如果 HTTP 也失败，抛出原始错误
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -144,6 +169,7 @@ export class LocalRSSService {
         title: rsshubInfo?.description || (titleMatch ? titleMatch[1].trim() : undefined),
         description: descMatch ? descMatch[1].trim() : rsshubInfo?.description,
         language: langMatch ? langMatch[1].trim() : undefined,
+        url: actualUrl,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -264,12 +290,34 @@ export class LocalRSSService {
         }
       }
       
-      const response = await fetchWithRetry(finalUrl, {
-        ...fetchOptions,
-        retries: 3,
-        retryDelay: 2000,
-        timeout: 15000
-      });
+      let response: Response;
+      try {
+        response = await fetchWithRetry(finalUrl, {
+          ...fetchOptions,
+          retries: 3,
+          retryDelay: 2000,
+          timeout: 15000
+        });
+      } catch (error) {
+        // 🔥 如果是 HTTPS 请求失败，尝试降级到 HTTP
+        if (actualUrl.startsWith('https://') && !useCorsProxy) {
+          const httpUrl = actualUrl.replace('https://', 'http://');
+          logger.info(`[fetchArticlesInternal] HTTPS failed, trying HTTP fallback: ${httpUrl}`);
+          try {
+            response = await fetchWithRetry(httpUrl, {
+              ...fetchOptions,
+              retries: 2,
+              retryDelay: 1000,
+              timeout: 10000
+            });
+            // 此次获取成功，暂不自动更新数据库 URL，以免频繁写入
+          } catch (httpError) {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -533,7 +581,16 @@ export class LocalRSSService {
     contentType: 'text' | 'image_text' = 'image_text'
   ): Promise<string> {
     try {
-      if (rawContent.length < 200 && url) {
+      // 检查是否需要抓取全文
+      // 1. 内容过短 (小于 500 字符，之前是 200)
+      // 2. 包含 "阅读全文" 等引导性链接
+      const shouldFetch = rawContent.length < 500 || 
+                         rawContent.includes('阅读全文') || 
+                         rawContent.includes('Read more') ||
+                         rawContent.includes('查看全文');
+
+      if (shouldFetch && url) {
+        // logger.info(`[extractContent] 触发全文抓取 (length: ${rawContent.length}, url: ${url})`);
         const fullContent = await this.fetchFullContent(url);
         if (fullContent) {
           rawContent = fullContent;

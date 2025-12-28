@@ -49,6 +49,12 @@ export class RSSService {
       // 1. 验证 RSS 源
       const feedInfo = await localRSSService.validateRSSFeed(cleanUrl);
       
+      // 🔥 如果验证过程中发生了 URL 变更（例如 HTTPS -> HTTP 降级），使用新的 URL
+      if (feedInfo.url && feedInfo.url !== cleanUrl) {
+        logger.info(`[addRSSSource] URL 更新: ${cleanUrl} -> ${feedInfo.url}`);
+        cleanUrl = feedInfo.url;
+      }
+      
       // 2. 代理模式：调用服务端订阅 API（仅当源级别选择代理模式时）
       if (sourceMode === 'proxy') {
         const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();

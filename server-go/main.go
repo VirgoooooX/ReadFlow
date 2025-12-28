@@ -8,6 +8,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"html"
 	"io"
@@ -483,8 +484,13 @@ func handleRSS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[RSS] Fetching: %s", feedURL)
 
 	// 创建请求
+	// 配置跳过 SSL 验证的 Transport
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout:   30 * time.Second,
+		Transport: tr,
 	}
 
 	req, err := http.NewRequest("GET", feedURL, nil)
@@ -501,6 +507,29 @@ func handleRSS(w http.ResponseWriter, r *http.Request) {
 	req.Header.Set("Cache-Control", "no-cache")
 
 	resp, err := client.Do(req)
+
+	// 🔥 HTTPS -> HTTP 降级重试策略
+	if err != nil && strings.HasPrefix(feedURL, "https://") {
+		log.Printf("[RSS] HTTPS fetch failed for %s, trying fallback to HTTP. Error: %v", feedURL, err)
+		httpURL := strings.Replace(feedURL, "https://", "http://", 1)
+
+		reqHTTP, errHTTP := http.NewRequest("GET", httpURL, nil)
+		if errHTTP == nil {
+			// 复制请求头
+			reqHTTP.Header = req.Header
+
+			respHTTP, errRetry := client.Do(reqHTTP)
+			if errRetry == nil {
+				log.Printf("[RSS] HTTP fallback succeeded for %s", httpURL)
+				resp = respHTTP
+				err = nil
+				feedURL = httpURL // 更新 URL 以便后续正确处理相对路径
+			} else {
+				log.Printf("[RSS] HTTP fallback also failed: %v", errRetry)
+			}
+		}
+	}
+
 	if err != nil {
 		log.Printf("[RSS] Error fetching %s: %v", feedURL, err)
 		sendJSON(w, 502, map[string]interface{}{"error": "Failed to fetch RSS feed"})
