@@ -15,6 +15,8 @@ import {
   BackHandler,
   Modal,
 } from 'react-native';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams, ShadowDecorator, OpacityDecorator } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -523,7 +525,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   );
 
   // 3. 核心：源卡片 (浏览模式 & 管理模式)
-  const SourceCard = React.memo(({ source, index, total }: { source: RSSSource, index: number, total: number }) => {
+  const SourceCard = React.memo(({ source, index, total, drag, isActive }: { source: RSSSource, index: number, total: number, drag?: () => void, isActive?: boolean }) => {
     const isSelected = selectedSources.has(source.id);
     // 生成伪随机颜色
     const iconColor = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'][source.id % 5];
@@ -554,12 +556,14 @@ const ManageSubscriptionsScreen: React.FC = () => {
         style={[
           styles.card,
           isEditMode && isSelected && styles.cardSelected,
+          isActive && { backgroundColor: theme.colors.surfaceVariant, elevation: 5, transform: [{ scale: 1.02 }] },
           // 禁用/停用状态样式
           !source.isActive && { opacity: 0.6 }
         ]}
         onPress={handlePress}
         onLongPress={handleLongPress}
         activeOpacity={0.7}
+        disabled={isActive}
       >
         <View style={styles.cardInner}>
           {/* 左侧图标或 Checkbox */}
@@ -599,23 +603,14 @@ const ManageSubscriptionsScreen: React.FC = () => {
           {/* 右侧：未读数字或排序按钮 */}
           <View style={styles.cardRight}>
             {isEditMode ? (
-              // 编辑模式显示排序箭头
+              // 编辑模式显示拖拽手柄
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
                  <TouchableOpacity 
-                   onPress={() => handleMoveSource(source.id, 'up')} 
-                   disabled={index===0} 
+                   onLongPress={drag}
                    style={styles.sortBtn}
                    hitSlop={{top:10, bottom:10, left:10, right:10}}
                  >
-                   <MaterialIcons name="arrow-upward" size={20} color={index===0 ? theme.colors.outlineVariant : theme.colors.onSurfaceVariant} />
-                 </TouchableOpacity>
-                 <TouchableOpacity 
-                   onPress={() => handleMoveSource(source.id, 'down')} 
-                   disabled={index===total-1} 
-                   style={styles.sortBtn}
-                   hitSlop={{top:10, bottom:10, left:10, right:10}}
-                 >
-                   <MaterialIcons name="arrow-downward" size={20} color={index===total-1 ? theme.colors.outlineVariant : theme.colors.onSurfaceVariant} />
+                   <MaterialIcons name="drag-handle" size={24} color={isActive ? theme.colors.primary : theme.colors.onSurfaceVariant} />
                  </TouchableOpacity>
               </View>
             ) : (
@@ -721,40 +716,112 @@ const ManageSubscriptionsScreen: React.FC = () => {
       );
     }
 
+    const onDragEnd = async ({ data }: { data: RSSSource[] }) => {
+      console.log(`[ManageSubscriptions] onDragEnd triggered for tab ${tabIndex}, items: ${data.length}`);
+      
+      // 1. 获取当前这批数据的所有原始 sortOrder
+      // 如果原始数据没有 sortOrder (均为0)，则使用索引作为基础
+      let originalSortOrders = sourcesForTab.map(s => s.sortOrder || 0).sort((a, b) => a - b);
+      
+      // 2. 关键修正：确保排序值序列是严格递增的，避免数据库 ORDER BY id ASC 干扰
+      for (let i = 1; i < originalSortOrders.length; i++) {
+        if (originalSortOrders[i] <= originalSortOrders[i-1]) {
+          originalSortOrders[i] = originalSortOrders[i-1] + 1;
+        }
+      }
+      
+      // 3. 将这些确保唯一的排序值按新顺序分配
+      const updates = data.map((s, idx) => {
+        return {
+          id: s.id,
+          sortOrder: originalSortOrders[idx] !== undefined ? originalSortOrders[idx] : (originalSortOrders[originalSortOrders.length - 1] || 0) + idx + 1
+        };
+      });
+
+      console.log('[ManageSubscriptions] Updating orders:', updates);
+
+      try {
+        await rssService.updateSourcesOrder(updates);
+        // 触发刷新以同步状态
+        await refreshRSSSources();
+        console.log('[ManageSubscriptions] Sort order updated and refreshed');
+        // 可选：添加震动反馈
+        Vibration.vibrate(50);
+      } catch (error) {
+        console.error('Error updating sort order:', error);
+        Alert.alert('排序失败', '无法更新顺序到数据库');
+      }
+    };
+
     return (
       <View style={{ width: screenWidth, flex: 1 }}>
-        <FlatList
-          data={sourcesForTab}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item, index }) => (
-            <SourceCard source={item} index={index} total={sourcesForTab.length} />
-          )}
-          ListHeaderComponent={() => (
-            <View style={styles.listHeader} />
-          )}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyState}>
-              <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
-              <Text style={styles.emptyText}>暂无订阅源</Text>
-            </View>
-          )}
-          ListFooterComponent={renderFooter}
-          // 优化滚动性能
-          initialNumToRender={10}
-          windowSize={5}
-          maxToRenderPerBatch={10}
-          removeClippedSubviews={true}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          showsVerticalScrollIndicator={false}
-        />
+        {isEditMode ? (
+           <DraggableFlatList
+             data={sourcesForTab}
+             keyExtractor={(item) => item.id.toString()}
+             onDragEnd={onDragEnd}
+             renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<RSSSource>) => (
+               <ScaleDecorator>
+                 <SourceCard 
+                   source={item} 
+                   index={getIndex() ?? 0} 
+                   total={sourcesForTab.length} 
+                   drag={drag}
+                   isActive={isActive}
+                 />
+               </ScaleDecorator>
+             )}
+             ListHeaderComponent={() => (
+               <View style={styles.listHeader} />
+             )}
+             ListEmptyComponent={() => (
+               <View style={styles.emptyState}>
+                 <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
+                 <Text style={styles.emptyText}>暂无订阅源</Text>
+               </View>
+             )}
+             ListFooterComponent={renderFooter}
+             initialNumToRender={10}
+             windowSize={5}
+             maxToRenderPerBatch={10}
+             removeClippedSubviews={true}
+             showsVerticalScrollIndicator={false}
+             containerStyle={{ flex: 1 }}
+           />
+        ) : (
+          <FlatList
+            data={sourcesForTab}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item, index }) => (
+              <SourceCard source={item} index={index} total={sourcesForTab.length} />
+            )}
+            ListHeaderComponent={() => (
+              <View style={styles.listHeader} />
+            )}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
+                <Text style={styles.emptyText}>暂无订阅源</Text>
+              </View>
+            )}
+            ListFooterComponent={renderFooter}
+            initialNumToRender={10}
+            windowSize={5}
+            maxToRenderPerBatch={10}
+            removeClippedSubviews={true}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
     );
   }, [getFilteredSources, screenWidth, isReady, refreshing, isEditMode, selectedSources, styles, theme]);
 
   return (
-    <View style={styles.container}>
-      {/* 顶部统计区 (固定) */}
-      {renderDashboard()}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        {/* 顶部统计区 (固定) */}
+        {renderDashboard()}
       
       {/* 工具栏 (订阅列表标题 / 批量操作控制) */}
       {renderToolbar()}
@@ -825,7 +892,8 @@ const ManageSubscriptionsScreen: React.FC = () => {
         visible={showActionSheet} 
         onClose={() => setShowActionSheet(false)} 
       />
-    </View>
+      </View>
+    </GestureHandlerRootView>
   );
 };
 
