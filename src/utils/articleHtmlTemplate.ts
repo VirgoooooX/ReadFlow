@@ -680,7 +680,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   `;
 
   // 【关键】将数据直接序列化以便注入 JS，在页面初始化时使用
-  const injectedWords = JSON.stringify(vocabularyWords);
+  // 【优化】初始 HTML 不包含生词数据，由 RN 在 WebView 加载完成后动态注入，避免重复刷新
+  const injectedWords = JSON.stringify([]); 
   const injectedScrollY = initialScrollY;
   const injectedArticleUrl = JSON.stringify(articleUrl);
 

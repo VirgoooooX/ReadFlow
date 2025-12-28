@@ -981,7 +981,8 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             navigation.navigate('ArticleDetail', { 
               articleId: id,
               articleIds,
-              currentIndex: currentIndex >= 0 ? currentIndex : 0
+              currentIndex: currentIndex >= 0 ? currentIndex : 0,
+              article: tabData.articles.find(a => a.id === id)
             });
           }}
           isDark={isDark}

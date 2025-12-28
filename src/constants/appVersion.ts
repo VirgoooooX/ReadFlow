@@ -2,8 +2,8 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '5.3.3',
-  buildNumber: 50303,
+  version: 'test2',
+  buildNumber: 1,
   updateTime: '2025-12-28',
   changelog: [
     '修复源设置并添加刷新提示',

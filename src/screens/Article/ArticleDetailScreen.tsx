@@ -273,7 +273,7 @@ const BottomProgressBar: React.FC<{
 const ArticleDetailScreen: React.FC = () => {
   const route = useRoute<ArticleDetailRouteProp>();
   const navigation = useNavigation();
-  const { articleId, articleIds, currentIndex } = route.params;
+  const { articleId, articleIds, currentIndex, article: passedArticle } = route.params;
   const { theme, isDark } = useThemeContext();
   const {
     settings: readingSettings,
@@ -281,8 +281,10 @@ const ArticleDetailScreen: React.FC = () => {
   } = useReadingSettings();
   const insets = useSafeAreaInsets(); // 获取安全区域
   const webViewRef = useRef<WebView>(null);
-  const [article, setArticle] = useState<Article | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 【优化】优先使用传递过来的 article 对象，实现秒开
+  const [article, setArticle] = useState<Article | null>(passedArticle || null);
+  // 【优化】如果有传递的数据，就不显示全屏 Loading
+  const [loading, setLoading] = useState(!passedArticle);
   const [vocabularyWords, setVocabularyWords] = useState<string[]>([]); // 单词本单词数组
   const vocabularyWordsRef = useRef<string[]>([]); // 使用 Ref 存储最新单词列表，避免重渲染
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
@@ -332,8 +334,13 @@ const ArticleDetailScreen: React.FC = () => {
   useEffect(() => {
     const loadArticle = async () => {
       try {
-        setLoading(true);
-        setWebViewReady(false); // 【关键修改】每次加载新文章前，重置 WebView 状态
+        // 【优化】如果已经有传递的数据，不要显示 Loading，仅在后台静默更新
+        if (!passedArticle) {
+          setLoading(true);
+        }
+        
+        // 【优化】不再强制重置 webViewReady，避免闪烁
+        // setWebViewReady(false); 
 
         // 【新增】获取代理服务器配置
         const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
@@ -460,17 +467,13 @@ const ArticleDetailScreen: React.FC = () => {
     }
   }, []);
 
-  // 【修改】仅保留监听 vocabularyWords 变化的 Effect
-  // 当用户在当前页面添加生词后，才需要重新注入（初始加载已由 HTML 处理）
-  // 这个 Effect 只在用户动态添加单词时触发
+  // 监听 vocabularyWords 变化，动态注入高亮
+  // 仅在 WebView 准备就绪且有生词数据时执行
   useEffect(() => {
-    // 跳过初始化阶段（initialScrollY 和 vocabularyWords 都是 0 或空数组时）
-    // 仅在用户交互后（添加新单词）才重新注入
-    if (webViewReady && article && vocabularyWords.length > 0) {
-      // 这里只用于处理用户在阅读中添加新单词的情况
-      // 初始加载由 HTML 内部的 init() 函数处理
+    if (webViewReady && vocabularyWords.length > 0) {
+      injectHighlights(vocabularyWords);
     }
-  }, [webViewReady, article]);
+  }, [webViewReady, vocabularyWords, injectHighlights]);
 
   const formatDate = (date: Date | string): string => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -802,7 +805,7 @@ const ArticleDetailScreen: React.FC = () => {
     
     logger.info('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);
     return html;
-  }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, vocabularyWords, proxyServerUrl]);
+  }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, proxyServerUrl]);
 
   if (loading || settingsLoading) {
     return (
@@ -905,6 +908,11 @@ const ArticleDetailScreen: React.FC = () => {
           }}
           onLoad={() => {
             console.log('[WebView] ✅ Content loaded successfully');
+            setWebViewReady(true);
+            // 确保在 WebView 加载完成时也尝试注入，作为 ready 事件的备份
+            if (vocabularyWordsRef.current.length > 0) {
+              injectHighlights(vocabularyWordsRef.current);
+            }
           }}
           renderLoading={() => (
             <View style={styles.webViewLoading}>
