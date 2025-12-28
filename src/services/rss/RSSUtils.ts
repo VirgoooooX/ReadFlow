@@ -49,6 +49,20 @@ export async function fetchWithRetry(
     ...fetchOptions
   } = options;
 
+  // 注入默认 Headers (模拟浏览器行为)
+  const headers = new Headers(fetchOptions.headers);
+  if (!headers.has('User-Agent')) {
+    headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+  }
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7');
+  }
+
+  const finalOptions = {
+    ...fetchOptions,
+    headers
+  };
+
   for (let i = 0; i <= retries; i++) {
     try {
       // 创建超时 Promise
@@ -57,7 +71,7 @@ export async function fetchWithRetry(
       });
 
       // 创建 fetch Promise
-      const fetchPromise = fetch(url, fetchOptions);
+      const fetchPromise = fetch(url, finalOptions);
 
       // 使用 Promise.race 实现超时控制
       const response = await Promise.race([fetchPromise, timeoutPromise]);
@@ -140,7 +154,7 @@ export function preserveHtmlContent(
     cleaned = cleaned.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
     cleaned = cleaned.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
     cleaned = cleaned.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
-    cleaned = cleaned.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
+    // cleaned = cleaned.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, ''); // 放宽限制：允许 iframe
     
     // 移除所有属性中的事件处理器
     cleaned = cleaned.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
@@ -152,8 +166,8 @@ export function preserveHtmlContent(
     if (contentType === 'text') {
       cleaned = cleaned.replace(/<img[^>]*>/gi, '');
       cleaned = cleaned.replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '');
-      cleaned = cleaned.replace(/<video[^>]*>[\s\S]*?<\/video>/gi, '');
-      cleaned = cleaned.replace(/<audio[^>]*>[\s\S]*?<\/audio>/gi, '');
+      // cleaned = cleaned.replace(/<video[^>]*>[\s\S]*?<\/video>/gi, ''); // 放宽限制：允许 video
+      // cleaned = cleaned.replace(/<audio[^>]*>[\s\S]*?<\/audio>/gi, ''); // 放宽限制：允许 audio
     }
     
     return cleaned.trim();

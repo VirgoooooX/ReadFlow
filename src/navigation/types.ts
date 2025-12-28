@@ -1,6 +1,7 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { Article } from '../types';
 
 // 根堆栈参数列表
 export type RootStackParamList = {
@@ -9,6 +10,7 @@ export type RootStackParamList = {
     articleId: number;
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
     currentIndex?: number;  // 当前文章在列表中的索引
+    article?: Article;      // 【新增】完整文章对象，用于无缝过渡
   };
   VocabularyDetail: { entryId: number };
   RSSSourceDetail: { sourceId: number };
@@ -38,6 +40,7 @@ export type HomeStackParamList = {
     articleId: number;
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
     currentIndex?: number;  // 当前文章在列表中的索引
+    article?: Article;      // 【新增】完整文章对象，用于无缝过渡
   };
   Search: { query?: string };
 };
