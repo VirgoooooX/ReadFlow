@@ -304,15 +304,17 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       margin: 32px auto 12px auto;
     }
     
-    /* 视频优化 - 自适应宽度和圆角 */
-    .video-container {
+    /* 多媒体组件优化 (Video, Audio, Iframe) */
+    .video-container, audio, iframe {
       position: relative;
       width: 100%;
       max-width: 100%;
       margin: 24px 0;
       border-radius: 12px;
       overflow: hidden;
-      background-color: #000;
+      display: block;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      background-color: ${isDark ? '#1a1a1a' : '#f5f5f5'};
     }
     
     .video-container video {
@@ -342,13 +344,25 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     .video-container.is-paused .video-paused-overlay {
       opacity: 1;
     }
+
+    audio {
+      height: 54px; /* 标准高度 */
+    }
+
+    iframe {
+      aspect-ratio: 16 / 9; /* 默认 16:9 比例，适合视频嵌入 */
+      border: none;
+    }
     
-    video {
-      max-width: 100%;
+    /* 独立 video 标签样式（如果没有被脚本包裹） */
+    video:not(.video-container video) {
+      width: 100%;
       height: auto;
-      border-radius: 8px;
+      border-radius: 12px;
       margin: 24px 0;
       display: block;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      background-color: #000;
     }
     
     /* 列表 */
@@ -926,6 +940,102 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             videoObserver.observe(container);
           });
         }
+      }
+
+      // 【新增】Iframe 优化：自动计算宽高比 + 平台特定优化
+      function setupIframes() {
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(function(iframe) {
+          const src = iframe.src || '';
+          
+          // 1. 通用属性优化
+          // 确保拥有全屏播放权限
+          iframe.setAttribute('allowfullscreen', 'true');
+          iframe.setAttribute('webkitallowfullscreen', 'true');
+          iframe.setAttribute('mozallowfullscreen', 'true');
+          // 授予必要的播放权限 (自动播放、加密媒体等)
+          if (!iframe.hasAttribute('allow')) {
+            iframe.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
+          }
+          
+          iframe.setAttribute('scrolling', 'no'); // 防止播放器内部滚动
+          iframe.style.maxWidth = '100%';
+          iframe.style.display = 'block';
+          iframe.style.margin = '20px auto'; // 居中
+          
+          // 2. 宽高比计算 (原有逻辑)
+          const width = iframe.getAttribute('width');
+          const height = iframe.getAttribute('height');
+          
+          // 移除硬编码尺寸，让 CSS width: 100% 生效
+          iframe.removeAttribute('width');
+          iframe.removeAttribute('height');
+          
+          let ratio = 9 / 16; // 默认 16:9 (0.5625)
+          
+          // 尝试从属性计算
+          if (width && height) {
+            const w = parseInt(width);
+            const h = parseInt(height);
+            if (!isNaN(w) && !isNaN(h) && w > 0) {
+              ratio = h / w;
+            }
+          }
+          
+          // 3. 特定平台优化
+          
+          // --- Bilibili (B站) ---
+          if (src.includes('player.bilibili.com')) {
+            // 强制 16:9 (B站绝大多数视频为横屏)
+            // 除非原始属性明确指定了竖屏，否则优先使用 16:9 以避免黑边
+            if (ratio > 0.6) { // 如果计算出的比例接近正方形或竖屏，则保留
+               // do nothing
+            } else {
+               ratio = 0.5625; // 强制 16:9
+            }
+            
+            // 优化 URL 参数: 高画质 + 关闭弹幕 (提升阅读体验)
+            // 注意：B站外链默认 360p，加 high_quality=1 可提升至 480p/720p(取决于视频)
+            try {
+              let urlObj = new URL(src);
+              if (!urlObj.searchParams.has('high_quality')) urlObj.searchParams.set('high_quality', '1');
+              if (!urlObj.searchParams.has('danmaku')) urlObj.searchParams.set('danmaku', '0');
+              // 某些情况下 iframe.src 赋值不会触发刷新，但在加载阶段修改是有效的
+              iframe.src = urlObj.toString();
+            } catch (e) {
+              // URL 解析失败则手动拼接
+              let newSrc = src;
+              if (!newSrc.includes('high_quality')) newSrc += (newSrc.includes('?') ? '&' : '?') + 'high_quality=1';
+              if (!newSrc.includes('danmaku')) newSrc += '&danmaku=0';
+              if (src !== newSrc) iframe.src = newSrc;
+            }
+          }
+          
+          // --- YouTube ---
+          else if (src.includes('youtube.com') || src.includes('youtu.be')) {
+             // 确保使用 embed 格式
+             // 某些 RSS 可能会错误地包含 watch?v= 链接
+             if (src.includes('watch?v=')) {
+                iframe.src = src.replace('watch?v=', 'embed/');
+             }
+             // Shorts 检测 (shorts/xxx -> embed/xxx)
+             if (src.includes('/shorts/')) {
+                iframe.src = src.replace('/shorts/', '/embed/');
+                // Shorts 通常是竖屏 (9:16)，如果 RSS 没给尺寸，我们需要修正默认比例
+                if (ratio === 0.5625) { // 如果是默认的 16:9
+                   ratio = 16 / 9; // 改为 9:16 (1.77)
+                }
+             }
+          }
+          
+          // --- Vimeo ---
+          else if (src.includes('player.vimeo.com')) {
+             // Vimeo 通常自适应较好，无需特殊处理
+          }
+          
+          // 应用计算出的比例
+          iframe.style.aspectRatio = String(1 / ratio);
+        });
       }
     
       // 【新增】处理 BBC 等网站的视频链接卡片
@@ -1520,6 +1630,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         
         // 2. 设置视频优化（可见性检测、自动暂停）
         setupVideos();
+        setupIframes();
       
         // 3. 处理视频链接卡片
         const articleUrl = ${injectedArticleUrl};

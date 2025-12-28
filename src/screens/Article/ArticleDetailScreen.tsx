@@ -897,11 +897,14 @@ const ArticleDetailScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          // 【优化】支持多媒体播放
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          allowsFullscreenVideo={true}
           scrollEnabled={true}
           startInLoadingState={true}
           allowFileAccess={true}
           allowUniversalAccessFromFileURLs={true}
-          mixedContentMode="always"
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('[WebView] Load error:', nativeEvent);
