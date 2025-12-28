@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { ToastAndroid, Platform } from 'react-native';
 import { RSSSource, RSSStartupSettings } from '../types';
 import { RSSService } from '../services/rss';
 import { SettingsService } from '../services/SettingsService';
@@ -193,6 +194,10 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
         console.log('[RSSSourceContext.syncAllSources] 🔕 无新文章，跳过 refreshAllSources 事件');
       }
       
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`已刷新，${result.totalArticles}篇新文章`, ToastAndroid.SHORT);
+      }
+
       console.log('[RSSSourceContext.syncAllSources] ✅ 所有源同步完成');
     } catch (error) {
       console.error('[RSSSourceContext.syncAllSources] 💥 同步失败:', error);
@@ -225,6 +230,10 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
           console.log(`[RSSSourceContext.syncSource] 🔕 无新文章，跳过 refreshSource 事件`);
         }
         
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(`已刷新，${newArticles ? newArticles.length : 0}篇新文章`, ToastAndroid.SHORT);
+        }
+
         console.log(`[RSSSourceContext.syncSource] ✅ 单个源同步完成: ${source.name}`);
       }
     } catch (error) {
@@ -253,6 +262,10 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
         logger.info('[RSSSourceContext.syncSources] 📢 触发 refreshSources 事件');
       } else {
         logger.info('[RSSSourceContext.syncSources] 🔕 无新文章，跳过 refreshSources 事件');
+      }
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`已刷新，${result.totalArticles}篇新文章`, ToastAndroid.SHORT);
       }
     } catch (error) {
       console.error('[RSSSourceContext.syncSources] 💥 同步失败:', error);

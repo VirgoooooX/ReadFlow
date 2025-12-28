@@ -70,11 +70,12 @@ export class RSSService {
         errorCount: 0,
         description: feedInfo.description,
         groupId: null, // 新源默认未分组
+        maxArticles: 20, // 默认限制 20 篇
       };
 
       const result = await this.databaseService.executeInsert(
-        `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated, max_articles) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rssSource.url,
           rssSource.name,
@@ -84,6 +85,7 @@ export class RSSService {
           rssSource.sourceMode,
           rssSource.isActive ? 1 : 0,
           rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
+          rssSource.maxArticles,
         ]
       );
 
@@ -224,6 +226,10 @@ export class RSSService {
       if (updates.sourceMode !== undefined) {
         setClause.push('source_mode = ?');
         values.push(updates.sourceMode);
+      }
+      if (updates.maxArticles !== undefined) {
+        setClause.push('max_articles = ?');
+        values.push(updates.maxArticles);
       }
       
       if (setClause.length === 0) {
@@ -623,6 +629,7 @@ export class RSSService {
       // 📦 分组字段
       groupId: row.group_id || null,
       groupSortOrder: row.group_sort_order || 0,
+      maxArticles: row.max_articles || 20,
     };
   }
 }

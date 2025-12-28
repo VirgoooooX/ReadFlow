@@ -2,10 +2,11 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '5.3.1',
-  buildNumber: 50301,
+  version: '5.3.2',
+  buildNumber: 50302,
   updateTime: '2025-12-27',
   changelog: [
+    '实现应用启动时自动刷新RSS源功能',
     '优化RSS同步性能并添加批量刷新功能',
     '升级应用版本至5.3.1',
     '在CacheEventData接口中添加reason字段记录刷新触发原因',
@@ -20,7 +21,6 @@ export const APP_VERSION = {
     '忽略标记已读触发的统计更新以避免不必要刷新',
     '改进URL验证和处理逻辑',
     '替换console.log为logger调用',
-    '优化功能',
   ],
 };
 

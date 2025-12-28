@@ -232,6 +232,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
 
 const styles = StyleSheet.create({
     container: {
+        width: '100%', // 确保占满全宽
         height: 40, // 减小高度 (48 -> 40)
         // 添加阴影
         shadowColor: '#000',

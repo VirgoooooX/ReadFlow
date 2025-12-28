@@ -35,7 +35,6 @@ interface FormData {
   category: string;
   contentType: 'text' | 'image_text';
   sourceMode: 'direct' | 'proxy';
-  updateFrequency: number;
   maxArticles: number; // 新增
   isActive: boolean;
 }
@@ -65,22 +64,12 @@ const EditRSSSourceScreen: React.FC = () => {
     category: '技术',
     contentType: 'image_text',
     sourceMode: 'direct',
-    updateFrequency: 3600,
     maxArticles: 20, // 默认 20
     isActive: true,
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
   const categories = ['技术', '新闻', '科学', '娱乐', '体育', '财经', '其他'];
-  const frequencyOptions = [
-    { label: '15分钟', value: 900 },
-    { label: '30分钟', value: 1800 },
-    { label: '1小时', value: 3600 },
-    { label: '2小时', value: 7200 },
-    { label: '6小时', value: 21600 },
-    { label: '12小时', value: 43200 },
-    { label: '24小时', value: 86400 },
-  ];
 
   useEffect(() => {
     loadRSSSource();
@@ -106,7 +95,6 @@ const EditRSSSourceScreen: React.FC = () => {
         category: source.category || '技术',
         contentType: source.contentType || 'image_text',
         sourceMode: source.sourceMode || 'direct',
-        updateFrequency: source.updateFrequency || 3600,
         maxArticles: source.maxArticles || 20,
         isActive: source.isActive,
       });
@@ -214,7 +202,7 @@ const EditRSSSourceScreen: React.FC = () => {
         category: formData.category,
         contentType: formData.contentType,
         sourceMode: formData.sourceMode,
-        updateFrequency: formData.updateFrequency,
+        maxArticles: formData.maxArticles,
         isActive: formData.isActive,
       };
 
@@ -414,32 +402,6 @@ const EditRSSSourceScreen: React.FC = () => {
                   }
                 />
               </View>
-            </View>
-
-            {/* 更新频率 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>更新频率</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                {frequencyOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.categoryChip,
-                      formData.updateFrequency === option.value && styles.categoryChipSelected,
-                    ]}
-                    onPress={() => updateFormData('updateFrequency', option.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        formData.updateFrequency === option.value && styles.categoryChipTextSelected,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
             </View>
 
             {/* 文章数量限制 */}
