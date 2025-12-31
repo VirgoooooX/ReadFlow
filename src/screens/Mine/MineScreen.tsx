@@ -140,6 +140,15 @@ const MineScreen: React.FC = () => {
           color="#10B981"
         />
         <SettingItem
+          icon="cloud"
+          label="云端同步"
+          onPress={() => {
+            console.log('Navigating to CloudSettings');
+            navigation.navigate('CloudSettings');
+          }}
+          color="#3B82F6"
+        />
+        <SettingItem
           icon="cloud-queue"
           label="代理服务器"
           onPress={() => navigation.navigate('ProxyServerSettings')}

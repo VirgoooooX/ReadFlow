@@ -1,0 +1,6 @@
+{
+  "imageQuality": 80,
+  "rssRefreshIntervalSeconds": 900,
+  "rssMaxArticlesPerFeed": 20,
+  "rssSyncMaxBlocksPerFeed": 200
+}

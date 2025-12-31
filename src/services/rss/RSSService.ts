@@ -8,6 +8,7 @@ import { RSSSource, Article, AppError } from '../../types';
 import { SettingsService } from '../SettingsService';
 import { localRSSService } from './LocalRSSService';
 import { proxyRSSService } from './ProxyRSSService';
+import { cloudSyncService } from './CloudSyncService';
 import { logger } from './RSSUtils';
 import { InteractionManager } from 'react-native';
 
@@ -311,6 +312,22 @@ export class RSSService {
     source: RSSSource,
     options: { mode?: 'sync' | 'refresh' } = {}
   ): Promise<Article[]> {
+    // 检查全局同步设置
+    const appSettings = await SettingsService.getInstance().getAppSettings();
+    logger.info(`[fetchArticlesFromSource] Checking sync mode. Enabled: ${appSettings.sync.mode === 'cloud'}, URL: ${appSettings.sync.serverUrl}`);
+    
+    if (appSettings.sync.mode === 'cloud' && appSettings.sync.serverUrl) {
+      logger.info(`[fetchArticlesFromSource] ☁️ 云端模式: ${source.name} (Trigger: ${options.mode === 'refresh'})`);
+      try {
+        // If mode is 'refresh' (manual pull), trigger server refresh
+        const triggerRefresh = options.mode === 'refresh';
+        return await cloudSyncService.fetchArticles(source, { triggerRefresh });
+      } catch (error) {
+        logger.error(`[fetchArticlesFromSource] 云端同步失败，降级到直连模式: ${source.name}`, error);
+        // Fallback to local/direct mode
+      }
+    }
+
     // 根据源级别配置判断
     if (source.sourceMode === 'proxy') {
       // 代理模式
@@ -350,6 +367,17 @@ export class RSSService {
     
     if (sources.length === 0) {
       return { success: 0, failed: 0, totalArticles: 0, errors: [] };
+    }
+
+    // 检查全局同步设置
+    const appSettings = await SettingsService.getInstance().getAppSettings();
+    const isCloudMode = appSettings.sync.mode === 'cloud' && !!appSettings.sync.serverUrl;
+
+    if (isCloudMode) {
+      logger.info(`[RefreshAllSources] ☁️ 全局云端模式开启，所有源走云端同步`);
+      // 走通用 fetchArticlesFromSource，它内部会处理云端逻辑
+      // 我们复用 refreshSources 的并发逻辑，但直接传所有 ID
+      return this.refreshSources(sources.map(s => s.id), options);
     }
 
     // 按 sourceMode 分组

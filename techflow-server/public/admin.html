@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechFlow Cloud Console</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa',
+                            500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a',
+                        },
+                        slate: {
+                            850: '#152033', // Custom dark
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-in-right': 'slideInRight 0.3s ease-out',
+                        'bounce-slight': 'bounceSlight 2s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideInRight: {
+                            '0%': { opacity: '0', transform: 'translateX(20px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                        bounceSlight: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Glassmorphism utilities */
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+        
+        /* Sidebar Active State */
+        .nav-item.active { 
+            background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0) 100%);
+            border-left-color: #3b82f6;
+            color: #60a5fa;
+        }
+        .nav-item {
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .nav-item:hover:not(.active) {
+            background: rgba(255,255,255,0.05);
+            color: #e2e8f0;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Modal Transitions */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 text-slate-400 flex flex-col shadow-2xl z-30 transition-all duration-300" id="sidebar">
+        <!-- Logo -->
+        <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-900">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white mr-3 shadow-lg shadow-blue-500/30">
+                <i class="fa-solid fa-cloud"></i>
+            </div>
+            <span class="text-lg font-bold text-white tracking-wide">TechFlow</span>
+        </div>
+        
+        <!-- Nav -->
+        <nav class="flex-1 py-6 space-y-1 overflow-y-auto custom-scrollbar">
+            <div class="px-4 mb-2 text-xs font-bold text-slate-600 uppercase tracking-wider">概览</div>
+            <a onclick="showTab('dashboard')" id="nav-dashboard" class="nav-item active flex items-center px-6 py-3 cursor-pointer">
+                <i class="fa-solid fa-gauge-high w-6"></i>
+                <span class="font-medium">仪表盘</span>
+            </a>
+            
+            <div class="px-4 mt-6 mb-2 text-xs font-bold text-slate-600 uppercase tracking-wider">内容管理</div>
+            <a onclick="showTab('feeds')" id="nav-feeds" class="nav-item flex items-center px-6 py-3 cursor-pointer">
+                <i class="fa-solid fa-rss w-6"></i>
+                <span class="font-medium">订阅源</span>
+            </a>
+            <a onclick="showTab('images')" id="nav-images" class="nav-item flex items-center px-6 py-3 cursor-pointer">
+                <i class="fa-regular fa-images w-6"></i>
+                <span class="font-medium">图片缓存</span>
+            </a>
+
+            <div class="px-4 mt-6 mb-2 text-xs font-bold text-slate-600 uppercase tracking-wider">用户与系统</div>
+            <a onclick="showTab('users')" id="nav-users" class="nav-item flex items-center px-6 py-3 cursor-pointer">
+                <i class="fa-solid fa-users w-6"></i>
+                <span class="font-medium">用户列表</span>
+            </a>
+            <a onclick="showTab('settings')" id="nav-settings" class="nav-item flex items-center px-6 py-3 cursor-pointer">
+                <i class="fa-solid fa-sliders w-6"></i>
+                <span class="font-medium">系统设置</span>
+            </a>
+        </nav>
+        
+        <!-- Footer -->
+        <div class="p-4 border-t border-slate-800 bg-slate-900">
+            <div class="flex items-center">
+                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-white">Admin</p>
+                    <p class="text-xs text-slate-500">Super User</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
+        
+        <!-- Header -->
+        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-20">
+            <div class="flex items-center">
+                <button id="sidebar-toggle" class="md:hidden text-slate-500 hover:text-slate-700 mr-4">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <h1 id="page-title" class="text-xl font-bold text-slate-800 tracking-tight">仪表盘</h1>
+                <div class="hidden md:flex items-center ml-4 text-sm text-slate-400">
+                    <span class="mx-2">/</span>
+                    <span id="page-breadcrumb" class="font-medium text-slate-500">Overview</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+                    <span id="header-status">系统正常</span>
+                </div>
+                
+                <button class="relative p-2 text-slate-400 hover:text-slate-600 transition">
+                    <i class="fa-regular fa-bell text-lg"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                </button>
+                
+                <a href="/" target="_blank" class="p-2 text-slate-400 hover:text-blue-600 transition" title="访问前台">
+                    <i class="fa-solid fa-external-link-alt"></i>
+                </a>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-auto p-6 md:p-8 relative scroll-smooth" id="content-area">
+            
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="space-y-8 animate-fade-in">
+                <!-- Welcome Section -->
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">欢迎回来, 管理员</h2>
+                    <p class="text-slate-500 mt-1">这是系统当前的运行概况与统计数据。</p>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="dashboard-stats">
+                    <!-- Loading Skeletons -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
+                </div>
+
+                <!-- Quick Actions & Status -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Quick Maintenance -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-800 flex items-center">
+                                <i class="fa-solid fa-screwdriver-wrench text-blue-500 mr-2"></i> 系统维护
+                            </h3>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <button onclick="clearCache()" class="group flex items-start p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition duration-200 text-left">
+                                <div class="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 group-hover:text-blue-700">清除图片缓存</h4>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">删除本地存储的所有缩略图与原图缓存，释放磁盘空间。</p>
+                                </div>
+                            </button>
+
+                            <button onclick="clearArticles()" class="group flex items-start p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition duration-200 text-left">
+                                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-file-circle-xmark"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 group-hover:text-blue-700">清除文章缓存</h4>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">重置所有订阅源的文章抓取记录，下次抓取将重新同步。</p>
+                                </div>
+                            </button>
+
+                            <button onclick="clearData()" class="group flex items-start p-4 rounded-xl border border-slate-100 hover:border-red-200 hover:bg-red-50/50 transition duration-200 text-left col-span-1 sm:col-span-2">
+                                <div class="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-radiation"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800 group-hover:text-red-700">工厂重置 (Danger)</h4>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">清空所有用户、订阅源及历史数据。此操作不可撤销，请谨慎使用。</p>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Server Info -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-50">
+                            <h3 class="font-bold text-slate-800 flex items-center">
+                                <i class="fa-solid fa-server text-purple-500 mr-2"></i> 服务状态
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-6">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-slate-500">API 响应状态</span>
+                                    <span class="text-emerald-600 font-bold">正常</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2">
+                                    <div class="bg-emerald-500 h-2 rounded-full w-full"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-slate-500">模拟负载 (Mock)</span>
+                                    <span class="text-blue-600 font-bold">24%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full w-[24%]"></div>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-slate-50">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-500">上次重启</span>
+                                    <span class="font-mono text-slate-700">3 days ago</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm mt-2">
+                                    <span class="text-slate-500">版本</span>
+                                    <span class="font-mono text-slate-700 bg-slate-100 px-2 rounded">v1.2.0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: FEEDS -->
+            <div id="view-feeds" class="hidden space-y-6 animate-fade-in">
+                <!-- Toolbar -->
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <div class="relative w-full md:w-64">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" placeholder="搜索订阅源..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                    </div>
+                    <button onclick="document.getElementById('add-feed-panel').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-500/30 flex items-center">
+                        <i class="fa-solid fa-plus mr-2"></i> 添加新源
+                    </button>
+                </div>
+
+                <!-- Add Feed Panel -->
+                <div id="add-feed-panel" class="hidden bg-white p-6 rounded-xl shadow-md border border-slate-100 border-l-4 border-l-blue-500 animate-slide-in-right">
+                    <h3 class="text-sm font-bold text-slate-800 mb-4">添加新 RSS 订阅源</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">名称</label>
+                            <input type="text" id="feed-name" placeholder="例如: TechCrunch" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div class="md:col-span-5">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">RSS 地址</label>
+                            <input type="text" id="feed-url" placeholder="https://..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">分类</label>
+                            <input type="text" id="feed-category" placeholder="Tech" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">间隔(秒)</label>
+                            <input type="number" id="feed-interval" placeholder="900" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div class="md:col-span-1">
+                            <button onclick="addFeed()" class="w-full bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium h-[38px]">
+                                确定
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50/50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                                <tr>
+                                    <th class="px-6 py-4">源名称 / 分类</th>
+                                    <th class="px-6 py-4 w-1/3">源地址</th>
+                                    <th class="px-6 py-4 text-center">抓取间隔</th>
+                                    <th class="px-6 py-4">最后更新</th>
+                                    <th class="px-6 py-4 text-center">状态</th>
+                                    <th class="px-6 py-4 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="feeds-list" class="divide-y divide-slate-50 text-sm text-slate-600">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: USERS -->
+            <div id="view-users" class="hidden space-y-6 animate-fade-in">
+                 <div class="flex justify-between items-end bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <div class="flex-1 max-w-lg">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">快速添加用户</label>
+                        <div class="flex gap-3">
+                            <input type="text" id="user-name" placeholder="输入用户名..." class="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <button onclick="addUser()" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition flex items-center text-sm font-medium shadow-md shadow-blue-500/20">
+                                <i class="fa-solid fa-plus mr-2"></i>添加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50/50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                                <tr>
+                                    <th class="px-6 py-4">用户</th>
+                                    <th class="px-6 py-4">联系方式</th>
+                                    <th class="px-6 py-4">注册时间</th>
+                                    <th class="px-6 py-4">最后活跃</th>
+                                    <th class="px-6 py-4 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list" class="divide-y divide-slate-50">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="hidden max-w-5xl mx-auto animate-fade-in">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+                        <h2 class="text-lg font-bold text-slate-800">全局参数配置</h2>
+                        <p class="text-sm text-slate-500 mt-1">调整服务器的核心运行参数。</p>
+                    </div>
+                    <div class="p-8 space-y-8">
+                        <!-- Section 1 -->
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                <span class="w-1 h-4 bg-blue-500 rounded mr-2"></span> 媒体处理
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">图片压缩质量 (1-100)</label>
+                                    <div class="relative">
+                                        <input type="number" id="setting-quality" min="1" max="100" class="w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
+                                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-sm">%</div>
+                                    </div>
+                                    <p class="mt-2 text-xs text-slate-400">数值越低体积越小，建议 70-80。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100">
+
+                        <!-- Section 2 -->
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                <span class="w-1 h-4 bg-purple-500 rounded mr-2"></span> RSS 抓取策略
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
+                                    <input type="number" id="setting-refresh-interval" min="15" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">单次最大抓取文章数</label>
+                                    <input type="number" id="setting-max-articles" min="1" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">最大同步块保留数</label>
+                                    <input type="number" id="setting-max-blocks" min="1" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-6 border-t border-slate-100 flex justify-end">
+                            <button onclick="saveSettings()" class="bg-slate-900 text-white px-8 py-3 rounded-xl hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition flex items-center font-bold">
+                                <i class="fa-solid fa-save mr-2"></i>保存所有更改
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: IMAGES -->
+            <div id="view-images" class="hidden space-y-6 animate-fade-in">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="font-bold text-slate-700 pl-2">已缓存图片列表</h2>
+                    <div class="flex space-x-3">
+                        <button onclick="loadImages()" class="text-slate-600 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-slate-50 transition text-sm font-medium border border-slate-200 bg-white">
+                            <i class="fa-solid fa-rotate mr-2"></i>刷新
+                        </button>
+                        <button onclick="clearCache()" class="text-red-600 hover:text-red-700 px-4 py-2 rounded-lg hover:bg-red-50 transition text-sm font-medium border border-red-200 bg-white">
+                            <i class="fa-solid fa-trash mr-2"></i>全部清空
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50/50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                                <tr>
+                                    <th class="px-6 py-4">文件名 / 预览链接</th>
+                                    <th class="px-6 py-4">大小</th>
+                                    <th class="px-6 py-4">生成时间</th>
+                                    <th class="px-6 py-4 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="images-list" class="divide-y divide-slate-50">
+                                <!-- JS Injection -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 right-8 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl transform translate-y-32 opacity-0 transition-all duration-500 z-50 flex items-center border border-slate-700">
+        <div id="toast-icon" class="text-emerald-400 mr-4 text-xl"><i class="fa-solid fa-circle-check"></i></div>
+        <div>
+            <h4 class="font-bold text-sm">Notification</h4>
+            <p id="toast-msg" class="text-xs text-slate-400 mt-0.5">操作成功</p>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Feed Articles Modal -->
+    <div id="articles-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="onArticlesOverlayClick(event)">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden animate-fade-in scale-95 transform transition-transform duration-300" onclick="event.stopPropagation()">
+            <div class="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800" id="articles-title">文章列表</h3>
+                    <div class="flex items-center text-xs text-slate-500 mt-1 space-x-2">
+                        <i class="fa-solid fa-link"></i>
+                        <span id="articles-subtitle" class="truncate max-w-md font-mono">...</span>
+                    </div>
+                </div>
+                <button onclick="closeArticles()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-auto bg-slate-50/30">
+                <table class="w-full text-left text-sm text-slate-600">
+                    <thead class="bg-white sticky top-0 z-10 shadow-sm text-xs uppercase text-slate-500 font-bold">
+                        <tr>
+                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100 w-48">发布时间</th>
+                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100">标题</th>
+                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100 w-32">封面</th>
+                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100 w-32 text-right">原文</th>
+                        </tr>
+                    </thead>
+                    <tbody id="articles-list" class="divide-y divide-slate-100 bg-white"></tbody>
+                </table>
+            </div>
+            
+            <div class="px-8 py-4 border-t border-slate-100 bg-white flex justify-between items-center">
+                <div class="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full" id="articles-progress">0 items</div>
+                <button id="articles-load-more" onclick="loadMoreArticles()" class="px-6 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 font-medium transition disabled:opacity-50 hover:shadow-sm">
+                    加载更多
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Details Modal -->
+    <div id="user-settings-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onclick="onUserSettingsOverlayClick(event)">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-fade-in" onclick="event.stopPropagation()">
+            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl mr-4">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800" id="user-settings-title">User</h3>
+                        <p class="text-xs text-slate-400 font-mono mt-0.5" id="user-settings-subtitle">ID</p>
+                    </div>
+                </div>
+                <button onclick="closeUserSettings()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-8 overflow-y-auto max-h-[70vh] space-y-8">
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">基础信息</h4>
+                    <div id="user-settings-meta" class="grid grid-cols-2 gap-4"></div>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">配置数据 (JSON)</h4>
+                    <div class="bg-slate-900 rounded-xl p-5 overflow-x-auto shadow-inner">
+                        <pre id="user-settings-json" class="text-xs text-emerald-400 font-mono leading-relaxed"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- Global Config ---
+    const API_BASE = '/api/admin';
+    const ARTICLES_PAGE_SIZE = 50;
+    const articlesState = {
+        feedId: '', feedName: '', feedUrl: '', total: 0, offset: 0, loading: false
+    };
+
+    // --- UI/Navigation Logic ---
+    
+    function showTab(tabId) {
+        // Sidebar active state
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const navItem = document.getElementById('nav-' + tabId);
+        if(navItem) navItem.classList.add('active');
+        
+        // Update Title & Breadcrumb
+        const titles = {
+            'dashboard': '仪表盘',
+            'settings': '系统设置',
+            'users': '用户管理',
+            'feeds': '订阅源管理',
+            'images': '图片缓存'
+        };
+        const breadcrumbs = {
+             'dashboard': 'Overview',
+             'settings': 'System / Configuration',
+             'users': 'System / Users',
+             'feeds': 'Content / Feeds',
+             'images': 'Content / Media'
+        }
+        document.getElementById('page-title').textContent = titles[tabId] || 'Console';
+        document.getElementById('page-breadcrumb').textContent = breadcrumbs[tabId] || 'Overview';
+
+        // Content switching
+        document.querySelectorAll('#content-area > div').forEach(el => el.classList.add('hidden'));
+        const view = document.getElementById('view-' + tabId);
+        if(view) {
+            view.classList.remove('hidden');
+            // Lazy load data
+            if (tabId === 'settings') loadSettings();
+            if (tabId === 'users') loadUsers();
+            if (tabId === 'feeds') loadFeeds();
+            if (tabId === 'images') loadImages();
+        }
+    }
+
+    function showToast(msg, type = 'success') {
+        const el = document.getElementById('toast');
+        const msgEl = document.getElementById('toast-msg');
+        const iconEl = document.getElementById('toast-icon');
+        
+        msgEl.textContent = msg;
+        
+        if(type === 'error') {
+            iconEl.className = 'text-red-400 mr-4 text-xl';
+            iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+        } else if (type === 'info') {
+             iconEl.className = 'text-blue-400 mr-4 text-xl';
+             iconEl.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+        } else {
+             iconEl.className = 'text-emerald-400 mr-4 text-xl';
+             iconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+        }
+
+        el.classList.remove('translate-y-32', 'opacity-0');
+        setTimeout(() => el.classList.add('translate-y-32', 'opacity-0'), 3000);
+    }
+
+    // --- Data Logic ---
+
+    // 1. Dashboard / Status
+    async function loadStatus() {
+        try {
+            const res = await fetch(`${API_BASE}/status`);
+            const data = await res.json();
+            
+            document.getElementById('header-status').textContent = '系统正常';
+            document.getElementById('header-status').parentElement.classList.replace('text-red-600', 'text-emerald-600');
+            document.getElementById('header-status').parentElement.classList.replace('bg-red-50', 'bg-emerald-50');
+            document.getElementById('header-status').parentElement.classList.replace('border-red-100', 'border-emerald-100');
+
+            // Render Stats Cards
+            const stats = document.getElementById('dashboard-stats');
+            
+            const card = (title, value, icon, color) => `
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between card-hover transition duration-200">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 mb-1">${title}</p>
+                        <p class="text-2xl font-bold text-slate-800">${value}</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-full bg-${color}-50 flex items-center justify-center text-${color}-500">
+                        <i class="${icon} text-xl"></i>
+                    </div>
+                </div>
+            `;
+            
+            stats.innerHTML = `
+                ${card('总用户数', data.users ?? 0, 'fa-solid fa-users', 'blue')}
+                ${card('订阅源', data.feeds ?? 0, 'fa-solid fa-rss', 'purple')}
+                ${card('文章缓存', data.articleCache?.totalArticles ?? 0, 'fa-solid fa-newspaper', 'emerald')}
+                ${card('图片缓存', data.imageCache ?? 0, 'fa-solid fa-images', 'orange')}
+            `;
+        } catch (e) {
+            console.error(e);
+            document.getElementById('header-status').textContent = '连接断开';
+            const statusBadge = document.getElementById('header-status').parentElement;
+            statusBadge.classList.replace('text-emerald-600', 'text-red-600');
+            statusBadge.classList.replace('bg-emerald-50', 'bg-red-50');
+            statusBadge.classList.replace('border-emerald-100', 'border-red-100');
+        }
+    }
+
+    // 2. Settings
+    async function loadSettings() {
+        try {
+            const res = await fetch(`${API_BASE}/settings`);
+            const data = await res.json();
+            document.getElementById('setting-quality').value = data.imageQuality || 80;
+            document.getElementById('setting-refresh-interval').value = data.rssRefreshIntervalSeconds || 900;
+            document.getElementById('setting-max-articles').value = data.rssMaxArticlesPerFeed || 20;
+            document.getElementById('setting-max-blocks').value = data.rssSyncMaxBlocksPerFeed || 200;
+        } catch(e) { console.error(e); }
+    }
+
+    async function saveSettings() {
+        const quality = parseInt(document.getElementById('setting-quality').value);
+        const rssRefreshIntervalSeconds = parseInt(document.getElementById('setting-refresh-interval').value);
+        const rssMaxArticlesPerFeed = parseInt(document.getElementById('setting-max-articles').value);
+        const rssSyncMaxBlocksPerFeed = parseInt(document.getElementById('setting-max-blocks').value);
+        
+        await fetch(`${API_BASE}/settings`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ imageQuality: quality, rssRefreshIntervalSeconds, rssMaxArticlesPerFeed, rssSyncMaxBlocksPerFeed })
+        });
+        showToast('配置已成功保存并生效');
+    }
+
+    // 3. Maintenance
+    async function clearCache() {
+        if(!confirm('确定要清除所有图片缓存吗？这可能导致客户端重新下载图片。')) return;
+        await fetch(`${API_BASE}/cache/clear`, { method: 'POST' });
+        showToast('图片缓存已清除');
+        loadStatus();
+    }
+    async function clearArticles() {
+        if(!confirm('确定要重置文章缓存吗？所有历史同步记录将被移除。')) return;
+        await fetch(`${API_BASE}/articles/clear`, { method: 'POST' });
+        showToast('文章缓存已重置');
+        loadStatus();
+    }
+    async function clearData() {
+        const input = prompt('此操作将永久删除所有数据！请输入 "DELETE" 确认：');
+        if(input !== 'DELETE') return;
+        
+        await fetch(`${API_BASE}/data/clear`, { method: 'POST' });
+        showToast('工厂重置完成', 'info');
+        setTimeout(() => location.reload(), 1000);
+    }
+
+    // 4. Feeds
+    async function loadFeeds() {
+        const res = await fetch(`${API_BASE}/feeds`);
+        const feeds = await res.json();
+        const tbody = document.getElementById('feeds-list');
+        
+        tbody.innerHTML = feeds.map(f => {
+            const statusColor = f.lastRefreshStatus === 'ok' ? 'text-emerald-500' : (f.lastRefreshStatus === 'error' ? 'text-red-500' : 'text-slate-400');
+            const statusBg = f.lastRefreshStatus === 'ok' ? 'bg-emerald-50' : (f.lastRefreshStatus === 'error' ? 'bg-red-50' : 'bg-slate-100');
+            const statusText = f.lastRefreshStatus === 'ok' ? '正常' : (f.lastRefreshStatus === 'error' ? '错误' : '未知');
+            
+            return `
+            <tr class="hover:bg-slate-50 transition group border-b border-slate-50 last:border-0">
+                <td class="px-6 py-4">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500 mr-3 text-sm">
+                            <i class="fa-solid fa-rss"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-700">${f.name || 'Unnamed'}</div>
+                            <div class="text-xs text-slate-400 mt-0.5">${f.category || 'General'}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <a href="${f.url}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline text-xs font-mono truncate block max-w-[240px]" title="${f.url}">
+                        ${f.url}
+                    </a>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <input type="number" value="${f.refreshIntervalSeconds ?? ''}" 
+                        class="w-20 px-2 py-1 text-xs border border-slate-200 bg-slate-50 rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                        onchange="updateFeedInterval('${f.id}', this.value)" placeholder="Default">
+                </td>
+                <td class="px-6 py-4 text-xs">
+                    <div class="text-slate-600 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
+                    <div class="text-slate-400 text-[10px] mt-0.5 scale-90 origin-left">Last check</div>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBg} ${statusColor}">
+                        <span class="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></span>
+                        ${statusText}
+                    </span>
+                    ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-400 ml-1 cursor-help" title="${f.lastRefreshError}"></i>` : ''}
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <div class="flex justify-end space-x-1">
+                        <button onclick="refreshFeed('${f.id}')" class="text-slate-500 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition" title="立即刷新">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                        <button onclick="viewFeedArticles('${f.id}')" class="text-slate-500 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition" title="查看文章">
+                            <i class="fa-solid fa-list-ul"></i>
+                        </button>
+                        <button onclick="clearFeedData('${f.id}')" class="text-slate-500 hover:text-orange-600 p-2 rounded-lg hover:bg-orange-50 transition" title="清空数据">
+                            <i class="fa-solid fa-eraser"></i>
+                        </button>
+                        <button onclick="deleteFeed('${f.id}')" class="text-slate-500 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition" title="删除订阅源">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `}).join('');
+    }
+
+    async function addFeed() {
+        const name = document.getElementById('feed-name').value;
+        const url = document.getElementById('feed-url').value;
+        const category = document.getElementById('feed-category').value;
+        const refreshIntervalSeconds = parseInt(document.getElementById('feed-interval').value);
+        
+        if (!name || !url) return showToast('请填写名称和URL', 'error');
+        
+        await fetch(`${API_BASE}/feeds`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, url, category, refreshIntervalSeconds })
+        });
+        
+        document.getElementById('feed-name').value = '';
+        document.getElementById('feed-url').value = '';
+        document.getElementById('feed-category').value = '';
+        document.getElementById('add-feed-panel').classList.add('hidden');
+        loadFeeds();
+        showToast('订阅源添加成功');
+    }
+
+    window.updateFeedInterval = async function(id, val) {
+        const refreshIntervalSeconds = val === '' ? null : parseInt(val);
+        await fetch(`${API_BASE}/feeds/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ refreshIntervalSeconds })
+        });
+        showToast('更新成功');
+    }
+    
+    window.refreshFeed = async function(id) {
+        showToast('已触发后台刷新...', 'info');
+        await fetch(`${API_BASE}/feeds/${id}/refresh`, { method: 'POST' });
+        setTimeout(loadFeeds, 1000); 
+    }
+    
+    window.deleteFeed = async function(id) {
+        if(!confirm('确定删除该订阅源吗？')) return;
+        await fetch(`${API_BASE}/feeds/${id}`, { method: 'DELETE' });
+        loadFeeds();
+        showToast('订阅源已删除');
+    }
+    
+    window.clearFeedData = async function(id) {
+        if(!confirm('确定清空该源的所有文章吗？')) return;
+        await fetch(`${API_BASE}/feeds/${id}/data/clear`, { method: 'POST' });
+        showToast('数据已清空');
+    }
+
+    // 5. Users
+    async function loadUsers() {
+        const res = await fetch(`${API_BASE}/users`);
+        const users = await res.json();
+        const tbody = document.getElementById('users-list');
+        tbody.innerHTML = users.map(u => `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-50 last:border-0">
+                <td class="px-6 py-4">
+                    <div class="flex items-center">
+                        <div class="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm shadow-sm mr-3">
+                            ${u.username ? u.username.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-800 text-sm">${u.username}</div>
+                            <div class="text-xs text-slate-400 font-mono mt-0.5">${u.id.substring(0,8)}...</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-600">${u.email || '<span class="text-slate-300 italic">No Email</span>'}</td>
+                <td class="px-6 py-4 text-xs text-slate-500">${u.registeredAt ? new Date(u.registeredAt).toLocaleDateString() : '-'}</td>
+                <td class="px-6 py-4 text-xs">
+                    <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                        ${u.lastActive ? new Date(u.lastActive).toLocaleString() : 'Never'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-right space-x-2">
+                    <button onclick="viewUserSettings('${u.id}')" class="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition text-xs font-medium border border-blue-200">
+                        详情
+                    </button>
+                    <button onclick="deleteUser('${u.id}')" class="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition text-xs font-medium border border-red-200">
+                        删除
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function addUser() {
+        const username = document.getElementById('user-name').value;
+        if (!username) return;
+        await fetch(`${API_BASE}/users`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username })
+        });
+        document.getElementById('user-name').value = '';
+        loadUsers();
+        showToast('用户创建成功');
+    }
+
+    window.deleteUser = async function(id) {
+        if(!confirm('确定删除该用户吗？')) return;
+        await fetch(`${API_BASE}/users/${id}`, { method: 'DELETE' });
+        loadUsers();
+        showToast('用户已删除');
+    }
+
+    // 6. User Settings Modal
+    window.viewUserSettings = async function(id) {
+        const res = await fetch(`${API_BASE}/users`);
+        const users = await res.json();
+        const user = users.find(u => u.id === id);
+        if (!user) return;
+        
+        document.getElementById('user-settings-title').textContent = user.username || 'User';
+        document.getElementById('user-settings-subtitle').textContent = user.id;
+        document.getElementById('user-settings-json').textContent = JSON.stringify(user.settings || {}, null, 2);
+        
+        const meta = document.getElementById('user-settings-meta');
+        const item = (label, val) => `
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div class="text-xs font-bold text-slate-400 mb-1 uppercase">${label}</div>
+                <div class="font-semibold text-slate-800 text-sm truncate" title="${val}">${val}</div>
+            </div>
+        `;
+        meta.innerHTML = `
+            ${item('用户 ID', user.id)}
+            ${item('电子邮箱', user.email || '-')}
+            ${item('注册时间', user.registeredAt ? new Date(user.registeredAt).toLocaleString() : '-')}
+            ${item('最后活跃', user.lastActive ? new Date(user.lastActive).toLocaleString() : '-')}
+        `;
+        document.getElementById('user-settings-overlay').classList.remove('hidden');
+    }
+    
+    window.closeUserSettings = () => document.getElementById('user-settings-overlay').classList.add('hidden');
+    window.onUserSettingsOverlayClick = (ev) => { if(ev.target.id === 'user-settings-overlay') closeUserSettings(); };
+
+    // 7. Images
+    async function loadImages() {
+        const res = await fetch(`${API_BASE}/cache/images?limit=200&offset=0`);
+        const data = await res.json();
+        const tbody = document.getElementById('images-list');
+        tbody.innerHTML = (data.images || []).map(img => `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-50 last:border-0">
+                <td class="px-6 py-4">
+                    <a href="/cache/${img.name}" target="_blank" class="flex items-center group">
+                        <div class="w-10 h-10 rounded bg-slate-200 bg-cover bg-center mr-3 border border-slate-300 group-hover:border-blue-400 transition" style="background-image:url('/cache/${img.name}')"></div>
+                        <span class="text-blue-500 hover:underline text-xs font-mono truncate max-w-[200px]">${img.name}</span>
+                    </a>
+                </td>
+                <td class="px-6 py-4 text-sm text-slate-600 font-mono">${formatBytes(img.size)}</td>
+                <td class="px-6 py-4 text-xs text-slate-500">${new Date(img.mtimeMs).toLocaleString()}</td>
+                <td class="px-6 py-4 text-right">
+                    <button onclick="deleteImage('${img.name}')" class="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    window.deleteImage = async function(name) {
+        if(!confirm('删除这张图片?')) return;
+        await fetch(`${API_BASE}/cache/images/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        loadImages();
+        showToast('图片已删除');
+    }
+
+    function formatBytes(bytes) {
+        if (!bytes && bytes !== 0) return '-';
+        const units = ['B','KB','MB','GB'];
+        let i = 0; let n = bytes;
+        while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+        return `${n.toFixed(1)} ${units[i]}`;
+    }
+
+    // 8. Articles Modal
+    window.viewFeedArticles = async function(id) {
+        const feedsRes = await fetch(`${API_BASE}/feeds`);
+        const feeds = await feedsRes.json();
+        const feed = (feeds || []).find(f => f.id === id);
+        
+        articlesState.feedId = id;
+        articlesState.feedName = feed?.name || 'Unknown Feed';
+        articlesState.feedUrl = feed?.url || '';
+        articlesState.total = 0;
+        articlesState.offset = 0;
+        articlesState.loading = false;
+
+        document.getElementById('articles-title').textContent = articlesState.feedName;
+        document.getElementById('articles-subtitle').textContent = articlesState.feedUrl;
+        document.getElementById('articles-list').innerHTML = '';
+        document.getElementById('articles-load-more').disabled = false;
+        
+        document.getElementById('articles-overlay').classList.remove('hidden');
+        await loadMoreArticles(true);
+    }
+
+    window.closeArticles = () => document.getElementById('articles-overlay').classList.add('hidden');
+    window.onArticlesOverlayClick = (ev) => { if(ev.target.id === 'articles-overlay') closeArticles(); };
+
+    window.loadMoreArticles = async function(reset = false) {
+        if (!articlesState.feedId || articlesState.loading) return;
+        articlesState.loading = true;
+        const btn = document.getElementById('articles-load-more');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>加载中...';
+
+        try {
+            const res = await fetch(`${API_BASE}/feeds/${articlesState.feedId}/articles?limit=${ARTICLES_PAGE_SIZE}&offset=${articlesState.offset}`);
+            const data = await res.json();
+            const items = data.articles || [];
+            
+            if (reset) document.getElementById('articles-list').innerHTML = '';
+            
+            const tbody = document.getElementById('articles-list');
+            const html = items.map(a => `
+                <tr class="hover:bg-slate-50 transition border-b border-slate-50">
+                    <td class="px-8 py-4 text-xs text-slate-500 whitespace-nowrap">
+                        ${a.publishedAt ? new Date(a.publishedAt).toLocaleString() : '-'}
+                    </td>
+                    <td class="px-8 py-4">
+                        <div class="font-semibold text-slate-800 text-sm mb-1 line-clamp-2 leading-snug" title="${a.title}">${a.title}</div>
+                        <a href="${a.url}" target="_blank" class="text-xs text-blue-400 hover:underline truncate block max-w-md">${a.url}</a>
+                    </td>
+                    <td class="px-8 py-4">
+                        ${a.imageUrl ? `<a href="${a.imageUrl}" target="_blank" class="block w-12 h-12 bg-slate-100 rounded-lg bg-cover bg-center border border-slate-200 hover:border-blue-400 transition shadow-sm" style="background-image:url('${a.imageUrl}')"></a>` : '<div class="w-12 h-12 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-center text-slate-300"><i class="fa-regular fa-image"></i></div>'}
+                    </td>
+                    <td class="px-8 py-4 text-right">
+                        <button onclick="window.open('${a.url}')" class="text-slate-400 hover:text-blue-600 transition p-2 hover:bg-slate-100 rounded-lg">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            tbody.insertAdjacentHTML('beforeend', html);
+
+            articlesState.total = data.total ?? 0;
+            articlesState.offset += items.length;
+            document.getElementById('articles-progress').textContent = `${articlesState.offset} / ${articlesState.total} 已加载`;
+
+            if ((articlesState.total > 0 && articlesState.offset >= articlesState.total) || items.length === 0) {
+                btn.disabled = true;
+                btn.textContent = '已加载全部';
+            } else {
+                btn.disabled = false;
+                btn.textContent = '加载更多';
+            }
+        } catch(e) {
+            console.error(e);
+            btn.textContent = '加载失败';
+            showToast('加载失败', 'error');
+        } finally {
+            articlesState.loading = false;
+        }
+    }
+
+    // --- Init ---
+    showTab('dashboard');
+    loadStatus();
+    setInterval(loadStatus, 10000); // Auto refresh status every 10s
+
+    // Mobile Toggle
+    document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        const sb = document.getElementById('sidebar');
+        if(sb.classList.contains('-translate-x-full')) {
+            sb.classList.remove('-translate-x-full');
+        } else {
+            // This is for mobile if I added absolute positioning logic, but current layout is flex.
+            // Simplified mobile logic:
+            if(sb.style.display === 'none') sb.style.display = 'flex';
+            else sb.style.display = 'none';
+        }
+    });
+    // Add simple responsive handler for sidebar
+    if(window.innerWidth < 768) {
+        document.getElementById('sidebar').style.display = 'none';
+    }
+    window.addEventListener('resize', () => {
+        if(window.innerWidth >= 768) document.getElementById('sidebar').style.display = 'flex';
+        else document.getElementById('sidebar').style.display = 'none';
+    });
+
+</script>
+</body>
+</html>

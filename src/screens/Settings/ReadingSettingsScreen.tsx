@@ -50,66 +50,43 @@ const ReadingSettingsScreen: React.FC = () => {
     }
   }, [settings, initialized]);
 
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      if (fontSizeTimeoutRef.current) {
-        clearTimeout(fontSizeTimeoutRef.current);
-      }
-      if (lineHeightTimeoutRef.current) {
-        clearTimeout(lineHeightTimeoutRef.current);
-      }
-      if (autoRefreshTimeoutRef.current) {
-        clearTimeout(autoRefreshTimeoutRef.current);
-      }
-    };
-  }, []);
+  // 清理定时器 - 不再需要，因为移除了防抖
+  // useEffect(() => {}, []);
 
   // 获取可用字体选项
   const availableFonts = getAvailableFonts();
   
-  // 防抖定时器引用
-  const fontSizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lineHeightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const autoRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 防抖函数
-  const debounce = useCallback((func: () => void, delay: number, timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>) => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(func, delay);
-  }, []);
-
   // 处理字体大小变化
   const handleFontSizeChange = useCallback((value: number) => {
     setFontSize(value);
-    debounce(async () => {
-      try {
-        await updateSetting('fontSize', value);
-      } catch (error) {
-        console.error('Failed to update font size:', error);
-        if (settings) {
-          setFontSize(settings.fontSize);
-        }
+  }, []);
+
+  const handleFontSizeComplete = useCallback(async (value: number) => {
+    try {
+      await updateSetting('fontSize', value);
+    } catch (error) {
+      console.error('Failed to update font size:', error);
+      if (settings) {
+        setFontSize(settings.fontSize);
       }
-    }, 300, fontSizeTimeoutRef);
-  }, [debounce, updateSetting, settings]);
+    }
+  }, [updateSetting, settings]);
 
   // 处理行间距变化
   const handleLineHeightChange = useCallback((value: number) => {
     setLineHeight(value);
-    debounce(async () => {
-      try {
-        await updateSetting('lineHeight', value);
-      } catch (error) {
-        console.error('Failed to update line height:', error);
-        if (settings) {
-          setLineHeight(settings.lineHeight);
-        }
+  }, []);
+
+  const handleLineHeightComplete = useCallback(async (value: number) => {
+    try {
+      await updateSetting('lineHeight', value);
+    } catch (error) {
+      console.error('Failed to update line height:', error);
+      if (settings) {
+        setLineHeight(settings.lineHeight);
       }
-    }, 300, lineHeightTimeoutRef);
-  }, [debounce, updateSetting, settings]);
+    }
+  }, [updateSetting, settings]);
 
   // 处理字体类型变化
   const handleFontFamilyChange = async (key: string) => {
@@ -138,17 +115,18 @@ const ReadingSettingsScreen: React.FC = () => {
   // 处理自动刷新间隔变化
   const handleAutoRefreshIntervalChange = useCallback((value: number) => {
     setAutoRefreshInterval(value);
-    debounce(async () => {
-      try {
-        await updateSetting('autoRefreshInterval', value);
-      } catch (error) {
-        console.error('Failed to update autoRefreshInterval:', error);
-        if (settings) {
-          setAutoRefreshInterval(settings.autoRefreshInterval ?? 10);
-        }
+  }, []);
+
+  const handleAutoRefreshIntervalComplete = useCallback(async (value: number) => {
+    try {
+      await updateSetting('autoRefreshInterval', value);
+    } catch (error) {
+      console.error('Failed to update autoRefreshInterval:', error);
+      if (settings) {
+        setAutoRefreshInterval(settings.autoRefreshInterval ?? 10);
       }
-    }, 300, autoRefreshTimeoutRef);
-  }, [debounce, updateSetting, settings]);
+    }
+  }, [updateSetting, settings]);
 
   // 处理滚动自动标记已读开关
   const handleAutoMarkReadOnScrollChange = async (value: boolean) => {
@@ -286,6 +264,7 @@ const ReadingSettingsScreen: React.FC = () => {
           max={24}
           step={1}
           onValueChange={handleFontSizeChange}
+          onSlidingComplete={handleFontSizeComplete}
           unit="px"
         />
         <SettingSliderItem
@@ -296,6 +275,7 @@ const ReadingSettingsScreen: React.FC = () => {
           max={2.5}
           step={0.1}
           onValueChange={handleLineHeightChange}
+          onSlidingComplete={handleLineHeightComplete}
           unit="倍"
           isLast
         />
@@ -311,6 +291,7 @@ const ReadingSettingsScreen: React.FC = () => {
           max={60}
           step={5}
           onValueChange={handleAutoRefreshIntervalChange}
+          onSlidingComplete={handleAutoRefreshIntervalComplete}
           unit="分钟"
           isLast
         />

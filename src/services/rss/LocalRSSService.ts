@@ -7,6 +7,7 @@ import { DatabaseService } from '../../database/DatabaseService';
 import { RSSSource, Article, AppError } from '../../types';
 import { imageExtractionService } from '../ImageExtractionService';
 import { rsshubService } from '../RSShubService';
+import { filterService } from './FilterService';
 import { parseEnhancedRSS, extractBestImageUrlFromItem, extractBestImageWithCaption } from '../EnhancedRSSParser';
 import {
   fetchWithRetry,
@@ -562,7 +563,7 @@ export class LocalRSSService {
       logger.info(`RSS 解析完成，源: ${sourceName}，解析 ${articles.length} 篇新文章`);
 
       // 🔥 应用过滤规则 (核心功能)
-      const filteredArticles = await this.applyFilterRules(articles, sourceId);
+      const filteredArticles = await filterService.applyFilterRules(articles, sourceId);
       logger.info(`过滤后剩余 ${filteredArticles.length} 篇文章 (被过滤: ${articles.length - filteredArticles.length} 篇)`);
       
       return filteredArticles;
@@ -683,89 +684,6 @@ export class LocalRSSService {
     } catch (error) {
       logger.error('[fetchFullContent] 获取全文失败:', error);
       return null;
-    }
-  }
-
-  /**
-   * 🔥 应用过滤规则 - 白名单优先，黑名单次之
-   */
-  private async applyFilterRules(
-    articles: Omit<Article, 'id'>[],
-    sourceId: number
-  ): Promise<Omit<Article, 'id'>[]> {
-    try {
-      // 1. 获取该源生效的所有规则 (全局 + 绑定的)
-      const rules = await this.databaseService.getEffectiveRules(sourceId);
-      
-      if (rules.length === 0) {
-        return articles; // 没有规则，直接返回
-      }
-      
-      // 2. 分类规则
-      const whitelist = rules.filter((r: any) => r.mode === 'include');
-      const blacklist = rules.filter((r: any) => r.mode === 'exclude');
-      
-      logger.info(`[过滤规则] 白名单: ${whitelist.length} 条, 黑名单: ${blacklist.length} 条`);
-      
-      // 3. 应用过滤
-      const filteredArticles: Omit<Article, 'id'>[] = [];
-      
-      for (let i = 0; i < articles.length; i++) {
-        const article = articles[i];
-        
-        // 每处理 5 篇文章让出一次主线程
-        if (i % 5 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-
-        const title = (article.title || '').toLowerCase();
-        const summary = (article.summary || '').toLowerCase();
-        const content = (article.content || '').toLowerCase();
-        const contentToCheck = `${title} ${summary} ${content}`;
-        
-        // 辅助函数：检查是否命中规则
-        const checkMatch = (rule: any): boolean => {
-          if (rule.is_regex === 1) {
-            try {
-              const regex = new RegExp(rule.keyword, 'i');
-              return regex.test(contentToCheck);
-            } catch (e) {
-              logger.warn(`[过滤规则] 无效的正则: ${rule.keyword}`);
-              return false;
-            }
-          } else {
-            // 普通文本匹配
-            return contentToCheck.includes(rule.keyword.toLowerCase());
-          }
-        };
-        
-        let keep = true;
-
-        // 🔥 白名单检查：如果存在白名单，文章**必须**命中至少一条
-        if (whitelist.length > 0) {
-          const hitsWhitelist = whitelist.some(rule => checkMatch(rule));
-          if (!hitsWhitelist) {
-            keep = false; // 未命中白名单，直接丢弃
-          }
-        }
-        
-        // 🔥 黑名单检查：如果命中任何一条黑名单，直接丢弃
-        if (keep && blacklist.length > 0) {
-          const hitsBlacklist = blacklist.some(rule => checkMatch(rule));
-          if (hitsBlacklist) {
-            keep = false; // 命中黑名单，丢弃
-          }
-        }
-        
-        if (keep) {
-          filteredArticles.push(article);
-        }
-      }
-      
-      return filteredArticles;
-    } catch (error) {
-      logger.error('[过滤规则] 应用失败:', error);
-      return articles; // 失败时返回原列表，不影响正常使用
     }
   }
 

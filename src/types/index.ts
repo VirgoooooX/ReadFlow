@@ -177,6 +177,14 @@ export interface AppSettings {
     syncInterval: number;
     wifiOnly: boolean;
     proxyMode?: boolean;  // 是否使用代理服务器模式
+    mode: 'local' | 'cloud'; // 同步模式：本地直连 vs 云端同步
+    serverUrl?: string;      // 云端服务器地址
+    imageCompression?: boolean; // 是否启用云端图片压缩
+    imageQuality?: number;      // 图片压缩质量 (1-100)
+    cloudCursors?: Record<string, number>;
+    userId?: string;
+    lastProfilePushAt?: number;
+    lastStateSyncAt?: number;
   };
   privacy: {
     analytics: boolean;

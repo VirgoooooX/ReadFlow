@@ -1,6 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { Article, ReadingSettings } from '../types';
 import cacheEventEmitter from './CacheEventEmitter';
+import { cloudSyncService } from './rss/CloudSyncService'; // Import CloudSyncService
 import { logger } from './rss/RSSUtils';
 
 export class ArticleService {
@@ -251,6 +252,9 @@ export class ArticleService {
         if (article.sourceId) {
           await this.updateSourceStats(article.sourceId, { reason: 'markRead' });
         }
+        
+        // 🔥 Trigger cloud sync (fire and forget)
+        cloudSyncService.syncUserArticleStates().catch(e => logger.warn('[ArticleService] Cloud sync failed:', e));
       }
     } catch (error) {
       logger.error('Error marking article as read:', error);
@@ -354,6 +358,9 @@ export class ArticleService {
         'UPDATE articles SET is_favorite = ? WHERE id = ?',
         [newFavoriteStatus ? 1 : 0, id]
       );
+
+      // 🔥 Trigger cloud sync (fire and forget)
+      cloudSyncService.syncUserArticleStates().catch(e => logger.warn('[ArticleService] Cloud sync failed:', e));
 
       return newFavoriteStatus;
     } catch (error) {

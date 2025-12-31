@@ -572,6 +572,12 @@ export class SettingsService {
         autoSync: false,
         syncInterval: 3600,
         wifiOnly: true,
+        mode: 'local',
+        serverUrl: '',
+        cloudCursors: {},
+        userId: '',
+        lastProfilePushAt: 0,
+        lastStateSyncAt: 0,
       },
       privacy: {
         analytics: false,

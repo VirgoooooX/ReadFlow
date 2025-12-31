@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AvatarStorageService from './AvatarStorageService';
 import { logger } from './rss/RSSUtils';
+import { SettingsService } from './SettingsService';
 
 export interface User {
   id: string;
@@ -39,6 +40,7 @@ export class AuthService {
   private registeredUsers: Map<string, { user: User; password: string }> = new Map();
   private static readonly REGISTERED_USERS_KEY = 'registered_users';
   private initialized = false;
+  private settingsService = SettingsService.getInstance();
 
   private constructor() {
     // 异步初始化将在getInstance或initialize中调用
@@ -143,7 +145,26 @@ export class AuthService {
    */
   public async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      // TODO: 替换为实际的API调用
+      const settings = await this.settingsService.getAppSettings();
+
+      // If server URL is configured, FORCE cloud login
+      if (settings.sync.serverUrl) {
+        try {
+          const response = await this.performCloudLogin(credentials);
+          if (response.success && response.user && response.token) {
+            this.currentUser = response.user;
+            this.authToken = response.token;
+            await AsyncStorage.setItem('auth_token', response.token);
+            await AsyncStorage.setItem('current_user', JSON.stringify(response.user));
+          }
+          return response;
+        } catch (e) {
+          // Network error or other crash
+          throw e;
+        }
+      }
+
+      // Local mode fallback (legacy mock)
       const response = await this.mockLogin(credentials);
 
       if (response.success && response.user && response.token) {
@@ -174,7 +195,20 @@ export class AuthService {
    */
   public async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      // TODO: 替换为实际的API调用
+      const settings = await this.settingsService.getAppSettings();
+
+      // If server URL is configured, FORCE cloud registration
+      if (settings.sync.serverUrl) {
+        try {
+          const response = await this.performCloudRegister(data);
+          // Auto login after registration if needed, or just return success
+          return response;
+        } catch (e) {
+          throw e;
+        }
+      }
+
+      // Local mode fallback
       const response = await this.mockRegister(data);
 
       return response;
@@ -264,7 +298,10 @@ export class AuthService {
    */
   private async validateToken(token: string): Promise<boolean> {
     try {
-      // TODO: 替换为实际的API调用
+      const settings = await this.settingsService.getAppSettings();
+      if (settings.sync.serverUrl) {
+        return await this.performCloudValidate(token);
+      }
       return await this.mockValidateToken(token);
     } catch (error) {
       logger.error('验证token失败:', error);
@@ -272,6 +309,67 @@ export class AuthService {
     }
   }
 
+
+  // ========== Cloud API Methods ==========
+
+  private async getApiUrl(path: string): Promise<string> {
+    const settings = await this.settingsService.getAppSettings();
+    const baseUrl = settings.sync.serverUrl;
+    if (!baseUrl) throw new Error('Server URL not configured');
+    return `${baseUrl.replace(/\/$/, '')}${path}`;
+  }
+
+  private async performCloudLogin(credentials: LoginCredentials): Promise<AuthResponse> {
+    try {
+      const url = await this.getApiUrl('/api/auth/login');
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.message || 'Login failed' };
+      }
+      return data;
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  private async performCloudRegister(data: RegisterData): Promise<AuthResponse> {
+    try {
+      const url = await this.getApiUrl('/api/auth/register');
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        return { success: false, message: resData.message || 'Register failed' };
+      }
+      return resData;
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  private async performCloudValidate(token: string): Promise<boolean> {
+    try {
+      const url = await this.getApiUrl('/api/auth/validate');
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!data.valid;
+    } catch (e) {
+      return false;
+    }
+  }
 
   /**
    * 获取当前用户

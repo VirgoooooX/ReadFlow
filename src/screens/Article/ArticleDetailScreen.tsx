@@ -613,6 +613,49 @@ const ArticleDetailScreen: React.FC = () => {
       return false;
     }
 
+    const safeDecode = (value: string): string => {
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return value;
+      }
+    };
+
+    const unwrapProxyUrl = (value: string): string => {
+      const decoded = safeDecode(value);
+      try {
+        const urlObj = decoded.startsWith('http')
+          ? new URL(decoded)
+          : new URL(decoded, 'http://localhost');
+
+        const isApiImage = urlObj.pathname === '/api/image' || urlObj.pathname.endsWith('/api/image');
+        if (isApiImage) {
+          const inner = urlObj.searchParams.get('url');
+          if (inner) return safeDecode(inner);
+        }
+
+        if (urlObj.hostname === 'images.weserv.nl') {
+          const inner = urlObj.searchParams.get('url');
+          if (inner) return safeDecode(inner);
+        }
+
+        return decoded;
+      } catch {
+        return decoded;
+      }
+    };
+
+    const normalizeForCompare = (value: string): string => {
+      const unwrapped = unwrapProxyUrl(value);
+      const decoded = safeDecode(unwrapped);
+      try {
+        const urlObj = new URL(decoded);
+        return `${urlObj.hostname.toLowerCase()}${urlObj.pathname}`;
+      } catch {
+        return decoded.split('#')[0].split('?')[0];
+      }
+    };
+
     const imgRegex = /<img[^>]*src=["']([^"']*)["'][^>]*>/gi;
     const contentImages = article.content.match(imgRegex);
     if (!contentImages || contentImages.length === 0) {
@@ -621,20 +664,26 @@ const ArticleDetailScreen: React.FC = () => {
 
     const thumbnailUrl = article.imageUrl;
     logger.info(`[shouldShowHeaderImage] 封面图片URL: ${thumbnailUrl}`);
+    const normalizedThumbnail = normalizeForCompare(thumbnailUrl);
     
     for (const imgTag of contentImages) {
       const srcMatch = imgTag.match(/src=["']([^"']*)["']/i);
       if (srcMatch && srcMatch[1]) {
         try {
-          const contentImageUrl = decodeURIComponent(srcMatch[1]);
-          const thumbnailImageUrl = decodeURIComponent(thumbnailUrl);
+          const contentImageUrl = safeDecode(srcMatch[1]);
+          const thumbnailImageUrl = safeDecode(thumbnailUrl);
           
           logger.info(`[shouldShowHeaderImage] 内容图片URL: ${contentImageUrl}`);
           logger.info(`[shouldShowHeaderImage] 解码后封面URL: ${thumbnailImageUrl}`);
 
-          if (contentImageUrl === thumbnailImageUrl ||
+          const normalizedContent = normalizeForCompare(contentImageUrl);
+
+          if (
+            normalizedContent === normalizedThumbnail ||
+            contentImageUrl === thumbnailImageUrl ||
             contentImageUrl.includes(thumbnailImageUrl) ||
-            thumbnailImageUrl.includes(contentImageUrl)) {
+            thumbnailImageUrl.includes(contentImageUrl)
+          ) {
             logger.info(`[shouldShowHeaderImage] 图片重复，不显示封面`);
             return false;
           }

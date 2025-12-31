@@ -48,6 +48,7 @@ import AboutScreen from '../screens/Settings/AboutScreen';
 import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
 import CustomColorScreen from '../screens/Settings/CustomColorScreen';
 import RSSStartupSettingsScreen from '../screens/Settings/RSSStartupSettingsScreen';
+import CloudSettingsScreen from '../screens/Settings/CloudSettingsScreen';
 
 // 导入类型定义
 export type RootStackParamList = {
@@ -60,6 +61,7 @@ export type RootStackParamList = {
   ManageSubscriptions: undefined;
   ReadingSettings: undefined;
   AppSettings: undefined;
+  CloudSettings: undefined;
   About: undefined;
 };
 
@@ -564,6 +566,20 @@ function UserStackNavigator() {
             showBackButton={true}
           >
             <RSSStartupSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
+        name="CloudSettings"
+        options={{ title: '云端同步' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="云端同步"
+            showBackButton={true}
+          >
+            <CloudSettingsScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>

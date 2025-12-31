@@ -99,6 +99,7 @@ interface SettingSliderItemProps {
   max: number;
   step: number;
   onValueChange: (value: number) => void;
+  onSlidingComplete?: (value: number) => void;
   unit?: string;
   isLast?: boolean;
 }
@@ -114,6 +115,7 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
   max,
   step,
   onValueChange,
+  onSlidingComplete,
   unit = '',
   isLast = false,
 }) => {
@@ -147,6 +149,7 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
             step={step}
             value={value}
             onValueChange={onValueChange}
+            onSlidingComplete={onSlidingComplete}
             minimumTrackTintColor={theme?.colors?.primary || '#6750A4'}
             maximumTrackTintColor={theme?.colors?.outline || (isDark ? '#938F99' : '#79747E')}
             thumbTintColor={theme?.colors?.primary || '#6750A4'}

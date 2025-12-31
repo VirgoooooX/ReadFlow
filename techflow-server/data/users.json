@@ -1,0 +1,62 @@
+[
+  {
+    "id": "yuchen0876@163.com",
+    "username": "Virgoooo",
+    "email": "yuchen0876@163.com",
+    "passwordHash": "46614e768356ac76e70621f43e8c574d8aaacd0927f4fe483ec7e036bdb0717d",
+    "registeredAt": "2025-12-31T10:28:55.923Z",
+    "lastActive": "2025-12-31T10:29:55.478Z",
+    "settings": {
+      "language": "en",
+      "theme": "light",
+      "notifications": {
+        "enabled": true,
+        "newArticles": true,
+        "vocabularyReview": true,
+        "dailyGoal": true,
+        "sound": true,
+        "vibration": true
+      },
+      "sync": {
+        "enabled": false,
+        "autoSync": false,
+        "syncInterval": 3600,
+        "wifiOnly": true,
+        "mode": "cloud",
+        "serverUrl": "http://192.168.31.27:3000",
+        "imageCompression": true,
+        "userId": "mjspbpauaelse0yx",
+        "lastProfilePushAt": 1767109043162,
+        "cloudCursors": {
+          "https://justlovemaki.github.io/CloudFlare-AI-Insight-Daily/rss.xml": 1,
+          "https://rss.198909.xyz:37891/cnbeta": 1,
+          "https://sspai.com/feed": 5,
+          "https://rss.198909.xyz:37891/dongqiudi/team_news/50001756": 1
+        }
+      },
+      "privacy": {
+        "analytics": false,
+        "crashReporting": true,
+        "dataCollection": false
+      },
+      "performance": {
+        "cacheSize": 100,
+        "preloadImages": true,
+        "offlineMode": true,
+        "backgroundSync": false
+      },
+      "accessibility": {
+        "highContrast": false,
+        "largeText": false,
+        "reduceMotion": false,
+        "screenReader": false
+      },
+      "backup": {
+        "autoBackup": false,
+        "backupInterval": 86400,
+        "includeImages": false,
+        "cloudProvider": "none"
+      }
+    }
+  }
+]

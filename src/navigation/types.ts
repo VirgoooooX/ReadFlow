@@ -84,6 +84,7 @@ export type UserStackParamList = {
   EditRSSSource: { sourceId: number };
   RSSStartupSettings: undefined; // RSS启动刷新设置
   RSSRefreshSettings: undefined;
+  CloudSettings: undefined; // 云端同步设置
   FilterManagement: undefined;  // 过滤规则管理
   FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器
 };

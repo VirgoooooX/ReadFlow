@@ -1,0 +1,46 @@
+[
+  {
+    "id": "1275980222",
+    "url": "https://rss.198909.xyz:37891/dongqiudi/team_news/50001756",
+    "name": "巴萨",
+    "category": "新闻",
+    "createdAt": "2025-12-30T15:18:12.541Z",
+    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "refreshIntervalSeconds": 3600,
+    "lastRefreshAt": "2025-12-31T10:06:48.454Z",
+    "lastRefreshStatus": "ok"
+  },
+  {
+    "id": "611353359",
+    "url": "https://sspai.com/feed",
+    "name": "少数派",
+    "category": "博客",
+    "createdAt": "2025-12-30T15:18:12.541Z",
+    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "refreshIntervalSeconds": 3600,
+    "lastRefreshAt": "2025-12-31T10:07:03.471Z",
+    "lastRefreshStatus": "ok"
+  },
+  {
+    "id": "481557552",
+    "url": "https://rss.198909.xyz:37891/cnbeta",
+    "name": "CN",
+    "category": "新闻",
+    "createdAt": "2025-12-30T15:18:12.541Z",
+    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "refreshIntervalSeconds": 3600,
+    "lastRefreshAt": "2025-12-31T10:07:18.483Z",
+    "lastRefreshStatus": "ok"
+  },
+  {
+    "id": "1483521394",
+    "url": "https://justlovemaki.github.io/CloudFlare-AI-Insight-Daily/rss.xml",
+    "name": "日报",
+    "category": "技术",
+    "createdAt": "2025-12-30T15:18:12.541Z",
+    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "refreshIntervalSeconds": 3600,
+    "lastRefreshAt": "2025-12-31T10:07:33.488Z",
+    "lastRefreshStatus": "ok"
+  }
+]

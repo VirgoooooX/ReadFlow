@@ -4,6 +4,7 @@ import {
   StyleSheet,
   TextStyle,
   TextProps,
+  StyleProp,
 } from 'react-native';
 import { useTheme } from '../../theme';
 import type { Theme } from '../../theme';
@@ -51,7 +52,7 @@ export interface CleanTextProps extends Omit<TextProps, 'style'> {
   /** 文本颜色 */
   color?: CleanTextColor;
   /** 自定义样式 */
-  style?: TextStyle;
+  style?: StyleProp<TextStyle>;
   /** 测试ID */
   testID?: string;
 }

@@ -1,106 +1,83 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
-node_modules/
-package-lock.json
-yarn.lock
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-.expo-shared/
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.cer
-*.bak
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
+# System Files
 .DS_Store
-*.pem
-
-# Windows
 Thumbs.db
-.vscode/
+*.log
 
-# IDE
+# IDE & Editors
+.vscode/
 .idea/
 *.swp
 *.swo
 *~
-.vscode/
 *.iml
 .gradle/
 local.properties
 
-# local env files
-.env*.local
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment Variables
 .env
-.env.*.local
+.env.*
+!.env.example
 
-# typescript
-*.tsbuildinfo
-
-# build outputs
+# Build Outputs
 build/
 dist/
-.next/
 out/
+web-build/
+.next/
+*.tsbuildinfo
 
-# cache
+# Cache & Debug
 .cache/
-.eslintcache
 .parcel-cache
+.eslintcache
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-# misc
-.DS_Store
-*.log
-*.pem
-.pem
-.certificate
-.mobileprovision
+# Expo
+.expo/
+.expo-shared/
+expo-env.d.ts
 
 # Android
 android/build/
 android/.gradle/
 android/.idea/
 android/local.properties
-android/app/debug.keystore
-android/app/release.keystore
+android/app/*.keystore
+*.jks
+.kotlin/
 
 # iOS
 ios/Pods/
 ios/Podfile.lock
 ios/Flutter/Flutter.framework/
 ios/Flutter/Flutter.podspec
+*.mobileprovision
+*.p12
+*.p8
+*.cer
+*.key
+*.pem
+.pem
+.certificate
 
 # Testing
 coverage/
 .nyc_output/
 
-# Production
-out/
-.trae/documents/TechFlowMobile 深度复盘与优化计划.md
-.gitignore
-.trae/documents/分组增强与问题修复开发计划.md
-.qoder/quests/group-feature-enhancement-and-issues-fix.md
-.trae/documents/深度项目复盘与性能优化建议.md
-.trae/documents/UI_UX 深度优化与风格统一.md
-.trae/documents/Fix UI Freezing, Sync Issues, and Add Dock Badge.md
-.trae/documents/Implement Auto Refresh on Startup.md
+# Server
+techflow-server/public/cache/
+
+# Project Documentation & AI Workspace
+.trae/documents/
+.qoder/quests/
+techflow-server/src/test-proxy.ts
+techflow-server/src/test-xml.ts
+techflow-server/src/verify.ts
