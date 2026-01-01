@@ -57,17 +57,26 @@ export class ImageProxyController {
       // 2. 获取远程图片
       // 伪造 Headers 以绕过简单的防盗链
       const userAgent =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
       const getReferers = (url: string): string[] => {
         try {
           const urlObj = new URL(url);
           const hostname = urlObj.hostname;
           if (hostname.includes('cnbetacdn.com')) {
-            return ['https://www.cnbeta.com.tw/', 'https://www.cnbeta.com/'];
+            return ['https://www.cnbeta.com.tw/', 'https://m.cnbeta.com.tw/', 'https://www.cnbeta.com/'];
           }
           if (hostname.includes('sspai.com')) return ['https://sspai.com/'];
           if (hostname.includes('ifanr.com') || hostname.includes('ifanr.cn')) return ['https://www.ifanr.com/'];
+          
+          if (hostname.includes('qpic.cn') || hostname.includes('qlogo.cn')) return ['https://mp.weixin.qq.com/'];
+          if (hostname.includes('zhimg.com')) return ['https://www.zhihu.com/'];
+          if (hostname.includes('sinaimg.cn')) return ['https://weibo.com/'];
+          if (hostname.includes('doubanio.com')) return ['https://www.douban.com/'];
+          if (hostname.includes('jianshu.io')) return ['https://www.jianshu.com/'];
+          if (hostname.includes('toutiaoimg.com')) return ['https://www.toutiao.com/'];
+          if (hostname.includes('36krcdn.com')) return ['https://36kr.com/'];
+
           return [urlObj.origin];
         } catch {
           return [];
@@ -78,7 +87,10 @@ export class ImageProxyController {
         const headers: Record<string, string> = {
           'User-Agent': userAgent,
           'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          'Sec-Fetch-Dest': 'image',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'cross-site',
         };
         if (referer) {
           headers['Referer'] = referer;

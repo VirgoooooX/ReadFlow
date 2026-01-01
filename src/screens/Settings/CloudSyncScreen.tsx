@@ -5,17 +5,36 @@ import { CleanText, SettingItem, SettingSection } from '../../components/ui';
 import AuthService from '../../services/AuthService';
 import { CloudConfig, cloudConfigService } from '../../services/CloudConfigService';
 import { configSyncService } from '../../services/ConfigSyncService';
+import { SettingsService } from '../../services/SettingsService';
+import { AppSettings } from '../../types';
 
 export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const styles = createStyles(isDark, theme);
 
+  const settingsService = SettingsService.getInstance();
   const [config, setConfig] = useState<CloudConfig | null>(null);
+  const [syncSettings, setSyncSettings] = useState<AppSettings['sync']>({
+    enabled: false,
+    autoSync: false,
+    syncInterval: 3600,
+    wifiOnly: true,
+    mode: 'local',
+    serverUrl: '',
+  });
   const [syncing, setSyncing] = useState(false);
 
   const load = async () => {
-    const c = await cloudConfigService.getConfig();
-    setConfig(c);
+    try {
+      const [c, appSettings] = await Promise.all([
+        cloudConfigService.getConfig(),
+        settingsService.getAppSettings()
+      ]);
+      setConfig(c);
+      setSyncSettings(appSettings.sync);
+    } catch (e) {
+      console.error('Failed to load settings', e);
+    }
   };
 
   useEffect(() => {
@@ -27,6 +46,16 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
     });
     return unsubscribe;
   }, [navigation]);
+
+  const saveSyncSettings = async (newSyncSettings: Partial<AppSettings['sync']>) => {
+    try {
+      const updatedSync = { ...syncSettings, ...newSyncSettings };
+      setSyncSettings(updatedSync);
+      await settingsService.updateAppSetting('sync', updatedSync);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save settings');
+    }
+  };
 
   const isConnected = !!config?.serverUrl;
   const isAuthed = !!config?.auth?.accessToken && !!config?.auth?.user;
@@ -131,6 +160,20 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
         />
         {isCloudMode && (
           <>
+            <SettingItem
+              label="启用图片压缩"
+              icon="image"
+              rightElement={
+                <Switch
+                  value={syncSettings.imageCompression ?? false}
+                  onValueChange={(val: boolean) => saveSyncSettings({ imageCompression: val })}
+                  disabled={syncing}
+                  trackColor={{ false: isDark ? '#4a4a4a' : '#e0e0e0', true: theme.colors.primaryContainer }}
+                  thumbColor={syncSettings.imageCompression ?? false ? theme.colors.primary : '#f4f3f4'}
+                />
+              }
+              showArrow={false}
+            />
             <SettingItem
               label="立即推送到云端"
               icon="cloud-upload"

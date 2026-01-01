@@ -47,4 +47,4 @@ RUN mkdir -p data public/cache
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["/bin/sh", "-c", "npx prisma migrate deploy && npm start"]

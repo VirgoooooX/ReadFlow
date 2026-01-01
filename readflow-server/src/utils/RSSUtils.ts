@@ -368,6 +368,13 @@ const ANTI_HOTLINK_DOMAINS = [
   'cnbetacdn.com', 'static.cnbetacdn.com',
   'twimg.com', 'pbs.twimg.com',
   'miro.medium.com',
+  'qpic.cn', 'qlogo.cn',
+  'zhimg.com',
+  'sinaimg.cn',
+  'doubanio.com',
+  'jianshu.io',
+  'toutiaoimg.com',
+  '36krcdn.com',
 ];
 
 /**
@@ -430,13 +437,28 @@ export function proxyImages(
   imageQuality: number = 80
 ): string {
   if (!html) return html;
-  
-  // 替换 src 属性中的图片 URL
-  // 支持 src="...", src='...', 以及不带引号的 src=...
-  return html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
-    if (needsProxy(url, baseUrl, imageCompression)) {
-      return `${prefix}${getProxyUrl(url, baseUrl, imageCompression, imageQuality)}${suffix}`;
-    }
-    return match;
+
+  // 使用 img 标签迭代方式，更稳健地处理属性
+  return html.replace(/<img([\s\S]*?)>/gi, (match, attributes) => {
+    // 1. 移除 srcset 以防止浏览器绕过代理加载原图
+    let newAttributes = attributes.replace(/\s+srcset=["'][^"']*["']/gi, '');
+
+    // 2. 辅助函数：替换指定属性中的 URL
+      const replaceUrlInAttr = (attrName: string) => {
+        // 匹配 src="...", src='...', src=...
+        const regex = new RegExp(`(${attrName}=["']?)([^"'\s>]+)(["']?)`, 'gi');
+        newAttributes = newAttributes.replace(regex, (m: string, prefix: string, url: string, suffix: string) => {
+           if (needsProxy(url, baseUrl, imageCompression)) {
+             return `${prefix}${getProxyUrl(url, baseUrl, imageCompression, imageQuality)}${suffix}`;
+           }
+           return m;
+        });
+      };
+
+    replaceUrlInAttr('src');
+    replaceUrlInAttr('data-src');
+    replaceUrlInAttr('data-original');
+
+    return `<img${newAttributes}>`;
   });
 }

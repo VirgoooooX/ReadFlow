@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { rssParserService } from '../services/RSSParserService';
 import { RSSSource, Article } from '../types';
 import { storageService } from '../services/StorageService';
@@ -224,7 +224,7 @@ export function startRssAutoRefresh() {
 }
 
 // GET /api/rss?url=...
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     const imageCompression = req.query.imageCompression === 'true';
@@ -247,7 +247,7 @@ router.get('/', async (req, res) => {
     };
 
     // 获取 Host 用于生成本地代理 URL
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
     const articles = await rssParserService.fetchAndParseArticles(
       source, 
@@ -262,7 +262,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/sync', async (req, res) => {
+router.get('/sync', async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     const since = req.query.since ? parseInt(req.query.since as string) : 0;
@@ -274,7 +274,7 @@ router.get('/sync', async (req, res) => {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
     const { latest, blocks } = await storageService.getSyncBlocksForSource(url, Number.isFinite(since) ? since : 0, Number.isFinite(maxBlocks) ? maxBlocks : 20);
 
     const mappedBlocks = blocks.map(b => ({
@@ -293,7 +293,7 @@ router.get('/sync', async (req, res) => {
   }
 });
 
-router.get('/profile', async (req, res) => {
+router.get('/profile', async (req: Request, res: Response) => {
   try {
     const userId = String((req as any)?.user?.id || '');
     if (!userId) {
@@ -323,7 +323,7 @@ router.get('/profile', async (req, res) => {
   }
 });
 
-router.post('/clientSync', async (req, res) => {
+router.post('/clientSync', async (req: Request, res: Response) => {
   try {
     const { user, settings, feeds } = req.body || {};
     if (!user?.id) {
@@ -347,7 +347,7 @@ router.post('/clientSync', async (req, res) => {
 });
 
 // POST /api/rss/refresh?url=... - Trigger manual refresh
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     if (!url) {
@@ -403,7 +403,7 @@ router.post('/refresh', async (req, res) => {
 });
 
 // POST /api/rss/syncState - Upload user article states (read/favorite)
-router.post('/syncState', async (req, res) => {
+router.post('/syncState', async (req: Request, res: Response) => {
   try {
     const { userId, states } = req.body;
     
@@ -424,7 +424,7 @@ router.post('/syncState', async (req, res) => {
 });
 
 // GET /api/rss/syncState - Download user article states
-router.get('/syncState', async (req, res) => {
+router.get('/syncState', async (req: Request, res: Response) => {
   try {
     const userId = req.query.userId as string;
     const since = req.query.since as string; // ISO string
@@ -447,7 +447,7 @@ router.get('/syncState', async (req, res) => {
 });
 
 // POST /api/rss/parse
-router.post('/parse', async (req, res) => {
+router.post('/parse', async (req: Request, res: Response) => {
   try {
     const { source, filterRules } = req.body;
     if (!source || !source.url) {
@@ -464,7 +464,7 @@ router.post('/parse', async (req, res) => {
 });
 
 // GET /api/rss/validate?url=...
-router.get('/validate', async (req, res) => {
+router.get('/validate', async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     if (!url) {
@@ -514,7 +514,7 @@ router.get('/sync/config', async (req, res) => {
 });
 
 // POST /api/rss/sync/config
-router.post('/sync/config', async (req, res) => {
+router.post('/sync/config', async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
