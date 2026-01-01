@@ -222,7 +222,17 @@ export class AuthService {
       if (cloudConfig.serverUrl) {
         try {
           const response = await this.performCloudRegister(data);
-          // Auto login after registration if needed, or just return success
+          if (response.success && response.user && response.token) {
+            this.currentUser = response.user;
+            this.authToken = response.token;
+            await cloudConfigService.updateConfig({
+              auth: {
+                user: response.user,
+                accessToken: response.token,
+                lastValidatedAt: Date.now(),
+              },
+            });
+          }
           return response;
         } catch (e) {
           throw e;

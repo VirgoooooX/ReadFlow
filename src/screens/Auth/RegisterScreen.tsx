@@ -100,9 +100,25 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     });
     
     if (response.success) {
-      Alert.alert('注册成功', '账户创建成功，请登录', [
-        { text: '确定', onPress: () => navigation.navigate('Login') }
-      ]);
+      if (response.user && response.token) {
+        Alert.alert('注册成功', '已自动登录', [
+          {
+            text: '确定',
+            onPress: () => {
+              const parent = navigation.getParent?.();
+              if (parent?.goBack) {
+                parent.goBack();
+              } else {
+                navigation.navigate('Login');
+              }
+            }
+          }
+        ]);
+      } else {
+        Alert.alert('注册成功', '账户创建成功，请登录', [
+          { text: '确定', onPress: () => navigation.navigate('Login') }
+        ]);
+      }
     } else {
       Alert.alert('注册失败', response.message || '注册过程中出现错误，请重试');
     }

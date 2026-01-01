@@ -13,13 +13,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { SettingsStackParamList } from '../../navigation/AppNavigator';
+import type { UserStackParamList } from '../../navigation/types';
 import BrandIcon from '../../components/BrandIcon';
 import { SettingsService } from '../../services/SettingsService';
 import { translationService } from '../../services/TranslationService';
 import cacheEventEmitter from '../../services/CacheEventEmitter';
 
-type NavigationProp = NativeStackNavigationProp<SettingsStackParamList, 'LLMSettings'>;
+type NavigationProp = NativeStackNavigationProp<UserStackParamList, 'LLMSettings'>;
 
 interface LLMSettings {
   provider: string;

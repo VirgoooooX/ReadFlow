@@ -143,7 +143,9 @@ export function UserProvider({ children }: UserProviderProps) {
 
       const response = await AuthService.register(data);
 
-      if (!response.success) {
+      if (response.success && response.user) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: response.user });
+      } else if (!response.success) {
         dispatch({ type: 'SET_ERROR', payload: response.message || '注册失败' });
       }
 

@@ -12,6 +12,51 @@ let refreshTimer: NodeJS.Timeout | null = null;
 let refreshRunning = false;
 const refreshingFeedIds = new Set<string>();
 
+function redactForLog(input: any, depth: number = 0): any {
+  if (depth > 8) return '[Truncated]';
+  if (input === null || input === undefined) return input;
+  if (typeof input !== 'object') return input;
+  if (Array.isArray(input)) return input.map(v => redactForLog(v, depth + 1));
+
+  const out: any = {};
+  for (const [k, v] of Object.entries(input)) {
+    const keyLower = String(k).toLowerCase();
+    const isSensitive =
+      keyLower !== 'keyword' &&
+      (keyLower.includes('apikey') ||
+        keyLower === 'token' ||
+        keyLower.endsWith('token') ||
+        keyLower.includes('password') ||
+        keyLower.includes('secret') ||
+        keyLower.includes('accesskey'));
+    out[k] = isSensitive ? '***' : redactForLog(v, depth + 1);
+  }
+  return out;
+}
+
+function safeJsonForLog(value: any, maxLen: number = 12000): string {
+  try {
+    const str = JSON.stringify(redactForLog(value));
+    if (str.length > maxLen) return `${str.slice(0, maxLen)}...[Truncated ${str.length - maxLen} chars]`;
+    return str;
+  } catch {
+    return '[Unserializable]';
+  }
+}
+
+function logConfigSyncSnapshot(userId: string, label: string, snapshot: any) {
+  const updatedAt = snapshot?.updatedAt ? String(snapshot.updatedAt) : '';
+  const sourcesCount = Array.isArray(snapshot?.sources) ? snapshot.sources.length : 0;
+  const groupsCount = Array.isArray(snapshot?.groups) ? snapshot.groups.length : 0;
+  const filterRulesCount = Array.isArray(snapshot?.filterRules) ? snapshot.filterRules.length : 0;
+  const hasSettings = !!snapshot?.settings;
+
+  logger.info(
+    `[SyncConfig] ${label} summary userId=${userId} updatedAt=${updatedAt} hasSettings=${hasSettings} sources=${sourcesCount} groups=${groupsCount} filterRules=${filterRulesCount}`
+  );
+  logger.info(`[SyncConfig] ${label} full userId=${userId}: ${safeJsonForLog(snapshot)}`);
+}
+
 function coerceBool(val: unknown): boolean {
   if (val === true) return true;
   if (val === false) return false;
@@ -460,6 +505,7 @@ router.get('/sync/config', async (req, res) => {
     if (!configSync || typeof configSync !== 'object') {
       return res.status(404).json({ error: 'No remote config' });
     }
+    logConfigSyncSnapshot(String(userId), 'GET', configSync);
     res.json(configSync);
   } catch (error) {
     logger.error('[SyncConfig] GET failed:', error);
@@ -493,6 +539,7 @@ router.post('/sync/config', async (req, res) => {
 
     const updatedAt = (incoming as any).updatedAt ? String((incoming as any).updatedAt) : new Date().toISOString();
     const nextConfigSync = { ...(incoming as any), updatedAt };
+    logConfigSyncSnapshot(String(userId), 'Incoming', nextConfigSync);
 
     const user = await storageService.getUserById(userId);
     if (!user) {
@@ -516,6 +563,9 @@ router.post('/sync/config', async (req, res) => {
     // or we can reject here if server is newer.
     
     if (serverTime > clientTime) {
+      logger.warn(
+        `[SyncConfig] Conflict userId=${userId} serverUpdatedAt=${serverConfigSyncUpdatedAt} clientUpdatedAt=${nextConfigSync.updatedAt}`
+      );
       return res.status(409).json({ 
         error: 'Conflict: Server has newer config',
         serverUpdatedAt: serverConfigSyncUpdatedAt 
@@ -526,6 +576,12 @@ router.post('/sync/config', async (req, res) => {
       id: userId,
       config: { configSync: nextConfigSync }
     });
+
+    const updatedUser = await storageService.getUserById(userId);
+    const persistedRaw = (updatedUser?.config && typeof updatedUser.config === 'object') ? updatedUser.config : {};
+    const persistedConfigSync = (persistedRaw as any).configSync;
+    logger.info(`[SyncConfig] Persisted at prisma.user.syncData.configSync userId=${userId}`);
+    logConfigSyncSnapshot(String(userId), 'Persisted', persistedConfigSync);
 
     logger.info(`[SyncConfig] Updated config for user ${userId}`);
     res.json({ success: true, updatedAt: nextConfigSync.updatedAt });
