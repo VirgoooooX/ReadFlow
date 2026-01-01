@@ -1,0 +1,11 @@
+# 忽略 node_modules 和构建产物
+node_modules
+dist
+.env
+.git
+.DS_Store
+*.log
+data/*
+!data/.keep
+public/cache/*
+!public/cache/.keep

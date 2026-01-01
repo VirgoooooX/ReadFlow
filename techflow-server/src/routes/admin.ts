@@ -19,9 +19,34 @@ function normalizeUrl(url: string): string {
   }
 }
 
-// Middleware to check admin password if needed (skipped for now or simple check)
-// For simplicity, we assume this is a private personal server
-// In production, add authentication here
+// Auth Middleware
+const requireAdminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const settings = storageService.getSettings();
+  const password = settings.adminPassword || 'admin';
+  const authHeader = req.headers['x-admin-token'];
+  
+  if (authHeader === password) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+};
+
+// Login Route (Public)
+router.post('/login', (req, res) => {
+  const { password } = req.body;
+  const settings = storageService.getSettings();
+  const currentPassword = settings.adminPassword || 'admin';
+  
+  if (password === currentPassword) {
+    res.json({ success: true, token: currentPassword });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+// Protect all other routes
+router.use(requireAdminAuth);
 
 // Settings
 router.get('/settings', (req, res) => {

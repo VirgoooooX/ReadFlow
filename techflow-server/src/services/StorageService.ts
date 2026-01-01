@@ -195,15 +195,24 @@ export class StorageService {
 
   // Settings
   private loadSettings(): ServerSettings {
+    const defaults: ServerSettings = { 
+      imageQuality: 80, 
+      rssRefreshIntervalSeconds: 900, 
+      rssMaxArticlesPerFeed: 20, 
+      rssSyncMaxBlocksPerFeed: 200,
+      adminPassword: process.env.ADMIN_PASSWORD || 'admin'
+    };
+
     try {
       if (fs.existsSync(this.settingsFile)) {
         const data = fs.readFileSync(this.settingsFile, 'utf-8');
-        return JSON.parse(data);
+        const loaded = JSON.parse(data);
+        return { ...defaults, ...loaded };
       }
     } catch (error) {
       logger.error('Failed to load settings:', error);
     }
-    return { imageQuality: 80, rssRefreshIntervalSeconds: 900, rssMaxArticlesPerFeed: 20, rssSyncMaxBlocksPerFeed: 200 };
+    return defaults;
   }
 
   public getSettings(): ServerSettings {

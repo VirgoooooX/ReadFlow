@@ -5,9 +5,9 @@
     "name": "巴萨",
     "category": "新闻",
     "createdAt": "2025-12-30T15:18:12.541Z",
-    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "updatedAt": "2025-12-31T12:34:14.100Z",
     "refreshIntervalSeconds": 3600,
-    "lastRefreshAt": "2025-12-31T10:06:48.454Z",
+    "lastRefreshAt": "2025-12-31T12:34:14.100Z",
     "lastRefreshStatus": "ok"
   },
   {
@@ -16,9 +16,9 @@
     "name": "少数派",
     "category": "博客",
     "createdAt": "2025-12-30T15:18:12.541Z",
-    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "updatedAt": "2025-12-31T12:34:17.104Z",
     "refreshIntervalSeconds": 3600,
-    "lastRefreshAt": "2025-12-31T10:07:03.471Z",
+    "lastRefreshAt": "2025-12-31T12:34:17.104Z",
     "lastRefreshStatus": "ok"
   },
   {
@@ -27,9 +27,9 @@
     "name": "CN",
     "category": "新闻",
     "createdAt": "2025-12-30T15:18:12.541Z",
-    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "updatedAt": "2025-12-31T12:34:22.660Z",
     "refreshIntervalSeconds": 3600,
-    "lastRefreshAt": "2025-12-31T10:07:18.483Z",
+    "lastRefreshAt": "2025-12-31T12:34:22.660Z",
     "lastRefreshStatus": "ok"
   },
   {
@@ -38,9 +38,9 @@
     "name": "日报",
     "category": "技术",
     "createdAt": "2025-12-30T15:18:12.541Z",
-    "updatedAt": "2025-12-31T10:29:55.479Z",
+    "updatedAt": "2025-12-31T12:34:29.100Z",
     "refreshIntervalSeconds": 3600,
-    "lastRefreshAt": "2025-12-31T10:07:33.488Z",
+    "lastRefreshAt": "2025-12-31T12:34:29.100Z",
     "lastRefreshStatus": "ok"
   }
 ]

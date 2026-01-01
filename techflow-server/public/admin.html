@@ -25,12 +25,27 @@
                         },
                         slate: {
                             850: '#152033', // Custom dark
+                        },
+                        // Custom Pastel Palette based on Icon
+                        pastel: {
+                            pink: '#FFD1DC',
+                            cyan: '#E0F7FA',
+                            blue: '#4A90E2',
+                            purple: '#9B59B6',
+                            gold: '#F1C40F',
+                            bg: '#f8faff', // Very light blueish white
                         }
                     },
                     animation: {
                         'fade-in': 'fadeIn 0.3s ease-out',
                         'slide-in-right': 'slideInRight 0.3s ease-out',
                         'bounce-slight': 'bounceSlight 2s infinite',
+                    },
+                    backgroundImage: {
+                        'gradient-icon': 'linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%)', // Pastel Pink to Cyan
+                        'gradient-primary': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', // Blue to Cyan
+                        'gradient-accent': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // Deep Blue to Purple
+                        'gradient-gold': 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)', // Gold/Orange
                     },
                     keyframes: {
                         fadeIn: {
@@ -59,14 +74,18 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Glassmorphism utilities */
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+        /* Glassmorphism utilities - High Contrast */
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.8); }
+        .glass-dark { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border-right: 1px solid rgba(255, 255, 255, 0.15); }
+        .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
         
         /* Sidebar Active State */
         .nav-item.active { 
-            background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0) 100%);
-            border-left-color: #3b82f6;
-            color: #60a5fa;
+            background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%);
+            border-left-color: #60a5fa;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+            font-weight: 600;
         }
         .nav-item {
             border-left: 3px solid transparent;
@@ -93,15 +112,27 @@
         .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
         .modal-exit { opacity: 1; transform: scale(1); }
         .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+        
+        /* Background Gradient Animation */
+        .bg-animated {
+            background: linear-gradient(-45deg, #FFDEE9, #B5FFFC, #E0C3FC, #8EC5FC);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden">
+<body class="bg-animated text-slate-800 h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-slate-900 text-slate-400 flex flex-col shadow-2xl z-30 transition-all duration-300" id="sidebar">
+    <aside class="w-64 glass-dark text-slate-300 flex flex-col shadow-2xl z-30 transition-all duration-300" id="sidebar">
         <!-- Logo -->
-        <div class="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-900">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white mr-3 shadow-lg shadow-blue-500/30">
+        <div class="h-16 flex items-center px-6 border-b border-slate-700/50 bg-transparent">
+            <div class="w-8 h-8 rounded-lg bg-gradient-accent flex items-center justify-center text-white mr-3 shadow-lg shadow-purple-500/30">
                 <i class="fa-solid fa-cloud"></i>
             </div>
             <span class="text-lg font-bold text-white tracking-wide">TechFlow</span>
@@ -137,24 +168,24 @@
         </nav>
         
         <!-- Footer -->
-        <div class="p-4 border-t border-slate-800 bg-slate-900">
+        <div class="p-4 border-t border-white/10 glass-dark">
             <div class="flex items-center">
-                <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white">
+                <div class="w-8 h-8 rounded-full bg-gradient-accent flex items-center justify-center text-xs text-white shadow-md shadow-purple-500/30">
                     <i class="fa-solid fa-user-shield"></i>
                 </div>
                 <div class="ml-3">
                     <p class="text-sm font-medium text-white">Admin</p>
-                    <p class="text-xs text-slate-500">Super User</p>
+                    <p class="text-xs text-slate-400">Super User</p>
                 </div>
             </div>
         </div>
     </aside>
 
     <!-- Main Content Wrapper -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-transparent">
         
         <!-- Header -->
-        <header class="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-20">
+        <header class="h-16 glass border-b border-white/50 flex items-center justify-between px-8 sticky top-0 z-20 shadow-sm">
             <div class="flex items-center">
                 <button id="sidebar-toggle" class="md:hidden text-slate-500 hover:text-slate-700 mr-4">
                     <i class="fa-solid fa-bars text-xl"></i>
@@ -167,7 +198,7 @@
             </div>
             
             <div class="flex items-center space-x-4">
-                <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-medium">
+                <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border border-emerald-100 text-xs font-medium shadow-sm">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
                     <span id="header-status">系统正常</span>
                 </div>
@@ -197,24 +228,24 @@
                 <!-- Stats Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="dashboard-stats">
                     <!-- Loading Skeletons -->
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-32 animate-pulse"></div>
+                    <div class="glass-card p-6 rounded-2xl h-32 animate-pulse"></div>
+                    <div class="glass-card p-6 rounded-2xl h-32 animate-pulse"></div>
+                    <div class="glass-card p-6 rounded-2xl h-32 animate-pulse"></div>
+                    <div class="glass-card p-6 rounded-2xl h-32 animate-pulse"></div>
                 </div>
 
                 <!-- Quick Actions & Status -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <!-- Quick Maintenance -->
-                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                        <div class="px-6 py-5 border-b border-slate-50 flex justify-between items-center">
+                    <div class="lg:col-span-2 glass-card rounded-2xl overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100/50 flex justify-between items-center bg-white/30">
                             <h3 class="font-bold text-slate-800 flex items-center">
                                 <i class="fa-solid fa-screwdriver-wrench text-blue-500 mr-2"></i> 系统维护
                             </h3>
                         </div>
                         <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <button onclick="clearCache()" class="group flex items-start p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition duration-200 text-left">
-                                <div class="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition">
+                            <button onclick="clearCache()" class="group flex items-start p-4 rounded-xl border border-white/60 bg-white/40 hover:bg-blue-50/80 hover:border-blue-200/50 transition duration-200 text-left shadow-sm">
+                                <div class="w-10 h-10 rounded-lg bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </div>
                                 <div>
@@ -223,8 +254,8 @@
                                 </div>
                             </button>
 
-                            <button onclick="clearArticles()" class="group flex items-start p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition duration-200 text-left">
-                                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition">
+                            <button onclick="clearArticles()" class="group flex items-start p-4 rounded-xl border border-white/60 bg-white/40 hover:bg-blue-50/80 hover:border-blue-200/50 transition duration-200 text-left shadow-sm">
+                                <div class="w-10 h-10 rounded-lg bg-indigo-100/80 text-indigo-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
                                     <i class="fa-solid fa-file-circle-xmark"></i>
                                 </div>
                                 <div>
@@ -233,8 +264,8 @@
                                 </div>
                             </button>
 
-                            <button onclick="clearData()" class="group flex items-start p-4 rounded-xl border border-slate-100 hover:border-red-200 hover:bg-red-50/50 transition duration-200 text-left col-span-1 sm:col-span-2">
-                                <div class="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition">
+                            <button onclick="clearData()" class="group flex items-start p-4 rounded-xl border border-white/60 bg-white/40 hover:bg-red-50/80 hover:border-red-200/50 transition duration-200 text-left col-span-1 sm:col-span-2 shadow-sm">
+                                <div class="w-10 h-10 rounded-lg bg-red-100/80 text-red-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
                                     <i class="fa-solid fa-radiation"></i>
                                 </div>
                                 <div>
@@ -246,8 +277,8 @@
                     </div>
 
                     <!-- Server Info -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                        <div class="px-6 py-5 border-b border-slate-50">
+                    <div class="glass-card rounded-2xl overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-100/50 bg-white/30">
                             <h3 class="font-bold text-slate-800 flex items-center">
                                 <i class="fa-solid fa-server text-purple-500 mr-2"></i> 服务状态
                             </h3>
@@ -258,8 +289,8 @@
                                     <span class="text-slate-500">API 响应状态</span>
                                     <span class="text-emerald-600 font-bold">正常</span>
                                 </div>
-                                <div class="w-full bg-slate-100 rounded-full h-2">
-                                    <div class="bg-emerald-500 h-2 rounded-full w-full"></div>
+                                <div class="w-full bg-slate-100/50 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-emerald-400 to-emerald-500 h-2 rounded-full w-full shadow-[0_0_10px_rgba(16,185,129,0.4)]"></div>
                                 </div>
                             </div>
                             <div>
@@ -267,18 +298,18 @@
                                     <span class="text-slate-500">模拟负载 (Mock)</span>
                                     <span class="text-blue-600 font-bold">24%</span>
                                 </div>
-                                <div class="w-full bg-slate-100 rounded-full h-2">
-                                    <div class="bg-blue-500 h-2 rounded-full w-[24%]"></div>
+                                <div class="w-full bg-slate-100/50 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-blue-400 to-blue-500 h-2 rounded-full w-[24%] shadow-[0_0_10px_rgba(59,130,246,0.4)]"></div>
                                 </div>
                             </div>
-                            <div class="pt-4 border-t border-slate-50">
+                            <div class="pt-4 border-t border-slate-100/50">
                                 <div class="flex items-center justify-between text-sm">
                                     <span class="text-slate-500">上次重启</span>
                                     <span class="font-mono text-slate-700">3 days ago</span>
                                 </div>
                                 <div class="flex items-center justify-between text-sm mt-2">
                                     <span class="text-slate-500">版本</span>
-                                    <span class="font-mono text-slate-700 bg-slate-100 px-2 rounded">v1.2.0</span>
+                                    <span class="font-mono text-slate-700 bg-slate-100/50 px-2 rounded">v1.2.0</span>
                                 </div>
                             </div>
                         </div>
@@ -289,38 +320,38 @@
             <!-- VIEW: FEEDS -->
             <div id="view-feeds" class="hidden space-y-6 animate-fade-in">
                 <!-- Toolbar -->
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-card p-4 rounded-xl">
                     <div class="relative w-full md:w-64">
                         <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input type="text" placeholder="搜索订阅源..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                        <input type="text" placeholder="搜索订阅源..." class="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
                     </div>
-                    <button onclick="document.getElementById('add-feed-panel').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-500/30 flex items-center">
+                    <button onclick="document.getElementById('add-feed-panel').classList.toggle('hidden')" class="bg-gradient-accent hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-purple-500/30 flex items-center transform hover:-translate-y-0.5">
                         <i class="fa-solid fa-plus mr-2"></i> 添加新源
                     </button>
                 </div>
 
                 <!-- Add Feed Panel -->
-                <div id="add-feed-panel" class="hidden bg-white p-6 rounded-xl shadow-md border border-slate-100 border-l-4 border-l-blue-500 animate-slide-in-right">
+                <div id="add-feed-panel" class="hidden glass-card p-6 rounded-xl border-l-4 border-l-blue-500 animate-slide-in-right">
                     <h3 class="text-sm font-bold text-slate-800 mb-4">添加新 RSS 订阅源</h3>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                         <div class="md:col-span-3">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">名称</label>
-                            <input type="text" id="feed-name" placeholder="例如: TechCrunch" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <input type="text" id="feed-name" placeholder="例如: TechCrunch" class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         </div>
                         <div class="md:col-span-5">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">RSS 地址</label>
-                            <input type="text" id="feed-url" placeholder="https://..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <input type="text" id="feed-url" placeholder="https://..." class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">分类</label>
-                            <input type="text" id="feed-category" placeholder="Tech" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <input type="text" id="feed-category" placeholder="Tech" class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         </div>
                         <div class="md:col-span-1">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">间隔(秒)</label>
-                            <input type="number" id="feed-interval" placeholder="900" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <input type="number" id="feed-interval" placeholder="900" class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         </div>
                         <div class="md:col-span-1">
-                            <button onclick="addFeed()" class="w-full bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium h-[38px]">
+                            <button onclick="addFeed()" class="w-full bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium h-[38px] shadow-lg shadow-slate-800/20">
                                 确定
                             </button>
                         </div>
@@ -328,10 +359,10 @@
                 </div>
 
                 <!-- Table -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="glass-card rounded-xl overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-50/50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                            <thead class="bg-slate-50/30 text-xs uppercase text-slate-500 font-bold border-b border-slate-100/50">
                                 <tr>
                                     <th class="px-6 py-4">源名称 / 分类</th>
                                     <th class="px-6 py-4 w-1/3">源地址</th>
@@ -341,7 +372,7 @@
                                     <th class="px-6 py-4 text-right">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="feeds-list" class="divide-y divide-slate-50 text-sm text-slate-600">
+                            <tbody id="feeds-list" class="divide-y divide-slate-100/50 text-sm text-slate-600 bg-white/40">
                                 <!-- JS Injection -->
                             </tbody>
                         </table>
@@ -351,22 +382,22 @@
 
             <!-- VIEW: USERS -->
             <div id="view-users" class="hidden space-y-6 animate-fade-in">
-                 <div class="flex justify-between items-end bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                 <div class="flex justify-between items-end glass-card p-6 rounded-xl">
                     <div class="flex-1 max-w-lg">
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">快速添加用户</label>
                         <div class="flex gap-3">
-                            <input type="text" id="user-name" placeholder="输入用户名..." class="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                            <button onclick="addUser()" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition flex items-center text-sm font-medium shadow-md shadow-blue-500/20">
+                            <input type="text" id="user-name" placeholder="输入用户名..." class="flex-1 px-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition">
+                            <button onclick="addUser()" class="bg-gradient-accent text-white px-5 py-2 rounded-lg hover:opacity-90 transition flex items-center text-sm font-medium shadow-md shadow-purple-500/20 transform hover:-translate-y-0.5">
                                 <i class="fa-solid fa-plus mr-2"></i>添加
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="glass-card rounded-xl overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-600">
-                            <thead class="bg-slate-50/50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                            <thead class="bg-slate-50/30 text-xs uppercase text-slate-500 font-bold border-b border-slate-100/50">
                                 <tr>
                                     <th class="px-6 py-4">用户</th>
                                     <th class="px-6 py-4">联系方式</th>
@@ -375,7 +406,7 @@
                                     <th class="px-6 py-4 text-right">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="users-list" class="divide-y divide-slate-50">
+                            <tbody id="users-list" class="divide-y divide-slate-100/50 bg-white/40">
                                 <!-- JS Injection -->
                             </tbody>
                         </table>
@@ -385,8 +416,8 @@
 
             <!-- VIEW: SETTINGS -->
             <div id="view-settings" class="hidden max-w-5xl mx-auto animate-fade-in">
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-8 py-6 border-b border-slate-100 bg-slate-50/50">
+                <div class="glass-card rounded-2xl overflow-hidden">
+                    <div class="px-8 py-6 border-b border-slate-100/50 bg-white/40">
                         <h2 class="text-lg font-bold text-slate-800">全局参数配置</h2>
                         <p class="text-sm text-slate-500 mt-1">调整服务器的核心运行参数。</p>
                     </div>
@@ -394,13 +425,13 @@
                         <!-- Section 1 -->
                         <div>
                             <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
-                                <span class="w-1 h-4 bg-blue-500 rounded mr-2"></span> 媒体处理
+                                <span class="w-1 h-4 bg-gradient-primary rounded mr-2"></span> 媒体处理
                             </h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">图片压缩质量 (1-100)</label>
                                     <div class="relative">
-                                        <input type="number" id="setting-quality" min="1" max="100" class="w-full pl-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
+                                        <input type="number" id="setting-quality" min="1" max="100" class="w-full pl-4 pr-12 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
                                         <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-sm">%</div>
                                     </div>
                                     <p class="mt-2 text-xs text-slate-400">数值越低体积越小，建议 70-80。</p>
@@ -408,31 +439,47 @@
                             </div>
                         </div>
 
-                        <hr class="border-slate-100">
+                        <hr class="border-slate-100/50">
 
                         <!-- Section 2 -->
                         <div>
                             <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
-                                <span class="w-1 h-4 bg-purple-500 rounded mr-2"></span> RSS 抓取策略
+                                <span class="w-1 h-4 bg-gradient-accent rounded mr-2"></span> RSS 抓取策略
                             </h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
-                                    <input type="number" id="setting-refresh-interval" min="15" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <input type="number" id="setting-refresh-interval" min="15" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">单次最大抓取文章数</label>
-                                    <input type="number" id="setting-max-articles" min="1" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <input type="number" id="setting-max-articles" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">最大同步块保留数</label>
-                                    <input type="number" id="setting-max-blocks" min="1" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <input type="number" id="setting-max-blocks" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                 </div>
                             </div>
                         </div>
 
-                        <div class="pt-6 border-t border-slate-100 flex justify-end">
-                            <button onclick="saveSettings()" class="bg-slate-900 text-white px-8 py-3 rounded-xl hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition flex items-center font-bold">
+                        <hr class="border-slate-100/50">
+
+                        <!-- Section 3 -->
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                <span class="w-1 h-4 bg-red-500 rounded mr-2"></span> 安全设置
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">管理员密码</label>
+                                    <input type="text" id="setting-password" placeholder="admin" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">修改后下次登录生效。默认密码: admin</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-6 border-t border-slate-100/50 flex justify-end">
+                            <button onclick="saveSettings()" class="bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-700 shadow-lg shadow-slate-900/20 transition flex items-center font-bold transform hover:-translate-y-0.5">
                                 <i class="fa-solid fa-save mr-2"></i>保存所有更改
                             </button>
                         </div>
@@ -442,22 +489,22 @@
 
             <!-- VIEW: IMAGES -->
             <div id="view-images" class="hidden space-y-6 animate-fade-in">
-                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center glass-card p-4 rounded-xl">
                     <h2 class="font-bold text-slate-700 pl-2">已缓存图片列表</h2>
                     <div class="flex space-x-3">
-                        <button onclick="loadImages()" class="text-slate-600 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-slate-50 transition text-sm font-medium border border-slate-200 bg-white">
+                        <button onclick="loadImages()" class="text-slate-600 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-slate-50/50 transition text-sm font-medium border border-slate-200/60 bg-white/50">
                             <i class="fa-solid fa-rotate mr-2"></i>刷新
                         </button>
-                        <button onclick="clearCache()" class="text-red-600 hover:text-red-700 px-4 py-2 rounded-lg hover:bg-red-50 transition text-sm font-medium border border-red-200 bg-white">
+                        <button onclick="clearCache()" class="text-red-600 hover:text-red-700 px-4 py-2 rounded-lg hover:bg-red-50/50 transition text-sm font-medium border border-red-200/60 bg-white/50">
                             <i class="fa-solid fa-trash mr-2"></i>全部清空
                         </button>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="glass-card rounded-xl overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-600">
-                            <thead class="bg-slate-50/50 text-xs uppercase text-slate-500 font-bold border-b border-slate-100">
+                            <thead class="bg-slate-50/30 text-xs uppercase text-slate-500 font-bold border-b border-slate-100/50">
                                 <tr>
                                     <th class="px-6 py-4">文件名 / 预览链接</th>
                                     <th class="px-6 py-4">大小</th>
@@ -465,7 +512,7 @@
                                     <th class="px-6 py-4 text-right">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="images-list" class="divide-y divide-slate-50">
+                            <tbody id="images-list" class="divide-y divide-slate-100/50 bg-white/40">
                                 <!-- JS Injection -->
                             </tbody>
                         </table>
@@ -477,7 +524,7 @@
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-8 right-8 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl transform translate-y-32 opacity-0 transition-all duration-500 z-50 flex items-center border border-slate-700">
+    <div id="toast" class="fixed bottom-8 right-8 glass-dark text-white px-6 py-4 rounded-xl shadow-2xl transform translate-y-32 opacity-0 transition-all duration-500 z-50 flex items-center border border-white/10">
         <div id="toast-icon" class="text-emerald-400 mr-4 text-xl"><i class="fa-solid fa-circle-check"></i></div>
         <div>
             <h4 class="font-bold text-sm">Notification</h4>
@@ -488,8 +535,8 @@
     <!-- Modals -->
     <!-- Feed Articles Modal -->
     <div id="articles-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="onArticlesOverlayClick(event)">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden animate-fade-in scale-95 transform transition-transform duration-300" onclick="event.stopPropagation()">
-            <div class="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div class="glass-card bg-white/95 rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden animate-fade-in scale-95 transform transition-transform duration-300" onclick="event.stopPropagation()">
+            <div class="px-8 py-5 border-b border-slate-100/50 flex justify-between items-center bg-slate-50/30">
                 <div>
                     <h3 class="text-xl font-bold text-slate-800" id="articles-title">文章列表</h3>
                     <div class="flex items-center text-xs text-slate-500 mt-1 space-x-2">
@@ -497,28 +544,28 @@
                         <span id="articles-subtitle" class="truncate max-w-md font-mono">...</span>
                     </div>
                 </div>
-                <button onclick="closeArticles()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition">
+                <button onclick="closeArticles()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100/50 text-slate-500 hover:bg-slate-200/50 hover:text-slate-800 transition">
                     <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
             
-            <div class="flex-1 overflow-auto bg-slate-50/30">
+            <div class="flex-1 overflow-auto bg-slate-50/10">
                 <table class="w-full text-left text-sm text-slate-600">
-                    <thead class="bg-white sticky top-0 z-10 shadow-sm text-xs uppercase text-slate-500 font-bold">
+                    <thead class="bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-sm text-xs uppercase text-slate-500 font-bold">
                         <tr>
-                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100 w-48">发布时间</th>
-                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100">标题</th>
-                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100 w-32">封面</th>
-                            <th class="px-8 py-4 bg-slate-50 border-b border-slate-100 w-32 text-right">原文</th>
+                            <th class="px-8 py-4 border-b border-slate-100/50 w-48">发布时间</th>
+                            <th class="px-8 py-4 border-b border-slate-100/50">标题</th>
+                            <th class="px-8 py-4 border-b border-slate-100/50 w-32">封面</th>
+                            <th class="px-8 py-4 border-b border-slate-100/50 w-32 text-right">原文</th>
                         </tr>
                     </thead>
-                    <tbody id="articles-list" class="divide-y divide-slate-100 bg-white"></tbody>
+                    <tbody id="articles-list" class="divide-y divide-slate-100/50 bg-white/40"></tbody>
                 </table>
             </div>
             
-            <div class="px-8 py-4 border-t border-slate-100 bg-white flex justify-between items-center">
-                <div class="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full" id="articles-progress">0 items</div>
-                <button id="articles-load-more" onclick="loadMoreArticles()" class="px-6 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 hover:bg-slate-50 font-medium transition disabled:opacity-50 hover:shadow-sm">
+            <div class="px-8 py-4 border-t border-slate-100/50 bg-white/80 backdrop-blur-sm flex justify-between items-center">
+                <div class="text-xs font-medium text-slate-500 bg-slate-100/50 px-3 py-1 rounded-full" id="articles-progress">0 items</div>
+                <button id="articles-load-more" onclick="loadMoreArticles()" class="px-6 py-2 bg-white/60 border border-slate-300/60 rounded-lg text-sm text-slate-700 hover:bg-slate-50/60 font-medium transition disabled:opacity-50 hover:shadow-sm">
                     加载更多
                 </button>
             </div>
@@ -527,10 +574,10 @@
 
     <!-- User Details Modal -->
     <div id="user-settings-overlay" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onclick="onUserSettingsOverlayClick(event)">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-fade-in" onclick="event.stopPropagation()">
-            <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
+        <div class="glass-card bg-white/95 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-fade-in" onclick="event.stopPropagation()">
+            <div class="px-8 py-6 border-b border-slate-100/50 flex justify-between items-center bg-gradient-to-r from-slate-50/50 to-white/50">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl mr-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100/50 text-blue-600 flex items-center justify-center text-xl mr-4">
                         <i class="fa-solid fa-user"></i>
                     </div>
                     <div>
@@ -538,18 +585,18 @@
                         <p class="text-xs text-slate-400 font-mono mt-0.5" id="user-settings-subtitle">ID</p>
                     </div>
                 </div>
-                <button onclick="closeUserSettings()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
+                <button onclick="closeUserSettings()" class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100/50 text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 transition">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
             <div class="p-8 overflow-y-auto max-h-[70vh] space-y-8">
                 <div>
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">基础信息</h4>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100/50 pb-2">基础信息</h4>
                     <div id="user-settings-meta" class="grid grid-cols-2 gap-4"></div>
                 </div>
                 <div>
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">配置数据 (JSON)</h4>
-                    <div class="bg-slate-900 rounded-xl p-5 overflow-x-auto shadow-inner">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100/50 pb-2">配置数据 (JSON)</h4>
+                    <div class="bg-slate-900/90 rounded-xl p-5 overflow-x-auto shadow-inner">
                         <pre id="user-settings-json" class="text-xs text-emerald-400 font-mono leading-relaxed"></pre>
                     </div>
                 </div>
@@ -557,9 +604,101 @@
         </div>
     </div>
 
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 hidden flex items-center justify-center transition-all duration-300">
+        <div class="glass-card bg-white/90 rounded-2xl shadow-2xl p-8 w-full max-w-md transform scale-100 transition-all animate-bounceSlight">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-gradient-accent rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
+                    <i class="fa-solid fa-shield-halved text-white text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">管理员登录</h2>
+                <p class="text-slate-500 mt-2">请输入管理员密码以继续访问。</p>
+            </div>
+            
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">密码</label>
+                    <input type="password" id="login-password" class="w-full px-4 py-3 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="w-full py-3 bg-gradient-accent hover:opacity-90 text-white font-bold rounded-xl shadow-lg shadow-purple-500/30 transition transform hover:-translate-y-0.5 active:translate-y-0">
+                    解锁后台
+                </button>
+            </form>
+        </div>
+    </div>
+
 <script>
     // --- Global Config ---
     const API_BASE = '/api/admin';
+    
+    // --- Auth Logic ---
+    const originalFetch = window.fetch;
+    window.fetch = async (url, options = {}) => {
+        // Only intercept calls to API_BASE
+        if (typeof url === 'string' && url.startsWith(API_BASE) && !url.includes('/login')) {
+            options.headers = {
+                ...options.headers,
+                'X-Admin-Token': localStorage.getItem('adminToken') || ''
+            };
+        }
+        
+        const res = await originalFetch(url, options);
+        if (res.status === 401 && url.startsWith(API_BASE) && !url.includes('/login')) {
+            showLogin();
+        }
+        return res;
+    };
+
+    function showLogin() {
+        const overlay = document.getElementById('login-overlay');
+        if (overlay) overlay.classList.remove('hidden');
+    }
+    
+    function hideLogin() {
+        const overlay = document.getElementById('login-overlay');
+        if (overlay) overlay.classList.add('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const pwd = document.getElementById('login-password').value;
+                const btn = loginForm.querySelector('button');
+                const originalText = btn.innerHTML;
+                
+                try {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 验证中...';
+                    
+                    const res = await originalFetch(`${API_BASE}/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: pwd })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        localStorage.setItem('adminToken', data.token);
+                        hideLogin();
+                        showToast('登录成功');
+                        loadStatus(); // Retry initial load
+                        // Reload feeds/users if needed, but status is the main one
+                    } else {
+                        showToast('密码错误', 'error');
+                        document.getElementById('login-password').value = '';
+                    }
+                } catch (err) {
+                    showToast('登录请求失败', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            });
+        }
+    });
+
     const ARTICLES_PAGE_SIZE = 50;
     const articlesState = {
         feedId: '', feedName: '', feedUrl: '', total: 0, offset: 0, loading: false
@@ -636,19 +775,19 @@
             
             document.getElementById('header-status').textContent = '系统正常';
             document.getElementById('header-status').parentElement.classList.replace('text-red-600', 'text-emerald-600');
-            document.getElementById('header-status').parentElement.classList.replace('bg-red-50', 'bg-emerald-50');
-            document.getElementById('header-status').parentElement.classList.replace('border-red-100', 'border-emerald-100');
+            document.getElementById('header-status').parentElement.classList.replace('bg-red-50', 'bg-emerald-50/50');
+            document.getElementById('header-status').parentElement.classList.replace('border-red-100', 'border-emerald-100/50');
 
             // Render Stats Cards
             const stats = document.getElementById('dashboard-stats');
             
             const card = (title, value, icon, color) => `
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between card-hover transition duration-200">
+                <div class="glass-card p-6 rounded-xl flex items-center justify-between card-hover transition duration-200">
                     <div>
-                        <p class="text-sm font-medium text-slate-500 mb-1">${title}</p>
-                        <p class="text-2xl font-bold text-slate-800">${value}</p>
+                        <p class="text-sm font-bold text-slate-600 mb-1">${title}</p>
+                        <p class="text-2xl font-extrabold text-slate-800">${value}</p>
                     </div>
-                    <div class="w-12 h-12 rounded-full bg-${color}-50 flex items-center justify-center text-${color}-500">
+                    <div class="w-12 h-12 rounded-full bg-${color}-50/80 flex items-center justify-center text-${color}-600 shadow-sm border border-${color}-100">
                         <i class="${icon} text-xl"></i>
                     </div>
                 </div>
@@ -665,8 +804,8 @@
             document.getElementById('header-status').textContent = '连接断开';
             const statusBadge = document.getElementById('header-status').parentElement;
             statusBadge.classList.replace('text-emerald-600', 'text-red-600');
-            statusBadge.classList.replace('bg-emerald-50', 'bg-red-50');
-            statusBadge.classList.replace('border-emerald-100', 'border-red-100');
+            statusBadge.classList.replace('bg-emerald-50/50', 'bg-red-50');
+            statusBadge.classList.replace('border-emerald-100/50', 'border-red-100');
         }
     }
 
@@ -679,6 +818,7 @@
             document.getElementById('setting-refresh-interval').value = data.rssRefreshIntervalSeconds || 900;
             document.getElementById('setting-max-articles').value = data.rssMaxArticlesPerFeed || 20;
             document.getElementById('setting-max-blocks').value = data.rssSyncMaxBlocksPerFeed || 200;
+            document.getElementById('setting-password').value = data.adminPassword || '';
         } catch(e) { console.error(e); }
     }
 
@@ -687,11 +827,12 @@
         const rssRefreshIntervalSeconds = parseInt(document.getElementById('setting-refresh-interval').value);
         const rssMaxArticlesPerFeed = parseInt(document.getElementById('setting-max-articles').value);
         const rssSyncMaxBlocksPerFeed = parseInt(document.getElementById('setting-max-blocks').value);
+        const adminPassword = document.getElementById('setting-password').value;
         
         await fetch(`${API_BASE}/settings`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ imageQuality: quality, rssRefreshIntervalSeconds, rssMaxArticlesPerFeed, rssSyncMaxBlocksPerFeed })
+            body: JSON.stringify({ imageQuality: quality, rssRefreshIntervalSeconds, rssMaxArticlesPerFeed, rssSyncMaxBlocksPerFeed, adminPassword })
         });
         showToast('配置已成功保存并生效');
     }
@@ -725,43 +866,43 @@
         const tbody = document.getElementById('feeds-list');
         
         tbody.innerHTML = feeds.map(f => {
-            const statusColor = f.lastRefreshStatus === 'ok' ? 'text-emerald-500' : (f.lastRefreshStatus === 'error' ? 'text-red-500' : 'text-slate-400');
-            const statusBg = f.lastRefreshStatus === 'ok' ? 'bg-emerald-50' : (f.lastRefreshStatus === 'error' ? 'bg-red-50' : 'bg-slate-100');
+            const statusColor = f.lastRefreshStatus === 'ok' ? 'text-emerald-700' : (f.lastRefreshStatus === 'error' ? 'text-red-700' : 'text-slate-600');
+            const statusBg = f.lastRefreshStatus === 'ok' ? 'bg-emerald-100' : (f.lastRefreshStatus === 'error' ? 'bg-red-100' : 'bg-slate-100');
             const statusText = f.lastRefreshStatus === 'ok' ? '正常' : (f.lastRefreshStatus === 'error' ? '错误' : '未知');
             
             return `
-            <tr class="hover:bg-slate-50 transition group border-b border-slate-50 last:border-0">
+            <tr class="hover:bg-white/60 transition group border-b border-slate-200/60 last:border-0">
                 <td class="px-6 py-4">
                     <div class="flex items-center">
-                        <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500 mr-3 text-sm">
+                        <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-600 mr-3 text-sm border border-slate-200">
                             <i class="fa-solid fa-rss"></i>
                         </div>
                         <div>
-                            <div class="font-bold text-slate-700">${f.name || 'Unnamed'}</div>
-                            <div class="text-xs text-slate-400 mt-0.5">${f.category || 'General'}</div>
+                            <div class="font-bold text-slate-800">${f.name || 'Unnamed'}</div>
+                            <div class="text-xs text-slate-500 mt-0.5 font-medium">${f.category || 'General'}</div>
                         </div>
                     </div>
                 </td>
                 <td class="px-6 py-4">
-                    <a href="${f.url}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline text-xs font-mono truncate block max-w-[240px]" title="${f.url}">
+                    <a href="${f.url}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline text-xs font-mono truncate block max-w-[240px]" title="${f.url}">
                         ${f.url}
                     </a>
                 </td>
                 <td class="px-6 py-4 text-center">
                     <input type="number" value="${f.refreshIntervalSeconds ?? ''}" 
-                        class="w-20 px-2 py-1 text-xs border border-slate-200 bg-slate-50 rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                        class="w-20 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm"
                         onchange="updateFeedInterval('${f.id}', this.value)" placeholder="Default">
                 </td>
                 <td class="px-6 py-4 text-xs">
-                    <div class="text-slate-600 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
-                    <div class="text-slate-400 text-[10px] mt-0.5 scale-90 origin-left">Last check</div>
+                    <div class="text-slate-700 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
+                    <div class="text-slate-500 text-[10px] mt-0.5 scale-90 origin-left">Last check</div>
                 </td>
                 <td class="px-6 py-4 text-center">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBg} ${statusColor}">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusBg} ${statusColor} border border-black/5">
                         <span class="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></span>
                         ${statusText}
                     </span>
-                    ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-400 ml-1 cursor-help" title="${f.lastRefreshError}"></i>` : ''}
+                    ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-500 ml-1 cursor-help" title="${f.lastRefreshError}"></i>` : ''}
                 </td>
                 <td class="px-6 py-4 text-right">
                     <div class="flex justify-end space-x-1">
@@ -840,30 +981,30 @@
         const users = await res.json();
         const tbody = document.getElementById('users-list');
         tbody.innerHTML = users.map(u => `
-            <tr class="hover:bg-slate-50 transition border-b border-slate-50 last:border-0">
+            <tr class="hover:bg-white/60 transition border-b border-slate-200/60 last:border-0">
                 <td class="px-6 py-4">
                     <div class="flex items-center">
-                        <div class="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm shadow-sm mr-3">
+                        <div class="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-sm shadow-sm mr-3">
                             ${u.username ? u.username.charAt(0).toUpperCase() : 'U'}
                         </div>
                         <div>
                             <div class="font-bold text-slate-800 text-sm">${u.username}</div>
-                            <div class="text-xs text-slate-400 font-mono mt-0.5">${u.id.substring(0,8)}...</div>
+                            <div class="text-xs text-slate-500 font-mono mt-0.5 font-medium">${u.id.substring(0,8)}...</div>
                         </div>
                     </div>
                 </td>
-                <td class="px-6 py-4 text-sm text-slate-600">${u.email || '<span class="text-slate-300 italic">No Email</span>'}</td>
-                <td class="px-6 py-4 text-xs text-slate-500">${u.registeredAt ? new Date(u.registeredAt).toLocaleDateString() : '-'}</td>
+                <td class="px-6 py-4 text-sm text-slate-700 font-medium">${u.email || '<span class="text-slate-400 italic">No Email</span>'}</td>
+                <td class="px-6 py-4 text-xs text-slate-600 font-medium">${u.registeredAt ? new Date(u.registeredAt).toLocaleDateString() : '-'}</td>
                 <td class="px-6 py-4 text-xs">
-                    <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                    <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-medium">
                         ${u.lastActive ? new Date(u.lastActive).toLocaleString() : 'Never'}
                     </span>
                 </td>
                 <td class="px-6 py-4 text-right space-x-2">
-                    <button onclick="viewUserSettings('${u.id}')" class="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition text-xs font-medium border border-blue-200">
+                    <button onclick="viewUserSettings('${u.id}')" class="text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition text-xs font-medium border border-blue-200 bg-white">
                         详情
                     </button>
-                    <button onclick="deleteUser('${u.id}')" class="text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition text-xs font-medium border border-red-200">
+                    <button onclick="deleteUser('${u.id}')" class="text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition text-xs font-medium border border-red-200 bg-white">
                         删除
                     </button>
                 </td>
@@ -904,7 +1045,7 @@
         
         const meta = document.getElementById('user-settings-meta');
         const item = (label, val) => `
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">
                 <div class="text-xs font-bold text-slate-400 mb-1 uppercase">${label}</div>
                 <div class="font-semibold text-slate-800 text-sm truncate" title="${val}">${val}</div>
             </div>
@@ -927,15 +1068,15 @@
         const data = await res.json();
         const tbody = document.getElementById('images-list');
         tbody.innerHTML = (data.images || []).map(img => `
-            <tr class="hover:bg-slate-50 transition border-b border-slate-50 last:border-0">
+            <tr class="hover:bg-white/60 transition border-b border-slate-200/60 last:border-0">
                 <td class="px-6 py-4">
                     <a href="/cache/${img.name}" target="_blank" class="flex items-center group">
-                        <div class="w-10 h-10 rounded bg-slate-200 bg-cover bg-center mr-3 border border-slate-300 group-hover:border-blue-400 transition" style="background-image:url('/cache/${img.name}')"></div>
-                        <span class="text-blue-500 hover:underline text-xs font-mono truncate max-w-[200px]">${img.name}</span>
+                        <div class="w-10 h-10 rounded bg-slate-200 bg-cover bg-center mr-3 border border-slate-300 group-hover:border-blue-500 transition shadow-sm" style="background-image:url('/cache/${img.name}')"></div>
+                        <span class="text-blue-600 hover:underline text-xs font-mono truncate max-w-[200px] font-medium">${img.name}</span>
                     </a>
                 </td>
-                <td class="px-6 py-4 text-sm text-slate-600 font-mono">${formatBytes(img.size)}</td>
-                <td class="px-6 py-4 text-xs text-slate-500">${new Date(img.mtimeMs).toLocaleString()}</td>
+                <td class="px-6 py-4 text-sm text-slate-700 font-mono font-medium">${formatBytes(img.size)}</td>
+                <td class="px-6 py-4 text-xs text-slate-600 font-medium">${new Date(img.mtimeMs).toLocaleString()}</td>
                 <td class="px-6 py-4 text-right">
                     <button onclick="deleteImage('${img.name}')" class="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition">
                         <i class="fa-solid fa-trash-can"></i>

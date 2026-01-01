@@ -92,6 +92,14 @@
 *   **Features**: RSS Parsing, Image Processing (Sharp), JWT Auth
 *   **Admin UI**: Tailwind CSS, Vanilla JS (无框架依赖，极致轻量)
 
+### Server (Go) - *New!*
+*   **Performance**: 极简高性能代理，资源占用极低。
+*   **Capabilities**: 
+    *   RSS 跨域转发与内容清洗。
+    *   流式图片代理 (Stream Proxy)，自动处理防盗链 Referer。
+    *   RSSHub 智能轮询机制。
+*   **Deployment**: 支持 Docker 一键部署，体积仅 ~15MB。
+
 ---
 
 ## 🚀 快速开始
@@ -104,7 +112,25 @@
 
 ### 2. 启动服务端 (TechFlow Server)
 
-服务端负责提供 API 接口、RSS 解析及管理后台。
+我们提供了两种服务端模式，可根据需求选择：
+
+#### 选项 A: Node.js 全功能版 (推荐)
+适合需要**云端同步**、用户系统和管理后台的场景。
+
+**使用 Docker 部署 (推荐):**
+
+```bash
+cd techflow-server
+
+# 启动服务
+docker-compose up -d
+```
+
+*   **配置**: 可在 `docker-compose.yml` 中修改 `ADMIN_PASSWORD` 环境变量来设置初始管理员密码（默认: `admin`）。
+*   **API 地址**: `http://localhost:3000`
+*   **管理后台**: `http://localhost:3000/admin`
+
+**使用源码启动:**
 
 ```bash
 # 进入服务端目录
@@ -117,9 +143,23 @@ npm install
 npm run dev
 ```
 
-启动成功后：
-*   **API 地址**: `http://localhost:3000`
-*   **管理后台**: 访问 `http://localhost:3000/admin` (默认查看后台)
+#### 选项 B: Go 轻量代理版 (Pure Proxy)
+适合**仅需要解决跨域和图片防盗链**，且希望极致轻量的场景。
+
+```bash
+# 进入 Go 服务目录
+cd server-go
+
+# 运行 (需安装 Go 环境)
+go run main.go
+
+# 或者使用 Docker (推荐)
+docker-compose up -d
+```
+
+*   **API 地址**: `http://localhost:8080`
+*   **特点**: 内存占用极低 (<10MB)，响应速度极快。
+*   **配置**: 在 App 中开启“代理模式”并填入此地址即可。
 
 ### 3. 启动客户端 (TechFlow Mobile)
 
