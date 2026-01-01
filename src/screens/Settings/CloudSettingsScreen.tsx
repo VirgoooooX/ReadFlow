@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Switch } from 'react-native';
 import { useThemeContext } from '../../theme';
-import { CleanText, CleanInput, SettingItem, SettingSection } from '../../components/ui';
+import { CleanText, SettingItem, SettingSection } from '../../components/ui';
 import { SettingsService } from '../../services/SettingsService';
 import { AppSettings } from '../../types';
+import AuthService from '../../services/AuthService';
+import { CloudConfig, cloudConfigService } from '../../services/CloudConfigService';
 
 const CloudSettingsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const settingsService = SettingsService.getInstance();
   
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [settings, setSettings] = useState<AppSettings['sync']>({
+  const [cloudConfig, setCloudConfig] = useState<CloudConfig | null>(null);
+  const [syncSettings, setSyncSettings] = useState<AppSettings['sync']>({
     enabled: false,
     autoSync: false,
     syncInterval: 3600,
@@ -27,8 +29,9 @@ const CloudSettingsScreen: React.FC = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const appSettings = await settingsService.getAppSettings();
-      setSettings(appSettings.sync);
+      const [appSettings, cc] = await Promise.all([settingsService.getAppSettings(), cloudConfigService.getConfig()]);
+      setCloudConfig(cc);
+      setSyncSettings(appSettings.sync);
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
@@ -36,37 +39,36 @@ const CloudSettingsScreen: React.FC = () => {
     }
   };
 
-  const saveSettings = async (newSyncSettings: Partial<AppSettings['sync']>) => {
+  const saveSyncSettings = async (newSyncSettings: Partial<AppSettings['sync']>) => {
     try {
-      const updatedSync = { ...settings, ...newSyncSettings };
-      setSettings(updatedSync);
+      const updatedSync = { ...syncSettings, ...newSyncSettings };
+      setSyncSettings(updatedSync);
       await settingsService.updateAppSetting('sync', updatedSync);
     } catch (error) {
       Alert.alert('Error', 'Failed to save settings');
     }
   };
 
-  const handleTestConnection = async () => {
-    if (!settings.serverUrl) {
-      Alert.alert('Error', 'Please enter a server URL');
+  const handleToggleCloudMode = async (val: boolean) => {
+    const cc = cloudConfig || (await cloudConfigService.getConfig());
+    if (!val) {
+      const next = await cloudConfigService.setMode('local');
+      setCloudConfig(next);
       return;
     }
 
-    try {
-      setTesting(true);
-      // Use the dedicated health check endpoint
-      const response = await fetch(`${settings.serverUrl}/health`);
-      
-      if (response.ok) {
-        Alert.alert('Success', 'Connection successful!');
-      } else {
-        throw new Error(`Server returned ${response.status}`);
-      }
-    } catch (error: any) {
-      Alert.alert('Connection Failed', error.message || 'Could not connect to server');
-    } finally {
-      setTesting(false);
+    if (!cc.serverUrl) {
+      Alert.alert('提示', '请先配置服务器地址并测试连接');
+      return;
     }
+
+    if (!AuthService.isAuthenticated()) {
+      Alert.alert('需要登录', '请先登录云端账号后再开启云端模式');
+      return;
+    }
+
+    const next = await cloudConfigService.setMode('cloud');
+    setCloudConfig(next);
   };
 
   return (
@@ -80,10 +82,10 @@ const CloudSettingsScreen: React.FC = () => {
           icon="cloud-queue"
           rightElement={
             <Switch
-              value={settings.mode === 'cloud'}
-              onValueChange={(val: boolean) => saveSettings({ mode: val ? 'cloud' : 'local' })}
+              value={cloudConfig?.mode === 'cloud'}
+              onValueChange={handleToggleCloudMode}
               trackColor={{ false: isDark ? '#4a4a4a' : '#e0e0e0', true: theme.colors.primaryContainer }}
-              thumbColor={settings.mode === 'cloud' ? theme.colors.primary : '#f4f3f4'}
+              thumbColor={cloudConfig?.mode === 'cloud' ? theme.colors.primary : '#f4f3f4'}
             />
           }
           showArrow={false}
@@ -92,10 +94,10 @@ const CloudSettingsScreen: React.FC = () => {
       </SettingSection>
       
       <CleanText style={[styles.description, { color: theme.colors.onSurfaceVariant }]}>
-        使用 TechFlow Server 进行云端抓取和解析，提升性能并节省流量
+        使用 ReadFlow Server 进行云端抓取和解析，提升性能并节省流量
       </CleanText>
 
-      {settings.mode === 'cloud' && (
+      {cloudConfig?.mode === 'cloud' && (
         <>
           <SettingSection title="图片处理">
             <SettingItem
@@ -103,10 +105,10 @@ const CloudSettingsScreen: React.FC = () => {
               icon="image"
               rightElement={
                 <Switch
-                  value={settings.imageCompression ?? false}
-                  onValueChange={(val: boolean) => saveSettings({ imageCompression: val })}
+                  value={syncSettings.imageCompression ?? false}
+                  onValueChange={(val: boolean) => saveSyncSettings({ imageCompression: val })}
                   trackColor={{ false: isDark ? '#4a4a4a' : '#e0e0e0', true: theme.colors.primaryContainer }}
-                  thumbColor={settings.imageCompression ?? false ? theme.colors.primary : '#f4f3f4'}
+                  thumbColor={syncSettings.imageCompression ?? false ? theme.colors.primary : '#f4f3f4'}
                 />
               }
               showArrow={false}
@@ -121,29 +123,18 @@ const CloudSettingsScreen: React.FC = () => {
         </>
       )}
 
-      <SettingSection title="服务器配置">
-        <View style={styles.inputContainer}>
-          <CleanInput
-            label="Server URL"
-            value={settings.serverUrl}
-            onChangeText={(text) => saveSettings({ serverUrl: text })}
-            placeholder="http://192.168.1.x:3000"
-            autoCapitalize="none"
-            autoCorrect={false}
-            variant="outlined"
-            containerStyle={{ marginBottom: 0 }}
-          />
-        </View>
-
+      <SettingSection title="服务器">
         <SettingItem
-          label={testing ? "正在连接..." : "测试连接"}
-          icon="network-check"
-          onPress={handleTestConnection}
-          disabled={testing || !settings.serverUrl}
-          isLast
-          rightElement={testing ? <ActivityIndicator size="small" color={theme.colors.primary} /> : undefined}
-          color={!settings.serverUrl ? theme.colors.outline : theme.colors.primary}
+          label={cloudConfig?.serverUrl ? '已连接' : '未连接'}
+          icon={cloudConfig?.serverUrl ? 'cloud-done' : 'cloud-off'}
+          showArrow={false}
         />
+        {!!cloudConfig?.serverUrl && (
+          <View style={styles.kvRow}>
+            <CleanText style={[styles.kvKey, { color: theme.colors.onSurfaceVariant }]}>Server URL</CleanText>
+            <CleanText style={[styles.kvValue, { color: theme.colors.onSurface }]}>{cloudConfig.serverUrl}</CleanText>
+          </View>
+        )}
       </SettingSection>
 
       <View style={styles.infoContainer}>
@@ -169,10 +160,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  inputContainer: {
+  kvRow: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 8,
+  },
+  kvKey: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  kvValue: {
+    fontSize: 14,
   },
   infoContainer: {
     marginTop: 8,

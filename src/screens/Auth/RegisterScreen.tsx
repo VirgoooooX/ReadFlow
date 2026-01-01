@@ -45,6 +45,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const { isLoading: authLoading } = state;
   const [errors, setErrors] = useState<Partial<RegisterForm>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);

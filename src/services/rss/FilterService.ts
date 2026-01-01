@@ -117,6 +117,90 @@ export class FilterService {
       return articles; // Return original list on error
     }
   }
+
+  /**
+   * 导出过滤规则
+   */
+  public async exportRulesForSync(): Promise<any[]> {
+    try {
+      const query = `
+        SELECT f.*, s.url as source_url 
+        FROM filter_rules f
+        LEFT JOIN rss_sources s ON f.source_id = s.id
+      `;
+      const results = await this.databaseService.executeQuery(query);
+      return results.map(row => ({
+        keyword: row.keyword,
+        mode: row.mode,
+        target: row.target,
+        sourceUrl: row.source_url, // Use URL for sync
+        isRegex: row.is_regex,
+        isActive: Boolean(row.is_active),
+      }));
+    } catch (error) {
+      logger.error('Error exporting filter rules:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 导入过滤规则
+   */
+  public async importRulesFromSync(rules: any[]): Promise<void> {
+    try {
+      await this.databaseService.beginTransaction();
+      
+      for (const rule of rules) {
+        // Resolve source ID from URL
+        let sourceId = null;
+        if (rule.sourceUrl) {
+          const sources = await this.databaseService.executeQuery(
+            'SELECT id FROM rss_sources WHERE url = ?', 
+            [rule.sourceUrl]
+          );
+          if (sources.length > 0) {
+            sourceId = sources[0].id;
+          } else {
+            // Source not found locally, maybe skip this rule or add as global?
+            // Let's skip specific rules for missing sources
+            continue; 
+          }
+        }
+
+        // Check existence
+        const query = sourceId 
+          ? 'SELECT id FROM filter_rules WHERE keyword = ? AND source_id = ? AND mode = ?'
+          : 'SELECT id FROM filter_rules WHERE keyword = ? AND source_id IS NULL AND mode = ?';
+        
+        const params = sourceId 
+          ? [rule.keyword, sourceId, rule.mode]
+          : [rule.keyword, rule.mode];
+
+        const existing = await this.databaseService.executeQuery(query, params);
+        
+        if (existing.length === 0) {
+           await this.databaseService.executeInsert(
+             `INSERT INTO filter_rules (keyword, mode, target, source_id, is_regex, is_active, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             [
+               rule.keyword, 
+               rule.mode, 
+               rule.target || 'title_summary', 
+               sourceId, 
+               rule.isRegex ? 1 : 0, 
+               rule.isActive ? 1 : 0,
+               new Date().toISOString()
+             ]
+           );
+        }
+      }
+      
+      await this.databaseService.commitTransaction();
+    } catch (error) {
+      await this.databaseService.rollbackTransaction();
+      logger.error('Error importing filter rules:', error);
+    }
+  }
 }
 
 export const filterService = FilterService.getInstance();

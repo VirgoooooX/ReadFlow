@@ -185,6 +185,7 @@ export interface AppSettings {
     userId?: string;
     lastProfilePushAt?: number;
     lastStateSyncAt?: number;
+    lastVocabSyncAt?: number;
   };
   privacy: {
     analytics: boolean;
@@ -271,6 +272,7 @@ export interface ProxyModeConfig {
   enabled: boolean;           // 是否启用代理模式
   serverUrl: string;          // 服务器地址，如 http://192.168.1.100:8080
   serverPassword: string;     // 部署密码
+  serverToken?: string;       // 服务器验证Token (用于注册和连接验证)
   token?: string;             // 登录后获得的 Token
   userId?: number;            // 用户 ID
   lastSyncTime?: string;      // 最后同步时间

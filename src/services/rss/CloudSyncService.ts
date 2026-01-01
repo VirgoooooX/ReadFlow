@@ -4,6 +4,7 @@ import { DatabaseService } from '../../database/DatabaseService';
 import { SettingsService } from '../SettingsService';
 import { filterService } from './FilterService';
 import AuthService from '../AuthService';
+import { cloudConfigService } from '../CloudConfigService';
 import { logger } from './RSSUtils';
 import cacheEventEmitter from '../CacheEventEmitter';
 
@@ -18,9 +19,8 @@ export class CloudSyncService implements IRSSProvider {
   }
 
   private async getServerUrl(): Promise<string> {
-    const settings = await this.settingsService.getAppSettings();
-    logger.info(`[CloudSync] Current settings: ${JSON.stringify(settings.sync)}`);
-    const url = settings.sync.serverUrl;
+    const cloudConfig = await cloudConfigService.getConfig();
+    const url = cloudConfig.serverUrl;
     if (!url) {
       throw new Error('Server URL not configured');
     }
@@ -34,8 +34,10 @@ export class CloudSyncService implements IRSSProvider {
   }
 
   private async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    const cloudConfig = await cloudConfigService.getConfig();
     const headers = {
       ...this.getAuthHeaders(),
+      ...(cloudConfig.serverAccessKey ? { 'x-server-token': cloudConfig.serverAccessKey, 'x-server-access-key': cloudConfig.serverAccessKey } : {}),
       ...(options.headers || {})
     };
     return fetch(url, { ...options, headers });
@@ -134,9 +136,12 @@ export class CloudSyncService implements IRSSProvider {
 
   private async pushUserAndFeedsIfNeeded(serverUrl: string): Promise<void> {
     try {
-      const appSettings = await this.settingsService.getAppSettings();
-      if (appSettings.sync.mode !== 'cloud') return;
-      if (!appSettings.sync.serverUrl) return;
+      const [appSettings, readingSettings] = await Promise.all([
+        this.settingsService.getAppSettings(),
+        this.settingsService.getReadingSettings(),
+      ]);
+      const cloudConfig = await cloudConfigService.getConfig();
+      if (cloudConfig.mode !== 'cloud') return;
 
       const now = Date.now();
       const last = appSettings.sync.lastProfilePushAt || 0;
@@ -179,7 +184,7 @@ export class CloudSyncService implements IRSSProvider {
           email: authUser?.email,
           registeredAt: authUser?.createdAt,
         },
-        settings: appSettings,
+        settings: { appSettings, readingSettings },
         feeds,
       };
 
@@ -213,14 +218,16 @@ export class CloudSyncService implements IRSSProvider {
    */
   public async syncUserArticleStates(): Promise<void> {
     try {
-      const appSettings = await this.settingsService.getAppSettings();
-      // If not in cloud mode, do nothing (don't throw)
-      if (appSettings.sync.mode !== 'cloud') return;
+      const [appSettings, cloudConfig] = await Promise.all([
+        this.settingsService.getAppSettings(),
+        cloudConfigService.getConfig(),
+      ]);
+      if (cloudConfig.mode !== 'cloud') return;
 
       this.checkAuth();
 
       const userId = appSettings.sync.userId;
-      if (appSettings.sync.mode !== 'cloud' || !appSettings.sync.serverUrl || !userId) {
+      if (!userId) {
         return;
       }
       
@@ -327,7 +334,7 @@ export class CloudSyncService implements IRSSProvider {
   public async validateFeed(url: string): Promise<FeedInfo> {
     try {
       const serverUrl = await this.getServerUrl();
-      // techflow-server 使用 GET /api/rss/validate
+      // readflow-server 使用 GET /api/rss/validate
       const apiUrl = `${serverUrl}/api/rss/validate?url=${encodeURIComponent(url)}`;
 
       const response = await this.authenticatedFetch(apiUrl);
@@ -344,7 +351,7 @@ export class CloudSyncService implements IRSSProvider {
   }
 
   private mapServerArticle(item: any, source: RSSSource): Article {
-    // techflow-server 返回的字段通常是 camelCase
+    // readflow-server 返回的字段通常是 camelCase
     return {
       id: item.id, 
       title: item.title,

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AvatarStorageService from './AvatarStorageService';
 import { logger } from './rss/RSSUtils';
 import { SettingsService } from './SettingsService';
+import { cloudConfigService } from './CloudConfigService';
 
 export interface User {
   id: string;
@@ -33,6 +34,20 @@ export interface AuthResponse {
   message?: string;
 }
 
+interface CloudProfileResponse {
+  ok: boolean;
+  user?: {
+    id: string;
+    username: string;
+    email?: string;
+    registeredAt?: string;
+    lastActive?: string | Date;
+  };
+  settings?: any;
+  feeds?: any[];
+  error?: string;
+}
+
 export class AuthService {
   private static instance: AuthService;
   private currentUser: User | null = null;
@@ -40,7 +55,14 @@ export class AuthService {
   private registeredUsers: Map<string, { user: User; password: string }> = new Map();
   private static readonly REGISTERED_USERS_KEY = 'registered_users';
   private initialized = false;
-  private settingsService = SettingsService.getInstance();
+  private settingsService?: SettingsService;
+
+  private getSettingsService(): SettingsService {
+    if (!this.settingsService) {
+      this.settingsService = SettingsService.getInstance();
+    }
+    return this.settingsService;
+  }
 
   private constructor() {
     // 异步初始化将在getInstance或initialize中调用
@@ -61,11 +83,11 @@ export class AuthService {
         this.registeredUsers = new Map(Object.entries(usersData));
       } else {
         // 初始化默认测试用户
-        this.registeredUsers.set('user@techflow.com', {
+        this.registeredUsers.set('user@readflow.com', {
           user: {
             id: '1',
-            username: 'TechFlow用户',
-            email: 'user@techflow.com',
+            username: 'ReadFlow用户',
+            email: 'user@readflow.com',
             avatar: undefined,
             bio: '热爱技术，喜欢阅读科技文章',
             phone: '',
@@ -110,8 +132,9 @@ export class AuthService {
       // 先初始化用户数据
       await this.initializeData();
 
-      const token = await AsyncStorage.getItem('auth_token');
-      const userStr = await AsyncStorage.getItem('current_user');
+      const cloudConfig = await cloudConfigService.getConfig();
+      const token = cloudConfig.auth.accessToken;
+      const userStr = cloudConfig.auth.user ? JSON.stringify(cloudConfig.auth.user) : null;
 
       if (token && userStr) {
         this.authToken = token;
@@ -125,8 +148,10 @@ export class AuthService {
             const avatarPath = await AvatarStorageService.getAvatarPath(this.currentUser.id);
             if (avatarPath && avatarPath !== this.currentUser.avatar) {
               this.currentUser.avatar = avatarPath;
-              await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
+              await cloudConfigService.updateConfig({ auth: { user: this.currentUser } });
             }
+
+            await cloudConfigService.updateConfig({ auth: { lastValidatedAt: Date.now() } });
           } else {
             await this.logout();
           }
@@ -145,17 +170,20 @@ export class AuthService {
    */
   public async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const settings = await this.settingsService.getAppSettings();
-
-      // If server URL is configured, FORCE cloud login
-      if (settings.sync.serverUrl) {
+      const cloudConfig = await cloudConfigService.getConfig();
+      if (cloudConfig.serverUrl) {
         try {
           const response = await this.performCloudLogin(credentials);
           if (response.success && response.user && response.token) {
             this.currentUser = response.user;
             this.authToken = response.token;
-            await AsyncStorage.setItem('auth_token', response.token);
-            await AsyncStorage.setItem('current_user', JSON.stringify(response.user));
+            await cloudConfigService.updateConfig({
+              auth: {
+                user: response.user,
+                accessToken: response.token,
+                lastValidatedAt: Date.now(),
+              },
+            });
           }
           return response;
         } catch (e) {
@@ -171,13 +199,8 @@ export class AuthService {
         this.currentUser = response.user;
         this.authToken = response.token;
 
-        // 保存到本地存储
-        await AsyncStorage.setItem('auth_token', response.token);
-        await AsyncStorage.setItem('current_user', JSON.stringify(response.user));
-
         // 更新最后登录时间
         this.currentUser.lastLoginAt = new Date().toISOString();
-        await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
       }
 
       return response;
@@ -195,10 +218,8 @@ export class AuthService {
    */
   public async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      const settings = await this.settingsService.getAppSettings();
-
-      // If server URL is configured, FORCE cloud registration
-      if (settings.sync.serverUrl) {
+      const cloudConfig = await cloudConfigService.getConfig();
+      if (cloudConfig.serverUrl) {
         try {
           const response = await this.performCloudRegister(data);
           // Auto login after registration if needed, or just return success
@@ -232,7 +253,7 @@ export class AuthService {
       this.currentUser = null;
       this.authToken = null;
 
-      await AsyncStorage.multiRemove(['auth_token', 'current_user']);
+      await cloudConfigService.clearAuth();
     } catch (error) {
       logger.error('登出失败:', error);
     }
@@ -255,7 +276,7 @@ export class AuthService {
 
       if (response.success && response.user) {
         this.currentUser = response.user;
-        await AsyncStorage.setItem('current_user', JSON.stringify(this.currentUser));
+        await cloudConfigService.updateConfig({ auth: { user: this.currentUser } });
       }
 
       return response;
@@ -298,8 +319,8 @@ export class AuthService {
    */
   private async validateToken(token: string): Promise<boolean> {
     try {
-      const settings = await this.settingsService.getAppSettings();
-      if (settings.sync.serverUrl) {
+      const cloudConfig = await cloudConfigService.getConfig();
+      if (cloudConfig.serverUrl) {
         return await this.performCloudValidate(token);
       }
       return await this.mockValidateToken(token);
@@ -313,18 +334,94 @@ export class AuthService {
   // ========== Cloud API Methods ==========
 
   private async getApiUrl(path: string): Promise<string> {
-    const settings = await this.settingsService.getAppSettings();
-    const baseUrl = settings.sync.serverUrl;
+    const cloudConfig = await cloudConfigService.getConfig();
+    const baseUrl = cloudConfig.serverUrl;
     if (!baseUrl) throw new Error('Server URL not configured');
     return `${baseUrl.replace(/\/$/, '')}${path}`;
+  }
+
+  private async getHeaders(): Promise<HeadersInit> {
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    const cloudConfig = await cloudConfigService.getConfig();
+    if (cloudConfig.serverAccessKey) {
+      headers['x-server-token'] = cloudConfig.serverAccessKey;
+      headers['x-server-access-key'] = cloudConfig.serverAccessKey;
+    }
+    return headers;
+  }
+
+  private async getAuthorizedHeaders(token: string): Promise<HeadersInit> {
+    const base = await this.getHeaders();
+    return {
+      ...base,
+      Authorization: `Bearer ${token}`,
+    };
+  }
+
+  private async pushCloudSettingsFromLocal(token: string, userId: string, settings: any): Promise<void> {
+    const url = await this.getApiUrl('/api/rss/clientSync');
+    const headers = await this.getAuthorizedHeaders(token);
+    const payload = {
+      user: {
+        id: userId,
+        username: this.currentUser?.username,
+        email: this.currentUser?.email,
+        registeredAt: this.currentUser?.createdAt,
+      },
+      settings,
+      feeds: [],
+    };
+    await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+  }
+
+  private async pullCloudSettingsToLocal(token: string, userId: string): Promise<void> {
+    const url = await this.getApiUrl('/api/rss/profile');
+    const headers = await this.getAuthorizedHeaders(token);
+    const res = await fetch(url, { method: 'GET', headers });
+    const data = (await res.json()) as CloudProfileResponse;
+    if (!res.ok || !data?.ok) {
+      return;
+    }
+
+    const remoteSettings = data.settings;
+    const local = await this.getSettingsService().getAppSettings();
+    const remoteAppSettings =
+      remoteSettings && typeof remoteSettings === 'object' && remoteSettings.appSettings && typeof remoteSettings.appSettings === 'object'
+        ? remoteSettings.appSettings
+        : remoteSettings;
+    const remoteReadingSettings =
+      remoteSettings && typeof remoteSettings === 'object' && remoteSettings.readingSettings && typeof remoteSettings.readingSettings === 'object'
+        ? remoteSettings.readingSettings
+        : null;
+
+    if (remoteReadingSettings) {
+      try {
+        await this.getSettingsService().saveReadingSettings(remoteReadingSettings);
+      } catch {
+      }
+    }
+
+    const baseMerged = remoteAppSettings && typeof remoteAppSettings === 'object' ? { ...local, ...remoteAppSettings } : local;
+    const merged = {
+      ...baseMerged,
+      sync: {
+        ...local.sync,
+        ...((remoteAppSettings && typeof remoteAppSettings === 'object' && remoteAppSettings.sync) ? remoteAppSettings.sync : {}),
+        userId,
+      },
+    };
+    await this.getSettingsService().saveAppSettings(merged);
+    const readingSettings = await this.getSettingsService().getReadingSettings();
+    await this.pushCloudSettingsFromLocal(token, userId, { appSettings: merged, readingSettings });
   }
 
   private async performCloudLogin(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       const url = await this.getApiUrl('/api/auth/login');
+      const headers = await this.getHeaders();
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify(credentials)
       });
       const data = await res.json();
@@ -340,9 +437,10 @@ export class AuthService {
   private async performCloudRegister(data: RegisterData): Promise<AuthResponse> {
     try {
       const url = await this.getApiUrl('/api/auth/register');
+      const headers = await this.getHeaders();
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify(data)
       });
       const resData = await res.json();
@@ -358,9 +456,10 @@ export class AuthService {
   private async performCloudValidate(token: string): Promise<boolean> {
     try {
       const url = await this.getApiUrl('/api/auth/validate');
+      const headers = await this.getHeaders();
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({ token })
       });
       if (!res.ok) return false;

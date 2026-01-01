@@ -44,8 +44,8 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   
   // 使用用户上下文数据
   const [profile, setProfile] = useState<UserProfile>({
-    name: user?.username || 'TechFlow用户',
-    email: user?.email || 'user@techflow.com',
+    name: user?.username || 'ReadFlow用户',
+    email: user?.email || 'user@readflow.com',
     bio: user?.bio || '热爱技术，喜欢阅读科技文章',
     avatar: user?.avatar || null,
     phone: user?.phone || '',

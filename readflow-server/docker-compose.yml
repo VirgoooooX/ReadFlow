@@ -1,0 +1,39 @@
+services:
+  readflow-server:
+    build: .
+    container_name: readflow-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # 持久化数据
+      - ./data:/app/data
+      # 缓存目录
+      - ./public/cache:/app/public/cache
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - SERVER_TOKEN=admin # (可选) 设置此Token后，客户端连接和注册时必须提供匹配的Token
+      - ADMIN_PASSWORD=admin # 请在部署时修改此默认密码
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/readflow?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: readflow-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: readflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d readflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data

@@ -63,6 +63,7 @@ const DEFAULT_SETTINGS: AppSettingsState = {
     enabled: false,
     serverUrl: '',
     serverPassword: '',
+    serverToken: '',
   },
   llmConfig: {
     provider: 'ollama',
@@ -80,6 +81,15 @@ export const AppSettingsProvider: React.FC<AppSettingsProviderProps> = ({ childr
   // 初始化加载所有设置
   useEffect(() => {
     loadAllSettings();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      if (eventData.type === 'settingsUpdated') {
+        loadAllSettings();
+      }
+    });
+    return unsubscribe;
   }, []);
 
   /**
@@ -101,6 +111,7 @@ export const AppSettingsProvider: React.FC<AppSettingsProviderProps> = ({ childr
           enabled: proxyConfig?.enabled ?? DEFAULT_SETTINGS.proxyMode.enabled,
           serverUrl: proxyConfig?.serverUrl ?? DEFAULT_SETTINGS.proxyMode.serverUrl,
           serverPassword: proxyConfig?.serverPassword ?? DEFAULT_SETTINGS.proxyMode.serverPassword,
+          serverToken: proxyConfig?.serverToken ?? DEFAULT_SETTINGS.proxyMode.serverToken,
           token: proxyConfig?.token,
           userId: proxyConfig?.userId,
         },
@@ -140,7 +151,7 @@ export const AppSettingsProvider: React.FC<AppSettingsProviderProps> = ({ childr
       console.log('[AppSettings] 代理模式配置已更新:', newConfig);
       
       // 触发事件通知其他组件
-      cacheEventEmitter.emit('updateRSSStats');
+      cacheEventEmitter.emit({ type: 'updateRSSStats' });
     } catch (error) {
       console.error('[AppSettings] 更新代理模式失败:', error);
       throw error;

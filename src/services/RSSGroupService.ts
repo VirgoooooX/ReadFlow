@@ -39,6 +39,8 @@ export class RSSGroupService {
       ]
     );
 
+    this.triggerSync();
+
     return {
       id: result.insertId,
       ...group,
@@ -80,6 +82,7 @@ export class RSSGroupService {
       `UPDATE rss_groups SET ${fields.join(', ')} WHERE id = ?`,
       values
     );
+    this.triggerSync();
   }
 
   /**
@@ -109,6 +112,7 @@ export class RSSGroupService {
       'DELETE FROM rss_groups WHERE id = ?',
       [groupId]
     );
+    this.triggerSync();
   }
 
   /**
@@ -182,6 +186,7 @@ export class RSSGroupService {
       }
       
       await this.dbService.commitTransaction();
+      this.triggerSync();
     } catch (error) {
       await this.dbService.rollbackTransaction();
       throw error;
@@ -203,6 +208,7 @@ export class RSSGroupService {
       `UPDATE rss_sources SET group_id = ?, updated_at = ? WHERE id IN (${placeholders})`,
       [targetGroupId, now, ...sourceIds]
     );
+    this.triggerSync();
   }
 
   /**
@@ -373,6 +379,82 @@ export class RSSGroupService {
     
     logger.info(`✅ [分组迁移] 完成！创建 ${createdCount} 个分组，关联 ${mappedCount} 个源`);
     return { created: createdCount, mapped: mappedCount };
+  }
+
+  /**
+   * 导出分组用于同步
+   */
+  async exportGroupsForSync(): Promise<any[]> {
+    try {
+      const query = 'SELECT name, icon, color, sort_order FROM rss_groups ORDER BY sort_order ASC';
+      const rows: any[] = await this.dbService.executeQuery(query);
+      return rows.map(row => ({
+        name: row.name,
+        icon: row.icon,
+        color: row.color,
+        sortOrder: row.sort_order,
+      }));
+    } catch (error) {
+      logger.error('Error exporting groups for sync:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 导入同步的分组
+   */
+  async importGroupsFromSync(groups: any[]): Promise<void> {
+    try {
+      await this.dbService.beginTransaction();
+
+      for (const group of groups) {
+        // 检查是否存在 (by Name)
+        const existing = await this.dbService.executeQuery(
+          'SELECT id FROM rss_groups WHERE name = ?',
+          [group.name]
+        );
+
+        if (existing.length > 0) {
+          // Update
+          const id = existing[0].id;
+          await this.dbService.executeStatement(
+            'UPDATE rss_groups SET icon = ?, color = ?, sort_order = ?, updated_at = ? WHERE id = ?',
+            [group.icon || null, group.color || null, group.sortOrder, Date.now(), id]
+          );
+        } else {
+          // Insert
+          await this.createGroup({
+            name: group.name,
+            icon: group.icon,
+            color: group.color,
+            sortOrder: group.sortOrder,
+          });
+        }
+      }
+
+      await this.dbService.commitTransaction();
+    } catch (error) {
+      await this.dbService.rollbackTransaction();
+      logger.error('Error importing groups from sync:', error);
+      throw error;
+    }
+  }
+
+  private syncTimer: any = null;
+
+  private triggerSync() {
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(async () => {
+      this.syncTimer = null;
+      try {
+        const { configSyncService } = require('./ConfigSyncService');
+        if (configSyncService) {
+          await configSyncService.syncConfig('push');
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }, 2000);
   }
 
   /**

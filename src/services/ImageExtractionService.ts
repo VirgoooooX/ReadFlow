@@ -308,7 +308,7 @@ export class ImageExtractionService {
         method: 'HEAD',
         signal: controller.signal,
         headers: {
-          'User-Agent': 'TechFlow Mobile App/1.0'
+          'User-Agent': 'ReadFlow Mobile App/1.0'
         }
       });
       

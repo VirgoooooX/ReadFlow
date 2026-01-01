@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
@@ -32,7 +33,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const { login, state } = useUser();
   const styles = createStyles(isDark, theme);
-  
+
   const [form, setForm] = useState<LoginForm>({
     email: '',
     password: '',
@@ -69,6 +70,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     
     if (!response.success) {
       Alert.alert('登录失败', response.message || '登录失败，请重试');
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
     }
   };
 
@@ -206,6 +211,68 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+  serverSettingsContainer: {
+    marginTop: 32,
+    width: '100%',
+  },
+  serverSettingsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  serverSettingsToggleText: {
+    fontSize: 14,
+    color: theme?.colors?.primary,
+    marginHorizontal: 8,
+    fontWeight: '500',
+  },
+  serverSettingsContent: {
+    marginTop: 12,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F5F5F5',
+    borderRadius: 12,
+    padding: 16,
+  },
+  serverSettingsHint: {
+    fontSize: 12,
+    color: theme?.colors?.onSurfaceVariant,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  serverInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  serverInputContainer: {
+    flex: 1,
+  },
+  serverInput: {
+    height: 40,
+    backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0',
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: theme?.colors?.onSurface,
+  },
+  testButton: {
+    height: 40,
+    paddingHorizontal: 16,
+    backgroundColor: theme?.colors?.primary,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  testButtonDisabled: {
+    opacity: 0.6,
+  },
+  testButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   container: {
     flex: 1,
     backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
@@ -223,7 +290,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    ...StyleUtils.createCardStyle(isDark, theme),
+    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
     justifyContent: 'center' as any,
     alignItems: 'center',
     marginBottom: 16,

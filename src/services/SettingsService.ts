@@ -2,10 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ReadingSettings, AppSettings, AppError, ProxyModeConfig, ProxyServer, ProxyServersConfig, RSSStartupSettings } from '../types';
 import { DatabaseService } from '../database/DatabaseService';
 import { logger } from './rss/RSSUtils';
+import { cloudConfigService } from './CloudConfigService';
+import cacheEventEmitter from './CacheEventEmitter';
+import { themeStorageService } from './ThemeStorageService';
 
 export class SettingsService {
   private static instance: SettingsService;
   private databaseService: DatabaseService;
+  private cloudSettingsSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly STORAGE_KEYS = {
     READING_SETTINGS: 'reading_settings',
     APP_SETTINGS: 'app_settings',
@@ -57,6 +61,7 @@ export class SettingsService {
         SettingsService.STORAGE_KEYS.READING_SETTINGS,
         JSON.stringify(settings)
       );
+      this.scheduleCloudSettingsSync();
     } catch (error) {
       logger.error('Error saving reading settings:', error);
       throw new AppError({
@@ -96,6 +101,7 @@ export class SettingsService {
         SettingsService.STORAGE_KEYS.APP_SETTINGS,
         JSON.stringify(settings)
       );
+      this.scheduleCloudSettingsSync();
     } catch (error) {
       logger.error('Error saving app settings:', error);
       throw new AppError({
@@ -156,6 +162,26 @@ export class SettingsService {
         details: error,
         timestamp: new Date(),
       });
+    }
+  }
+
+  private scheduleCloudSettingsSync(): void {
+    if (this.cloudSettingsSyncTimer) {
+      clearTimeout(this.cloudSettingsSyncTimer);
+    }
+    this.cloudSettingsSyncTimer = setTimeout(() => {
+      this.cloudSettingsSyncTimer = null;
+      this.pushCloudSettingsToServer().catch(() => {
+      });
+    }, 1500);
+  }
+
+  private async pushCloudSettingsToServer(): Promise<void> {
+    try {
+      const { configSyncService } = require('./ConfigSyncService');
+      await configSyncService.syncConfig('push');
+    } catch (error) {
+      logger.warn('Failed to auto-push settings:', error);
     }
   }
 
@@ -326,15 +352,19 @@ export class SettingsService {
     rssSettings: any;
     llmSettings: any;
     themeSettings: any;
+    rssStartupSettings: any;
+    proxyServersConfig: any;
     exportedAt: string;
   }> {
     try {
-      const [readingSettings, appSettings, rssSettings, llmSettings, themeSettings] = await Promise.all([
+      const [readingSettings, appSettings, rssSettings, llmSettings, themeSettings, rssStartupSettings, proxyServersConfig] = await Promise.all([
         this.getReadingSettings(),
         this.getAppSettings(),
         this.getRSSSettings(),
         this.getLLMSettings(),
-        this.getThemeSettings(),
+        themeStorageService.getThemeSettings(),
+        this.getRSSStartupSettings(),
+        this.getProxyServersConfig(),
       ]);
 
       return {
@@ -343,6 +373,8 @@ export class SettingsService {
         rssSettings,
         llmSettings,
         themeSettings,
+        rssStartupSettings,
+        proxyServersConfig,
         exportedAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -403,6 +435,11 @@ export class SettingsService {
   public async importSettings(data: {
     readingSettings?: ReadingSettings;
     appSettings?: AppSettings;
+    rssSettings?: any;
+    llmSettings?: any;
+    themeSettings?: any;
+    rssStartupSettings?: any;
+    proxyServersConfig?: any;
   }): Promise<void> {
     try {
       if (data.readingSettings) {
@@ -412,6 +449,31 @@ export class SettingsService {
       if (data.appSettings) {
         await this.saveAppSettings(data.appSettings);
       }
+
+      if (data.rssSettings) {
+        await this.saveRSSSettings(data.rssSettings);
+      }
+
+      if (data.llmSettings) {
+        await this.saveLLMSettings(data.llmSettings);
+      }
+
+      if (data.themeSettings) {
+        const raw = data.themeSettings;
+        const mode = raw?.mode || raw?.themeMode || 'system';
+        const preset = raw?.preset || raw?.currentPreset || 'default';
+        const customColors = raw?.customColors || raw?.customConfig || undefined;
+        await themeStorageService.setThemeSettings({ mode, preset, customColors });
+      }
+
+      if (data.rssStartupSettings) {
+        await this.saveRSSStartupSettings(data.rssStartupSettings);
+      }
+
+      if (data.proxyServersConfig) {
+        await this.saveProxyServersConfig(data.proxyServersConfig);
+      }
+      cacheEventEmitter.settingsUpdated('settingsImport');
     } catch (error) {
       logger.error('Error importing settings:', error);
       throw new AppError({
@@ -791,19 +853,47 @@ export class SettingsService {
     try {
       const configStr = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.PROXY_MODE_CONFIG);
       if (!configStr) {
-        return { 
-          enabled: false, 
-          serverUrl: '', 
-          serverPassword: '' 
+        try {
+          const appSettings = await this.getAppSettings();
+          const url = appSettings?.sync?.serverUrl ?? '';
+          if (url) {
+            return {
+              enabled: appSettings?.sync?.mode === 'cloud',
+              serverUrl: url,
+              serverPassword: '',
+              serverToken: '',
+            };
+          }
+        } catch {
+        }
+
+        return {
+          enabled: false,
+          serverUrl: '',
+          serverPassword: '',
+          serverToken: '',
         };
       }
-      return JSON.parse(configStr);
+      const raw = JSON.parse(configStr) as any;
+      const serverPassword = raw?.serverPassword ?? '';
+      const serverToken = raw?.serverToken ?? raw?.serverAccessKey ?? (raw?.serverPassword ?? '');
+
+      return {
+        enabled: !!raw?.enabled,
+        serverUrl: raw?.serverUrl ?? '',
+        serverPassword,
+        serverToken,
+        token: raw?.token,
+        userId: raw?.userId,
+        lastSyncTime: raw?.lastSyncTime,
+      };
     } catch (error) {
       logger.error('Error getting proxy mode config:', error);
       return { 
         enabled: false, 
         serverUrl: '', 
-        serverPassword: '' 
+        serverPassword: '',
+        serverToken: ''
       };
     }
   }
@@ -825,70 +915,6 @@ export class SettingsService {
         details: error,
         timestamp: new Date(),
       });
-    }
-  }
-
-  /**
-   * 登录代理服务器
-   */
-  public async loginToProxyServer(
-    serverUrl: string,
-    serverPassword: string,
-    username: string
-  ): Promise<{ success: boolean; message?: string; token?: string; userId?: number }> {
-    try {
-      logger.info(`[Proxy Login] 尝试连接: ${serverUrl}/api/auth/login`);
-      logger.info(`[Proxy Login] 用户名: ${username}`);
-      logger.info(`[Proxy Login] 发送数据: {
-        username: "${username}",
-        password: "${serverPassword}"
-      }`);
-      
-      const response = await fetch(`${serverUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: username,
-          password: serverPassword,
-        }),
-        timeout: 10000,
-      } as any);
-
-      logger.info(`[Proxy Login] 响应状态: ${response.status}`);
-
-      if (!response.ok) {
-        logger.error(`[Proxy Login] HTTP ${response.status} 错误`);
-        const errorText = await response.text();
-        logger.error(`[Proxy Login] 错误响应: ${errorText}`);
-        return { success: false, message: `HTTP ${response.status}: ${errorText || '认证失败'}` };
-      }
-
-      const data = await response.json();
-      logger.info(`[Proxy Login] 响应数据:`, { success: data.success, user_id: data.user_id });
-
-      if (data.success) {
-        // 保存配置
-        const config: ProxyModeConfig = {
-          enabled: true,
-          serverUrl,
-          serverPassword,
-          token: data.token,
-          userId: data.user_id,
-        };
-        
-        await this.saveProxyModeConfig(config);
-        logger.info('[Proxy Login] 登录成功，Token 已保存');
-        
-
-        return { success: true, token: data.token, userId: data.user_id };
-      } else {
-        logger.error('[Proxy Login] 服务端返回失败:', data.message);
-        return { success: false, message: data.message || '认证失败' };
-      }
-    } catch (error) {
-      logger.error('[Proxy Login] 错误:', error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      return { success: false, message: `连接失败: ${errorMsg}` };
     }
   }
 

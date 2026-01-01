@@ -3,6 +3,7 @@ import { VocabularyEntry, WordDefinition, AppError, ProxyModeConfig } from '../t
 import { DictionaryService } from './DictionaryService';
 import { SettingsService } from './SettingsService';
 import { logger } from './rss/RSSUtils';
+import { cloudConfigService } from './CloudConfigService';
 
 export class VocabularyService {
   private static instance: VocabularyService;

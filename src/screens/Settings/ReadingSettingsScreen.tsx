@@ -36,19 +36,15 @@ const ReadingSettingsScreen: React.FC = () => {
   const [autoMarkReadOnScroll, setAutoMarkReadOnScroll] = useState(false);
   const [showFontDropdown, setShowFontDropdown] = useState(false);
 
-  // 从设置中初始化本地状态（仅在首次加载时）
-  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    if (settings && !initialized) {
-      setFontSize(settings.fontSize);
-      setFontFamily(settings.fontFamily);
-      setLineHeight(settings.lineHeight);
-      setShowAllTab(settings.showAllTab ?? true);
-      setAutoRefreshInterval(settings.autoRefreshInterval ?? 10);
-      setAutoMarkReadOnScroll(settings.autoMarkReadOnScroll ?? false);
-      setInitialized(true);
-    }
-  }, [settings, initialized]);
+    if (!settings) return;
+    setFontSize(settings.fontSize);
+    setFontFamily(settings.fontFamily);
+    setLineHeight(settings.lineHeight);
+    setShowAllTab(settings.showAllTab ?? true);
+    setAutoRefreshInterval(settings.autoRefreshInterval ?? 10);
+    setAutoMarkReadOnScroll(settings.autoMarkReadOnScroll ?? false);
+  }, [settings]);
 
   // 清理定时器 - 不再需要，因为移除了防抖
   // useEffect(() => {}, []);

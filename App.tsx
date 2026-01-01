@@ -33,6 +33,7 @@ import { VocabularyService } from './src/services/VocabularyService';
 import { SettingsService } from './src/services/SettingsService';
 import { RSSService } from './src/services/rss';
 import { logger } from './src/services/rss/RSSUtils';
+import { configSyncService } from './src/services/ConfigSyncService';
 
 // 阻止原生启动屏自动消失
 SplashScreen.preventAutoHideAsync();
@@ -70,6 +71,16 @@ function App(): React.JSX.Element {
 
         logger.info('✅ 核心服务初始化完成');
         
+        // Cloud Config Sync (Cold Start)
+        try {
+          logger.info('☁️ 检查云端配置同步...');
+          configSyncService.syncConfig('pull').catch(err => {
+            logger.warn('⚠️ 云端配置同步失败:', err);
+          });
+        } catch (e) {
+          logger.warn('⚠️ 云端配置同步初始化失败:', e);
+        }
+
         // 【暂时禁用】如果启用了代理模式，尝试同步单词本和文章
         // 保留代码逻辑，但暂不自动调用，等后续手动触发
         // try {

@@ -1,4 +1,4 @@
-# 📚 ReadFlow (TechFlow Mobile)
+# 📚 ReadFlow
 
 > **极简主义、智能驱动的深度阅读生态系统**
 >
@@ -110,7 +110,7 @@
 *   Expo CLI: `npm install -g expo-cli`
 *   模拟器 (iOS Simulator / Android Emulator) 或 真机
 
-### 2. 启动服务端 (TechFlow Server)
+### 2. 启动服务端 (ReadFlow Server)
 
 我们提供了两种服务端模式，可根据需求选择：
 
@@ -120,7 +120,7 @@
 **使用 Docker 部署 (推荐):**
 
 ```bash
-cd techflow-server
+cd readflow-server
 
 # 启动服务
 docker-compose up -d
@@ -134,7 +134,7 @@ docker-compose up -d
 
 ```bash
 # 进入服务端目录
-cd techflow-server
+cd readflow-server
 
 # 安装依赖
 npm install
@@ -161,7 +161,7 @@ docker-compose up -d
 *   **特点**: 内存占用极低 (<10MB)，响应速度极快。
 *   **配置**: 在 App 中开启“代理模式”并填入此地址即可。
 
-### 3. 启动客户端 (TechFlow Mobile)
+### 3. 启动客户端 (ReadFlow Mobile)
 
 ```bash
 # 回到项目根目录
@@ -192,7 +192,7 @@ npx expo start --clear
 ## 📂 项目结构
 
 ```
-TechFlowMobile/
+ReadFlow/
 ├── src/                    # 📱 客户端源码
 │   ├── components/         # UI 组件
 │   ├── contexts/           # 全局状态 (Theme, Settings)
@@ -203,7 +203,7 @@ TechFlowMobile/
 │   ├── store/              # Redux Store
 │   └── theme/              # 主题配置
 │
-├── techflow-server/        # ☁️ 服务端源码
+├── readflow-server/        # ☁️ 服务端源码
 │   ├── public/             # 静态资源 (Admin UI)
 │   ├── src/
 │   │   ├── routes/         # API 路由

@@ -48,7 +48,8 @@ import AboutScreen from '../screens/Settings/AboutScreen';
 import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
 import CustomColorScreen from '../screens/Settings/CustomColorScreen';
 import RSSStartupSettingsScreen from '../screens/Settings/RSSStartupSettingsScreen';
-import CloudSettingsScreen from '../screens/Settings/CloudSettingsScreen';
+import { CloudSyncScreen } from '../screens/Settings/CloudSyncScreen';
+import { CloudConnectScreen } from '../screens/Settings/CloudConnectScreen';
 
 // 导入类型定义
 export type RootStackParamList = {
@@ -579,7 +580,21 @@ function UserStackNavigator() {
             title="云端同步"
             showBackButton={true}
           >
-            <CloudSettingsScreen {...props} />
+            <CloudSyncScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
+        name="CloudConnect"
+        options={{ title: '连接云端服务器' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="连接云端服务器"
+            showBackButton={true}
+          >
+            <CloudConnectScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
@@ -744,11 +759,12 @@ function RootNavigator() {
         ...getCommonScreenOptions(theme, isDark),
       }}
     >
-      {state.isAuthenticated ? (
-        <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
-      ) : (
-        <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-      )}
+      <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
+      <RootStack.Screen
+        name="Auth"
+        component={AuthStackNavigator}
+        options={{ presentation: 'modal' as any }}
+      />
       <RootStack.Screen
         name="ArticleDetail"
         component={ArticleDetailScreen}

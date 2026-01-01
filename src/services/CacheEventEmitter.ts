@@ -22,6 +22,7 @@ export type CacheEventType =
   | 'clearArticles' 
   | 'clearSourceArticles'
   | 'updateRSSStats'
+  | 'settingsUpdated'
   | 'refreshSource'
   | 'refreshSources'
   | 'refreshAllSources'
@@ -129,6 +130,10 @@ class CacheEventEmitter {
     this.emit({ type: 'updateRSSStats' });
   }
 
+  settingsUpdated(reason?: string): void {
+    this.emit({ type: 'settingsUpdated', reason });
+  }
+
   /**
    * 通知单个源刷新完成
    * @param sourceId 源ID
@@ -187,4 +192,3 @@ class CacheEventEmitter {
 }
 
 export default CacheEventEmitter.getInstance();
-

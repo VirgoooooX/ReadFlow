@@ -11,6 +11,7 @@ import { proxyRSSService } from './ProxyRSSService';
 import { cloudSyncService } from './CloudSyncService';
 import { logger } from './RSSUtils';
 import { InteractionManager } from 'react-native';
+import { cloudConfigService } from '../CloudConfigService';
 
 export class RSSService {
   private static instance: RSSService;
@@ -112,6 +113,7 @@ export class RSSService {
         }
       }
 
+      this.triggerSync();
       return newSource;
     } catch (error) {
       logger.error('Error adding RSS source:', error);
@@ -188,6 +190,7 @@ export class RSSService {
           [item.sortOrder, item.id]
         );
       }
+      this.triggerSync();
     } catch (error) {
       logger.error('Error updating RSS sources order:', error);
       throw error;
@@ -247,6 +250,7 @@ export class RSSService {
       
       const sql = `UPDATE rss_sources SET ${setClause.join(', ')} WHERE id = ?`;
       await this.databaseService.executeStatement(sql, values);
+      this.triggerSync();
     } catch (error) {
       logger.error('Error updating RSS source:', error);
       throw new AppError({
@@ -291,6 +295,7 @@ export class RSSService {
         'DELETE FROM rss_sources WHERE id = ?',
         [id]
       );
+      this.triggerSync();
     } catch (error) {
       logger.error('Error deleting RSS source:', error);
       throw new AppError({
@@ -312,11 +317,13 @@ export class RSSService {
     source: RSSSource,
     options: { mode?: 'sync' | 'refresh' } = {}
   ): Promise<Article[]> {
-    // 检查全局同步设置
-    const appSettings = await SettingsService.getInstance().getAppSettings();
-    logger.info(`[fetchArticlesFromSource] Checking sync mode. Enabled: ${appSettings.sync.mode === 'cloud'}, URL: ${appSettings.sync.serverUrl}`);
+    const [appSettings, cloudConfig] = await Promise.all([
+      SettingsService.getInstance().getAppSettings(),
+      cloudConfigService.getConfig(),
+    ]);
+    logger.info(`[fetchArticlesFromSource] Checking sync mode. Enabled: ${cloudConfig.mode === 'cloud'}, URL: ${cloudConfig.serverUrl}`);
     
-    if (appSettings.sync.mode === 'cloud' && appSettings.sync.serverUrl) {
+    if (cloudConfig.mode === 'cloud' && cloudConfig.serverUrl) {
       logger.info(`[fetchArticlesFromSource] ☁️ 云端模式: ${source.name} (Trigger: ${options.mode === 'refresh'})`);
       try {
         // If mode is 'refresh' (manual pull), trigger server refresh
@@ -370,8 +377,11 @@ export class RSSService {
     }
 
     // 检查全局同步设置
-    const appSettings = await SettingsService.getInstance().getAppSettings();
-    const isCloudMode = appSettings.sync.mode === 'cloud' && !!appSettings.sync.serverUrl;
+    const [appSettings, cloudConfig] = await Promise.all([
+      SettingsService.getInstance().getAppSettings(),
+      cloudConfigService.getConfig(),
+    ]);
+    const isCloudMode = cloudConfig.mode === 'cloud' && !!cloudConfig.serverUrl;
 
     if (isCloudMode) {
       logger.info(`[RefreshAllSources] ☁️ 全局云端模式开启，所有源走云端同步`);
@@ -636,6 +646,119 @@ export class RSSService {
     language?: string;
   }> {
     return await localRSSService.validateRSSFeed(url);
+  }
+
+  /**
+   * 导出源用于同步（包含分组名称）
+   */
+  public async exportSourcesForSync(): Promise<any[]> {
+    try {
+      const query = `
+        SELECT s.*, g.name as group_name 
+        FROM rss_sources s
+        LEFT JOIN rss_groups g ON s.group_id = g.id
+        ORDER BY s.sort_order ASC
+      `;
+      const results = await this.databaseService.executeQuery(query);
+      return results.map(row => ({
+        url: row.url,
+        name: row.title,
+        description: row.description,
+        category: row.category,
+        contentType: row.content_type,
+        sourceMode: row.source_mode,
+        isActive: Boolean(row.is_active),
+        maxArticles: row.max_articles,
+        groupName: row.group_name,
+        sortOrder: row.sort_order,
+        updateFrequency: row.update_frequency,
+      }));
+    } catch (error) {
+      logger.error('Error exporting sources for sync:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 导入同步的源
+   */
+  public async importSourcesFromSync(sources: any[]): Promise<void> {
+    try {
+      await this.databaseService.beginTransaction();
+
+      // 获取所有分组映射 (name -> id)
+      const groups = await this.databaseService.executeQuery('SELECT id, name FROM rss_groups');
+      const groupMap = new Map(groups.map((g: any) => [g.name, g.id]));
+
+      for (const source of sources) {
+        // 解析 Group ID
+        let groupId = null;
+        if (source.groupName && groupMap.has(source.groupName)) {
+          groupId = groupMap.get(source.groupName);
+        }
+
+        // 检查是否存在 (by URL)
+        const existing = await this.databaseService.executeQuery(
+          'SELECT id FROM rss_sources WHERE url = ?',
+          [source.url]
+        );
+
+        if (existing.length > 0) {
+          // Update
+          const id = existing[0].id;
+          await this.databaseService.executeStatement(
+            `UPDATE rss_sources SET 
+              title = ?, description = ?, category = ?, content_type = ?, 
+              source_mode = ?, is_active = ?, max_articles = ?, 
+              group_id = ?, sort_order = ?, update_frequency = ?
+             WHERE id = ?`,
+            [
+              source.name, source.description, source.category, source.contentType,
+              source.sourceMode, source.isActive ? 1 : 0, source.maxArticles,
+              groupId, source.sortOrder, source.updateFrequency,
+              id
+            ]
+          );
+        } else {
+          // Insert
+          await this.databaseService.executeStatement(
+            `INSERT INTO rss_sources 
+              (url, title, description, category, content_type, source_mode, is_active, max_articles, group_id, sort_order, update_frequency, last_updated)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              source.url, source.name, source.description, source.category, 
+              source.contentType, source.sourceMode, source.isActive ? 1 : 0, 
+              source.maxArticles, groupId, source.sortOrder, source.updateFrequency,
+              new Date().toISOString()
+            ]
+          );
+        }
+      }
+
+      await this.databaseService.commitTransaction();
+    } catch (error) {
+      await this.databaseService.rollbackTransaction();
+      logger.error('Error importing sources from sync:', error);
+      throw error;
+    }
+  }
+
+  private syncTimer: any = null;
+
+  private triggerSync() {
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    this.syncTimer = setTimeout(async () => {
+      this.syncTimer = null;
+      try {
+        // Use require to avoid circular dependency
+        const { configSyncService } = require('../ConfigSyncService');
+        if (configSyncService) {
+          await configSyncService.syncConfig('push');
+        }
+      } catch (e) {
+        // Ignore errors during sync trigger
+      }
+    }, 2000);
   }
 
   // =================== 私有方法 ===================

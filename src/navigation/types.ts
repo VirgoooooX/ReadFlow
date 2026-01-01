@@ -85,6 +85,7 @@ export type UserStackParamList = {
   RSSStartupSettings: undefined; // RSS启动刷新设置
   RSSRefreshSettings: undefined;
   CloudSettings: undefined; // 云端同步设置
+  CloudConnect: undefined; // 连接云端服务器
   FilterManagement: undefined;  // 过滤规则管理
   FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器
 };

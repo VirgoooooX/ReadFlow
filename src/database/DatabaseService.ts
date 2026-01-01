@@ -9,9 +9,9 @@ export class DatabaseService {
   private initPromise: Promise<void> | null = null;
 
   private readonly config: DatabaseConfig = {
-    name: 'techflow.db',
+    name: 'readflow.db',
     version: '1.0',
-    displayName: 'TechFlow Database',
+    displayName: 'ReadFlow Database',
     size: 50 * 1024 * 1024, // 50MB
   };
 

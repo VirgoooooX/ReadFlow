@@ -17,6 +17,7 @@ import type { SettingsStackParamList } from '../../navigation/AppNavigator';
 import BrandIcon from '../../components/BrandIcon';
 import { SettingsService } from '../../services/SettingsService';
 import { translationService } from '../../services/TranslationService';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 
 type NavigationProp = NativeStackNavigationProp<SettingsStackParamList, 'LLMSettings'>;
 
@@ -57,6 +58,15 @@ const LLMSettingsScreen: React.FC = () => {
   useEffect(() => {
     loadSettings();
     loadUsageStats();
+  }, []);
+  
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      if (eventData.type === 'settingsUpdated') {
+        loadSettings();
+      }
+    });
+    return unsubscribe;
   }, []);
 
   const loadSettings = async () => {

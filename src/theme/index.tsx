@@ -5,6 +5,7 @@ import { spacing, componentSpacing, layoutSpacing, borderRadius, elevation, size
 import { withAlpha, getContrastColor } from '../utils/colorUtils';
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { themeStorageService, type ThemeSettings } from '../services/ThemeStorageService';
+import cacheEventEmitter from '../services/CacheEventEmitter';
 
 // 主题接口定义
 export interface Theme {
@@ -106,6 +107,19 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     };
 
     loadThemeSettings();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      if (eventData.type !== 'settingsUpdated') return;
+      themeStorageService.getThemeSettings().then((settings) => {
+        setThemeModeState(settings.mode || 'system');
+        setCurrentPresetState(settings.preset || 'default');
+        setCustomConfigState(settings.customColors || undefined);
+      }).catch(() => {
+      });
+    });
+    return unsubscribe;
   }, []);
   
   // 【优化】使用 useMemo 计算 isDark，避免重复计算

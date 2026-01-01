@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { settingsService } from '../services/SettingsService';
 import { ReadingSettings } from '../types';
 import { getPlatformFont } from '../theme/typography';
+import cacheEventEmitter from '../services/CacheEventEmitter';
 
 interface ReadingSettingsContextType {
     settings: ReadingSettings | null;
@@ -40,6 +41,15 @@ export const ReadingSettingsProvider: React.FC<{ children: React.ReactNode }> = 
 
     useEffect(() => {
         loadSettings();
+    }, [loadSettings]);
+
+    useEffect(() => {
+        const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+            if (eventData.type === 'settingsUpdated') {
+                loadSettings();
+            }
+        });
+        return unsubscribe;
     }, [loadSettings]);
 
     const updateSetting = useCallback(async <K extends keyof ReadingSettings>(

@@ -300,6 +300,26 @@ export function parsePublishedDate(dateString: string): Date {
   return new Date();
 }
 
+/**
+ * 格式化日期
+ */
+export const formatDate = (date: Date | string | number): string => {
+  const d = new Date(date);
+  // Force Beijing Time display logic if system locale isn't enough, 
+  // but usually simple locale string with zh-CN works well on mobile.
+  // We explicitly request 'zh-CN' and 24h format.
+  return d.toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+};
+
 // =================== 通用工具 ===================
 
 /**

@@ -71,7 +71,7 @@ const AboutScreen: React.FC = () => {
           <SettingItem
             icon="public"
             label="官方网站"
-            onPress={() => Linking.openURL('https://github.com/techflow')}
+            onPress={() => Linking.openURL('https://github.com/readflow')}
             color="#3B82F6"
           />
           <SettingItem

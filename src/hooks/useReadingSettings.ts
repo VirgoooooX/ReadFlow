@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { settingsService } from '../services/SettingsService';
 import { ReadingSettings } from '../types';
 import { getPlatformFont } from '../theme/typography';
+import cacheEventEmitter from '../services/CacheEventEmitter';
 
 export const useReadingSettings = () => {
   const [settings, setSettings] = useState<ReadingSettings | null>(null);
@@ -124,6 +125,15 @@ export const useReadingSettings = () => {
 
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      if (eventData.type === 'settingsUpdated') {
+        loadSettings();
+      }
+    });
+    return unsubscribe;
   }, []);
 
   return {
