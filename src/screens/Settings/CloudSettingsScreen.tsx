@@ -6,6 +6,7 @@ import { SettingsService } from '../../services/SettingsService';
 import { AppSettings } from '../../types';
 import AuthService from '../../services/AuthService';
 import { CloudConfig, cloudConfigService } from '../../services/CloudConfigService';
+import cacheEventEmitter from '../../services/CacheEventEmitter';
 
 const CloudSettingsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
@@ -24,6 +25,15 @@ const CloudSettingsScreen: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
+  }, []);
+  
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
+      if (eventData.type === 'settingsUpdated') {
+        loadSettings();
+      }
+    });
+    return unsubscribe;
   }, []);
 
   const loadSettings = async () => {
