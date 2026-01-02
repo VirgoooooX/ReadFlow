@@ -16,7 +16,6 @@
 版本：`v6.1.1`（`app.json`） / `build 60101`（Android）
 
 ![ReadFlow Icon](./assets/icon.png)
-![ReadFlow Splash](./assets/splash.png)
 
 ## 目录
 
@@ -241,3 +240,4 @@ go run .
 - 修改 `ADMIN_PASSWORD`、设置强 `JWT_SECRET`
 - 需要访问码就设置 `SERVER_TOKEN`（客户端需要填写对应的 Access Key）
 - 建议用反向代理（HTTPS）并设置 `APP_BASE_URL`
+
