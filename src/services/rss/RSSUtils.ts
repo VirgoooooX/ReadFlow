@@ -220,6 +220,40 @@ export function fixRelativeImageUrls(htmlContent: string, articleLink: string): 
 }
 
 /**
+ * 修复 HTML 中的懒加载图片 (将 data-src/data-original 提升为 src)
+ * @param html HTML 内容
+ */
+export function fixLazyImageUrls(html: string): string {
+  if (!html) return html;
+
+  try {
+    // 匹配 img 标签
+    return html.replace(/<img[^>]+>/gi, (imgTag) => {
+      // 检查是否有懒加载属性
+      const lazyMatch = imgTag.match(/\s+(data-original|data-src|data-url|data-lazy-src)=["']([^"']+)["']/i);
+      
+      if (lazyMatch && lazyMatch[2]) {
+        const realUrl = lazyMatch[2];
+        
+        // 1. 移除旧的 src 属性 (如果有)
+        let newTag = imgTag.replace(/\s+src=["'][^"']*["']/gi, '');
+        
+        // 2. 在 <img 后直接添加 src
+        // 这样可以确保 src 是第一个属性，或者至少存在
+        newTag = newTag.replace('<img', `<img src="${realUrl}"`);
+        
+        // logger.info(`[fixLazyImageUrls] 修复: ${realUrl}`);
+        return newTag;
+      }
+      return imgTag;
+    });
+  } catch (error) {
+    logger.error('修复懒加载图片失败:', error);
+    return html;
+  }
+}
+
+/**
  * 生成文章摘要
  */
 export function generateSummary(content: string, maxLength: number = 200): string {

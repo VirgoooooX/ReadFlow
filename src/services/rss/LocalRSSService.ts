@@ -19,6 +19,7 @@ import {
   parsePublishedDate,
   shouldUseCorsProxy,
   fixRelativeImageUrls,
+  fixLazyImageUrls,
 } from './RSSUtils';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
@@ -459,9 +460,9 @@ export class LocalRSSService {
         
         if (!item.title || !itemLink) continue;
         
-        // 🔥 关键：在提取内容和图片之前，先修复相对路径
+        // 🔥 关键：在提取内容和图片之前，先修复相对路径和懒加载图片
         const rawContent = item.content || item.description || '';
-        const fixedRawContent = fixRelativeImageUrls(rawContent, itemLink);
+        const fixedRawContent = fixLazyImageUrls(fixRelativeImageUrls(rawContent, itemLink));
         
         // 🔥 修复后更新回 item 对象，确保封面图提取也用修复后的内容
         if (item.content) {

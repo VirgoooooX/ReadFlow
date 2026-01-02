@@ -37,7 +37,8 @@ app.use((req, res, next) => {
       const cache = res.getHeader('X-Cache') || 'MISS';
       const contentType = res.getHeader('Content-Type') || 'unknown';
       const size = res.getHeader('Content-Length') || 0;
-      logger.request(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} (${durationMs}ms) [${cache}, ${contentType}, ${size}B]`);
+      const imageUrl = req.query.url || 'unknown';
+      logger.request(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} (${durationMs}ms) [${cache}, ${contentType}, ${size}B, url=${imageUrl}]`);
       return;
     }
 

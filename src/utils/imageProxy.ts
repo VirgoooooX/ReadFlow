@@ -1,3 +1,5 @@
+import { logger } from '../services/rss/RSSUtils';
+
 /**
  * 图片代理工具类
  * 统一管理客户端的图片代理策略，处理防盗链和被墙域名
@@ -82,20 +84,33 @@ export function toProxyUrl(url: string, proxyServerUrl?: string): string {
 
   const urlLower = url.toLowerCase();
 
-  // 1. 被墙域名策略：强制使用公共代理 (weserv.nl)
+  // 1. 自建代理优先策略：只要配置了自建代理，统统优先使用
+  // 无论是被墙域名还是防盗链域名，自建服务器通常都能处理
+  if (proxyServerUrl) {
+    // 检查 URL 是否已经是经过代理的（包含自建代理的地址）
+    if (url.includes(proxyServerUrl)) {
+      logger.info(`[ImageProxy] URL already proxied by server, skipping local proxy: ${url}`);
+      return url;
+    }
+
+    // 移除末尾斜杠
+    const baseUrl = proxyServerUrl.replace(/\/$/, '');
+    
+    // 【日志】如果有自建代理，记录一下
+    if (ANTI_HOTLINK_DOMAINS.some(d => urlLower.includes(d)) || BLOCKED_DOMAINS.some(d => urlLower.includes(d))) {
+      logger.info(`[ImageProxy] Using self-hosted proxy for protected domain: ${url}`);
+    }
+    
+    return `${baseUrl}/api/image?url=${encodeURIComponent(url)}`;
+  }
+
+  // 2. 被墙域名策略：强制使用公共代理 (weserv.nl)
   // 原因：直连模式下，用户可能没有自建服务器，或者自建服务器也可能被墙。公共代理最稳妥。
   // 注意：BBC 图片经常带有 .webp 后缀或特殊参数，只要域名匹配就必须代理
   if (BLOCKED_DOMAINS.some(d => urlLower.includes(d))) {
     // 移除可能存在的查询参数干扰，确保 url 参数干净
     // weserv.nl 支持直接传原 URL
     return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&output=webp`;
-  }
-
-  // 2. 防盗链域名策略：优先使用自建代理，无自建则使用公共代理
-  if (proxyServerUrl) {
-    // 移除末尾斜杠
-    const baseUrl = proxyServerUrl.replace(/\/$/, '');
-    return `${baseUrl}/api/image?url=${encodeURIComponent(url)}`;
   }
   
   // 3. 直连模式下的防盗链兜底策略
@@ -106,12 +121,8 @@ export function toProxyUrl(url: string, proxyServerUrl?: string): string {
     return `https://i0.wp.com/${cleanUrl}`;
   }
   
-  // 4. 针对 sspai 的特殊处理：伪造 Referer
-  if (urlLower.includes('sspai.com')) {
-    // 强制指定 Referer 为 sspai.com，绕过防盗链
-    return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&referer=${encodeURIComponent('https://sspai.com')}&output=webp`;
-  }
-  
-  // 默认兜底：公共代理 weserv.nl
+  // 4. 默认兜底：公共代理 weserv.nl
+  // 注意：sspai 等普通防盗链域名如果没有自建代理，会走到这里
+  // weserv.nl 通常能处理大部分防盗链，只要不需要伪造特定 Referer
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&output=webp`;
 }

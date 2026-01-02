@@ -36,6 +36,7 @@ import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
 import { setLastViewedArticleId } from '../Home/HomeScreen';
 import { needsProxy, toProxyUrl } from '../../utils/imageProxy';
+import { cloudConfigService } from '../../services/CloudConfigService';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
@@ -343,11 +344,19 @@ const ArticleDetailScreen: React.FC = () => {
         // 【优化】不再强制重置 webViewReady，避免闪烁
         // setWebViewReady(false); 
 
-        // 【新增】获取代理服务器配置
-        const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-        if (proxyConfig.enabled && proxyConfig.serverUrl) {
-          setProxyServerUrl(proxyConfig.serverUrl);
-        }
+        const settingsService = SettingsService.getInstance();
+        const [proxyConfig, cloudConfig] = await Promise.all([
+          settingsService.getProxyModeConfig(),
+          cloudConfigService.getConfig(),
+        ]);
+
+        const cloudUrl = (cloudConfig.serverUrl || '').replace(/\/$/, '');
+        const proxyUrl = (proxyConfig.serverUrl || '').replace(/\/$/, '');
+        const activeUrl =
+          cloudConfig.mode === 'cloud' && cloudUrl
+            ? cloudUrl
+            : (proxyConfig.enabled && proxyUrl ? proxyUrl : '');
+        setProxyServerUrl(activeUrl);
 
         // 【新增】使用 Promise.all 并行加载所有数据：文章内容、滚动位置、生词本
         // 确保所有数据都准备好后再生成 HTML，避免数据缺失

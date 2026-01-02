@@ -467,6 +467,18 @@ export function proxyImages(
     // 1. 移除 srcset 以防止浏览器绕过代理加载原图
     let newAttributes = attributes.replace(/\s+srcset=["'][^"']*["']/gi, '');
 
+    // 1.5 提取懒加载属性并提升为 src (针对 sspai 等网站)
+    // 查找 data-original, data-src, data-url
+    const lazyMatch = newAttributes.match(/\s+(data-original|data-src|data-url)=["']([^"']+)["']/i);
+    if (lazyMatch && lazyMatch[2]) {
+      const realUrl = lazyMatch[2];
+      // 如果存在懒加载属性，强制替换 src
+      // 先移除已有的 src (如果有)
+      newAttributes = newAttributes.replace(/\s+src=["'][^"']*["']/gi, '');
+      // 添加新的 src
+      newAttributes = ` src="${realUrl}"` + newAttributes;
+    }
+
     // 2. 辅助函数：替换指定属性中的 URL
       const replaceUrlInAttr = (attrName: string) => {
         // 匹配 src="...", src='...', src=...
@@ -480,6 +492,7 @@ export function proxyImages(
       };
 
     replaceUrlInAttr('src');
+    // data-src 等也替换一下，以防万一
     replaceUrlInAttr('data-src');
     replaceUrlInAttr('data-original');
 

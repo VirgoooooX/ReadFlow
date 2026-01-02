@@ -1371,22 +1371,41 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       
       // 【新增】监听图片加载，动态更新进度
       function setupImageLoadListener() {
-        const images = document.querySelectorAll('img[loading="lazy"], img');
+        const images = document.querySelectorAll('img');
         let loadedCount = 0;
         const totalImages = images.length;
         
         if (totalImages === 0) return;
         
         images.forEach(function(img) {
+          // 【日志】记录发现的图片 URL
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'debug',
+            debugType: 'ImageFound',
+            message: img.src
+          }));
+
           // 如果图片已经加载完成
           if (img.complete) {
             loadedCount++;
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'debug',
+              debugType: 'ImageLoaded(Sync)',
+              message: img.src
+            }));
             return;
           }
           
           // 监听图片加载完成
           img.addEventListener('load', function() {
             loadedCount++;
+            
+            // 【日志】记录图片加载完成
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'debug',
+              debugType: 'ImageLoaded(Async)',
+              message: img.src
+            }));
             
             // 【关键】图片加载后，立即重新计算并发送进度
             // 解决"已到底但进度只有 80%"的问题

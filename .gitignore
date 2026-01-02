@@ -82,3 +82,4 @@ techflow-server/
 readflow-server/src/test-proxy.ts
 readflow-server/src/test-xml.ts
 readflow-server/src/verify.ts
+server-go/main.exe

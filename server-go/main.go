@@ -28,6 +28,11 @@ var (
 	authToken     string
 	activeRSSHub  = "https://rsshub.app"
 	defaultRSSHub = "https://rsshub.app"
+
+	// 正则表达式
+	imgTagRegex   = regexp.MustCompile(`(?i)<img[^>]+>`)
+	lazyAttrRegex = regexp.MustCompile(`(?i)\s+(data-original|data-src|data-url|data-lazy-src)=["']([^"']+)["']`)
+	srcAttrRegex  = regexp.MustCompile(`(?i)\s+src=["'][^"']*["']`)
 )
 
 // RSSHub 实例列表
@@ -371,6 +376,25 @@ func fixRelativeImageURLs(content string, feedURL string) string {
 	return result
 }
 
+// fixLazyImageURLs 修复懒加载图片属性
+func fixLazyImageURLs(content string) string {
+	return imgTagRegex.ReplaceAllStringFunc(content, func(imgTag string) string {
+		matches := lazyAttrRegex.FindStringSubmatch(imgTag)
+		if len(matches) >= 3 {
+			realURL := matches[2]
+			// 移除旧的 src
+			newTag := srcAttrRegex.ReplaceAllString(imgTag, "")
+
+			// 插入新的 src
+			lowerTag := strings.ToLower(newTag)
+			if strings.HasPrefix(lowerTag, "<img") {
+				return newTag[:4] + fmt.Sprintf(` src="%s"`, realURL) + newTag[4:]
+			}
+		}
+		return imgTag
+	})
+}
+
 // validateToken 验证 Token
 func validateToken(r *http.Request) bool {
 	if authToken == "" {
@@ -580,6 +604,9 @@ func handleRSS(w http.ResponseWriter, r *http.Request) {
 
 	// 🔥 在替换图片 URL 之前，先修复相对路径
 	content = fixRelativeImageURLs(content, feedURL)
+
+	// 🔥 修复懒加载图片
+	content = fixLazyImageURLs(content)
 
 	// 替换图片 URL
 	content = replaceImageURLs(content)
