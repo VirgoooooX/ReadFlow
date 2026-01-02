@@ -35,6 +35,7 @@ import { getFontStackForWebView } from '../../theme/typography';
 import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
 import { setLastViewedArticleId } from '../Home/HomeScreen';
+import { needsProxy, toProxyUrl } from '../../utils/imageProxy';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
@@ -369,12 +370,6 @@ const ArticleDetailScreen: React.FC = () => {
         setVocabularyWords(words);
         vocabularyWordsRef.current = words;
         logger.info('[ArticleDetail] Prepared vocabulary words count:', words.length);
-
-// import cacheEventEmitter from '../../services/CacheEventEmitter'; // Removed duplicate import
-
-// ... (existing imports)
-
-// ...
 
         // 自动标记为已读
         if (articleData && !articleData.isRead) {
@@ -824,31 +819,28 @@ const ArticleDetailScreen: React.FC = () => {
       
     const finalImageUrl = shouldShowHeaderImage() ? article.imageUrl : undefined;
     logger.info(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
-  
+
     const html = generateArticleHtml({
       content: article.content,
       fontSize: readingSettings.fontSize || 16,
       lineHeight: readingSettings.lineHeight || 1.8,
-      fontFamily: getFontStackForWebView(readingSettings.fontFamily || 'system'), // 新增：传递字体设置
+      fontFamily: getFontStackForWebView(readingSettings.fontFamily || 'system'),
       isDark,
       primaryColor: theme?.colors?.primary || '#3B82F6',
-      // 传入元数据
       title: article.title,
       titleCn: article.titleCn,
       sourceName: article.sourceName,
       publishedAt: formatDate(article.publishedAt),
       author: article.author,
-      imageUrl: finalImageUrl,
-      // 【新增】传入图片说明和图片来源
+      // 【关键修改】确保封面图被正确代理
+      // 即使在直连模式下，如果域名在 BLOCKED_DOMAINS 列表中（如 BBC），
+      // toProxyUrl 也会强制使用 weserv.nl，而不依赖 proxyServerUrl
+      imageUrl: finalImageUrl ? toProxyUrl(finalImageUrl, proxyServerUrl) : undefined,
       imageCaption: article.imageCaption,
       imageCredit: article.imageCredit,
-      // 【新增】传入文章原始链接，用于视频跳转
       articleUrl: article.url,
-      // 【新增】直接将初始滚动位置和生词表注入 HTML
-      // 这样 HTML 初始化时就能直接处理，无需等待 WebView ready 后再注入
       initialScrollY,
       vocabularyWords,
-      // 【新增】代理服务器地址，用于处理防盗链图片
       proxyServerUrl,
     });
     

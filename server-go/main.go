@@ -107,6 +107,24 @@ var refererMap = map[string]string{
 	"preview.redd.it": "https://www.reddit.com/",
 }
 
+// 被墙域名列表 - 强制走代理
+var blockedDomains = []string{
+	"bbc.co.uk", "bbc.com", "bbci.co.uk",
+	"nytimes.com", "nyt.com",
+	"wsj.com", "wsj.net",
+	"bloomberg.com",
+	"reuters.com",
+	"dw.com",
+	"voanews.com",
+	"rfa.org",
+	"epochtimes.com",
+	"ntdtv.com",
+	"boxun.com",
+	"creaders.net",
+	"wenxuecity.com",
+	"6park.com",
+}
+
 // 图片扩展名正则（新增 avif 格式支持）
 var imageExtRegex = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|avif)(\?.*)?$`)
 
@@ -206,6 +224,14 @@ func shouldProxyURL(imgURL string) bool {
 		return true
 	}
 	imgLower := strings.ToLower(imgURL)
+
+	// Check Blocked Domains
+	for _, domain := range blockedDomains {
+		if strings.Contains(imgLower, domain) {
+			return true
+		}
+	}
+
 	for _, cdn := range imageCdnHosts {
 		if strings.Contains(imgLower, cdn) {
 			return true

@@ -44,6 +44,7 @@ model RSSSource {
   // Status
   isActive    Boolean  @default(true)
   lastFetchAt DateTime?
+  refreshIntervalSeconds Int? // Custom refresh interval
   errorCount  Int      @default(0)
   lastErrorMessage String?
   
@@ -73,6 +74,10 @@ model Article {
   
   // User states are separate
   userStates  UserArticleState[]
+  
+  // New fields for stats
+  wordCount   Int      @default(0)
+  readingTime Int      @default(0)
 
   createdAt   DateTime @default(now())
   
@@ -114,6 +119,36 @@ model UserArticleState {
 
   @@unique([userId, articleId])
   @@map("user_article_states")
+}
+
+model Vocabulary {
+  id              Int      @id @default(autoincrement())
+  word            String   @unique
+  definition      Json?    @db.JsonB
+  context         String?
+  articleId       Int?
+  sourceArticleId Int?     // Optional link to source article ID if known
+  
+  // SRS Stats
+  reviewCount     Int      @default(0)
+  correctCount    Int      @default(0)
+  masteryLevel    Int      @default(0)
+  difficulty      String   @default("medium")
+  
+  // Timestamps
+  addedAt         DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastReviewedAt  DateTime?
+  nextReviewAt    DateTime @default(now())
+  
+  // Meta
+  tags            Json?    @db.JsonB
+  notes           String?
+  
+  // Soft Delete
+  isDeleted       Boolean  @default(false)
+
+  @@map("vocabulary")
 }
 
 model ServerSetting {

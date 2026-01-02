@@ -3,45 +3,43 @@
  * 用于 WebView 渲柣文章内容，包含样式和交互脚本
  */
 
-// 防盗链图片域名列表，需要通过代理加载
-const ANTI_HOTLINK_DOMAINS = [
-  'cdnfile.sspai.com', 'cdn.sspai.com', 'sspai.com',
-  's3.ifanr.com', 'images.ifanr.cn', 'ifanr.com',
-  'cnbetacdn.com', 'static.cnbetacdn.com',
-  'twimg.com', 'pbs.twimg.com',
-  'miro.medium.com',
-];
+import { needsProxy, toProxyUrl } from './imageProxy';
 
 /**
- * 检查图片 URL 是否需要代理
- */
-function needsProxy(url: string): boolean {
-  if (!url || url.startsWith('data:')) return false;
-  const urlLower = url.toLowerCase();
-  return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
-}
-
-/**
- * 将图片 URL 转换为代理 URL
- */
-function toProxyUrl(url: string, proxyServerUrl: string): string {
-  if (!url || !proxyServerUrl) return url;
-  return `${proxyServerUrl}/api/image?url=${encodeURIComponent(url)}`;
-}
-
-/**
- * 替换 HTML 中需要代理的图片 URL
+ * 替换 HTML 中需要代理的图片 URL (包括 src 和 srcset)
  */
 function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
-  if (!html || !proxyServerUrl) return html;
+  if (!html) return html;
   
-  // 替换 src 属性中的图片 URL
-  return html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
+  // 1. 替换 src 属性
+  let processedHtml = html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
     if (needsProxy(url)) {
       return `${prefix}${toProxyUrl(url, proxyServerUrl)}${suffix}`;
     }
     return match;
   });
+
+  // 2. 替换 srcset 属性
+  // 格式: srcset="url1 320w, url2 480w"
+  processedHtml = processedHtml.replace(/(<img[^>]*\ssrcset=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, srcsetContent, suffix) => {
+    // 分割 srcset 中的每一项
+    const sources = srcsetContent.split(',').map((item: string) => {
+      const parts = item.trim().split(/\s+/);
+      if (parts.length > 0) {
+        const url = parts[0];
+        if (needsProxy(url)) {
+          // 替换 URL 部分
+          parts[0] = toProxyUrl(url, proxyServerUrl);
+          return parts.join(' ');
+        }
+      }
+      return item;
+    });
+
+    return `${prefix}${sources.join(', ')}${suffix}`;
+  });
+
+  return processedHtml;
 }
 
 export interface HtmlTemplateOptions {
@@ -115,13 +113,12 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   let optimizedContent = content.replace(/<img\s+/gi, '<img loading="lazy" ');
 
   // 【新增】处理防盗链图片：将需要代理的图片 URL 替换为代理 URL
-  if (proxyServerUrl) {
-    optimizedContent = proxyImagesInHtml(optimizedContent, proxyServerUrl);
-  }
+  // 即使没有 proxyServerUrl，也要处理被墙域名（走公共代理）
+  optimizedContent = proxyImagesInHtml(optimizedContent, proxyServerUrl);
 
   // 处理封面图片的代理
   let proxiedImageUrl = imageUrl || '';
-  if (proxyServerUrl && imageUrl && needsProxy(imageUrl)) {
+  if (imageUrl && needsProxy(imageUrl)) {
     proxiedImageUrl = toProxyUrl(imageUrl, proxyServerUrl);
   }
 

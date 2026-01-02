@@ -141,19 +141,12 @@ const MineScreen: React.FC = () => {
         />
         <SettingItem
           icon="cloud"
-          label="云端同步"
+          label="运行模式与同步"
           onPress={() => {
             console.log('Navigating to CloudSettings');
             navigation.navigate('CloudSettings');
           }}
           color="#3B82F6"
-        />
-        <SettingItem
-          icon="cloud-queue"
-          label="代理服务器"
-          onPress={() => navigation.navigate('ProxyServerSettings')}
-          color={proxyStatus.enabled ? '#10B981' : '#6B7280'}
-          valueText={proxyStatus.enabled ? '已启用' : '未启用'}
         />
         <SettingItem
           icon="palette"

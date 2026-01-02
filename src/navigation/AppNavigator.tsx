@@ -49,7 +49,6 @@ import StorageManagementScreen from '../screens/Settings/StorageManagementScreen
 import CustomColorScreen from '../screens/Settings/CustomColorScreen';
 import RSSStartupSettingsScreen from '../screens/Settings/RSSStartupSettingsScreen';
 import { CloudSyncScreen } from '../screens/Settings/CloudSyncScreen';
-import { CloudConnectScreen } from '../screens/Settings/CloudConnectScreen';
 
 // 导入类型定义
 export type RootStackParamList = {
@@ -573,28 +572,14 @@ function UserStackNavigator() {
 
       <UserStack.Screen
         name="CloudSettings"
-        options={{ title: '云端同步' }}
+        options={{ title: '运行模式与同步' }}
       >
         {(props: any) => (
           <ScreenWithCustomHeader
-            title="云端同步"
+            title="运行模式与同步"
             showBackButton={true}
           >
             <CloudSyncScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-
-      <UserStack.Screen
-        name="CloudConnect"
-        options={{ title: '连接云端服务器' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="连接云端服务器"
-            showBackButton={true}
-          >
-            <CloudConnectScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>

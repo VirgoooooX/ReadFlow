@@ -29,31 +29,7 @@ import CustomTabContent, { CustomTabContentHandle } from '../../components/Custo
 import { useSharedValue } from 'react-native-reanimated';
 import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
 import { Alert, ToastAndroid, Platform } from 'react-native'; // 新增 Alert, ToastAndroid, Platform
-// 🔥 防盗链域名列表
-const ANTI_HOTLINK_DOMAINS = [
-  'cdnfile.sspai.com', 'cdn.sspai.com', 'sspai.com',
-  's3.ifanr.com', 'images.ifanr.cn', 'ifanr.com',
-  'cnbetacdn.com', 'static.cnbetacdn.com',
-  'twimg.com', 'pbs.twimg.com',
-  'miro.medium.com',
-];
-
-/**
- * 检查图片 URL 是否需要代理
- */
-function needsProxy(url: string): boolean {
-  if (!url || url.startsWith('data:')) return false;
-  const urlLower = url.toLowerCase();
-  return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
-}
-
-/**
- * 将图片 URL 转换为代理 URL
- */
-function toProxyUrl(url: string, proxyServerUrl: string): string {
-  if (!url || !proxyServerUrl) return url;
-  return `${proxyServerUrl}/api/image?url=${encodeURIComponent(url)}`;
-}
+import { needsProxy, toProxyUrl } from '../../utils/imageProxy';
 
 // 【修改】全局状态，记录是否切换过文章
 export let lastViewedArticleId: number | null = null;
@@ -104,9 +80,16 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl
   // 🔥 处理防盗链图片代理
   const imageUri = useMemo(() => {
     if (!item.imageUrl) return null;
-    if (proxyServerUrl && needsProxy(item.imageUrl)) {
-      return toProxyUrl(item.imageUrl, proxyServerUrl);
+    
+    // 只要 needsProxy 为 true，就应该尝试获取代理 URL (自建或公共)
+    if (needsProxy(item.imageUrl)) {
+      const finalUrl = toProxyUrl(item.imageUrl, proxyServerUrl);
+      if (finalUrl !== item.imageUrl) {
+        logger.info(`[ImageProxy] Redirecting: ${item.imageUrl} -> ${finalUrl}`);
+      }
+      return finalUrl;
     }
+    
     return item.imageUrl;
   }, [item.imageUrl, proxyServerUrl]);
 

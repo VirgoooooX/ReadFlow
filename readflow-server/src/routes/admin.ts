@@ -249,6 +249,7 @@ router.get('/status', async (req, res) => {
     // New fields
     const dbSize = await storageService.getDatabaseSize();
     const imageCacheSize = storageService.getImageCacheTotalSize();
+    const recentArticleCount = await storageService.getRecentArticleCount(24);
     
     res.json({ 
       users, 
@@ -257,7 +258,13 @@ router.get('/status', async (req, res) => {
       imageCache, 
       storage: {
         dbSize,
-        imageCacheSize
+        imageCacheSize,
+        recentArticleCount
+      },
+      system: {
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        loadAvg: [0, 0, 0] // process.loadavg() is not available on Windows usually, or use os.loadavg()
       }
     });
   } catch (error) {

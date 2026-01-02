@@ -4,11 +4,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import rssRoutes from './routes/rss';
+import vocabRoutes from './routes/vocabulary';
 import imageRoutes from './routes/image';
 import adminRoutes from './routes/admin';
 import authRoutes, { verifyToken } from './routes/auth';
 import { logger } from './utils/Logger';
 import { startRssAutoRefresh } from './routes/rss';
+import { storageService } from './services/StorageService';
 
 // Set timezone to Asia/Shanghai (UTC+8)
 process.env.TZ = 'Asia/Shanghai';
@@ -25,18 +27,21 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const durationMs = Date.now() - start;
-    const isImage = req.originalUrl === '/api/image' || req.originalUrl.startsWith('/api/image?') || req.originalUrl.startsWith('/api/image/');
+    
+    // Skip health checks from logging to reduce noise
+    if (req.url === '/health' && res.statusCode === 200) return;
+
+    const isImage = req.originalUrl.startsWith('/api/image');
+    
     if (isImage) {
-      const contentType = res.getHeader('Content-Type') || '';
-      const cache = res.getHeader('X-Cache') || '';
-      const quality = res.getHeader('X-ReadFlow-Image-Quality') || '';
-      const requestedQ = res.getHeader('X-ReadFlow-Image-RequestedQ') || '';
-      const mode = res.getHeader('X-ReadFlow-Image-Mode') || '';
-      logger.info(`${req.method} ${req.url} -> ${res.statusCode} (${durationMs}ms) ct=${contentType} cache=${cache} mode=${mode} q=${quality} rq=${requestedQ}`);
+      const cache = res.getHeader('X-Cache') || 'MISS';
+      const contentType = res.getHeader('Content-Type') || 'unknown';
+      const size = res.getHeader('Content-Length') || 0;
+      logger.request(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} (${durationMs}ms) [${cache}, ${contentType}, ${size}B]`);
       return;
     }
 
-    logger.info(`${req.method} ${req.url} -> ${res.statusCode} (${durationMs}ms)`);
+    logger.request(`${req.method} ${req.url} ${res.statusCode} (${durationMs}ms)`);
   });
   next();
 });
@@ -77,8 +82,14 @@ const serverTokenMiddleware = (req: express.Request, res: express.Response, next
 // Auth Middleware
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
+  const serverToken = process.env.SERVER_TOKEN;
+
   if (!authHeader) {
-    // Optional: Allow some public endpoints if needed, but for now we enforce it on applied routes
+    // Check x-server-token as fallback
+    if (serverToken && req.headers['x-server-token'] === serverToken) {
+      (req as any).user = { id: 'admin' };
+      return next();
+    }
     return res.status(401).json({ error: 'Unauthorized: Missing token' });
   }
 
@@ -87,6 +98,13 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
     return res.status(401).json({ error: 'Unauthorized: Invalid token format' });
   }
 
+  // 1. Try Server Token
+  if (serverToken && token === serverToken) {
+    (req as any).user = { id: 'admin' };
+    return next();
+  }
+
+  // 2. Try JWT
   const userId = verifyToken(token);
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
@@ -99,6 +117,7 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
 
 // Routes
 app.use('/api/rss', authMiddleware, rssRoutes); // Protect RSS routes
+app.use('/api/vocab', authMiddleware, vocabRoutes); // Protect Vocabulary routes
 app.use('/api/image', imageRoutes); // Images might need to be public or protected depending on requirement. Usually public for <img> tags.
 app.use('/api/admin', adminRoutes); // Admin should be protected too, but maybe separately or with same middleware?
 // Let's protect Admin too for consistency with "Force Cloud Auth"
@@ -124,6 +143,29 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
+  logger.system(`Server running on port ${PORT}`);
   startRssAutoRefresh();
+
+  // Initial status log
+  setTimeout(logServerStatus, 5000);
+
+  // Periodic status heartbeat (every hour)
+  setInterval(logServerStatus, 60 * 60 * 1000);
 });
+
+async function logServerStatus() {
+  try {
+    const mem = process.memoryUsage();
+    const memUsage = Math.round(mem.rss / 1024 / 1024);
+    const uptime = Math.floor(process.uptime());
+    const uptimeH = Math.floor(uptime / 3600);
+    const uptimeM = Math.floor((uptime % 3600) / 60);
+    
+    const users = (await storageService.getUsers()).length;
+    const feeds = (await storageService.getFeeds()).length;
+    
+    logger.system(`Status Update | Memory: ${memUsage}MB | Uptime: ${uptimeH}h ${uptimeM}m | Users: ${users} | Feeds: ${feeds}`);
+  } catch (e) {
+    logger.error('Failed to log status', e);
+  }
+}

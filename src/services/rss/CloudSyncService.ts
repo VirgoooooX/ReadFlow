@@ -224,7 +224,10 @@ export class CloudSyncService implements IRSSProvider {
       ]);
       if (cloudConfig.mode !== 'cloud') return;
 
-      this.checkAuth();
+      if (!AuthService.isAuthenticated()) {
+        logger.info('[CloudSync] Skip state sync: Cloud mode enabled but not logged in');
+        return;
+      }
 
       const userId = appSettings.sync.userId;
       if (!userId) {

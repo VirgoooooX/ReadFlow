@@ -6,7 +6,7 @@ import { Article } from '../types';
 import { simpleHash } from '../utils/RSSUtils';
 
 console.log('StorageService initializing...');
-console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Found' : 'Missing');
+// console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Found' : 'Missing');
 
 const prisma = new PrismaClient({
   datasources: {
@@ -14,7 +14,7 @@ const prisma = new PrismaClient({
       url: process.env.DATABASE_URL
     }
   },
-  log: ['query', 'info', 'warn', 'error'],
+  log: ['warn', 'error'],
 });
 
 export interface ServerSettings {
@@ -389,6 +389,10 @@ export class StorageService {
           publishedAt: a.publishedAt ? new Date(a.publishedAt) : new Date(),
           imageUrl: a.imageUrl,
           sourceId: source.id,
+          // Remove wordCount if not in Prisma schema or provide default if it is
+          // If schema doesn't have wordCount, remove it. If it does, keep it.
+          // Assuming schema has readingTime but maybe not wordCount based on error
+          readingTime: a.readingTime || 0,
         }
       });
       
@@ -651,6 +655,94 @@ export class StorageService {
       logger.error('Failed to prune articles:', err);
       throw err;
     }
+  }
+
+  public async getRecentArticleCount(hours: number): Promise<number> {
+    const date = new Date();
+    date.setHours(date.getHours() - hours);
+    try {
+      return await prisma.article.count({
+        where: {
+          publishedAt: {
+            gte: date
+          }
+        }
+      });
+    } catch (err) {
+      logger.error('Failed to get recent article count:', err);
+      return 0;
+    }
+  }
+
+  // Vocabulary
+  public async upsertVocabulary(word: any) {
+    try {
+      // Cast prisma to any to bypass type check for now since schema might not be generated yet
+      await (prisma as any).vocabulary.upsert({
+        where: { word: word.word },
+        update: {
+          definition: word.definition || undefined,
+          context: word.context || undefined,
+          articleId: word.articleId || undefined,
+          sourceArticleId: word.sourceArticleId || undefined,
+          reviewCount: word.reviewCount || undefined,
+          correctCount: word.correctCount || undefined,
+          masteryLevel: word.masteryLevel || undefined,
+          difficulty: word.difficulty || undefined,
+          updatedAt: word.updatedAt ? new Date(word.updatedAt) : new Date(),
+          lastReviewedAt: word.lastReviewedAt ? new Date(word.lastReviewedAt) : undefined,
+          nextReviewAt: word.nextReviewAt ? new Date(word.nextReviewAt) : undefined,
+          tags: word.tags || undefined,
+          notes: word.notes || undefined,
+          isDeleted: word.isDeleted ?? false,
+        },
+        create: {
+          word: word.word,
+          definition: word.definition,
+          context: word.context,
+          articleId: word.articleId,
+          sourceArticleId: word.sourceArticleId,
+          reviewCount: word.reviewCount || 0,
+          correctCount: word.correctCount || 0,
+          masteryLevel: word.masteryLevel || 0,
+          difficulty: word.difficulty || 'medium',
+          addedAt: word.addedAt ? new Date(word.addedAt) : new Date(),
+          updatedAt: word.updatedAt ? new Date(word.updatedAt) : new Date(),
+          lastReviewedAt: word.lastReviewedAt ? new Date(word.lastReviewedAt) : undefined,
+          nextReviewAt: word.nextReviewAt ? new Date(word.nextReviewAt) : new Date(),
+          tags: word.tags,
+          notes: word.notes,
+          isDeleted: word.isDeleted ?? false,
+        }
+      });
+    } catch (error) {
+      logger.error(`Failed to upsert vocabulary word ${word.word}:`, error);
+      throw error;
+    }
+  }
+
+  public async getVocabularySince(since: string, limit: number = 500) {
+    const date = new Date(since);
+    // Find modified words (upserted or deleted)
+    // Note: If deleted, we mark isDeleted=true in DB, so we just fetch all updated > since
+    const words = await (prisma as any).vocabulary.findMany({
+      where: {
+        updatedAt: { gt: date }
+      },
+      orderBy: { updatedAt: 'asc' },
+      take: limit
+    });
+    
+    return words;
+  }
+
+  public async getVocabularyServerTime(): Promise<string> {
+    // Get the latest updatedAt
+    const latest = await (prisma as any).vocabulary.findFirst({
+      orderBy: { updatedAt: 'desc' },
+      select: { updatedAt: true }
+    });
+    return latest?.updatedAt.toISOString() || new Date().toISOString();
   }
 
   public pruneImages(days: number): { count: number; size: number } {

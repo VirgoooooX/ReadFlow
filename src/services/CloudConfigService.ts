@@ -65,11 +65,26 @@ export class CloudConfigService {
   }
 
   public async clearAuth(): Promise<CloudConfig> {
-    return await this.updateConfig({ auth: {} });
+    const current = await this.getConfig();
+    const next: CloudConfig = this.normalize({
+      ...current,
+      auth: {},
+    });
+    await this.saveConfig(next);
+    return next;
   }
 
   public async clearServer(): Promise<CloudConfig> {
-    return await this.updateConfig({ mode: 'local', serverUrl: '', serverAccessKey: undefined, auth: {} });
+    const current = await this.getConfig();
+    const next: CloudConfig = this.normalize({
+      ...current,
+      mode: 'local',
+      serverUrl: '',
+      serverAccessKey: undefined,
+      auth: {},
+    });
+    await this.saveConfig(next);
+    return next;
   }
 
   public async setMode(mode: CloudMode): Promise<CloudConfig> {

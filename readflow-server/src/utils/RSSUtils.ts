@@ -236,7 +236,11 @@ export function generateSummary(content: string, maxLength: number = 200): strin
  * 统计字数
  */
 export function countWords(text: string): number {
-  const cleanText = text.replace(/\s+/g, ' ').trim();
+  // 先移除所有 HTML 标签
+  const textContent = text.replace(/<[^>]*>/g, '');
+  
+  // 清理空白字符
+  const cleanText = textContent.replace(/\s+/g, ' ').trim();
   if (!cleanText) return 0;
   
   // 中文字符按字计算，英文按词计算
@@ -361,6 +365,24 @@ export function shouldUseCorsProxy(url: string): boolean {
 
 // =================== 防盗链图片处理 ===================
 
+// 被墙域名列表 - 强制走代理
+const BLOCKED_DOMAINS = [
+  'bbc.co.uk', 'bbc.com', 'bbci.co.uk',
+  'nytimes.com', 'nyt.com',
+  'wsj.com', 'wsj.net',
+  'bloomberg.com',
+  'reuters.com',
+  'dw.com',
+  'voanews.com',
+  'rfa.org',
+  'epochtimes.com',
+  'ntdtv.com',
+  'boxun.com',
+  'creaders.net',
+  'wenxuecity.com',
+  '6park.com'
+];
+
 // 防盗链图片域名列表，需要通过代理加载
 const ANTI_HOTLINK_DOMAINS = [
   'cdnfile.sspai.com', 'cdn.sspai.com', 'sspai.com',
@@ -396,11 +418,13 @@ export function needsProxy(url: string, baseUrl?: string, imageCompression: bool
     const isHttp = urlLower.startsWith('http://') || urlLower.startsWith('https://');
     if (!isHttp) return false;
     if (imageCompression) return true;
-    return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
+    return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain)) ||
+           BLOCKED_DOMAINS.some(domain => urlLower.includes(domain));
   }
 
   // 客户端模式/旧模式：仅代理白名单域名
-  return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain));
+  return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain)) ||
+         BLOCKED_DOMAINS.some(domain => urlLower.includes(domain));
 }
 
 /**

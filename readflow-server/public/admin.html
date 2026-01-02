@@ -303,17 +303,17 @@
                             </div>
                             <div>
                                 <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-slate-500">模拟负载 (Mock)</span>
-                                    <span class="text-blue-600 font-bold">24%</span>
+                                    <span class="text-slate-500">内存占用</span>
+                                    <span class="text-blue-600 font-bold" id="status-memory">-</span>
                                 </div>
                                 <div class="w-full bg-slate-100/50 rounded-full h-2">
-                                    <div class="bg-gradient-to-r from-blue-400 to-blue-500 h-2 rounded-full w-[24%] shadow-[0_0_10px_rgba(59,130,246,0.4)]"></div>
+                                    <div class="bg-gradient-to-r from-blue-400 to-blue-500 h-2 rounded-full w-[0%] transition-all duration-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]" id="status-memory-bar"></div>
                                 </div>
                             </div>
                             <div class="pt-4 border-t border-slate-100/50">
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-slate-500">上次重启</span>
-                                    <span class="font-mono text-slate-700">3 days ago</span>
+                                    <span class="text-slate-500">运行时间</span>
+                                    <span class="font-mono text-slate-700" id="status-uptime">-</span>
                                 </div>
                                 <div class="flex items-center justify-between text-sm mt-2">
                                     <span class="text-slate-500">版本</span>
@@ -903,9 +903,29 @@
             stats.innerHTML = `
                 ${card('总用户数', data.users ?? 0, 'fa-solid fa-users', 'blue')}
                 ${card('订阅源', data.feeds ?? 0, 'fa-solid fa-rss', 'purple')}
+                ${card('24h新增文章', data.storage?.recentArticleCount ?? 0, 'fa-regular fa-newspaper', 'pink')}
                 ${card('数据库占用', formatBytes(data.storage?.dbSize ?? 0), 'fa-solid fa-database', 'emerald')}
-                ${card('图片缓存', formatBytes(data.storage?.imageCacheSize ?? 0), 'fa-solid fa-images', 'orange')}
             `;
+
+            // System Status
+            if (data.system) {
+                const uptime = formatUptime(data.system.uptime);
+                const mem = data.system.memoryUsage;
+                const memUsed = mem ? formatBytes(mem.rss) : '-';
+                // Estimate percentage relative to 512MB or 1GB just for visuals, or just show text
+                // Let's assume 1GB for bar
+                const memVal = mem ? mem.rss : 0;
+                const memPercent = Math.min(100, (memVal / (1024 * 1024 * 1024)) * 100); 
+
+                const elUptime = document.getElementById('status-uptime');
+                if(elUptime) elUptime.textContent = uptime;
+                
+                const elMem = document.getElementById('status-memory');
+                if(elMem) elMem.textContent = memUsed;
+
+                const elMemBar = document.getElementById('status-memory-bar');
+                if(elMemBar) elMemBar.style.width = `${memPercent}%`;
+            }
         } catch (e) {
             console.error(e);
             document.getElementById('header-status').textContent = '连接断开';
@@ -1066,7 +1086,7 @@
     async function loadLogs() {
         try {
             const res = await fetch(`${API_BASE}/logs?limit=500`);
-            const logs = await res.json();
+            const logs = (await res.json()).reverse();
             const container = document.getElementById('logs-container');
             if (logs.length === 0) {
                 container.innerHTML = '<div class="text-slate-500 italic p-4">暂无日志</div>';
@@ -1410,6 +1430,17 @@
         let i = 0; let n = bytes;
         while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
         return `${n.toFixed(1)} ${units[i]}`;
+    }
+
+    function formatUptime(seconds) {
+        if (!seconds) return '-';
+        const d = Math.floor(seconds / (3600*24));
+        const h = Math.floor(seconds % (3600*24) / 3600);
+        const m = Math.floor(seconds % 3600 / 60);
+        const s = Math.floor(seconds % 60);
+        if(d > 0) return `${d}d ${h}h ${m}m`;
+        if(h > 0) return `${h}h ${m}m`;
+        return `${m}m ${s}s`;
     }
 
     // 8. Articles Modal
