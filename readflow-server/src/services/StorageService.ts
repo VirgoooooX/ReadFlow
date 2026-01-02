@@ -389,9 +389,8 @@ export class StorageService {
           publishedAt: a.publishedAt ? new Date(a.publishedAt) : new Date(),
           imageUrl: a.imageUrl,
           sourceId: source.id,
-          // Remove wordCount if not in Prisma schema or provide default if it is
-          // If schema doesn't have wordCount, remove it. If it does, keep it.
-          // Assuming schema has readingTime but maybe not wordCount based on error
+          // Correctly map wordCount and readingTime from the parsed article
+          wordCount: (a as any).wordCount || 0,
           readingTime: a.readingTime || 0,
         }
       });
