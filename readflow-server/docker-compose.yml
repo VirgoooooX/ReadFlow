@@ -1,5 +1,6 @@
 services:
   readflow-server:
+    image: virgoooox/readflowserver:latest
     build: .
     container_name: readflow-server
     restart: unless-stopped

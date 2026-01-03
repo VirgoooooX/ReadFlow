@@ -317,6 +317,11 @@ export class RSSService {
     source: RSSSource,
     options: { mode?: 'sync' | 'refresh' } = {}
   ): Promise<Article[]> {
+    if (source.isActive === false) {
+      logger.info(`[fetchArticlesFromSource] 源已停用，跳过刷新: ${source.name}`);
+      return [];
+    }
+
     const [appSettings, cloudConfig] = await Promise.all([
       SettingsService.getInstance().getAppSettings(),
       cloudConfigService.getConfig(),

@@ -215,6 +215,14 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       setIsLoading(true);
       const source = rssSources.find(s => s.id === sourceId);
       if (source) {
+        if (!source.isActive) {
+          console.log(`[RSSSourceContext.syncSource] ⏭️ 源已停用，跳过刷新: ${source.name}`);
+          if (Platform.OS === 'android') {
+            ToastAndroid.show('该 RSS 源已停用，跳过刷新', ToastAndroid.SHORT);
+          }
+          return;
+        }
+
         // 直接调用 fetchArticlesFromSource，内部会自动判断代理模式
         const newArticles = await rssService.fetchArticlesFromSource(source);
         

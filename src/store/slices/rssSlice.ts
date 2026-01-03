@@ -36,8 +36,15 @@ export const deleteRSSSource = createAsyncThunk(
 export const refreshRSSSource = createAsyncThunk(
   'rss/refreshSource',
   async (id: number) => {
+    const source = await rssService.getSourceById(id);
+    if (!source) {
+      throw new Error('RSS source not found');
+    }
+    if (!source.isActive) {
+      return { id, totalArticles: 0, skipped: true };
+    }
     const result = await rssService.refreshSources([id]);
-    return { id, totalArticles: result.totalArticles };
+    return { id, totalArticles: result.totalArticles, skipped: false };
   }
 );
 
@@ -381,17 +388,18 @@ const rssSlice = createSlice({
         state.error = null;
       })
       .addCase(refreshRSSSource.fulfilled, (state, action) => {
-        const { id } = action.payload;
+        const { id, skipped } = action.payload;
         state.refreshing.sources.delete(id);
         
-        // 更新最后刷新时间
-        rssSlice.caseReducers.updateSourceInList(state, {
-          payload: {
-            id,
-            updates: { lastFetchAt: new Date() },
-          },
-          type: 'updateSourceInList',
-        });
+        if (!skipped) {
+          rssSlice.caseReducers.updateSourceInList(state, {
+            payload: {
+              id,
+              updates: { lastFetchAt: new Date() },
+            },
+            type: 'updateSourceInList',
+          });
+        }
       })
       .addCase(refreshRSSSource.rejected, (state, action) => {
         const sourceId = action.meta.arg;
