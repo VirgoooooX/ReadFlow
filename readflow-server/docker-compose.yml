@@ -4,7 +4,7 @@ services:
     container_name: readflow-server
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "30000:3000"
     volumes:
       # 持久化数据
       - ./data:/app/data

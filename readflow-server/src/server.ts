@@ -143,15 +143,40 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal Server Error', details: err.message });
 });
 
-app.listen(PORT, () => {
-  logger.system(`Server running on port ${PORT}`);
-  startRssAutoRefresh();
+async function start(): Promise<void> {
+  await storageService.init();
 
-  // Initial status log
-  setTimeout(logServerStatus, 5000);
+  app.listen(PORT, () => {
+    logger.system(`Server running on port ${PORT}`);
+    startRssAutoRefresh();
 
-  // Periodic status heartbeat (every hour)
-  setInterval(logServerStatus, 60 * 60 * 1000);
+    setTimeout(logServerStatus, 5000);
+    setInterval(logServerStatus, 60 * 60 * 1000);
+
+    let lastCleanupAt = 0;
+    const runCleanupIfDue = async () => {
+      const settings = storageService.getSettings();
+      const hours = settings.cleanupIntervalHours ?? 24;
+      const intervalMs = Math.max(1, hours) * 60 * 60 * 1000;
+      const now = Date.now();
+      if (now - lastCleanupAt < intervalMs) return;
+      lastCleanupAt = now;
+      const result = await storageService.cleanupArticles();
+      logger.system(`Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount}`);
+    };
+
+    setTimeout(() => {
+      runCleanupIfDue().catch(e => logger.error('Cleanup failed', e));
+    }, 30_000);
+
+    setInterval(() => {
+      runCleanupIfDue().catch(e => logger.error('Cleanup failed', e));
+    }, 60_000);
+  });
+}
+
+start().catch(error => {
+  logger.error('Server start failed:', error);
 });
 
 async function logServerStatus() {

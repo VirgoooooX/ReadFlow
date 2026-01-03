@@ -20,9 +20,14 @@ const prisma = new PrismaClient({
 export interface ServerSettings {
   imageQuality: number;
   adminPassword?: string;
-  rssRefreshIntervalSeconds?: number;
-  rssMaxArticlesPerFeed?: number;
-  rssSyncMaxBlocksPerFeed?: number;
+  rssDefaultRefreshIntervalSeconds?: number;
+  rssMaxItemsPerFetch?: number;
+  rssFetchTimeoutMs?: number;
+  retentionDays?: number;
+  retentionMaxArticlesPerFeed?: number;
+  cleanupIntervalHours?: number;
+  syncPageSizeDefault?: number;
+  syncPageSizeMax?: number;
 }
 
 // Retain legacy interfaces for compatibility
@@ -79,10 +84,10 @@ interface StoredSyncBlock {
 export class StorageService {
   private static instance: StorageService;
   
-  // In-memory cache for ServerSettings (since we decided to keep them simple/file-based or hardcoded for now)
-  // Actually, let's just hardcode defaults + env vars for ServerSettings to avoid fs dependency
   private settings: ServerSettings;
   private cacheDir: string;
+  private settingsInitialized: boolean = false;
+  private readonly serverSettingsKey = 'global';
 
   private constructor() {
     this.cacheDir = path.join(process.cwd(), 'public', 'cache');
@@ -92,10 +97,15 @@ export class StorageService {
 
     this.settings = {
       imageQuality: 80,
-      rssRefreshIntervalSeconds: 900,
-      rssMaxArticlesPerFeed: 20,
-      rssSyncMaxBlocksPerFeed: 200,
-      adminPassword: process.env.ADMIN_PASSWORD || 'admin'
+      rssDefaultRefreshIntervalSeconds: 900,
+      rssMaxItemsPerFetch: 20,
+      rssFetchTimeoutMs: 15000,
+      retentionDays: 0,
+      retentionMaxArticlesPerFeed: 0,
+      cleanupIntervalHours: 24,
+      syncPageSizeDefault: 200,
+      syncPageSizeMax: 2000,
+      adminPassword: process.env.ADMIN_PASSWORD || 'admin',
     };
   }
 
@@ -104,6 +114,27 @@ export class StorageService {
       StorageService.instance = new StorageService();
     }
     return StorageService.instance;
+  }
+
+  public async init(): Promise<void> {
+    if (this.settingsInitialized) return;
+    try {
+      const row = await prisma.serverSetting.findUnique({ where: { key: this.serverSettingsKey } });
+      const data = row?.data && typeof row.data === 'object' ? row.data : null;
+      if (data) {
+        this.settings = { ...this.settings, ...this.sanitizeSettings(data) };
+      } else {
+        await prisma.serverSetting.upsert({
+          where: { key: this.serverSettingsKey },
+          update: { data: this.settings as any },
+          create: { key: this.serverSettingsKey, data: this.settings as any },
+        });
+      }
+      this.settingsInitialized = true;
+    } catch (error) {
+      this.settingsInitialized = true;
+      logger.error('Failed to init server settings from DB:', error);
+    }
   }
 
   private normalizeUrl(url: string): string {
@@ -123,9 +154,70 @@ export class StorageService {
     return { ...this.settings };
   }
 
-  public saveSettings(newSettings: Partial<ServerSettings>) {
-    this.settings = { ...this.settings, ...newSettings };
-    // TODO: Persist server settings if needed. For now memory/env is fine.
+  public async saveSettings(newSettings: Partial<ServerSettings>) {
+    const sanitized = this.sanitizeSettings(newSettings);
+    this.settings = { ...this.settings, ...sanitized };
+    await prisma.serverSetting.upsert({
+      where: { key: this.serverSettingsKey },
+      update: { data: this.settings as any },
+      create: { key: this.serverSettingsKey, data: this.settings as any },
+    });
+  }
+
+  private sanitizeSettings(input: any): Partial<ServerSettings> {
+    const out: Partial<ServerSettings> = {};
+
+    const setNum = (key: keyof ServerSettings, v: any, min?: number, max?: number) => {
+      if (v === undefined || v === null) return;
+      const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+      if (!Number.isFinite(n)) return;
+      let next = n;
+      if (typeof min === 'number') next = Math.max(min, next);
+      if (typeof max === 'number') next = Math.min(max, next);
+      (out as any)[key] = next;
+    };
+
+    const setStr = (key: keyof ServerSettings, v: any) => {
+      if (v === undefined || v === null) return;
+      const s = String(v);
+      if (!s) return;
+      (out as any)[key] = s;
+    };
+
+    setNum('imageQuality', input.imageQuality, 1, 100);
+    setNum(
+      'rssDefaultRefreshIntervalSeconds',
+      input.rssDefaultRefreshIntervalSeconds ?? input.rssRefreshIntervalSeconds,
+      60
+    );
+
+    setNum(
+      'rssMaxItemsPerFetch',
+      input.rssMaxItemsPerFetch ?? input.rssMaxArticlesPerFeed ?? input.fetchParseItemCap,
+      0,
+      5000
+    );
+    setNum('rssFetchTimeoutMs', input.rssFetchTimeoutMs ?? input.fetchTimeoutMs, 1000, 60000);
+
+    setNum('syncPageSizeDefault', input.syncPageSizeDefault ?? input.syncDefaultPageSize, 10, 2000);
+    setNum(
+      'syncPageSizeMax',
+      input.syncPageSizeMax ?? input.syncMaxPageSize ?? input.rssSyncMaxBlocksPerFeed,
+      100,
+      10000
+    );
+
+    setNum('retentionDays', input.retentionDays ?? input.articleRetentionDays, 0, 3650);
+    setNum(
+      'retentionMaxArticlesPerFeed',
+      input.retentionMaxArticlesPerFeed ?? input.articleMaxCountPerFeed,
+      0,
+      5_000_000
+    );
+    setNum('cleanupIntervalHours', input.cleanupIntervalHours, 1, 168);
+
+    setStr('adminPassword', input.adminPassword);
+    return out;
   }
 
   // Users
@@ -254,6 +346,7 @@ export class StorageService {
       category: s.category,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt.toISOString(),
+      refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
       lastRefreshAt: s.lastFetchAt?.toISOString(),
       lastRefreshStatus: 'ok', // Simplified
       lastRefreshError: undefined,
@@ -274,6 +367,7 @@ export class StorageService {
       category: uf.source.category,
       createdAt: uf.source.createdAt,
       updatedAt: uf.source.updatedAt.toISOString(),
+      refreshIntervalSeconds: uf.source.refreshIntervalSeconds ?? undefined,
       lastRefreshAt: uf.source.lastFetchAt?.toISOString(),
       articleCount: uf.source._count?.articles ?? 0,
       subscriberCount: uf.source._count?.users ?? 0,
@@ -409,7 +503,9 @@ export class StorageService {
     const normalizedUrl = this.normalizeUrl(sourceUrl);
     const source = await prisma.rSSSource.findUnique({ where: { url: normalizedUrl } });
     
-    if (!source) return { latest: 0, blocks: [] };
+    const limit = Number.isFinite(maxBlocks) && maxBlocks > 0 ? maxBlocks : 50;
+
+    if (!source) return { latest: 0, blocks: [], hasMore: false };
 
     // Fetch articles newer than `since` (Article ID)
     const articles = await prisma.article.findMany({
@@ -418,14 +514,20 @@ export class StorageService {
         id: { gt: since }
       },
       orderBy: { id: 'asc' },
-      take: 50 // Limit batch size
+      take: limit
     });
 
     if (articles.length === 0) {
-      return { latest: since, blocks: [] };
+      return { latest: since, blocks: [], hasMore: false };
     }
 
     const latestId = articles[articles.length - 1].id;
+    const hasMore =
+      articles.length === limit &&
+      !!(await prisma.article.findFirst({
+        where: { sourceId: source.id, id: { gt: latestId } },
+        select: { id: true },
+      }));
     
     // Wrap as a single block
     const block: StoredSyncBlock = {
@@ -455,7 +557,8 @@ export class StorageService {
 
     return {
       latest: latestId,
-      blocks: [block]
+      blocks: [block],
+      hasMore,
     };
   }
 
@@ -532,14 +635,60 @@ export class StorageService {
         name: feed.name,
         category: feed.category,
         lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
+        refreshIntervalSeconds: feed.refreshIntervalSeconds === undefined ? undefined : (feed.refreshIntervalSeconds ?? null),
       },
       create: {
         url: normalizedUrl,
         name: feed.name,
         category: feed.category || 'General',
         lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
+        refreshIntervalSeconds: feed.refreshIntervalSeconds ?? null,
       }
     });
+  }
+
+  public async cleanupArticles(): Promise<{ deletedByRetention: number; deletedByMaxCount: number }> {
+    const settings = this.getSettings();
+    const retentionDays = settings.retentionDays ?? 0;
+    const maxCount = settings.retentionMaxArticlesPerFeed ?? 0;
+
+    let deletedByRetention = 0;
+    let deletedByMaxCount = 0;
+
+    const sources = await prisma.rSSSource.findMany({ select: { id: true } });
+
+    if (retentionDays > 0) {
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+      const result = await prisma.article.deleteMany({
+        where: {
+          sourceId: { in: sources.map(s => s.id) },
+          publishedAt: { lt: cutoff },
+        },
+      });
+      deletedByRetention += result.count;
+    }
+
+    if (maxCount > 0) {
+      for (const s of sources) {
+        while (true) {
+          const ids = await prisma.article.findMany({
+            where: { sourceId: s.id },
+            orderBy: { publishedAt: 'desc' },
+            select: { id: true },
+            skip: maxCount,
+            take: 1000,
+          });
+          if (ids.length === 0) break;
+          const result = await prisma.article.deleteMany({
+            where: { id: { in: ids.map(x => x.id) } },
+          });
+          deletedByMaxCount += result.count;
+          if (ids.length < 1000) break;
+        }
+      }
+    }
+
+    return { deletedByRetention, deletedByMaxCount };
   }
 
   public async deleteFeed(id: string) {

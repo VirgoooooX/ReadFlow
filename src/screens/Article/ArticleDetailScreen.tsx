@@ -284,9 +284,16 @@ const ArticleDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets(); // 获取安全区域
   const webViewRef = useRef<WebView>(null);
   // 【优化】优先使用传递过来的 article 对象，实现秒开
-  const [article, setArticle] = useState<Article | null>(passedArticle || null);
+  const passedArticleHydrated: Article | null = passedArticle
+    ? {
+        ...passedArticle,
+        publishedAt: new Date(passedArticle.publishedAt),
+        readAt: passedArticle.readAt ? new Date(passedArticle.readAt) : undefined,
+      }
+    : null;
+  const [article, setArticle] = useState<Article | null>(passedArticleHydrated);
   // 【优化】如果有传递的数据，就不显示全屏 Loading
-  const [loading, setLoading] = useState(!passedArticle);
+  const [loading, setLoading] = useState(!passedArticleHydrated);
   const [vocabularyWords, setVocabularyWords] = useState<string[]>([]); // 单词本单词数组
   const vocabularyWordsRef = useRef<string[]>([]); // 使用 Ref 存储最新单词列表，避免重渲染
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态

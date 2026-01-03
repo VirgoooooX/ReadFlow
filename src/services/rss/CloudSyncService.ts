@@ -73,61 +73,85 @@ export class CloudSyncService implements IRSSProvider {
         }
       }
 
-      const syncUrl = `${serverUrl}/api/rss/sync?url=${encodeURIComponent(source.url)}&since=${since}&imageCompression=${imageCompression}`;
-      logger.info(`[CloudSync] Syncing articles for source ${source.name} from ${syncUrl}`);
-
-      let articles: Article[] = [];
+      const sourceId = typeof source.id === 'string' ? parseInt(source.id, 10) : source.id;
+      let cursor = since;
       let latestCursor = since;
+      const aggregated: Article[] = [];
+      const seenUrls = new Set<string>();
 
-      const syncResp = await this.authenticatedFetch(syncUrl);
-      if (syncResp.ok) {
-        const payload = await syncResp.json();
-        const blocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
-        const upserts = blocks.flatMap((b: any) => (Array.isArray(b?.upserts) ? b.upserts : []));
+      const maxPages = 100;
+      let page = 0;
 
-        articles = upserts.map((item: any) => this.mapServerArticle(item, source));
+      while (page < maxPages) {
+        const syncUrl = `${serverUrl}/api/rss/sync?url=${encodeURIComponent(source.url)}&since=${cursor}&imageCompression=${imageCompression}`;
+        logger.info(`[CloudSync] Syncing articles for source ${source.name} from ${syncUrl}`);
 
-        latestCursor = typeof payload?.latest === 'number' ? payload.latest : since;
-        if (latestCursor !== since) {
-          const nextSync = {
-            ...settings.sync,
-            cloudCursors: { ...cursors, [source.url]: latestCursor },
-          };
-          await this.settingsService.updateAppSetting('sync', nextSync);
+        const syncResp = await this.authenticatedFetch(syncUrl);
+        if (syncResp.ok) {
+          const payload = await syncResp.json();
+          const blocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
+          const upserts = blocks.flatMap((b: any) => (Array.isArray(b?.upserts) ? b.upserts : []));
+          const pageArticles = upserts.map((item: any) => this.mapServerArticle(item, source));
+
+          const pageLatest = typeof payload?.latest === 'number' ? payload.latest : cursor;
+          const hasMore = payload?.hasMore === true;
+
+          const filteredPage = await filterService.applyFilterRules<Article>(pageArticles, sourceId);
+          logger.info(`[CloudSync] Filtered articles: ${pageArticles.length} -> ${filteredPage.length}`);
+          await this.saveArticles(filteredPage);
+
+          for (const a of filteredPage) {
+            if (!a?.url) continue;
+            if (seenUrls.has(a.url)) continue;
+            seenUrls.add(a.url);
+            aggregated.push(a);
+          }
+
+          if (pageLatest > cursor) {
+            cursor = pageLatest;
+            latestCursor = pageLatest;
+            const nextSync = {
+              ...settings.sync,
+              cloudCursors: { ...cursors, [source.url]: latestCursor },
+            };
+            await this.settingsService.updateAppSettingNoCloudSync('sync', nextSync);
+          } else if (pageLatest < cursor) {
+            logger.warn(`[CloudSync] Sync cursor regressed for ${source.name}, stopping pagination`);
+            break;
+          } else if (pageArticles.length > 0 && hasMore) {
+            logger.warn(`[CloudSync] Sync cursor did not advance for ${source.name}, stopping pagination`);
+            break;
+          }
+
+          if (!hasMore || pageArticles.length === 0) {
+            break;
+          }
+
+          page += 1;
+          continue;
         }
-      } else if (syncResp.status === 404) {
-        const apiUrl = `${serverUrl}/api/rss?url=${encodeURIComponent(source.url)}&imageCompression=${imageCompression}`;
-        logger.info(`[CloudSync] Falling back to full fetch for source ${source.name} from ${apiUrl}`);
 
-        const response = await this.authenticatedFetch(apiUrl);
-        if (!response.ok) {
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        if (syncResp.status === 404) {
+          const apiUrl = `${serverUrl}/api/rss?url=${encodeURIComponent(source.url)}&imageCompression=${imageCompression}`;
+          logger.info(`[CloudSync] Falling back to full fetch for source ${source.name} from ${apiUrl}`);
+
+          const response = await this.authenticatedFetch(apiUrl);
+          if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          const articles = Array.isArray(data) ? data.map((item: any) => this.mapServerArticle(item, source)) : [];
+          const filteredArticles = await filterService.applyFilterRules<Article>(articles, sourceId);
+          logger.info(`[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`);
+          await this.saveArticles(filteredArticles);
+          return filteredArticles;
         }
 
-        const data = await response.json();
-        articles = Array.isArray(data) ? data.map((item: any) => this.mapServerArticle(item, source)) : [];
-      } else {
         throw new Error(`Server returned ${syncResp.status}: ${syncResp.statusText}`);
       }
 
-      // 🔥 Apply client-side filtering (Crucial for Cloud Mode to support per-user rules)
-      const sourceId = typeof source.id === 'string' ? parseInt(source.id, 10) : source.id;
-      const filteredArticles = await filterService.applyFilterRules(articles, sourceId);
-      logger.info(`[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`);
-
-      // Save to local database
-      await this.saveArticles(filteredArticles);
-
-      // Check if we need to trigger a refresh (if data is stale)
-      // If latest block didn't change, and it's been a while, trigger refresh
-      if (latestCursor === since) {
-        // Logic to check last refresh time could be here, but for now we trust user action
-        // If user manually pulled (not auto-sync), and no new data, maybe we should trigger?
-        // But fetchArticles doesn't know if it's manual or auto.
-        // Let's rely on the caller to decide. Or we can return a flag.
-      }
-
-      return filteredArticles;
+      return aggregated;
     } catch (error) {
       logger.error('[CloudSync] Fetch failed:', error);
       throw error;
@@ -157,12 +181,12 @@ export class CloudSyncService implements IRSSProvider {
         if (userId !== authUser.id) {
           userId = authUser.id;
           // Update setting immediately to match Auth User
-          await this.settingsService.updateAppSetting('sync', { ...appSettings.sync, userId });
+          await this.settingsService.updateAppSettingNoCloudSync('sync', { ...appSettings.sync, userId });
         }
       } else if (!userId) {
         // Fallback: Generate random ID for guest
         userId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-        await this.settingsService.updateAppSetting('sync', { ...appSettings.sync, userId });
+        await this.settingsService.updateAppSettingNoCloudSync('sync', { ...appSettings.sync, userId });
       }
 
       const rows: any[] = await this.databaseService.executeQuery(
@@ -207,7 +231,7 @@ export class CloudSyncService implements IRSSProvider {
         userId = respData.user.id;
       }
 
-      await this.settingsService.updateAppSetting('sync', { ...appSettings.sync, userId, lastProfilePushAt: now });
+      await this.settingsService.updateAppSettingNoCloudSync('sync', { ...appSettings.sync, userId, lastProfilePushAt: now });
     } catch (error) {
       logger.warn('[CloudSync] Profile push failed:', error);
     }
@@ -283,7 +307,7 @@ export class CloudSyncService implements IRSSProvider {
         }
         
         // Update sync timestamp
-        await this.settingsService.updateAppSetting('sync', { 
+        await this.settingsService.updateAppSettingNoCloudSync('sync', { 
           ...appSettings.sync, 
           lastStateSyncAt: Date.now() 
         });

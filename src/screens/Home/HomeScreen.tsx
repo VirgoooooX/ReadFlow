@@ -961,11 +961,25 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 
             const currentIndex = articleIds.indexOf(id);
             setLastViewedArticleId(id);
+      const quickArticle = tabData.articles.find(a => a.id === id);
             navigation.navigate('ArticleDetail', { 
               articleId: id,
               articleIds,
               currentIndex: currentIndex >= 0 ? currentIndex : 0,
-              article: tabData.articles.find(a => a.id === id)
+              article: quickArticle
+                ? {
+                    ...quickArticle,
+                    publishedAt:
+                      quickArticle.publishedAt instanceof Date
+                        ? quickArticle.publishedAt.toISOString()
+                        : new Date((quickArticle as any).publishedAt).toISOString(),
+                    readAt: quickArticle.readAt
+                      ? (quickArticle.readAt instanceof Date
+                          ? quickArticle.readAt.toISOString()
+                          : new Date((quickArticle as any).readAt).toISOString())
+                      : undefined,
+                  }
+                : undefined
             });
           }}
           isDark={isDark}

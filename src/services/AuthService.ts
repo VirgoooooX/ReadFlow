@@ -406,7 +406,7 @@ export class AuthService {
 
     if (remoteReadingSettings) {
       try {
-        await this.getSettingsService().saveReadingSettings(remoteReadingSettings);
+        await this.getSettingsService().saveReadingSettingsNoCloudSync(remoteReadingSettings);
       } catch {
       }
     }
@@ -420,7 +420,7 @@ export class AuthService {
         userId,
       },
     };
-    await this.getSettingsService().saveAppSettings(merged);
+    await this.getSettingsService().saveAppSettingsNoCloudSync(merged);
     const readingSettings = await this.getSettingsService().getReadingSettings();
     await this.pushCloudSettingsFromLocal(token, userId, { appSettings: merged, readingSettings });
   }

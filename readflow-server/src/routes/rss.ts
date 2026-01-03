@@ -159,7 +159,7 @@ async function refreshAllFeedsOnce() {
 
     const now = Date.now();
     const settings = storageService.getSettings();
-    const globalIntervalSeconds = settings.rssRefreshIntervalSeconds ?? 900;
+    const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
 
     for (const feed of feeds) {
       if (!feed?.url) continue;
@@ -182,11 +182,19 @@ async function refreshAllFeedsOnce() {
           isActive: true,
           errorCount: 0,
           groupId: null,
-          maxArticles: settings.rssMaxArticlesPerFeed ?? 20,
+          maxArticles: settings.rssMaxItemsPerFetch ?? 20,
         };
 
         const startedAtIso = new Date().toISOString();
-        const articles = await rssParserService.fetchAndParseArticles(source, [], undefined, true, settings.imageQuality ?? 80, false);
+        const articles = await rssParserService.fetchAndParseArticles(
+          source,
+          [],
+          undefined,
+          true,
+          settings.imageQuality ?? 80,
+          false,
+          settings.rssFetchTimeoutMs
+        );
         const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
 
         await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: startedAtIso, status: 'ok' });
@@ -228,7 +236,8 @@ router.get('/', async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
     const imageCompression = req.query.imageCompression === 'true';
-    const imageQuality = storageService.getSettings().imageQuality ?? 80;
+    const settings = storageService.getSettings();
+    const imageQuality = settings.imageQuality ?? 80;
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
@@ -254,7 +263,9 @@ router.get('/', async (req: Request, res: Response) => {
       [], 
       baseUrl, 
       imageCompression, 
-      imageQuality
+      imageQuality,
+      true,
+      settings.rssFetchTimeoutMs
     );
     res.json(articles);
   } catch (error) {
@@ -267,15 +278,24 @@ router.get('/sync', async (req: Request, res: Response) => {
     const url = req.query.url as string;
     const since = req.query.since ? parseInt(req.query.since as string) : 0;
     const maxBlocks = req.query.maxBlocks ? parseInt(req.query.maxBlocks as string) : 20;
+    const limitRaw = req.query.limit ? parseInt(req.query.limit as string) : undefined;
     const imageCompression = coerceBool(req.query.imageCompression);
-    const imageQuality = storageService.getSettings().imageQuality ?? 80;
+    const settings = storageService.getSettings();
+    const imageQuality = settings.imageQuality ?? 80;
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
     }
 
     const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
-    const { latest, blocks } = await storageService.getSyncBlocksForSource(url, Number.isFinite(since) ? since : 0, Number.isFinite(maxBlocks) ? maxBlocks : 20);
+    const defaultLimit = settings.syncPageSizeDefault ?? 200;
+    const maxLimit = settings.syncPageSizeMax ?? 2000;
+    const effectiveLimit = Math.max(1, Math.min(Number.isFinite(limitRaw as number) ? (limitRaw as number) : defaultLimit, maxLimit));
+    const { latest, blocks, hasMore } = await storageService.getSyncBlocksForSource(
+      url,
+      Number.isFinite(since) ? since : 0,
+      effectiveLimit
+    );
 
     const mappedBlocks = blocks.map(b => ({
       id: b.id,
@@ -287,6 +307,7 @@ router.get('/sync', async (req: Request, res: Response) => {
       sourceUrl: url,
       latest,
       blocks: mappedBlocks,
+      hasMore,
     });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -380,11 +401,19 @@ router.post('/refresh', async (req: Request, res: Response) => {
       isActive: true,
       errorCount: 0,
       groupId: null,
-      maxArticles: settings.rssMaxArticlesPerFeed ?? 20,
+      maxArticles: settings.rssMaxItemsPerFetch ?? 20,
     };
 
     const atIso = new Date().toISOString();
-    const articles = await rssParserService.fetchAndParseArticles(source, [], undefined, true, settings.imageQuality ?? 80, false);
+    const articles = await rssParserService.fetchAndParseArticles(
+      source,
+      [],
+      undefined,
+      true,
+      settings.imageQuality ?? 80,
+      false,
+      settings.rssFetchTimeoutMs
+    );
     const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
     
     await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: atIso, status: 'ok' });
@@ -456,7 +485,15 @@ router.post('/parse', async (req: Request, res: Response) => {
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const settings = storageService.getSettings();
-    const articles = await rssParserService.fetchAndParseArticles(source, filterRules || [], baseUrl, true, settings.imageQuality ?? 80);
+    const articles = await rssParserService.fetchAndParseArticles(
+      source,
+      filterRules || [],
+      baseUrl,
+      true,
+      settings.imageQuality ?? 80,
+      true,
+      settings.rssFetchTimeoutMs
+    );
     res.json({ articles });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

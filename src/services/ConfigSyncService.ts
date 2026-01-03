@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SettingsService } from './SettingsService';
 import { rssService } from './rss/RSSService';
 import { cloudConfigService } from './CloudConfigService';
@@ -11,6 +12,7 @@ import cacheEventEmitter from './CacheEventEmitter';
 
 export class ConfigSyncService {
   private static instance: ConfigSyncService;
+  private static readonly LAST_PUSHED_FINGERPRINT_KEY = 'cloud_config_last_pushed_fingerprint_v1';
   private settingsService?: SettingsService;
   private rssService = rssService;
   private groupService = GroupService;
@@ -20,6 +22,91 @@ export class ConfigSyncService {
   private inFlightMarker: Record<'push' | 'pull', string | undefined> = { push: undefined, pull: undefined };
 
   private constructor() {}
+
+  private static stableStringify(value: any): string {
+    const seen = new WeakSet<object>();
+    const normalize = (input: any): any => {
+      if (input === null || input === undefined) return input;
+      const t = typeof input;
+      if (t === 'string' || t === 'number' || t === 'boolean') return input;
+      if (Array.isArray(input)) return input.map(normalize);
+      if (t === 'object') {
+        if (seen.has(input)) return '[Circular]';
+        seen.add(input);
+        const out: Record<string, any> = {};
+        for (const key of Object.keys(input).sort()) {
+          const v = (input as any)[key];
+          if (v === undefined) continue;
+          out[key] = normalize(v);
+        }
+        return out;
+      }
+      return String(input);
+    };
+    return JSON.stringify(normalize(value));
+  }
+
+  private static fnv1aHex(input: string): string {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < input.length; i += 1) {
+      hash ^= input.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+
+  private sanitizeExportedSettingsForConfigSync(settings: any): any {
+    const exported = settings && typeof settings === 'object' ? settings : {};
+    const {
+      exportedAt: _exportedAt,
+      appSettings: rawAppSettings,
+      ...rest
+    } = exported;
+
+    const appSettings = rawAppSettings && typeof rawAppSettings === 'object' ? { ...rawAppSettings } : undefined;
+    if (appSettings && appSettings.sync && typeof appSettings.sync === 'object') {
+      const {
+        cloudCursors: _cloudCursors,
+        lastProfilePushAt: _lastProfilePushAt,
+        lastStateSyncAt: _lastStateSyncAt,
+        lastVocabSyncAt: _lastVocabSyncAt,
+        userId: _userId,
+        ...syncRest
+      } = appSettings.sync;
+      appSettings.sync = syncRest;
+    }
+
+    return {
+      ...rest,
+      ...(appSettings ? { appSettings } : {}),
+    };
+  }
+
+  private computeConfigFingerprint(input: { settings: any; sources: any; groups: any; filterRules: any }): string {
+    const canonical = ConfigSyncService.stableStringify({
+      settings: this.sanitizeExportedSettingsForConfigSync(input.settings),
+      sources: input.sources,
+      groups: input.groups,
+      filterRules: input.filterRules,
+    });
+    return ConfigSyncService.fnv1aHex(canonical);
+  }
+
+  private async getLastPushedFingerprint(): Promise<string | null> {
+    try {
+      const v = await AsyncStorage.getItem(ConfigSyncService.LAST_PUSHED_FINGERPRINT_KEY);
+      return v ? String(v) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async setLastPushedFingerprint(value: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(ConfigSyncService.LAST_PUSHED_FINGERPRINT_KEY, value);
+    } catch {
+    }
+  }
 
   private redactForLog(input: any, depth: number = 0): any {
     if (depth > 8) return '[Truncated]';
@@ -171,8 +258,15 @@ export class ConfigSyncService {
       this.filterService.exportRulesForSync(),
     ]);
 
+    const fingerprint = this.computeConfigFingerprint({ settings, sources, groups, filterRules });
+    const lastFingerprint = await this.getLastPushedFingerprint();
+    if (lastFingerprint && lastFingerprint === fingerprint) {
+      logger.info(`[ConfigSync] Skip push: Config unchanged requestId=${requestId} fingerprint=${fingerprint}`);
+      return;
+    }
+
     const payload = {
-      settings,
+      settings: this.sanitizeExportedSettingsForConfigSync(settings),
       sources,
       groups,
       filterRules,
@@ -223,6 +317,7 @@ export class ConfigSyncService {
     logger.info(
       `[ConfigSync] Push successful requestId=${requestId}${resData?.updatedAt ? ` serverUpdatedAt=${resData.updatedAt}` : ''}`
     );
+    await this.setLastPushedFingerprint(fingerprint);
     
     // Trigger Vocabulary Sync
     this.vocabService.syncToProxyServer().catch(e => logger.warn('[ConfigSync] Vocab sync failed:', e));
@@ -294,8 +389,10 @@ export class ConfigSyncService {
         this.groupService.exportGroupsForSync(),
         this.filterService.exportRulesForSync(),
       ]);
+      const fingerprint = this.computeConfigFingerprint({ settings, sources, groups, filterRules });
+      await this.setLastPushedFingerprint(fingerprint);
       this.logConfigSnapshot(requestId, 'Local config (after pull applied)', {
-        settings,
+        settings: this.sanitizeExportedSettingsForConfigSync(settings),
         sources,
         groups,
         filterRules,

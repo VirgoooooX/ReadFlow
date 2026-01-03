@@ -10,6 +10,7 @@ export class SettingsService {
   private static instance: SettingsService;
   private databaseService: DatabaseService;
   private cloudSettingsSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private cloudSettingsSyncSuppressDepth: number = 0;
   private static readonly STORAGE_KEYS = {
     READING_SETTINGS: 'reading_settings',
     APP_SETTINGS: 'app_settings',
@@ -24,6 +25,65 @@ export class SettingsService {
 
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
+  }
+
+  private async withCloudSettingsSyncSuppressed<T>(fn: () => Promise<T>): Promise<T> {
+    this.cloudSettingsSyncSuppressDepth += 1;
+    try {
+      return await fn();
+    } finally {
+      this.cloudSettingsSyncSuppressDepth = Math.max(0, this.cloudSettingsSyncSuppressDepth - 1);
+    }
+  }
+
+  private deepEqual(a: any, b: any): boolean {
+    if (a === b) return true;
+    if (a === null || a === undefined || b === null || b === undefined) return false;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== 'object') return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) {
+        if (!this.deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    aKeys.sort();
+    bKeys.sort();
+    for (let i = 0; i < aKeys.length; i += 1) {
+      if (aKeys[i] !== bKeys[i]) return false;
+    }
+    for (const k of aKeys) {
+      if (!this.deepEqual(a[k], b[k])) return false;
+    }
+    return true;
+  }
+
+  private isOnlySyncRuntimeMetaChanged(prev: AppSettings, next: AppSettings): boolean {
+    const prevSync = (prev as any)?.sync;
+    const nextSync = (next as any)?.sync;
+    const { sync: _prevSync, ...prevRest } = prev as any;
+    const { sync: _nextSync, ...nextRest } = next as any;
+    if (!this.deepEqual(prevRest, nextRest)) return false;
+    if (!prevSync || !nextSync) return false;
+
+    const runtimeKeys = new Set([
+      'cloudCursors',
+      'lastProfilePushAt',
+      'lastStateSyncAt',
+      'lastVocabSyncAt',
+      'userId',
+    ]);
+    const keys = new Set<string>([...Object.keys(prevSync), ...Object.keys(nextSync)]);
+    for (const k of keys) {
+      if (runtimeKeys.has(k)) continue;
+      if (!this.deepEqual(prevSync[k], nextSync[k])) return false;
+    }
+    return true;
   }
 
   public static getInstance(): SettingsService {
@@ -97,11 +157,24 @@ export class SettingsService {
    */
   public async saveAppSettings(settings: AppSettings): Promise<void> {
     try {
+      let shouldSchedule = this.cloudSettingsSyncSuppressDepth === 0;
+      if (shouldSchedule) {
+        try {
+          const previous = await this.getAppSettings();
+          if (this.isOnlySyncRuntimeMetaChanged(previous, settings)) {
+            shouldSchedule = false;
+          }
+        } catch {
+        }
+      }
+
       await AsyncStorage.setItem(
         SettingsService.STORAGE_KEYS.APP_SETTINGS,
         JSON.stringify(settings)
       );
-      this.scheduleCloudSettingsSync();
+      if (shouldSchedule) {
+        this.scheduleCloudSettingsSync();
+      }
     } catch (error) {
       logger.error('Error saving app settings:', error);
       throw new AppError({
@@ -165,7 +238,31 @@ export class SettingsService {
     }
   }
 
+  public async updateAppSettingNoCloudSync<K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K]
+  ): Promise<void> {
+    await this.withCloudSettingsSyncSuppressed(async () => {
+      await this.updateAppSetting(key, value);
+    });
+  }
+
+  public async saveAppSettingsNoCloudSync(settings: AppSettings): Promise<void> {
+    await this.withCloudSettingsSyncSuppressed(async () => {
+      await this.saveAppSettings(settings);
+    });
+  }
+
+  public async saveReadingSettingsNoCloudSync(settings: ReadingSettings): Promise<void> {
+    await this.withCloudSettingsSyncSuppressed(async () => {
+      await this.saveReadingSettings(settings);
+    });
+  }
+
   private scheduleCloudSettingsSync(): void {
+    if (this.cloudSettingsSyncSuppressDepth > 0) {
+      return;
+    }
     if (this.cloudSettingsSyncTimer) {
       clearTimeout(this.cloudSettingsSyncTimer);
     }
@@ -442,13 +539,15 @@ export class SettingsService {
     proxyServersConfig?: any;
   }): Promise<void> {
     try {
-      if (data.readingSettings) {
-        await this.saveReadingSettings(data.readingSettings);
-      }
+      await this.withCloudSettingsSyncSuppressed(async () => {
+        if (data.readingSettings) {
+          await this.saveReadingSettings(data.readingSettings);
+        }
 
-      if (data.appSettings) {
-        await this.saveAppSettings(data.appSettings);
-      }
+        if (data.appSettings) {
+          await this.saveAppSettings(data.appSettings);
+        }
+      });
 
       if (data.rssSettings) {
         await this.saveRSSSettings(data.rssSettings);

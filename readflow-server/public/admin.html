@@ -464,17 +464,45 @@
                                     <input type="number" id="setting-refresh-interval" min="15" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">单次最大抓取文章数</label>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">单次解析保护上限</label>
                                     <input type="number" id="setting-max-articles" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">最大同步块保留数</label>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">同步最大分页大小</label>
                                     <input type="number" id="setting-max-blocks" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">抓取超时 (毫秒)</label>
+                                    <input type="number" id="setting-fetch-timeout" min="1000" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">同步默认分页大小</label>
+                                    <input type="number" id="setting-sync-default-page" min="10" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                 </div>
                             </div>
                         </div>
 
                         <hr class="border-slate-100/50">
+
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
+                                <span class="w-1 h-4 bg-emerald-500 rounded mr-2"></span> 库存治理
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">文章保留天数 (0=不限制)</label>
+                                    <input type="number" id="setting-retention-days" min="0" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">每源库存上限 (0=不限制)</label>
+                                    <input type="number" id="setting-max-count-per-feed" min="0" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">清理频率 (小时)</label>
+                                    <input type="number" id="setting-cleanup-interval" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Section 3 -->
                         <div>
@@ -942,24 +970,45 @@
             const res = await fetch(`${API_BASE}/settings`);
             const data = await res.json();
             document.getElementById('setting-quality').value = data.imageQuality || 80;
-            document.getElementById('setting-refresh-interval').value = data.rssRefreshIntervalSeconds || 900;
-            document.getElementById('setting-max-articles').value = data.rssMaxArticlesPerFeed || 20;
-            document.getElementById('setting-max-blocks').value = data.rssSyncMaxBlocksPerFeed || 200;
+            document.getElementById('setting-refresh-interval').value = data.rssDefaultRefreshIntervalSeconds ?? data.rssRefreshIntervalSeconds ?? 900;
+            document.getElementById('setting-max-articles').value = data.rssMaxItemsPerFetch ?? data.rssMaxArticlesPerFeed ?? data.fetchParseItemCap ?? 1000;
+            document.getElementById('setting-max-blocks').value = data.syncPageSizeMax ?? data.syncMaxPageSize ?? data.rssSyncMaxBlocksPerFeed ?? 2000;
+            document.getElementById('setting-fetch-timeout').value = data.rssFetchTimeoutMs ?? data.fetchTimeoutMs ?? 15000;
+            document.getElementById('setting-sync-default-page').value = data.syncPageSizeDefault ?? data.syncDefaultPageSize ?? 200;
+            document.getElementById('setting-retention-days').value = data.retentionDays ?? data.articleRetentionDays ?? 0;
+            document.getElementById('setting-max-count-per-feed').value = data.retentionMaxArticlesPerFeed ?? data.articleMaxCountPerFeed ?? 0;
+            document.getElementById('setting-cleanup-interval').value = data.cleanupIntervalHours ?? 24;
             document.getElementById('setting-password').value = data.adminPassword || '';
         } catch(e) { console.error(e); }
     }
 
     async function saveSettings() {
         const quality = parseInt(document.getElementById('setting-quality').value);
-        const rssRefreshIntervalSeconds = parseInt(document.getElementById('setting-refresh-interval').value);
-        const rssMaxArticlesPerFeed = parseInt(document.getElementById('setting-max-articles').value);
-        const rssSyncMaxBlocksPerFeed = parseInt(document.getElementById('setting-max-blocks').value);
+        const rssDefaultRefreshIntervalSeconds = parseInt(document.getElementById('setting-refresh-interval').value);
+        const rssMaxItemsPerFetch = parseInt(document.getElementById('setting-max-articles').value);
+        const syncPageSizeMax = parseInt(document.getElementById('setting-max-blocks').value);
+        const rssFetchTimeoutMs = parseInt(document.getElementById('setting-fetch-timeout').value);
+        const syncPageSizeDefault = parseInt(document.getElementById('setting-sync-default-page').value);
+        const retentionDays = parseInt(document.getElementById('setting-retention-days').value);
+        const retentionMaxArticlesPerFeed = parseInt(document.getElementById('setting-max-count-per-feed').value);
+        const cleanupIntervalHours = parseInt(document.getElementById('setting-cleanup-interval').value);
         const adminPassword = document.getElementById('setting-password').value;
         
         await fetch(`${API_BASE}/settings`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ imageQuality: quality, rssRefreshIntervalSeconds, rssMaxArticlesPerFeed, rssSyncMaxBlocksPerFeed, adminPassword })
+            body: JSON.stringify({
+                imageQuality: quality,
+                rssDefaultRefreshIntervalSeconds,
+                rssFetchTimeoutMs,
+                rssMaxItemsPerFetch,
+                retentionDays,
+                retentionMaxArticlesPerFeed,
+                cleanupIntervalHours,
+                syncPageSizeDefault,
+                syncPageSizeMax,
+                adminPassword
+            })
         });
         showToast('配置已成功保存并生效');
     }

@@ -122,7 +122,8 @@ export class RSSParserService {
     baseUrl?: string,
     imageCompression: boolean = true,
     imageQuality: number = 80,
-    applyImageProxy: boolean = true
+    applyImageProxy: boolean = true,
+    fetchTimeoutMs?: number
   ): Promise<Article[]> {
     try {
       logger.info(`Fetching articles from: ${source.url}`);
@@ -134,7 +135,7 @@ export class RSSParserService {
       }
       
       const response = await fetchWithRetry(actualUrl, {
-        timeout: 15000
+        timeout: typeof fetchTimeoutMs === 'number' && Number.isFinite(fetchTimeoutMs) ? fetchTimeoutMs : 15000
       });
       
       if (!response.ok) {

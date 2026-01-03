@@ -54,12 +54,14 @@ router.get('/settings', (req, res) => {
 });
 
 router.post('/settings', (req, res) => {
-  try {
-    storageService.saveSettings(req.body);
-    res.json(storageService.getSettings());
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to save settings' });
-  }
+  (async () => {
+    try {
+      await storageService.saveSettings(req.body);
+      res.json(storageService.getSettings());
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to save settings' });
+    }
+  })().catch(() => {});
 });
 
 // Users
@@ -116,7 +118,7 @@ router.post('/feeds', async (req, res) => {
       url: normalizedUrl,
       createdAt: req.body.createdAt || nowIso,
       updatedAt: nowIso,
-      refreshIntervalSeconds: req.body.refreshIntervalSeconds ?? defaults.rssRefreshIntervalSeconds ?? 900,
+      refreshIntervalSeconds: req.body.refreshIntervalSeconds ?? defaults.rssDefaultRefreshIntervalSeconds ?? 900,
     };
     await storageService.saveFeed(feed);
     res.json(feed);
@@ -194,11 +196,19 @@ router.post('/feeds/:id/refresh', async (req, res) => {
       isActive: true,
       errorCount: 0,
       groupId: null,
-      maxArticles: settings.rssMaxArticlesPerFeed ?? 20,
+      maxArticles: settings.rssMaxItemsPerFetch ?? 20,
     };
 
     const atIso = new Date().toISOString();
-    const articles = await rssParserService.fetchAndParseArticles(source, [], undefined, true, settings.imageQuality ?? 80, false);
+    const articles = await rssParserService.fetchAndParseArticles(
+      source,
+      [],
+      undefined,
+      true,
+      settings.imageQuality ?? 80,
+      false,
+      settings.rssFetchTimeoutMs
+    );
     const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
     await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: atIso, status: 'ok' });
     res.json({ success: true, ...result });
@@ -294,6 +304,15 @@ router.post('/maintenance/prune-images', (req, res) => {
     res.json({ success: true, ...result, message: `Pruned ${result.count} images (${(result.size/1024/1024).toFixed(2)}MB) older than ${days} days` });
   } catch (error) {
     res.status(500).json({ error: 'Failed to prune images' });
+  }
+});
+
+router.post('/maintenance/cleanup', async (req, res) => {
+  try {
+    const result = await storageService.cleanupArticles();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cleanup articles' });
   }
 });
 
