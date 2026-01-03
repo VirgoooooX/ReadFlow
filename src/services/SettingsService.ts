@@ -605,6 +605,44 @@ export class SettingsService {
     }
   }
 
+  public async clearCache(): Promise<void> {
+    try {
+      await this.databaseService.initializeDatabase();
+      await Promise.all([
+        this.databaseService.executeStatement('DELETE FROM dictionary_cache').catch(() => {}),
+        this.databaseService.executeStatement('DELETE FROM translation_cache').catch(() => {}),
+      ]);
+      cacheEventEmitter.clearAll();
+    } catch (error) {
+      logger.error('Error clearing cache:', error);
+      throw new AppError({
+        code: 'CACHE_CLEAR_ERROR',
+        message: 'Failed to clear cache',
+        details: error,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  public async clearReadingHistory(): Promise<void> {
+    try {
+      await this.databaseService.initializeDatabase();
+      await this.databaseService.executeStatement(
+        'UPDATE articles SET is_read = 0, read_progress = 0, read_at = NULL'
+      );
+      cacheEventEmitter.clearArticles();
+      cacheEventEmitter.updateRSSStats();
+    } catch (error) {
+      logger.error('Error clearing reading history:', error);
+      throw new AppError({
+        code: 'READING_HISTORY_CLEAR_ERROR',
+        message: 'Failed to clear reading history',
+        details: error,
+        timestamp: new Date(),
+      });
+    }
+  }
+
   /**
    * 获取用户偏好设置
    */
@@ -643,6 +681,33 @@ export class SettingsService {
       throw new AppError({
         code: 'SETTINGS_UPDATE_ERROR',
         message: `Failed to set user preference: ${key}`,
+        details: error,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  public async removeUserPreference(key: string): Promise<void> {
+    try {
+      const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.USER_PREFERENCES);
+      if (!stored) {
+        return;
+      }
+
+      const preferences = JSON.parse(stored);
+      if (preferences && typeof preferences === 'object') {
+        delete preferences[key];
+      }
+
+      await AsyncStorage.setItem(
+        SettingsService.STORAGE_KEYS.USER_PREFERENCES,
+        JSON.stringify(preferences)
+      );
+    } catch (error) {
+      logger.error('Error removing user preference:', error);
+      throw new AppError({
+        code: 'SETTINGS_UPDATE_ERROR',
+        message: `Failed to remove user preference: ${key}`,
         details: error,
         timestamp: new Date(),
       });

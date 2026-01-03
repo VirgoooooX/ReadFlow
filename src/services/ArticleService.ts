@@ -497,6 +497,30 @@ export class ArticleService {
     }
   }
 
+  public async getRecommendedArticles(limit: number = 10): Promise<Article[]> {
+    try {
+      await this.databaseService.initializeDatabase();
+
+      const safeLimit = Math.max(1, Math.min(50, limit));
+      const columns = 'a.id, a.title, a.title_cn, a.content, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
+
+      const results = await this.databaseService.executeQuery(
+        `SELECT ${columns}, r.title as source_title, r.url as source_url 
+         FROM articles a 
+         LEFT JOIN rss_sources r ON a.rss_source_id = r.id 
+         WHERE a.is_read = 0 
+         ORDER BY a.published_at DESC 
+         LIMIT ?`,
+        [safeLimit]
+      ).catch(() => []);
+
+      return results.map(this.mapArticleRow);
+    } catch (error) {
+      logger.error('Error getting recommended articles:', error);
+      return [];
+    }
+  }
+
   /**
    * 获取阅读统计
    */

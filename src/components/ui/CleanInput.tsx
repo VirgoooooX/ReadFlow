@@ -227,39 +227,56 @@ export const CleanInput: React.FC<CleanInputProps> = ({
   };
   
   const getInputContainerStyle = () => {
-    const baseStyle = [styles.inputContainer];
+    const baseStyle: ViewStyle[] = [styles.inputContainer as ViewStyle];
     
     if (variant === 'filled') {
-      baseStyle.push(styles.inputFilled);
-      if (isFocused) baseStyle.push(styles.inputFilledFocused);
-      if (error) baseStyle.push(styles.inputFilledError);
-      if (disabled) baseStyle.push(styles.inputFilledDisabled);
+      baseStyle.push(styles.inputFilled as ViewStyle);
+      if (isFocused) baseStyle.push(styles.inputFilledFocused as ViewStyle);
+      if (error) baseStyle.push(styles.inputFilledError as ViewStyle);
+      if (disabled) baseStyle.push(styles.inputFilledDisabled as ViewStyle);
     } else {
-      baseStyle.push(styles.inputOutlined);
-      if (isFocused) baseStyle.push(styles.inputOutlinedFocused);
-      if (error) baseStyle.push(styles.inputOutlinedError);
-      if (disabled) baseStyle.push(styles.inputOutlinedDisabled);
+      baseStyle.push(styles.inputOutlined as ViewStyle);
+      if (isFocused) baseStyle.push(styles.inputOutlinedFocused as ViewStyle);
+      if (error) baseStyle.push(styles.inputOutlinedError as ViewStyle);
+      if (disabled) baseStyle.push(styles.inputOutlinedDisabled as ViewStyle);
     }
     
     return baseStyle;
   };
   
   const getInputStyle = () => {
-    return [
-      styles.inputBase,
-      styles[`input${size.charAt(0).toUpperCase() + size.slice(1)}`],
-      disabled && styles.inputDisabled,
-      inputStyle,
+    const baseStyle: TextStyle[] = [
+      styles.inputBase as TextStyle,
+      styles[`input${size.charAt(0).toUpperCase() + size.slice(1)}` as keyof typeof styles] as TextStyle,
     ];
+
+    if (disabled) {
+      baseStyle.push(styles.inputDisabled as TextStyle);
+    }
+
+    if (inputStyle) {
+      baseStyle.push(inputStyle);
+    }
+
+    return baseStyle;
   };
   
   const getLabelStyle = () => {
-    return [
-      styles.label,
-      error && styles.labelError,
-      disabled && styles.labelDisabled,
-      labelStyle,
-    ];
+    const baseStyle: TextStyle[] = [styles.label as TextStyle];
+
+    if (error) {
+      baseStyle.push(styles.labelError as TextStyle);
+    }
+
+    if (disabled) {
+      baseStyle.push(styles.labelDisabled as TextStyle);
+    }
+
+    if (labelStyle) {
+      baseStyle.push(labelStyle);
+    }
+
+    return baseStyle;
   };
   
   const displayHelperText = error && errorText ? errorText : helperText;

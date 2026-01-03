@@ -95,13 +95,19 @@ export const CleanCard: React.FC<CleanCardProps> = ({
   const theme = useTheme();
   const styles = createCleanCardStyles(theme);
   
-  const cardStyle = [
-    styles.base,
-    styles[variant],
-    styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}`],
-    pressable && styles.pressable,
-    style,
+  const cardStyle: ViewStyle[] = [
+    styles.base as ViewStyle,
+    styles[variant] as ViewStyle,
+    styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}` as keyof typeof styles] as ViewStyle,
   ];
+
+  if (pressable) {
+    cardStyle.push(styles.pressable as ViewStyle);
+  }
+
+  if (style) {
+    cardStyle.push(style);
+  }
   
   if (pressable && onPress) {
     return (

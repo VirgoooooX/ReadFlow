@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeContext } from '../../theme';
 import { THEME_PRESETS } from '../../theme/presets';
-import type { UserStackParamList } from '../../navigation/AppNavigator';
+import type { UserStackParamList } from '../../navigation';
 
 type ThemeSettingsNavigationProp = NativeStackNavigationProp<UserStackParamList>;
 

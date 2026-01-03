@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { ReadingSettings, AppSettings, AppError } from '../../types';
 import { settingsService } from '../../services';
+import { themeStorageService, ThemeMode } from '../../services/ThemeStorageService';
 
 // 异步thunk actions
 export const fetchReadingSettings = createAsyncThunk(
@@ -13,7 +14,11 @@ export const fetchReadingSettings = createAsyncThunk(
 export const updateReadingSettings = createAsyncThunk(
   'settings/updateReadingSettings',
   async (settings: Partial<ReadingSettings>) => {
-    await settingsService.updateReadingSettings(settings);
+    for (const [key, value] of Object.entries(settings) as Array<
+      [keyof ReadingSettings, ReadingSettings[keyof ReadingSettings]]
+    >) {
+      await settingsService.updateReadingSetting(key, value as any);
+    }
     return settings;
   }
 );
@@ -36,7 +41,11 @@ export const fetchAppSettings = createAsyncThunk(
 export const updateAppSettings = createAsyncThunk(
   'settings/updateAppSettings',
   async (settings: Partial<AppSettings>) => {
-    await settingsService.updateAppSettings(settings);
+    for (const [key, value] of Object.entries(settings) as Array<
+      [keyof AppSettings, AppSettings[keyof AppSettings]]
+    >) {
+      await settingsService.updateAppSetting(key, value as any);
+    }
     return settings;
   }
 );
@@ -52,14 +61,16 @@ export const resetAppSettings = createAsyncThunk(
 export const exportSettings = createAsyncThunk(
   'settings/exportSettings',
   async () => {
-    return await settingsService.exportSettings();
+    const data = await settingsService.exportSettings();
+    return JSON.stringify(data);
   }
 );
 
 export const importSettings = createAsyncThunk(
   'settings/importSettings',
   async (settingsData: string) => {
-    await settingsService.importSettings(settingsData);
+    const data = JSON.parse(settingsData);
+    await settingsService.importSettings(data);
     // 重新获取所有设置
     const [readingSettings, appSettings] = await Promise.all([
       settingsService.getReadingSettings(),
@@ -103,7 +114,7 @@ export const setUserPreference = createAsyncThunk(
 export const getUserPreference = createAsyncThunk(
   'settings/getUserPreference',
   async (key: string) => {
-    const value = await settingsService.getUserPreference(key);
+    const value = await settingsService.getUserPreference<any>(key, null);
     return { key, value };
   }
 );
@@ -119,7 +130,7 @@ export const removeUserPreference = createAsyncThunk(
 export const setTheme = createAsyncThunk(
   'settings/setTheme',
   async (theme: 'light' | 'dark' | 'system') => {
-    await settingsService.setTheme(theme);
+    await themeStorageService.setThemeMode(theme);
     return theme;
   }
 );
@@ -127,7 +138,7 @@ export const setTheme = createAsyncThunk(
 export const getTheme = createAsyncThunk(
   'settings/getTheme',
   async () => {
-    return await settingsService.getTheme();
+    return await themeStorageService.getThemeMode();
   }
 );
 
@@ -143,20 +154,14 @@ interface SettingsState {
   userPreferences: Record<string, any>;
   
   // 主题设置
-  theme: 'light' | 'dark' | 'system';
+  theme: ThemeMode;
   
   // 存储使用情况
   storageUsage: {
-    totalSize: number;
-    usedSize: number;
-    availableSize: number;
-    breakdown: {
-      articles: number;
-      vocabulary: number;
-      cache: number;
-      settings: number;
-      other: number;
-    };
+    readingSettings: number;
+    appSettings: number;
+    userPreferences: number;
+    total: number;
   } | null;
   
   // 导入导出
@@ -367,6 +372,7 @@ const settingsSlice = createSlice({
       .addCase(fetchReadingSettings.rejected, (state, action) => {
         state.loading.readingSettings = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_READING_SETTINGS_ERROR',
           message: action.error.message || 'Failed to fetch reading settings',
           timestamp: new Date(),
@@ -410,6 +416,7 @@ const settingsSlice = createSlice({
       .addCase(fetchAppSettings.rejected, (state, action) => {
         state.loading.appSettings = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_APP_SETTINGS_ERROR',
           message: action.error.message || 'Failed to fetch app settings',
           timestamp: new Date(),
@@ -456,6 +463,7 @@ const settingsSlice = createSlice({
         state.loading.importExport = false;
         state.importExport.exporting = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'EXPORT_SETTINGS_ERROR',
           message: action.error.message || 'Failed to export settings',
           timestamp: new Date(),
@@ -485,6 +493,7 @@ const settingsSlice = createSlice({
           message: action.error.message || 'Failed to import settings',
         };
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'IMPORT_SETTINGS_ERROR',
           message: action.error.message || 'Failed to import settings',
           timestamp: new Date(),

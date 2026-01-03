@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { VocabularyEntry, LearningStats, AppError } from '../../types';
+import { VocabularyEntry, AppError } from '../../types';
 import { vocabularyService } from '../../services';
+
+type VocabularyStudyStats = Awaited<ReturnType<(typeof vocabularyService)['getStudyStats']>>;
 
 // 异步thunk actions
 export const fetchVocabularyEntries = createAsyncThunk(
@@ -10,10 +12,17 @@ export const fetchVocabularyEntries = createAsyncThunk(
     offset?: number;
     tags?: string[];
     difficulty?: string;
-    sortBy?: 'added_at' | 'word' | 'review_count' | 'last_reviewed';
+    sortBy?: 'added_at' | 'word' | 'mastery_level' | 'next_review_at';
     sortOrder?: 'ASC' | 'DESC';
   } = {}) => {
-    return await vocabularyService.getVocabularyEntries(params);
+    return await vocabularyService.getAllWords({
+      limit: params.limit,
+      offset: params.offset,
+      difficulty: params.difficulty,
+      tag: params.tags?.[0],
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
+    });
   }
 );
 
@@ -24,7 +33,7 @@ export const searchVocabulary = createAsyncThunk(
     limit?: number;
     offset?: number;
   }) => {
-    return await vocabularyService.searchVocabulary(params.query, params);
+    return await vocabularyService.searchWords(params.query, params.limit);
   }
 );
 
@@ -37,13 +46,24 @@ export const addVocabularyEntry = createAsyncThunk(
     tags?: string[];
     notes?: string;
   }) => {
-    return await vocabularyService.addWord(
-      params.word,
-      params.context,
-      params.sourceArticleId,
-      params.tags,
-      params.notes
-    );
+    const entry = await vocabularyService.addWord(params.word, params.context, params.sourceArticleId);
+
+    if (entry.id) {
+      if (params.notes !== undefined) {
+        await vocabularyService.updateNotes(entry.id, params.notes);
+      }
+
+      if (params.tags?.length) {
+        for (const tag of params.tags) {
+          await vocabularyService.addTag(entry.id, tag);
+        }
+      }
+
+      const updated = await vocabularyService.getWordById(entry.id);
+      return updated || entry;
+    }
+
+    return entry;
   }
 );
 
@@ -92,12 +112,7 @@ export const recordReviewResult = createAsyncThunk(
     reviewType: 'recognition' | 'recall' | 'spelling';
     responseTime?: number;
   }) => {
-    await vocabularyService.recordReviewResult(
-      params.id,
-      params.isCorrect,
-      params.reviewType,
-      params.responseTime
-    );
+    await vocabularyService.recordReview(params.id, params.isCorrect);
     return params;
   }
 );
@@ -121,7 +136,7 @@ export const removeVocabularyTag = createAsyncThunk(
 export const fetchLearningStats = createAsyncThunk(
   'vocabulary/fetchLearningStats',
   async () => {
-    return await vocabularyService.getLearningStats();
+    return await vocabularyService.getStudyStats();
   }
 );
 
@@ -135,42 +150,123 @@ export const fetchVocabularyTags = createAsyncThunk(
 export const fetchDueForReview = createAsyncThunk(
   'vocabulary/fetchDueForReview',
   async (limit: number = 20) => {
-    return await vocabularyService.getDueForReview(limit);
+    return await vocabularyService.getWordsForReview(limit);
   }
 );
 
 export const fetchRecentlyAdded = createAsyncThunk(
   'vocabulary/fetchRecentlyAdded',
   async (limit: number = 10) => {
-    return await vocabularyService.getRecentlyAdded(limit);
+    return await vocabularyService.getAllWords({
+      limit,
+      sortBy: 'added_at',
+      sortOrder: 'DESC',
+    });
   }
 );
 
 export const fetchDifficultWords = createAsyncThunk(
   'vocabulary/fetchDifficultWords',
   async (limit: number = 10) => {
-    return await vocabularyService.getDifficultWords(limit);
+    return await vocabularyService.getAllWords({
+      limit,
+      difficulty: 'hard',
+      sortBy: 'mastery_level',
+      sortOrder: 'ASC',
+    });
   }
 );
 
 export const fetchMasteredWords = createAsyncThunk(
   'vocabulary/fetchMasteredWords',
   async (limit: number = 10) => {
-    return await vocabularyService.getMasteredWords(limit);
+    return await vocabularyService.getAllWords({
+      limit,
+      masteryLevel: 5,
+      sortBy: 'added_at',
+      sortOrder: 'DESC',
+    });
   }
 );
 
 export const exportVocabulary = createAsyncThunk(
   'vocabulary/exportVocabulary',
   async (format: 'json' | 'csv' | 'anki') => {
-    return await vocabularyService.exportVocabulary(format);
+    const entries = await vocabularyService.exportVocabulary();
+
+    if (format === 'json') {
+      return JSON.stringify(entries);
+    }
+
+    if (format === 'anki') {
+      return entries
+        .map(entry => {
+          const front = entry.word ?? '';
+          const back =
+            entry.translation ??
+            (typeof entry.definition === 'string'
+              ? entry.definition
+              : entry.definition?.definitions?.[0]?.translation) ??
+            '';
+
+          return `${front}\t${back}`;
+        })
+        .join('\n');
+    }
+
+    const escapeCsv = (value: unknown) => {
+      const raw = String(value ?? '');
+      const escaped = raw.replace(/"/g, '""');
+      return `"${escaped}"`;
+    };
+
+    const header = ['word', 'translation', 'notes', 'addedAt'].map(escapeCsv).join(',');
+    const rows = entries.map(entry =>
+      [
+        entry.word,
+        entry.translation,
+        entry.notes,
+        entry.addedAt instanceof Date ? entry.addedAt.toISOString() : entry.addedAt,
+      ]
+        .map(escapeCsv)
+        .join(',')
+    );
+
+    return [header, ...rows].join('\n');
   }
 );
 
 export const importVocabulary = createAsyncThunk(
   'vocabulary/importVocabulary',
   async (params: { data: string; format: 'json' | 'csv' }) => {
-    return await vocabularyService.importVocabulary(params.data, params.format);
+    let words: string[] = [];
+
+    if (params.format === 'json') {
+      const parsed = JSON.parse(params.data);
+      if (Array.isArray(parsed)) {
+        words = parsed
+          .map(item => {
+            if (typeof item === 'string') return item;
+            if (item && typeof item === 'object' && 'word' in item) return String((item as any).word);
+            return '';
+          })
+          .map(w => w.trim())
+          .filter(Boolean);
+      } else {
+        throw new Error('Invalid JSON format');
+      }
+    } else {
+      const lines = params.data.split(/\r?\n/);
+      words = lines
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(',')[0]?.trim() ?? '')
+        .filter(Boolean)
+        .filter(w => w.toLowerCase() !== 'word');
+    }
+
+    const result = await vocabularyService.importWords(words);
+    return { ...result, errors: [] as string[] };
   }
 );
 
@@ -222,7 +318,7 @@ interface VocabularyState {
   selectedTags: string[];
   
   // 学习统计
-  learningStats: LearningStats | null;
+  learningStats: VocabularyStudyStats | null;
   
   // 复习会话
   reviewSession: {
@@ -243,7 +339,7 @@ interface VocabularyState {
     difficulty?: string;
     tags: string[];
     isArchived: boolean;
-    sortBy: 'added_at' | 'word' | 'review_count' | 'last_reviewed';
+    sortBy: 'added_at' | 'word' | 'mastery_level' | 'next_review_at';
     sortOrder: 'ASC' | 'DESC';
   };
   
@@ -499,6 +595,7 @@ const vocabularySlice = createSlice({
       .addCase(fetchVocabularyEntries.rejected, (state, action) => {
         state.loading.entries = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_VOCABULARY_ERROR',
           message: action.error.message || 'Failed to fetch vocabulary entries',
           timestamp: new Date(),
@@ -638,6 +735,7 @@ const vocabularySlice = createSlice({
       .addCase(exportVocabulary.rejected, (state, action) => {
         state.importExport.exporting = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'EXPORT_VOCABULARY_ERROR',
           message: action.error.message || 'Failed to export vocabulary',
           timestamp: new Date(),
@@ -655,6 +753,7 @@ const vocabularySlice = createSlice({
       .addCase(importVocabulary.rejected, (state, action) => {
         state.importExport.importing = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'IMPORT_VOCABULARY_ERROR',
           message: action.error.message || 'Failed to import vocabulary',
           timestamp: new Date(),

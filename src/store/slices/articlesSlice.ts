@@ -311,6 +311,7 @@ const articlesSlice = createSlice({
       .addCase(fetchArticles.rejected, (state, action) => {
         state.loading.articles = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_ARTICLES_ERROR',
           message: action.error.message || 'Failed to fetch articles',
           timestamp: new Date(),
@@ -329,6 +330,7 @@ const articlesSlice = createSlice({
       .addCase(fetchArticleById.rejected, (state, action) => {
         state.loading.currentArticle = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_ARTICLE_ERROR',
           message: action.error.message || 'Failed to fetch article',
           timestamp: new Date(),
@@ -347,6 +349,7 @@ const articlesSlice = createSlice({
       .addCase(searchArticles.rejected, (state, action) => {
         state.loading.search = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'SEARCH_ARTICLES_ERROR',
           message: action.error.message || 'Failed to search articles',
           timestamp: new Date(),

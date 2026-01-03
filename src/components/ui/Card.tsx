@@ -112,20 +112,24 @@ export const Card: React.FC<CardProps> = ({
   
   // 获取卡片样式
   const getCardStyle = (): ViewStyle[] => {
-    const baseStyles = [styles.base, styles[variant]];
+    const baseStyles: ViewStyle[] = [styles.base as ViewStyle, styles[variant] as ViewStyle];
     
     // 添加内边距
     if (typeof padding === 'number') {
       baseStyles.push({ padding });
     } else {
-      baseStyles.push(styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}` as keyof typeof styles]);
+      baseStyles.push(
+        styles[`padding${padding.charAt(0).toUpperCase() + padding.slice(1)}` as keyof typeof styles] as ViewStyle
+      );
     }
     
     // 添加外边距
     if (typeof margin === 'number') {
       baseStyles.push({ margin });
     } else {
-      baseStyles.push(styles[`margin${margin.charAt(0).toUpperCase() + margin.slice(1)}` as keyof typeof styles]);
+      baseStyles.push(
+        styles[`margin${margin.charAt(0).toUpperCase() + margin.slice(1)}` as keyof typeof styles] as ViewStyle
+      );
     }
     
     // 自定义圆角
@@ -135,7 +139,7 @@ export const Card: React.FC<CardProps> = ({
     
     // 可点击样式
     if (pressable) {
-      baseStyles.push(styles.pressable);
+      baseStyles.push(styles.pressable as ViewStyle);
     }
     
     // 自定义样式

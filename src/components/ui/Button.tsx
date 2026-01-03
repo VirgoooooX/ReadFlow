@@ -201,14 +201,18 @@ export const Button: React.FC<ButtonProps> = ({
   
   // 获取按钮样式
   const getButtonStyle = (): ViewStyle[] => {
-    const baseStyles = [styles.base, styles[size], styles[variant]];
+    const baseStyles: ViewStyle[] = [
+      styles.base as ViewStyle,
+      styles[size] as ViewStyle,
+      styles[variant] as ViewStyle,
+    ];
     
     if (fullWidth) {
-      baseStyles.push(styles.fullWidth);
+      baseStyles.push(styles.fullWidth as ViewStyle);
     }
     
     if (disabled) {
-      baseStyles.push(styles.disabled);
+      baseStyles.push(styles.disabled as ViewStyle);
     }
     
     if (style) {
@@ -220,15 +224,15 @@ export const Button: React.FC<ButtonProps> = ({
   
   // 获取文本样式
   const getTextStyle = (): TextStyle[] => {
-    const baseStyles = [
-      styles.textBase,
-      styles[`text${variant.charAt(0).toUpperCase() + variant.slice(1)}` as keyof typeof styles],
+    const baseStyles: TextStyle[] = [
+      styles.textBase as TextStyle,
+      styles[`text${variant.charAt(0).toUpperCase() + variant.slice(1)}` as keyof typeof styles] as TextStyle,
     ];
     
     if (size === 'small') {
-      baseStyles.push(styles.textSmall);
+      baseStyles.push(styles.textSmall as TextStyle);
     } else if (size === 'large') {
-      baseStyles.push(styles.textLarge);
+      baseStyles.push(styles.textLarge as TextStyle);
     }
     
     if (textStyle) {

@@ -6,21 +6,21 @@ import { rssService } from '../../services';
 export const fetchRSSSources = createAsyncThunk(
   'rss/fetchSources',
   async () => {
-    return await rssService.getAllSources();
+    return await rssService.getAllRSSSources();
   }
 );
 
 export const addRSSSource = createAsyncThunk(
   'rss/addSource',
   async (params: { url: string; name?: string; category?: string }) => {
-    return await rssService.addSource(params.url, params.name, params.category);
+    return await rssService.addRSSSource(params.url, params.name, 'image_text', params.category);
   }
 );
 
 export const updateRSSSource = createAsyncThunk(
   'rss/updateSource',
   async (params: { id: number; updates: Partial<RSSSource> }) => {
-    await rssService.updateSource(params.id, params.updates);
+    await rssService.updateRSSSource(params.id, params.updates);
     return params;
   }
 );
@@ -28,7 +28,7 @@ export const updateRSSSource = createAsyncThunk(
 export const deleteRSSSource = createAsyncThunk(
   'rss/deleteSource',
   async (id: number) => {
-    await rssService.deleteSource(id);
+    await rssService.deleteRSSSource(id);
     return id;
   }
 );
@@ -36,8 +36,8 @@ export const deleteRSSSource = createAsyncThunk(
 export const refreshRSSSource = createAsyncThunk(
   'rss/refreshSource',
   async (id: number) => {
-    const articles = await rssService.refreshSource(id);
-    return { id, articles };
+    const result = await rssService.refreshSources([id]);
+    return { id, totalArticles: result.totalArticles };
   }
 );
 
@@ -51,7 +51,12 @@ export const refreshAllRSSSources = createAsyncThunk(
 export const toggleRSSSourceActive = createAsyncThunk(
   'rss/toggleSourceActive',
   async (id: number) => {
-    const isActive = await rssService.toggleSourceActive(id);
+    const source = await rssService.getSourceById(id);
+    if (!source) {
+      throw new Error('RSS source not found');
+    }
+    const isActive = !source.isActive;
+    await rssService.updateRSSSource(id, { isActive });
     return { id, isActive };
   }
 );
@@ -59,7 +64,15 @@ export const toggleRSSSourceActive = createAsyncThunk(
 export const validateRSSUrl = createAsyncThunk(
   'rss/validateUrl',
   async (url: string) => {
-    return await rssService.validateRSSUrl(url);
+    try {
+      const result = await rssService.validateRSSFeed(url);
+      return { isValid: true, ...result };
+    } catch (error: any) {
+      return {
+        isValid: false,
+        error: error?.message || 'Validation failed',
+      };
+    }
   }
 );
 
@@ -77,28 +90,69 @@ export const fetchRSSSourceById = createAsyncThunk(
 export const fetchRSSSourcesByCategory = createAsyncThunk(
   'rss/fetchSourcesByCategory',
   async (category: string) => {
-    return await rssService.getSourcesByCategory(category);
+    const sources = await rssService.getAllRSSSources();
+    return sources.filter(source => source.category === category);
   }
 );
 
 export const fetchRSSCategories = createAsyncThunk(
   'rss/fetchCategories',
   async () => {
-    return await rssService.getCategories();
+    const sources = await rssService.getAllRSSSources();
+    return Array.from(new Set(sources.map(source => source.category).filter(Boolean))).sort();
   }
 );
 
 export const importOPML = createAsyncThunk(
   'rss/importOPML',
   async (opmlContent: string) => {
-    return await rssService.importOPML(opmlContent);
+    const urls: string[] = [];
+    const xmlUrlMatches = opmlContent.matchAll(/\bxmlUrl\s*=\s*["']([^"']+)["']/gi);
+    for (const match of xmlUrlMatches) {
+      const url = match[1]?.trim();
+      if (url) urls.push(url);
+    }
+
+    const uniqueUrls = Array.from(new Set(urls));
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const url of uniqueUrls) {
+      try {
+        await rssService.addRSSSource(url);
+        success++;
+      } catch (error: any) {
+        failed++;
+        errors.push(`${url}: ${error?.message || 'Failed to import source'}`);
+      }
+    }
+
+    return { success, failed, errors };
   }
 );
 
 export const exportOPML = createAsyncThunk(
   'rss/exportOPML',
   async () => {
-    return await rssService.exportOPML();
+    const sources = await rssService.getAllRSSSources();
+    const escaped = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+
+    const outlines = sources
+      .map((s) => {
+        const title = escaped(s.name || s.url);
+        const xmlUrl = escaped(s.url);
+        return `    <outline text="${title}" title="${title}" type="rss" xmlUrl="${xmlUrl}" />`;
+      })
+      .join('\n');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="1.0">\n  <head>\n    <title>ReadFlow Subscriptions</title>\n  </head>\n  <body>\n${outlines}\n  </body>\n</opml>\n`;
   }
 );
 
@@ -268,6 +322,7 @@ const rssSlice = createSlice({
       .addCase(fetchRSSSources.rejected, (state, action) => {
         state.loading.sources = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_RSS_SOURCES_ERROR',
           message: action.error.message || 'Failed to fetch RSS sources',
           timestamp: new Date(),
@@ -289,6 +344,7 @@ const rssSlice = createSlice({
       })
       .addCase(addRSSSource.rejected, (state, action) => {
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'ADD_RSS_SOURCE_ERROR',
           message: action.error.message || 'Failed to add RSS source',
           timestamp: new Date(),
@@ -332,7 +388,7 @@ const rssSlice = createSlice({
         rssSlice.caseReducers.updateSourceInList(state, {
           payload: {
             id,
-            updates: { lastFetchedAt: new Date() },
+            updates: { lastFetchAt: new Date() },
           },
           type: 'updateSourceInList',
         });
@@ -341,6 +397,7 @@ const rssSlice = createSlice({
         const sourceId = action.meta.arg;
         state.refreshing.sources.delete(sourceId);
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'REFRESH_RSS_SOURCE_ERROR',
           message: action.error.message || 'Failed to refresh RSS source',
           timestamp: new Date(),
@@ -360,13 +417,14 @@ const rssSlice = createSlice({
         const now = new Date();
         state.sources.forEach(source => {
           if (source.isActive) {
-            source.lastFetchedAt = now;
+            source.lastFetchAt = now;
           }
         });
       })
       .addCase(refreshAllRSSSources.rejected, (state, action) => {
         state.refreshing.all = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'REFRESH_ALL_RSS_SOURCES_ERROR',
           message: action.error.message || 'Failed to refresh RSS sources',
           timestamp: new Date(),
@@ -412,6 +470,7 @@ const rssSlice = createSlice({
       .addCase(fetchRSSSourceById.rejected, (state, action) => {
         state.loading.currentSource = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'FETCH_RSS_SOURCE_ERROR',
           message: action.error.message || 'Failed to fetch RSS source',
           timestamp: new Date(),
@@ -446,6 +505,7 @@ const rssSlice = createSlice({
       .addCase(importOPML.rejected, (state, action) => {
         state.importExport.importing = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'IMPORT_OPML_ERROR',
           message: action.error.message || 'Failed to import OPML',
           timestamp: new Date(),
@@ -462,6 +522,7 @@ const rssSlice = createSlice({
       .addCase(exportOPML.rejected, (state, action) => {
         state.importExport.exporting = false;
         state.error = {
+          name: action.error.name || 'AppError',
           code: 'EXPORT_OPML_ERROR',
           message: action.error.message || 'Failed to export OPML',
           timestamp: new Date(),

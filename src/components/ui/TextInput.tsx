@@ -259,18 +259,22 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>((
   
   // 获取容器样式
   const getContainerStyle = (): ViewStyle[] => {
-    const baseStyles = [styles.inputContainer, styles[variant], styles[size]];
+    const baseStyles: ViewStyle[] = [
+      styles.inputContainer as ViewStyle,
+      styles[variant] as ViewStyle,
+      styles[size] as ViewStyle,
+    ];
     
     if (isFocused) {
-      baseStyles.push(styles[`${variant}Focused` as keyof typeof styles]);
+      baseStyles.push(styles[`${variant}Focused` as keyof typeof styles] as ViewStyle);
     }
     
     if (error) {
-      baseStyles.push(styles[`${variant}Error` as keyof typeof styles]);
+      baseStyles.push(styles[`${variant}Error` as keyof typeof styles] as ViewStyle);
     }
     
     if (disabled) {
-      baseStyles.push(styles.disabled);
+      baseStyles.push(styles.disabled as ViewStyle);
     }
     
     if (multiline) {
@@ -282,16 +286,16 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>((
   
   // 获取输入框样式
   const getInputStyle = (): TextStyle[] => {
-    const baseStyles = [styles.input];
+    const baseStyles: TextStyle[] = [styles.input as TextStyle];
     
     if (size === 'small') {
-      baseStyles.push(styles.inputSmall);
+      baseStyles.push(styles.inputSmall as TextStyle);
     } else if (size === 'large') {
-      baseStyles.push(styles.inputLarge);
+      baseStyles.push(styles.inputLarge as TextStyle);
     }
     
     if (multiline) {
-      baseStyles.push(styles.inputMultiline);
+      baseStyles.push(styles.inputMultiline as TextStyle);
     }
     
     if (inputStyle) {
@@ -303,18 +307,18 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>((
   
   // 获取标签样式
   const getLabelStyle = (): TextStyle[] => {
-    const baseStyles = [styles.label];
+    const baseStyles: TextStyle[] = [styles.label as TextStyle];
     
     if (required) {
-      baseStyles.push(styles.labelRequired);
+      baseStyles.push(styles.labelRequired as TextStyle);
     }
     
     if (isFocused) {
-      baseStyles.push(styles.labelFocused);
+      baseStyles.push(styles.labelFocused as TextStyle);
     }
     
     if (error) {
-      baseStyles.push(styles.labelError);
+      baseStyles.push(styles.labelError as TextStyle);
     }
     
     if (labelStyle) {
