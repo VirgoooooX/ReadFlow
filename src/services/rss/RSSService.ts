@@ -788,6 +788,7 @@ export class RSSService {
       article_count: row.article_count || 0,
       unread_count: row.unread_count || 0,
       last_updated: row.last_updated,
+      latest_published_at: row.latest_published_at,
       // 📦 分组字段
       groupId: row.group_id || null,
       groupSortOrder: row.group_sort_order || 0,

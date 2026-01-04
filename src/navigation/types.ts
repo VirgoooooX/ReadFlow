@@ -8,6 +8,13 @@ export type ArticleNavParam = Omit<Article, 'publishedAt' | 'readAt'> & {
   readAt?: string;
 };
 
+export type PerfNavParam = {
+  id: string;
+  tPressMs?: number;
+  tNavigateMs?: number;
+  sourceTabKey?: string;
+};
+
 // 根堆栈参数列表
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -16,6 +23,7 @@ export type RootStackParamList = {
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
     currentIndex?: number;  // 当前文章在列表中的索引
     article?: ArticleNavParam;
+    perf?: PerfNavParam;
   };
   VocabularyDetail: { entryId: number };
   RSSSourceDetail: { sourceId: number };
@@ -46,6 +54,7 @@ export type HomeStackParamList = {
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
     currentIndex?: number;  // 当前文章在列表中的索引
     article?: ArticleNavParam;
+    perf?: PerfNavParam;
   };
   Search: { query?: string };
 };

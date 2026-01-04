@@ -64,6 +64,12 @@ export const getPendingScrollInfo = () => {
 
 type Props = HomeStackScreenProps<'HomeMain'>;
 
+const nowMs = () => {
+  const p = (globalThis as any)?.performance;
+  if (p && typeof p.now === 'function') return p.now();
+  return Date.now();
+};
+
 // 【优化】提取单独的 ArticleItem 组件，性能更好且代码更清晰
 const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl }: any) => {
   // 格式化日期，看起来更友好
@@ -933,6 +939,9 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           isRefreshing={isRefreshing && index === tabIndex}
           onRefresh={handleRefresh}
           onArticlePress={(id: number) => {
+            const tPressMs = nowMs();
+            const perfId = `${id}-${Math.round(tPressMs)}`;
+
             // 立即在本地标记为已读（乐观更新），无需等待返回刷新
             setTabDataMap(prev => {
               const updated = new Map(prev);
@@ -956,16 +965,20 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               return updated;
             });
 
-            // 异步调用服务标记已读
-            articleService.markAsRead(id).catch(e => logger.error('Failed to mark read:', e));
-
             const currentIndex = articleIds.indexOf(id);
             setLastViewedArticleId(id);
       const quickArticle = tabData.articles.find(a => a.id === id);
+            const tNavigateMs = nowMs();
+            logger.info(
+              `[Perf] [List->Detail] press id=${perfId} dtBeforeNavigateMs=${Math.round(
+                tNavigateMs - tPressMs
+              )} tab=${route.key} listCount=${tabData.articles.length} articleId=${id}`
+            );
             navigation.navigate('ArticleDetail', { 
               articleId: id,
               articleIds,
               currentIndex: currentIndex >= 0 ? currentIndex : 0,
+              perf: { id: perfId, tPressMs, tNavigateMs, sourceTabKey: route.key },
               article: quickArticle
                 ? {
                     ...quickArticle,

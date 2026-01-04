@@ -43,6 +43,7 @@ export interface RSSSource {
   article_count?: number;
   unread_count?: number;
   last_updated?: string;
+  latest_published_at?: string;
   
   // 📁 分组相关字段
   groupId: number | null;        // 所属分组 ID（null = 未分组）

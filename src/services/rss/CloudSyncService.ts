@@ -477,19 +477,31 @@ export class CloudSyncService implements IRSSProvider {
   }
 
   /**
-   * Update RSS source stats (unread count, etc.) and emit event
+   * Update RSS source stats (unread count, last_updated, etc.) and emit event
    */
   private async updateSourceStats(sourceId: number): Promise<void> {
     try {
+      const articleCountResult = await this.databaseService.executeQuery(
+        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
+        [sourceId]
+      );
+      const articleCount = articleCountResult[0]?.count || 0;
+
       const unreadCountResult = await this.databaseService.executeQuery(
         'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0',
         [sourceId]
       );
       const unreadCount = unreadCountResult[0]?.count || 0;
-      
+
+      const latestPublishedResult = await this.databaseService.executeQuery(
+        'SELECT published_at FROM articles WHERE rss_source_id = ? ORDER BY published_at DESC LIMIT 1',
+        [sourceId]
+      );
+      const latestPublishedAt = latestPublishedResult[0]?.published_at ?? null;
+
       await this.databaseService.executeStatement(
-        'UPDATE rss_sources SET unread_count = ? WHERE id = ?',
-        [unreadCount, sourceId]
+        'UPDATE rss_sources SET last_updated = ?, latest_published_at = ?, article_count = ?, unread_count = ? WHERE id = ?',
+        [new Date().toISOString(), latestPublishedAt, articleCount, unreadCount, sourceId]
       );
       
       // Emit event to update UI

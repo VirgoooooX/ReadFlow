@@ -706,6 +706,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   const javascript = `
     (function() {
       'use strict';
+
+      var __rfPerfStart = (window.performance && typeof window.performance.now === 'function') ? window.performance.now() : Date.now();
     
       /**
        * 图片说明智能提取脚本 v5.0 (高性能读写分离版)
@@ -1545,6 +1547,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             
       window.highlightVocabularyWords = function(words) {
         try {
+          var __rfHighlightStart = (window.performance && typeof window.performance.now === 'function') ? window.performance.now() : Date.now();
           if (!words || !Array.isArray(words) || words.length === 0) {
             return;
           }
@@ -1634,6 +1637,18 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
               currentNode.parentNode.replaceChild(container, currentNode);
             }
           });
+
+          var __rfHighlightEnd = (window.performance && typeof window.performance.now === 'function') ? window.performance.now() : Date.now();
+          try {
+            if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'perf',
+                event: 'highlight',
+                durationMs: (__rfHighlightEnd - __rfHighlightStart),
+                highlighted: totalHighlighted
+              }));
+            }
+          } catch (e) {}
         } catch (error) {
           // 失败静静处理
         }
@@ -1819,7 +1834,11 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
               
         // 8. 通知 RN WebView 已准备好（此时内容已经渲染完成）
         setTimeout(function() {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+          var __rfReadyTs = (window.performance && typeof window.performance.now === 'function') ? window.performance.now() : Date.now();
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'ready',
+            perf: { initMs: (__rfReadyTs - __rfPerfStart) }
+          }));
         }, 100);
       }
     

@@ -81,6 +81,11 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def reactNativeArchitectures() {
+    def value = project.getProperties().get("reactNativeArchitectures")
+    return value ? value.split(",") : ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -92,8 +97,11 @@ android {
         applicationId 'com.virgoooooox.ReadFlow'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 60203
-        versionName "6.2.3"
+        versionCode 60205
+        versionName "6.2.5"
+        ndk {
+            abiFilters(*reactNativeArchitectures())
+        }
     }
     signingConfigs {
         debug {

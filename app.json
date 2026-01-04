@@ -2,7 +2,7 @@
   "expo": {
     "name": "ReadFlow",
     "slug": "ReadFlow",
-    "version": "6.2.3",
+    "version": "6.2.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.virgoooooox.ReadFlow",
-      "versionCode": 60203,
+      "versionCode": 60205,
       "splash": {
         "image": "./assets/transparent.png",
         "resizeMode": "cover",

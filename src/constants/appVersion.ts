@@ -2,8 +2,8 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '6.2.3',
-  buildNumber: 60203,
+  version: '6.2.5',
+  buildNumber: 60205,
   updateTime: '2026-01-04',
   changelog: [
     'feat(LLM): 实现多档案管理和功能绑定功能',

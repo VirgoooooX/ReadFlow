@@ -66,7 +66,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
     const active = rssSources.filter(s => {
-      const last = s.last_updated ? new Date(s.last_updated).getTime() : 0;
+      const last = s.latest_published_at ? new Date(s.latest_published_at).getTime() : 0;
       return (now - last) < oneDay;
     }).length;
     
@@ -435,8 +435,8 @@ const ManageSubscriptionsScreen: React.FC = () => {
     );
   };
 
-  const formatTime = (dateStr?: string) => {
-    if (!dateStr) return '从未更新';
+  const formatTime = (dateStr?: string, emptyText = '从未') => {
+    if (!dateStr) return emptyText;
     const date = new Date(dateStr);
     const now = new Date();
     const diff = (now.getTime() - date.getTime()) / 1000; // seconds
@@ -513,7 +513,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
     <View style={styles.dashboardContainer}>
       <StatCard icon="rss-feed" value={stats.total} label="总订阅" color={theme.colors.primary} />
       <StatCard icon="mark-email-unread" value={stats.unread} label="总未读" color={theme.colors.error} />
-      <StatCard icon="update" value={stats.active} label="近日更新" color={theme.colors.tertiary} />
+      <StatCard icon="update" value={stats.active} label="近日发文" color={theme.colors.tertiary} />
     </View>
   );
 
@@ -595,7 +595,10 @@ const ManageSubscriptionsScreen: React.FC = () => {
             </View>
             <View style={styles.cardMetaRow}>
               <Text style={styles.metaText}>
-                {formatTime(source.last_updated)}更新
+                最新文章：{formatTime(source.latest_published_at, '暂无')}
+              </Text>
+              <Text style={[styles.metaText, { marginTop: 2 }]}>
+                上次检查：{formatTime(source.last_updated, '从未')}
               </Text>
             </View>
           </View>
@@ -1109,8 +1112,8 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 4,
   },
   cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   metaText: {
     ...typography.bodySmall,

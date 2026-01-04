@@ -143,6 +143,7 @@ export class DatabaseService {
         { name: 'group_id', sql: 'ALTER TABLE rss_sources ADD COLUMN group_id INTEGER' },
         { name: 'group_sort_order', sql: 'ALTER TABLE rss_sources ADD COLUMN group_sort_order INTEGER DEFAULT 0' },
         { name: 'max_articles', sql: 'ALTER TABLE rss_sources ADD COLUMN max_articles INTEGER DEFAULT 20' },
+        { name: 'latest_published_at', sql: 'ALTER TABLE rss_sources ADD COLUMN latest_published_at TEXT' },
       ];
 
       for (const column of columnsToAdd) {
@@ -287,6 +288,7 @@ export class DatabaseService {
         content_type TEXT DEFAULT 'image_text',
         is_active INTEGER DEFAULT 1,
         last_updated TEXT,
+        latest_published_at TEXT,
         article_count INTEGER DEFAULT 0,
         update_frequency INTEGER DEFAULT 3600,
         language TEXT,

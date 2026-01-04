@@ -3,16 +3,15 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Platform,
   Dimensions,
   Text,
   TouchableOpacity,
+  InteractionManager,
   Animated, // 【新增】
   Easing,   // 【新增】
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient'; // 【新增】渐变背景
-import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics'; // 【新增】震动反馈
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -27,7 +26,6 @@ import { dictionaryService } from '../../services/DictionaryService';
 import { vocabularyService } from '../../services/VocabularyService';
 import { translationService } from '../../services/TranslationService';
 import { SettingsService } from '../../services/SettingsService';
-import cacheEventEmitter from '../../services/CacheEventEmitter';
 import { logger } from '../../services/rss/RSSUtils';
 import type { RootStackParamList } from '../../navigation/types';
 import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
@@ -35,12 +33,30 @@ import { getFontStackForWebView } from '../../theme/typography';
 import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
 import { setLastViewedArticleId } from '../Home/HomeScreen';
-import { needsProxy, toProxyUrl } from '../../utils/imageProxy';
+import { toProxyUrl } from '../../utils/imageProxy';
 import { cloudConfigService } from '../../services/CloudConfigService';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
 const { width: screenWidth } = Dimensions.get('window');
+
+const nowMs = () => {
+  const p = (globalThis as any)?.performance;
+  if (p && typeof p.now === 'function') return p.now();
+  return Date.now();
+};
+
+const formatDateForMeta = (date: Date | string): string => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (!dateObj || Number.isNaN(dateObj.getTime())) {
+    return '未知日期';
+  }
+  return dateObj.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
 
 // 【优化】底部进度条组件 - 流体磁吸风格设计
 const BottomProgressBar: React.FC<{ 
@@ -272,10 +288,84 @@ const BottomProgressBar: React.FC<{
   );
 };
 
+const ArticleBodyLinesSkeleton: React.FC<{ isDark: boolean; theme: any }> = ({ isDark, theme }) => {
+  const lineBase = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+
+  const lines = [
+    { w: '92%', h: 14, mt: 0, c: lineBase },
+    { w: '90%', h: 14, mt: 10, c: lineBase },
+    { w: '90%', h: 14, mt: 10, c: lineBase },
+    { w: '78%', h: 14, mt: 10, c: lineBase },
+    { w: '94%', h: 14, mt: 18, c: lineBase },
+    { w: '88%', h: 14, mt: 10, c: lineBase },
+    { w: '72%', h: 14, mt: 10, c: lineBase },
+    { w: '96%', h: 14, mt: 18, c: lineBase },
+    { w: '82%', h: 14, mt: 10, c: lineBase },
+    { w: '90%', h: 14, mt: 10, c: lineBase },
+  ];
+
+  return (
+    <View style={{ marginTop: 22 }}>
+      {lines.map((l, idx) => (
+        <View
+          key={idx}
+          style={{
+            width: l.w as any,
+            height: l.h,
+            marginTop: l.mt,
+            borderRadius: 8,
+            backgroundColor: l.c,
+          }}
+        />
+      ))}
+    </View>
+  );
+};
+
+const ArticleHeaderSkeletonOverlay: React.FC<{
+  article: Article;
+  isDark: boolean;
+  theme: any;
+  publishedAtText: string;
+}> = ({ article, isDark, theme, publishedAtText }) => {
+  const bg = theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE');
+  const textColor = isDark ? '#E6E1E5' : '#202124';
+  const secondaryTextColor = isDark ? '#CAC4D0' : '#5F6368';
+
+  const metaText = useMemo(() => {
+    const parts: string[] = [];
+    if (article.sourceName) parts.push(article.sourceName);
+    if (publishedAtText) parts.push(publishedAtText);
+    if (article.author) parts.push(article.author);
+    return parts.join(' · ');
+  }, [article.author, article.sourceName, publishedAtText]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: bg }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 20, maxWidth: 800, alignSelf: 'center', width: '100%' }}>
+        <Text style={{ fontSize: 24, fontWeight: '800', lineHeight: 30, color: textColor }} numberOfLines={3}>
+          {article.title}
+        </Text>
+        {!!article.titleCn && (
+          <Text style={{ marginTop: 10, fontSize: 17, fontWeight: '400', lineHeight: 24, color: secondaryTextColor }} numberOfLines={3}>
+            {article.titleCn}
+          </Text>
+        )}
+        {!!metaText && (
+          <Text style={{ marginTop: 12, fontSize: 13, fontWeight: '600', color: secondaryTextColor }} numberOfLines={2}>
+            {metaText}
+          </Text>
+        )}
+        <ArticleBodyLinesSkeleton isDark={isDark} theme={theme} />
+      </View>
+    </View>
+  );
+};
+
 const ArticleDetailScreen: React.FC = () => {
   const route = useRoute<ArticleDetailRouteProp>();
   const navigation = useNavigation();
-  const { articleId, articleIds, currentIndex, article: passedArticle } = route.params;
+  const { articleId, articleIds, currentIndex, article: passedArticle, perf } = route.params as any;
   const { theme, isDark } = useThemeContext();
   const {
     settings: readingSettings,
@@ -283,6 +373,12 @@ const ArticleDetailScreen: React.FC = () => {
   } = useReadingSettings();
   const insets = useSafeAreaInsets(); // 获取安全区域
   const webViewRef = useRef<WebView>(null);
+  const perfRef = useRef(perf as any);
+  const mountMsRef = useRef(nowMs());
+  const pendingMarkReadRef = useRef(false);
+  const deferredWorkStartedRef = useRef(false);
+  const bodyFadeAnim = useRef(new Animated.Value(0)).current;
+  const webViewReadyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 【优化】优先使用传递过来的 article 对象，实现秒开
   const passedArticleHydrated: Article | null = passedArticle
     ? {
@@ -294,7 +390,6 @@ const ArticleDetailScreen: React.FC = () => {
   const [article, setArticle] = useState<Article | null>(passedArticleHydrated);
   // 【优化】如果有传递的数据，就不显示全屏 Loading
   const [loading, setLoading] = useState(!passedArticleHydrated);
-  const [vocabularyWords, setVocabularyWords] = useState<string[]>([]); // 单词本单词数组
   const vocabularyWordsRef = useRef<string[]>([]); // 使用 Ref 存储最新单词列表，避免重渲染
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
   const [webViewReady, setWebViewReady] = useState(false); // WebView 准备就绪
@@ -334,6 +429,7 @@ const ArticleDetailScreen: React.FC = () => {
   
   // 【新增】代理服务器地址，用于处理防盗链图片
   const [proxyServerUrl, setProxyServerUrl] = useState<string>('');
+  const aliveRef = useRef(true);
   
   // 【修改】检查是否有下一篇未读文章
   const hasNextArticle = nextUnreadIndex !== null;
@@ -341,7 +437,43 @@ const ArticleDetailScreen: React.FC = () => {
   const styles = createStyles(isDark, theme, readingSettings);
 
   useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setWebViewReady(false);
+    pendingMarkReadRef.current = false;
+    deferredWorkStartedRef.current = false;
+    vocabularyWordsRef.current = [];
+    bodyFadeAnim.setValue(0);
+    if (webViewReadyFallbackTimerRef.current) {
+      clearTimeout(webViewReadyFallbackTimerRef.current);
+      webViewReadyFallbackTimerRef.current = null;
+    }
+  }, [articleId, bodyFadeAnim]);
+
+  useEffect(() => {
+    const perfPayload = perfRef.current;
+    if (perfPayload?.id) {
+      const tMountMs = mountMsRef.current;
+      const dtFromPress = perfPayload.tPressMs ? tMountMs - perfPayload.tPressMs : undefined;
+      const dtFromNavigate = perfPayload.tNavigateMs ? tMountMs - perfPayload.tNavigateMs : undefined;
+      logger.info(
+        `[Perf] [Detail] mount id=${perfPayload.id} dtFromPressMs=${
+          dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
+        } dtFromNavigateMs=${dtFromNavigate !== undefined ? Math.round(dtFromNavigate) : 'na'} articleId=${articleId}`
+      );
+    }
+  }, [articleId]);
+
+  useEffect(() => {
     const loadArticle = async () => {
+      const perfPayload = perfRef.current;
+      const perfId = perfPayload?.id || `a${articleId}`;
+      const tLoadStart = nowMs();
       try {
         // 【优化】如果已经有传递的数据，不要显示 Loading，仅在后台静默更新
         if (!passedArticle) {
@@ -352,10 +484,12 @@ const ArticleDetailScreen: React.FC = () => {
         // setWebViewReady(false); 
 
         const settingsService = SettingsService.getInstance();
+        const tConfigStart = nowMs();
         const [proxyConfig, cloudConfig] = await Promise.all([
           settingsService.getProxyModeConfig(),
           cloudConfigService.getConfig(),
         ]);
+        logger.info(`[Perf] [Detail] configLoaded id=${perfId} ms=${Math.round(nowMs() - tConfigStart)}`);
 
         const cloudUrl = (cloudConfig.serverUrl || '').replace(/\/$/, '');
         const proxyUrl = (proxyConfig.serverUrl || '').replace(/\/$/, '');
@@ -365,12 +499,20 @@ const ArticleDetailScreen: React.FC = () => {
             : (proxyConfig.enabled && proxyUrl ? proxyUrl : '');
         setProxyServerUrl(activeUrl);
 
-        // 【新增】使用 Promise.all 并行加载所有数据：文章内容、滚动位置、生词本
-        // 确保所有数据都准备好后再生成 HTML，避免数据缺失
-        const [articleData, savedScrollY, vocabularyEntries] = await Promise.all([
-          articleService.getArticleById(articleId),
-          articleService.getScrollPosition(articleId).catch(() => 0),
-          vocabularyService.getAllWords({ limit: 10000 }).catch(() => [])
+        const tArticleStart = nowMs();
+        const articlePromise = articleService.getArticleById(articleId).then((res) => {
+          logger.info(`[Perf] [Detail] getArticleById id=${perfId} ms=${Math.round(nowMs() - tArticleStart)}`);
+          return res;
+        });
+        const tScrollStart = nowMs();
+        const scrollPromise = articleService.getScrollPosition(articleId).catch(() => 0).then((res) => {
+          logger.info(`[Perf] [Detail] getScrollPosition id=${perfId} ms=${Math.round(nowMs() - tScrollStart)}`);
+          return res;
+        });
+
+        const [articleData, savedScrollY] = await Promise.all([
+          articlePromise,
+          scrollPromise,
         ]);
 
         setArticle(articleData);
@@ -382,49 +524,15 @@ const ArticleDetailScreen: React.FC = () => {
         // 【新增】设置滚动位置和生词表
         setInitialScrollY(savedScrollY || 0);
 
-        const words = vocabularyEntries.map((entry: any) => entry.word.toLowerCase());
-        setVocabularyWords(words);
-        vocabularyWordsRef.current = words;
-        logger.info('[ArticleDetail] Prepared vocabulary words count:', words.length);
-
         // 自动标记为已读
         if (articleData && !articleData.isRead) {
-          articleService.markAsRead(articleId);
-          // 立即通知列表更新状态
-          cacheEventEmitter.emitArticleRead(articleId);
-        }
-        
-        // 【新增】查找下一篇未读文章
-        if (articleIds && currentIndex !== undefined) {
-          let foundNextUnread = false;
-          for (let i = currentIndex + 1; i < articleIds.length; i++) {
-            try {
-              const nextArticle = await articleService.getArticleById(articleIds[i]);
-              if (nextArticle && !nextArticle.isRead) {
-                setNextUnreadIndex(i);
-                foundNextUnread = true;
-                logger.info('[ArticleDetail] Found next unread article at index:', i);
-                break;
-              }
-            } catch (e) {
-              logger.warn('[ArticleDetail] Failed to check article:', articleIds[i]);
-            }
-          }
-          if (!foundNextUnread) {
-            setNextUnreadIndex(null);
-            // 判断是否是最后一篇文章
-            if (currentIndex >= articleIds.length - 1) {
-              setShowLastArticleHint(true);
-            } else {
-              setNoUnreadArticle(true);
-            }
-            logger.info('[ArticleDetail] No more unread articles');
-          }
+          pendingMarkReadRef.current = true;
         }
       } catch (error) {
         console.error('Failed to load article data:', error);
       } finally {
         setLoading(false);
+        logger.info(`[Perf] [Detail] loadArticleDone id=${perfRef.current?.id || `a${articleId}`} ms=${Math.round(nowMs() - tLoadStart)}`);
       }
     };
 
@@ -478,25 +586,88 @@ const ArticleDetailScreen: React.FC = () => {
     }
   }, []);
 
-  // 监听 vocabularyWords 变化，动态注入高亮
-  // 仅在 WebView 准备就绪且有生词数据时执行
-  useEffect(() => {
-    if (webViewReady && vocabularyWords.length > 0) {
-      injectHighlights(vocabularyWords);
-    }
-  }, [webViewReady, vocabularyWords, injectHighlights]);
+  const startDeferredWork = useCallback(() => {
+    if (deferredWorkStartedRef.current) return;
+    if (!aliveRef.current) return;
+    deferredWorkStartedRef.current = true;
 
-  const formatDate = (date: Date | string): string => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    if (!dateObj || isNaN(dateObj.getTime())) {
-      return '未知日期';
-    }
-    return dateObj.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+    const perfPayload = perfRef.current;
+    const perfId = perfPayload?.id || `a${articleId}`;
+
+    InteractionManager.runAfterInteractions(async () => {
+      if (!aliveRef.current) return;
+
+      if (pendingMarkReadRef.current) {
+        pendingMarkReadRef.current = false;
+        const tMarkReadStart = nowMs();
+        await articleService.markAsRead(articleId).catch(() => undefined);
+        if (!aliveRef.current) return;
+        logger.info(`[Perf] [Detail] markAsReadDone id=${perfId} ms=${Math.round(nowMs() - tMarkReadStart)}`);
+      }
+
+      const tVocabStart = nowMs();
+      const vocabularyEntries = await vocabularyService
+        .getAllWords({ limit: 10000 })
+        .catch(() => []);
+      if (!aliveRef.current) return;
+      logger.info(
+        `[Perf] [Detail] getAllWords id=${perfId} ms=${Math.round(nowMs() - tVocabStart)} count=${vocabularyEntries?.length || 0}`
+      );
+
+      const words = vocabularyEntries.map((entry: any) => entry.word.toLowerCase());
+      vocabularyWordsRef.current = words;
+      if (words.length > 0) {
+        injectHighlights(words);
+      }
+
+      if (articleIds && currentIndex !== undefined) {
+        const tFindNextStart = nowMs();
+        let checkedCount = 0;
+        let foundNextUnread = false;
+        for (let i = currentIndex + 1; i < articleIds.length; i++) {
+          if (!aliveRef.current) return;
+          try {
+            checkedCount++;
+            const nextArticle = await articleService.getArticleById(articleIds[i]);
+            if (!aliveRef.current) return;
+            if (nextArticle && !nextArticle.isRead) {
+              setNextUnreadIndex(i);
+              foundNextUnread = true;
+              break;
+            }
+          } catch (e) {
+            logger.warn('[ArticleDetail] Failed to check article:', articleIds[i]);
+          }
+        }
+        if (!aliveRef.current) return;
+        if (!foundNextUnread) {
+          setNextUnreadIndex(null);
+          if (currentIndex >= articleIds.length - 1) {
+            setShowLastArticleHint(true);
+          } else {
+            setNoUnreadArticle(true);
+          }
+        }
+        logger.info(
+          `[Perf] [Detail] findNextUnreadDone id=${perfId} ms=${Math.round(nowMs() - tFindNextStart)} checked=${checkedCount}`
+        );
+      }
     });
-  };
+  }, [articleId, articleIds, currentIndex, injectHighlights]);
+
+  useEffect(() => {
+    Animated.timing(bodyFadeAnim, {
+      toValue: webViewReady ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [webViewReady, bodyFadeAnim]);
+
+  useEffect(() => {
+    if (!webViewReady) return;
+    startDeferredWork();
+  }, [webViewReady, startDeferredWork]);
 
   /**
    * 处理收藏/取消收藏
@@ -726,7 +897,28 @@ const ArticleDetailScreen: React.FC = () => {
         case 'ready':
           // WebView 已准备就绪
           logger.info('[ArticleDetail] WebView ready event received');
+          if (webViewReadyFallbackTimerRef.current) {
+            clearTimeout(webViewReadyFallbackTimerRef.current);
+            webViewReadyFallbackTimerRef.current = null;
+          }
           setWebViewReady(true);
+          if (perfRef.current?.id) {
+            const tNow = nowMs();
+            const dtFromPress = perfRef.current?.tPressMs ? tNow - perfRef.current.tPressMs : undefined;
+            const dtFromMount = tNow - mountMsRef.current;
+            logger.info(
+              `[Perf] [Detail] webViewReady id=${perfRef.current.id} dtFromPressMs=${
+                dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
+              } dtFromMountMs=${dtFromMount !== undefined ? Math.round(dtFromMount) : 'na'}`
+            );
+          }
+          if (data.perf?.initMs !== undefined) {
+            logger.info(
+              `[Perf] [WebView] event=init id=${perfRef.current?.id || `a${articleId}`} durationMs=${Math.round(
+                data.perf.initMs
+              )}`
+            );
+          }
           // 【关键修改】此时不再需要注入高亮或滚动位置，因为 HTML 内部已经处理了
           // 仅保留 injectHighlights 以便在用户添加新单词时使用
           break;
@@ -799,6 +991,18 @@ const ArticleDetailScreen: React.FC = () => {
             setTimeout(() => setShowLastArticleHint(false), 2000);
           }
           break;
+
+        case 'perf':
+          if (data.event) {
+            logger.info(
+              `[Perf] [WebView] event=${data.event} id=${perfRef.current?.id || `a${articleId}`} durationMs=${
+                data.durationMs !== undefined ? Math.round(data.durationMs) : 'na'
+              } highlighted=${data.highlighted !== undefined ? data.highlighted : 'na'} initMs=${
+                data.initMs !== undefined ? Math.round(data.initMs) : 'na'
+              }`
+            );
+          }
+          break;
       }
     } catch (error) {
       console.error('Failed to parse WebView message:', error);
@@ -820,6 +1024,7 @@ const ArticleDetailScreen: React.FC = () => {
 
   // 生成 HTML 内容 - 将 initialScrollY 和 vocabularyWords 直接注入
   const htmlContent = useMemo(() => {
+    const tStart = nowMs();
     logger.info('[ArticleDetail] Generating HTML, article exists:', !!article);
     logger.info('[ArticleDetail] article.content exists:', !!article?.content);
     logger.info('[ArticleDetail] readingSettings exists:', !!readingSettings);
@@ -830,10 +1035,11 @@ const ArticleDetailScreen: React.FC = () => {
     }
   
     // 【调试日志】空急论证 imageUrl
+    const showHeaderImage = shouldShowHeaderImage();
     logger.info(`[ArticleDetail] article.imageUrl = ${article.imageUrl}`);
-    logger.info(`[ArticleDetail] shouldShowHeaderImage() = ${shouldShowHeaderImage()}`);
-      
-    const finalImageUrl = shouldShowHeaderImage() ? article.imageUrl : undefined;
+    logger.info(`[ArticleDetail] shouldShowHeaderImage() = ${showHeaderImage}`);
+
+    const finalImageUrl = showHeaderImage ? article.imageUrl : undefined;
     logger.info(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
 
     const html = generateArticleHtml({
@@ -846,7 +1052,7 @@ const ArticleDetailScreen: React.FC = () => {
       title: article.title,
       titleCn: article.titleCn,
       sourceName: article.sourceName,
-      publishedAt: formatDate(article.publishedAt),
+      publishedAt: formatDateForMeta(article.publishedAt),
       author: article.author,
       // 【关键修改】确保封面图被正确代理
       // 即使在直连模式下，如果域名在 BLOCKED_DOMAINS 列表中（如 BBC），
@@ -856,15 +1062,25 @@ const ArticleDetailScreen: React.FC = () => {
       imageCredit: article.imageCredit,
       articleUrl: article.url,
       initialScrollY,
-      vocabularyWords,
+      vocabularyWords: [],
       proxyServerUrl,
     });
     
     logger.info('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);
+    logger.info(
+      `[Perf] [Detail] generateHtmlDone id=${perfRef.current?.id || `a${articleId}`} ms=${Math.round(nowMs() - tStart)} htmlLen=${
+        html.length
+      }`
+    );
     return html;
   }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, proxyServerUrl]);
 
-  if (loading || settingsLoading) {
+  const webViewSource = useMemo(() => ({ html: htmlContent }), [htmlContent]);
+
+  const shouldShowSkeleton = !htmlContent || !webViewReady;
+  const headerPublishedAtText = useMemo(() => formatDateForMeta(article?.publishedAt || ''), [article?.publishedAt]);
+
+  if (!article && (loading || settingsLoading)) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator
@@ -944,54 +1160,88 @@ const ArticleDetailScreen: React.FC = () => {
 
 
       {/* WebView 内容 */}
-      {htmlContent ? (
-        <WebView
-          ref={webViewRef}
-          originWhitelist={['*']}
-          source={{ html: htmlContent }}
-          onMessage={handleWebViewMessage}
-          style={[styles.webView, { opacity: 0.99 }]}
-          showsVerticalScrollIndicator={false}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          // 【优化】支持多媒体播放
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          allowsFullscreenVideo={true}
-          scrollEnabled={true}
-          startInLoadingState={true}
-          allowFileAccess={true}
-          allowUniversalAccessFromFileURLs={true}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('[WebView] Load error:', nativeEvent);
-          }}
-          onLoad={() => {
-            console.log('[WebView] ✅ Content loaded successfully');
-            setWebViewReady(true);
-            // 确保在 WebView 加载完成时也尝试注入，作为 ready 事件的备份
-            if (vocabularyWordsRef.current.length > 0) {
-              injectHighlights(vocabularyWordsRef.current);
-            }
-          }}
-          renderLoading={() => (
-            <View style={styles.webViewLoading}>
-              <ActivityIndicator size="small" color={theme?.colors?.primary} />
-            </View>
-          )}
-          {...(Platform.OS === 'android' && {
-            textZoom: 100,
-            forceDarkOn: false,
-            mixedContentMode: 'compatibility',
-            overScrollMode: 'never',
-            androidLayerType: 'hardware',
-          })}
-        />
-      ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: theme?.colors?.error }}>⚠️ HTML 内容为空</Text>
-        </View>
-      )}
+      <View style={styles.readerContainer}>
+        {!!htmlContent && (
+          <Animated.View style={{ flex: 1, opacity: bodyFadeAnim }}>
+            <WebView
+              ref={webViewRef}
+              originWhitelist={['*']}
+              source={webViewSource}
+              onMessage={handleWebViewMessage}
+              style={[styles.webView, { opacity: 0.99 }]}
+              showsVerticalScrollIndicator={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo={true}
+              scrollEnabled={true}
+              startInLoadingState={true}
+              allowFileAccess={true}
+              allowUniversalAccessFromFileURLs={true}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error('[WebView] Load error:', nativeEvent);
+              }}
+              onLoad={() => {
+                console.log('[WebView] ✅ Content loaded successfully');
+                if (perfRef.current?.id) {
+                  const tNow = nowMs();
+                  const dtFromPress = perfRef.current?.tPressMs ? tNow - perfRef.current.tPressMs : undefined;
+                  const dtFromMount = mountMsRef.current ? tNow - mountMsRef.current : undefined;
+                  logger.info(
+                    `[Perf] [Detail] webViewOnLoad id=${perfRef.current.id} dtFromPressMs=${
+                      dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
+                    } dtFromMountMs=${dtFromMount !== undefined ? Math.round(dtFromMount) : 'na'}`
+                  );
+                }
+                if (vocabularyWordsRef.current.length > 0) {
+                  injectHighlights(vocabularyWordsRef.current);
+                }
+                if (!webViewReady && !webViewReadyFallbackTimerRef.current) {
+                  webViewReadyFallbackTimerRef.current = setTimeout(() => {
+                    webViewReadyFallbackTimerRef.current = null;
+                    setWebViewReady(true);
+                  }, 900);
+                }
+              }}
+              renderLoading={() => (
+                <View style={styles.webViewLoading}>
+                  <ActivityIndicator size="small" color={theme?.colors?.primary} />
+                </View>
+              )}
+              {...(Platform.OS === 'android' && {
+                textZoom: 100,
+                forceDarkOn: false,
+                mixedContentMode: 'compatibility',
+                overScrollMode: 'never',
+                androidLayerType: 'hardware',
+              })}
+            />
+          </Animated.View>
+        )}
+        {shouldShowSkeleton && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: bodyFadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0],
+                }),
+              },
+            ]}
+          >
+            <ArticleHeaderSkeletonOverlay
+              article={article}
+              isDark={isDark}
+              theme={theme}
+              publishedAtText={headerPublishedAtText}
+            />
+          </Animated.View>
+        )}
+      </View>
 
       {/* 词典弹窗 */}
       <WordDefinitionModal
@@ -1058,6 +1308,10 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
     webView: {
       flex: 1,
       backgroundColor: 'transparent',
+    },
+    readerContainer: {
+      flex: 1,
+      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
     },
     webViewLoading: {
       position: 'absolute',

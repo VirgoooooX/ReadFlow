@@ -334,6 +334,11 @@ export class LocalRSSService {
       // 解析 RSS
       const newArticles = await this.parseRSSFeed(xmlText, source);
       
+      // 更新 RSS 源统计 (即使没有新文章也要更新 last_updated，确保显示“刚刚更新”)
+      if (source.id) {
+        await this.updateSourceStats(source.id.toString());
+      }
+
       if (!newArticles || newArticles.length === 0) {
         logger.info(`RSS 源 ${source.name} 没有新文章`);
         return [];
@@ -356,8 +361,12 @@ export class LocalRSSService {
         }
       }
       
-      // 更新 RSS 源统计
-      await this.updateSourceStats(source.id!.toString());
+      // 注意：上面的 updateSourceStats 已经更新了时间，这里如果保存了新文章，
+      // 可以再次更新以确保 unread_count 准确，或者合并逻辑。
+      // 为了效率，如果 savedArticles > 0，我们再更新一次统计数据
+      if (savedArticles.length > 0) {
+        await this.updateSourceStats(source.id!.toString());
+      }
       
       logger.info(`成功保存 ${savedArticles.length} 篇新文章`);
       return savedArticles;
@@ -737,7 +746,7 @@ export class LocalRSSService {
   /**
    * 更新 RSS 源统计信息
    */
-  private async updateSourceStats(sourceId: string): Promise<void> {
+  public async updateSourceStats(sourceId: string): Promise<void> {
     try {
       const articleCountResult = await this.databaseService.executeQuery(
         'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
@@ -750,10 +759,16 @@ export class LocalRSSService {
         [sourceId]
       );
       const unreadCount = unreadCountResult[0]?.count || 0;
+
+      const latestPublishedResult = await this.databaseService.executeQuery(
+        'SELECT published_at FROM articles WHERE rss_source_id = ? ORDER BY published_at DESC LIMIT 1',
+        [sourceId]
+      );
+      const latestPublishedAt = latestPublishedResult[0]?.published_at ?? null;
       
       await this.databaseService.executeStatement(
-        'UPDATE rss_sources SET last_updated = ?, article_count = ?, unread_count = ? WHERE id = ?',
-        [new Date().toISOString(), articleCount, unreadCount, sourceId]
+        'UPDATE rss_sources SET last_updated = ?, latest_published_at = ?, article_count = ?, unread_count = ? WHERE id = ?',
+        [new Date().toISOString(), latestPublishedAt, articleCount, unreadCount, sourceId]
       );
       
       // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
