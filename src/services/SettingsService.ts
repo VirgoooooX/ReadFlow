@@ -6,6 +6,31 @@ import { cloudConfigService } from './CloudConfigService';
 import cacheEventEmitter from './CacheEventEmitter';
 import { themeStorageService } from './ThemeStorageService';
 
+type LLMFeature = 'translation' | 'dictionary' | 'titleTranslation';
+
+type LLMProfile = {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  apiKey: string;
+  baseUrl: string;
+  temperature: number;
+  maxTokens: number;
+  topP: number;
+  isActive: boolean;
+  customModelName: string;
+};
+
+type LLMSettingsStoreV2 = {
+  version: 2;
+  profiles: LLMProfile[];
+  bindings: Record<LLMFeature, string>;
+  ui?: {
+    lastEditedProfileId?: string;
+  };
+};
+
 export class SettingsService {
   private static instance: SettingsService;
   private databaseService: DatabaseService;
@@ -373,11 +398,9 @@ export class SettingsService {
    */
   public async getLLMSettings(): Promise<any> {
     try {
-      const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.LLM_SETTINGS);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-      return this.getDefaultLLMSettings();
+      const store = await this.getLLMSettingsStore();
+      const profileId = store.bindings.translation;
+      return store.profiles.find(p => p.id === profileId) || store.profiles[0];
     } catch (error) {
       logger.error('Error getting LLM settings:', error);
       return this.getDefaultLLMSettings();
@@ -389,10 +412,54 @@ export class SettingsService {
    */
   public async saveLLMSettings(settings: any): Promise<void> {
     try {
-      await AsyncStorage.setItem(
-        SettingsService.STORAGE_KEYS.LLM_SETTINGS,
-        JSON.stringify(settings)
-      );
+      const storageKey = SettingsService.STORAGE_KEYS.LLM_SETTINGS;
+
+      const isV2Store =
+        settings &&
+        typeof settings === 'object' &&
+        settings.version === 2 &&
+        Array.isArray(settings.profiles);
+
+      if (isV2Store) {
+        const store = this.normalizeLLMSettingsStore(settings);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(store));
+        cacheEventEmitter.settingsUpdated('llmSettings');
+        this.scheduleCloudSettingsSync();
+        return;
+      }
+
+      const store = await this.getLLMSettingsStore();
+      const boundId = store.bindings.translation || store.profiles[0]?.id;
+      const index = boundId ? store.profiles.findIndex(p => p.id === boundId) : -1;
+      const existing = index >= 0 ? store.profiles[index] : store.profiles[0];
+
+      if (!existing) {
+        const nextStore = this.normalizeLLMSettingsStore(settings);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(nextStore));
+        cacheEventEmitter.settingsUpdated('llmSettings');
+        this.scheduleCloudSettingsSync();
+        return;
+      }
+
+      const nextProfile: LLMProfile = {
+        ...existing,
+        ...(settings && typeof settings === 'object' ? settings : {}),
+        id: existing.id,
+        name: existing.name,
+      };
+
+      if (index >= 0) {
+        store.profiles[index] = nextProfile;
+      } else {
+        store.profiles[0] = nextProfile;
+      }
+
+      store.ui = { ...(store.ui || {}), lastEditedProfileId: nextProfile.id };
+
+      const normalizedStore = this.normalizeLLMSettingsStore(store);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(normalizedStore));
+      cacheEventEmitter.settingsUpdated('llmSettings');
+      this.scheduleCloudSettingsSync();
     } catch (error) {
       logger.error('Error saving LLM settings:', error);
       throw new AppError({
@@ -402,6 +469,99 @@ export class SettingsService {
         timestamp: new Date(),
       });
     }
+  }
+
+  public async saveLLMSettingsNoCloudSync(settings: any): Promise<void> {
+    await this.withCloudSettingsSyncSuppressed(async () => {
+      await this.saveLLMSettings(settings);
+    });
+  }
+
+  public async getLLMSettingsStore(): Promise<LLMSettingsStoreV2> {
+    const storageKey = SettingsService.STORAGE_KEYS.LLM_SETTINGS;
+    let raw: any = null;
+    try {
+      const stored = await AsyncStorage.getItem(storageKey);
+      raw = stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      logger.error('Error reading LLM settings store:', error);
+    }
+
+    const store = this.normalizeLLMSettingsStore(raw);
+
+    const shouldWriteBack = !raw || raw?.version !== 2 || !this.deepEqual(store, raw);
+    if (shouldWriteBack) {
+      try {
+        await AsyncStorage.setItem(storageKey, JSON.stringify(store));
+        this.scheduleCloudSettingsSync();
+      } catch (error) {
+        logger.error('Error writing migrated LLM settings store:', error);
+      }
+    }
+
+    return store;
+  }
+
+  public async getLLMSettingsFor(feature: LLMFeature): Promise<LLMProfile> {
+    const store = await this.getLLMSettingsStore();
+    const profileId = store.bindings[feature];
+    return store.profiles.find(p => p.id === profileId) || store.profiles[0];
+  }
+
+  public async listLLMProfiles(): Promise<LLMProfile[]> {
+    const store = await this.getLLMSettingsStore();
+    return store.profiles;
+  }
+
+  public async upsertLLMProfile(profile: LLMProfile): Promise<void> {
+    const store = await this.getLLMSettingsStore();
+    const existingIndex = store.profiles.findIndex(p => p.id === profile.id);
+    if (existingIndex >= 0) {
+      store.profiles[existingIndex] = profile;
+    } else {
+      store.profiles.push(profile);
+    }
+    store.ui = { ...(store.ui || {}), lastEditedProfileId: profile.id };
+    await this.saveLLMSettings(store);
+  }
+
+  public async deleteLLMProfile(profileId: string): Promise<void> {
+    const store = await this.getLLMSettingsStore();
+    if (store.profiles.length <= 1) return;
+
+    store.profiles = store.profiles.filter(p => p.id !== profileId);
+    const fallbackId = store.profiles[0]?.id;
+    if (!fallbackId) return;
+
+    const nextBindings: Record<LLMFeature, string> = { ...store.bindings };
+    (Object.keys(nextBindings) as LLMFeature[]).forEach((feature) => {
+      if (nextBindings[feature] === profileId) nextBindings[feature] = fallbackId;
+    });
+    store.bindings = nextBindings;
+
+    if (store.ui?.lastEditedProfileId === profileId) {
+      store.ui = { ...(store.ui || {}), lastEditedProfileId: fallbackId };
+    }
+
+    await this.saveLLMSettings(store);
+  }
+
+  public async setLLMBinding(feature: LLMFeature, profileId: string): Promise<void> {
+    const store = await this.getLLMSettingsStore();
+    const exists = store.profiles.some(p => p.id === profileId);
+    const effectiveId = exists ? profileId : store.profiles[0]?.id;
+    if (!effectiveId) return;
+
+    store.bindings = { ...store.bindings, [feature]: effectiveId };
+    await this.saveLLMSettings(store);
+  }
+
+  public async setLLMLastEditedProfileId(profileId: string): Promise<void> {
+    const store = await this.getLLMSettingsStore();
+    const exists = store.profiles.some(p => p.id === profileId);
+    if (!exists) return;
+    store.ui = { ...(store.ui || {}), lastEditedProfileId: profileId };
+    await this.saveLLMSettings(store);
   }
 
   /**
@@ -458,7 +618,7 @@ export class SettingsService {
         this.getReadingSettings(),
         this.getAppSettings(),
         this.getRSSSettings(),
-        this.getLLMSettings(),
+        this.getLLMSettingsStore(),
         themeStorageService.getThemeSettings(),
         this.getRSSStartupSettings(),
         this.getProxyServersConfig(),
@@ -509,6 +669,94 @@ export class SettingsService {
       topP: 1.0,
       isActive: true,
       customModelName: '',
+    };
+  }
+
+  private normalizeLLMSettingsStore(raw: any): LLMSettingsStoreV2 {
+    const base = this.getDefaultLLMSettings();
+    const defaultProfile: LLMProfile = {
+      id: 'default',
+      name: '默认',
+      ...base,
+    };
+
+    const createProfileFromRaw = (value: any, index: number): LLMProfile => {
+      const id = typeof value?.id === 'string' && value.id.trim() ? value.id : `profile_${Date.now()}_${index}`;
+      const name = typeof value?.name === 'string' && value.name.trim() ? value.name : `档案${index + 1}`;
+      return {
+        id,
+        name,
+        provider: value?.provider ?? base.provider,
+        model: value?.model ?? base.model,
+        apiKey: value?.apiKey ?? base.apiKey,
+        baseUrl: value?.baseUrl ?? base.baseUrl,
+        temperature: typeof value?.temperature === 'number' ? value.temperature : base.temperature,
+        maxTokens: typeof value?.maxTokens === 'number' ? value.maxTokens : base.maxTokens,
+        topP: typeof value?.topP === 'number' ? value.topP : base.topP,
+        isActive: typeof value?.isActive === 'boolean' ? value.isActive : base.isActive,
+        customModelName: value?.customModelName ?? base.customModelName,
+      };
+    };
+
+    const isV2 = raw && typeof raw === 'object' && raw.version === 2 && Array.isArray(raw.profiles);
+
+    let profiles: LLMProfile[] = [];
+    let bindings: Record<LLMFeature, string> = {
+      translation: defaultProfile.id,
+      dictionary: defaultProfile.id,
+      titleTranslation: defaultProfile.id,
+    };
+    let ui: LLMSettingsStoreV2['ui'] = { lastEditedProfileId: defaultProfile.id };
+
+    if (isV2) {
+      profiles = raw.profiles.map((p: any, idx: number) => createProfileFromRaw(p, idx));
+      const rawBindings = raw.bindings || {};
+      bindings = {
+        translation: rawBindings.translation,
+        dictionary: rawBindings.dictionary,
+        titleTranslation: rawBindings.titleTranslation,
+      } as any;
+      ui = raw.ui || ui;
+    } else if (raw && typeof raw === 'object' && typeof raw.provider === 'string') {
+      profiles = [
+        {
+          id: defaultProfile.id,
+          name: defaultProfile.name,
+          provider: raw.provider ?? base.provider,
+          model: raw.model ?? base.model,
+          apiKey: raw.apiKey ?? base.apiKey,
+          baseUrl: raw.baseUrl ?? base.baseUrl,
+          temperature: typeof raw.temperature === 'number' ? raw.temperature : base.temperature,
+          maxTokens: typeof raw.maxTokens === 'number' ? raw.maxTokens : base.maxTokens,
+          topP: typeof raw.topP === 'number' ? raw.topP : base.topP,
+          isActive: typeof raw.isActive === 'boolean' ? raw.isActive : base.isActive,
+          customModelName: raw.customModelName ?? base.customModelName,
+        },
+      ];
+    } else {
+      profiles = [defaultProfile];
+    }
+
+    if (profiles.length === 0) profiles = [defaultProfile];
+
+    const existingIds = new Set(profiles.map(p => p.id));
+    const firstId = profiles[0].id;
+
+    const ensureBinding = (value: any) => (typeof value === 'string' && existingIds.has(value) ? value : firstId);
+    bindings = {
+      translation: ensureBinding(bindings.translation),
+      dictionary: ensureBinding(bindings.dictionary),
+      titleTranslation: ensureBinding(bindings.titleTranslation),
+    };
+
+    const lastEdited = typeof ui?.lastEditedProfileId === 'string' ? ui.lastEditedProfileId : firstId;
+    ui = { ...(ui || {}), lastEditedProfileId: existingIds.has(lastEdited) ? lastEdited : firstId };
+
+    return {
+      version: 2,
+      profiles,
+      bindings,
+      ui,
     };
   }
 

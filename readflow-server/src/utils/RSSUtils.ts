@@ -464,8 +464,7 @@ export function proxyImages(
 
   // 使用 img 标签迭代方式，更稳健地处理属性
   return html.replace(/<img([\s\S]*?)>/gi, (match, attributes) => {
-    // 1. 移除 srcset 以防止浏览器绕过代理加载原图
-    let newAttributes = attributes.replace(/\s+srcset=["'][^"']*["']/gi, '');
+    let newAttributes = attributes;
 
     // 1.5 提取懒加载属性并提升为 src (针对 sspai 等网站)
     // 查找 data-original, data-src, data-url
@@ -495,6 +494,36 @@ export function proxyImages(
     // data-src 等也替换一下，以防万一
     replaceUrlInAttr('data-src');
     replaceUrlInAttr('data-original');
+
+    const rewriteSrcsetValue = (value: string) => {
+      const candidates = value
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const rewritten = candidates.map(candidate => {
+        const tokens = candidate.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return candidate;
+        const url = tokens[0];
+        const descriptor = tokens.slice(1).join(' ');
+        const finalUrl = needsProxy(url, baseUrl, imageCompression)
+          ? getProxyUrl(url, baseUrl, imageCompression, imageQuality)
+          : url;
+        return descriptor ? `${finalUrl} ${descriptor}` : finalUrl;
+      });
+
+      return rewritten.join(', ');
+    };
+
+    const replaceSrcsetAttr = (attrName: string) => {
+      const regex = new RegExp(`\\s+${attrName}=(["'])([^"']*)\\1`, 'gi');
+      newAttributes = newAttributes.replace(regex, (m: string, quote: string, value: string) => {
+        return ` ${attrName}=${quote}${rewriteSrcsetValue(value)}${quote}`;
+      });
+    };
+
+    replaceSrcsetAttr('srcset');
+    replaceSrcsetAttr('data-srcset');
 
     return `<img${newAttributes}>`;
   });

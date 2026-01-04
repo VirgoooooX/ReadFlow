@@ -194,7 +194,7 @@ export class DictionaryService {
    */
   private async queryLLM(word: string, context?: string): Promise<WordDefinition | null> {
     try {
-      const llmSettings = await this.settingsService.getLLMSettings();
+      const llmSettings = await this.settingsService.getLLMSettingsFor('dictionary');
       
       if (!llmSettings?.apiKey) {
         logger.warn('LLM API key not configured');
@@ -216,7 +216,7 @@ export class DictionaryService {
     } catch (error) {
       logger.error('Error querying LLM:', error);
       // 记录失败统计
-      const llmSettings = await this.settingsService.getLLMSettings();
+      const llmSettings = await this.settingsService.getLLMSettingsFor('dictionary');
       if (llmSettings) {
         await this.logUsage('dictionary', llmSettings.provider, llmSettings.model, false);
       }

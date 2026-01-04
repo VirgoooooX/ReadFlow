@@ -160,9 +160,10 @@ export class CloudSyncService implements IRSSProvider {
 
   private async pushUserAndFeedsIfNeeded(serverUrl: string): Promise<void> {
     try {
-      const [appSettings, readingSettings] = await Promise.all([
+      const [appSettings, readingSettings, llmSettings] = await Promise.all([
         this.settingsService.getAppSettings(),
         this.settingsService.getReadingSettings(),
+        this.settingsService.getLLMSettingsStore(),
       ]);
       const cloudConfig = await cloudConfigService.getConfig();
       if (cloudConfig.mode !== 'cloud') return;
@@ -208,7 +209,7 @@ export class CloudSyncService implements IRSSProvider {
           email: authUser?.email,
           registeredAt: authUser?.createdAt,
         },
-        settings: { appSettings, readingSettings },
+        settings: { appSettings, readingSettings, llmSettings },
         feeds,
       };
 

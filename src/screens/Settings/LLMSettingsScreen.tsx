@@ -21,7 +21,18 @@ import cacheEventEmitter from '../../services/CacheEventEmitter';
 
 type NavigationProp = NativeStackNavigationProp<UserStackParamList, 'LLMSettings'>;
 
-interface LLMSettings {
+type LLMFeature = 'translation' | 'dictionary' | 'titleTranslation';
+type SelectorKey =
+  | 'binding_translation'
+  | 'binding_dictionary'
+  | 'binding_titleTranslation'
+  | 'editing_profile'
+  | 'provider'
+  | 'model';
+
+interface LLMProfile {
+  id: string;
+  name: string;
   provider: string;
   model: string;
   apiKey: string;
@@ -38,6 +49,15 @@ const LLMSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
 
   // LLM设置状态 - 基于数据库字段简化设计
+  const [profiles, setProfiles] = useState<LLMProfile[]>([]);
+  const [bindings, setBindings] = useState<Record<LLMFeature, string>>({
+    translation: '',
+    dictionary: '',
+    titleTranslation: '',
+  });
+  const [editingProfileId, setEditingProfileId] = useState('');
+  const [profileName, setProfileName] = useState('');
+
   const [provider, setProvider] = useState('openai'); // openai, anthropic, local, custom_openai
   const [model, setModel] = useState('gpt-3.5-turbo');
   const [apiKey, setApiKey] = useState('');
@@ -53,6 +73,7 @@ const LLMSettingsScreen: React.FC = () => {
   const [customModelName, setCustomModelName] = useState('');
   const [loading, setLoading] = useState(true);
   const [usageStats, setUsageStats] = useState({ monthly: 0, total: 0 });
+  const [expandedSelector, setExpandedSelector] = useState<SelectorKey | null>(null);
 
   // 加载设置
   useEffect(() => {
@@ -72,19 +93,40 @@ const LLMSettingsScreen: React.FC = () => {
   const loadSettings = async () => {
     try {
       const settingsService = SettingsService.getInstance();
-      const settings = await settingsService.getLLMSettings();
-      if (settings) {
-        setProvider(settings.provider);
-        setModel(settings.model);
-        setApiKey(settings.apiKey);
-        setBaseUrl(settings.baseUrl);
-        setTemperature(settings.temperature);
-        setTemperatureText(settings.temperature.toString());
-        setMaxTokens(settings.maxTokens);
-        setTopP(settings.topP);
-        setTopPText(settings.topP.toString());
-        setIsActive(settings.isActive);
-        setCustomModelName(settings.customModelName);
+      const store = await settingsService.getLLMSettingsStore();
+      const nextProfiles: LLMProfile[] = store?.profiles || [];
+      const nextBindings: Record<LLMFeature, string> = store?.bindings || {
+        translation: '',
+        dictionary: '',
+        titleTranslation: '',
+      };
+
+      setProfiles(nextProfiles);
+      setBindings(nextBindings);
+
+      const preferredEditingId =
+        store?.ui?.lastEditedProfileId ||
+        nextBindings.translation ||
+        nextProfiles[0]?.id ||
+        '';
+
+      const activeProfile =
+        nextProfiles.find(p => p.id === preferredEditingId) || nextProfiles[0];
+
+      if (activeProfile) {
+        setEditingProfileId(activeProfile.id);
+        setProfileName(activeProfile.name || '');
+        setProvider(activeProfile.provider);
+        setModel(activeProfile.model);
+        setApiKey(activeProfile.apiKey);
+        setBaseUrl(activeProfile.baseUrl);
+        setTemperature(activeProfile.temperature);
+        setTemperatureText(activeProfile.temperature.toString());
+        setMaxTokens(activeProfile.maxTokens);
+        setTopP(activeProfile.topP);
+        setTopPText(activeProfile.topP.toString());
+        setIsActive(activeProfile.isActive);
+        setCustomModelName(activeProfile.customModelName);
       }
     } catch (error) {
       console.error('Failed to load LLM settings:', error);
@@ -104,10 +146,13 @@ const LLMSettingsScreen: React.FC = () => {
     }
   };
 
-  const saveSettings = async () => {
+  const saveCurrentProfile = async () => {
     try {
       const settingsService = SettingsService.getInstance();
-      const settings: LLMSettings = {
+      if (!editingProfileId) return;
+      const profile: LLMProfile = {
+        id: editingProfileId,
+        name: profileName.trim() || '未命名',
         provider,
         model,
         apiKey,
@@ -118,10 +163,133 @@ const LLMSettingsScreen: React.FC = () => {
         isActive,
         customModelName,
       };
-      await settingsService.saveLLMSettings(settings);
+      await settingsService.upsertLLMProfile(profile);
     } catch (error) {
       console.error('Failed to save LLM settings:', error);
     }
+  };
+
+  const applyProfileToForm = (profile: LLMProfile) => {
+    setEditingProfileId(profile.id);
+    setProfileName(profile.name || '');
+    setProvider(profile.provider);
+    setModel(profile.model);
+    setApiKey(profile.apiKey);
+    setBaseUrl(profile.baseUrl);
+    setTemperature(profile.temperature);
+    setTemperatureText(profile.temperature.toString());
+    setMaxTokens(profile.maxTokens);
+    setTopP(profile.topP);
+    setTopPText(profile.topP.toString());
+    setIsActive(profile.isActive);
+    setCustomModelName(profile.customModelName);
+    setShowApiKey(false);
+    setShowBaseUrl(false);
+  };
+
+  const handleEditingProfileChange = async (profileId: string) => {
+    const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return;
+    applyProfileToForm(profile);
+    try {
+      const settingsService = SettingsService.getInstance();
+      await settingsService.setLLMLastEditedProfileId(profileId);
+    } catch (error) {
+      console.error('Failed to save last edited profile:', error);
+    }
+  };
+
+  const handleBindingChange = async (feature: LLMFeature, profileId: string) => {
+    try {
+      const settingsService = SettingsService.getInstance();
+      await settingsService.setLLMBinding(feature, profileId);
+      await loadSettings();
+    } catch (error) {
+      console.error('Failed to update LLM binding:', error);
+    }
+  };
+
+  const buildUniqueProfileName = (baseName: string) => {
+    const existing = new Set(profiles.map(p => (p.name || '').trim()).filter(Boolean));
+    if (!existing.has(baseName)) return baseName;
+    for (let i = 2; i < 1000; i += 1) {
+      const candidate = `${baseName} (${i})`;
+      if (!existing.has(candidate)) return candidate;
+    }
+    return `${baseName} (${Date.now()})`;
+  };
+
+  const handleCreateProfile = async () => {
+    try {
+      const settingsService = SettingsService.getInstance();
+      const id = `profile_${Date.now()}`;
+      const profile: LLMProfile = {
+        id,
+        name: buildUniqueProfileName(`档案${profiles.length + 1}`),
+        provider: 'openai',
+        model: 'gpt-3.5-turbo',
+        apiKey: '',
+        baseUrl: 'https://api.openai.com/v1',
+        temperature: 0.7,
+        maxTokens: 2048,
+        topP: 1.0,
+        isActive: true,
+        customModelName: '',
+      };
+      await settingsService.upsertLLMProfile(profile);
+      await loadSettings();
+    } catch (error) {
+      console.error('Failed to create profile:', error);
+    }
+  };
+
+  const handleDuplicateProfile = async () => {
+    if (!editingProfileId) return;
+    try {
+      const settingsService = SettingsService.getInstance();
+      const id = `profile_${Date.now()}`;
+      const profile: LLMProfile = {
+        id,
+        name: buildUniqueProfileName(`${profileName.trim() || '未命名'} 副本`),
+        provider,
+        model,
+        apiKey,
+        baseUrl,
+        temperature,
+        maxTokens,
+        topP,
+        isActive,
+        customModelName,
+      };
+      await settingsService.upsertLLMProfile(profile);
+      await loadSettings();
+    } catch (error) {
+      console.error('Failed to duplicate profile:', error);
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!editingProfileId) return;
+    if (profiles.length <= 1) {
+      Alert.alert('提示', '至少需要保留一个档案');
+      return;
+    }
+    Alert.alert('删除档案', `确定删除“${profileName || '未命名'}”吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const settingsService = SettingsService.getInstance();
+            await settingsService.deleteLLMProfile(editingProfileId);
+            await loadSettings();
+          } catch (error) {
+            console.error('Failed to delete profile:', error);
+          }
+        },
+      },
+    ]);
   };
 
   // 提供商选项
@@ -168,7 +336,7 @@ const LLMSettingsScreen: React.FC = () => {
     return providerOptions.find(p => p.value === provider) || providerOptions[0];
   };
   // 提供商选择处理函数
-  const handleProviderChange = async (selectedProvider: string) => {
+  const handleProviderChange = (selectedProvider: string) => {
     setProvider(selectedProvider);
     const providerInfo = providerOptions.find(p => p.value === selectedProvider);
     if (providerInfo) {
@@ -183,13 +351,6 @@ const LLMSettingsScreen: React.FC = () => {
     
     // 重置自定义模型名称
     setCustomModelName('');
-    
-    // 自动保存
-    try {
-      await saveSettings();
-    } catch (error) {
-      console.error('Failed to save provider change:', error);
-    }
   };
 
   // 参数输入处理函数
@@ -272,67 +433,108 @@ const LLMSettingsScreen: React.FC = () => {
       }
       
       // 保存设置到AsyncStorage
-      await saveSettings();
+      await saveCurrentProfile();
       
-      Alert.alert('成功', 'LLM配置已保存');
+      Alert.alert('成功', '档案已保存');
     } catch (error) {
       console.error('保存LLM配置失败:', error);
       Alert.alert('错误', '保存配置失败');
     }
   };
 
-  // 选择器渲染函数
-  const renderOptionSelector = (
-    title: string,
+  const getOptionLabel = (options: any[], selectedValue: string) => {
+    const selected = options.find((option) => {
+      if (typeof option === 'string') return option === selectedValue;
+      return option?.value === selectedValue;
+    });
+    if (!selectedValue) return '未选择';
+    if (!selected) return selectedValue;
+    if (typeof selected === 'string') return selected;
+    return selected.label || selected.value || selectedValue;
+  };
+
+  const renderOptionsList = (
     selectedValue: string,
     options: any[],
     onSelect: (value: string) => void,
     defaultIcon?: string
   ) => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.card}>
-        {options.map((option, index) => {
-          const isSelected = selectedValue === option.value || selectedValue === option;
-          const isLast = index === options.length - 1;
-          const iconName = option.icon || defaultIcon || 'circle';
-          return (
-            <React.Fragment key={option.value || option}>
-              <TouchableOpacity
-                style={[
-                  styles.optionItem,
-                  isSelected && styles.selectedOption,
-                ]}
-                onPress={() => onSelect(option.value || option)}
-              >
-                <View style={styles.optionLeft}>
-                  {option.value && ['openai', 'anthropic', 'google', 'local', 'custom'].includes(option.value) ? (
-                    <BrandIcon 
-                      brand={option.value} 
-                      size={24} 
-                      color={theme?.colors?.primary} 
-                    />
-                  ) : (
-                    <MaterialIcons name={iconName as any} size={24} color={theme?.colors?.primary} />
-                  )}
-                  <Text style={[
-                    styles.optionText,
-                    isSelected && styles.selectedText
-                  ]}>
-                    {option.label || option}
-                  </Text>
-                </View>
-                {isSelected && (
-                  <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />
+    <View style={styles.expandedOptions}>
+      {options.map((option, index) => {
+        const value = typeof option === 'string' ? option : option?.value;
+        const label = typeof option === 'string' ? option : option?.label;
+        const iconName = (typeof option === 'object' ? option?.icon : undefined) || defaultIcon || 'circle';
+        const isSelected = selectedValue === value;
+        const isLast = index === options.length - 1;
+        return (
+          <React.Fragment key={value}>
+            <TouchableOpacity
+              style={[
+                styles.optionItem,
+                styles.expandedOptionItem,
+                isSelected && styles.selectedOption,
+              ]}
+              onPress={() => onSelect(value)}
+            >
+              <View style={styles.optionLeft}>
+                {value && ['openai', 'anthropic', 'google', 'local', 'custom'].includes(value) ? (
+                  <BrandIcon brand={value} size={24} color={theme?.colors?.primary} />
+                ) : (
+                  <MaterialIcons name={iconName as any} size={24} color={theme?.colors?.primary} />
                 )}
-              </TouchableOpacity>
-              {!isLast && <View style={styles.optionDivider} />}
-            </React.Fragment>
-          );
-        })}
-      </View>
+                <Text style={[styles.optionText, isSelected && styles.selectedText]}>
+                  {label || value}
+                </Text>
+              </View>
+              {isSelected && <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />}
+            </TouchableOpacity>
+            {!isLast && <View style={styles.optionDivider} />}
+          </React.Fragment>
+        );
+      })}
     </View>
   );
+
+  const renderSelectorRow = (
+    selectorKey: SelectorKey,
+    title: string,
+    icon: string,
+    selectedValue: string,
+    options: any[],
+    onSelect: (value: string) => void,
+    defaultIcon?: string
+  ) => {
+    const expanded = expandedSelector === selectorKey;
+    const selectedLabel = getOptionLabel(options, selectedValue);
+    return (
+      <>
+        <TouchableOpacity
+          style={styles.optionItem}
+          onPress={() => setExpandedSelector(expanded ? null : selectorKey)}
+        >
+          <View style={styles.optionLeft}>
+            <MaterialIcons name={icon as any} size={24} color={theme?.colors?.primary} />
+            <Text style={styles.optionText}>{title}</Text>
+          </View>
+          <View style={styles.optionRight}>
+            <Text style={styles.optionValueText} numberOfLines={1}>
+              {selectedLabel}
+            </Text>
+            <MaterialIcons
+              name={expanded ? 'expand-less' : 'chevron-right'}
+              size={24}
+              color={theme?.colors?.onSurfaceVariant}
+            />
+          </View>
+        </TouchableOpacity>
+        {expanded &&
+          renderOptionsList(selectedValue, options, (value) => {
+            onSelect(value);
+            setExpandedSelector(null);
+          }, defaultIcon)}
+      </>
+    );
+  };
 
   const renderSwitchOption = (
     title: string,
@@ -362,13 +564,17 @@ const LLMSettingsScreen: React.FC = () => {
   );
 
   const styles = createStyles(isDark, theme);
+  const profileOptions = profiles.map(p => ({
+    label: p.name || p.id,
+    value: p.id,
+    icon: 'badge',
+  }));
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.content}>
-        {/* 基础配置 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>基础配置</Text>
+          <Text style={styles.sectionTitle}>概览</Text>
           <View style={styles.card}>
             {renderSwitchOption(
               '启用LLM功能',
@@ -377,45 +583,166 @@ const LLMSettingsScreen: React.FC = () => {
               setIsActive,
               'smart-toy'
             )}
+            <View style={styles.optionDivider} />
+            <View style={styles.optionItem}>
+              <View style={styles.optionLeft}>
+                <MaterialIcons name="analytics" size={24} color={theme?.colors?.primary} />
+                <Text style={styles.optionText}>本月请求</Text>
+              </View>
+              <Text style={styles.statValueText}>{usageStats.monthly}次</Text>
+            </View>
+            <View style={styles.optionDivider} />
+            <View style={styles.optionItem}>
+              <View style={styles.optionLeft}>
+                <MaterialIcons name="account-balance" size={24} color={theme?.colors?.primary} />
+                <Text style={styles.optionText}>总请求数</Text>
+              </View>
+              <Text style={styles.statValueText}>{usageStats.total}次</Text>
+            </View>
           </View>
         </View>
 
-        {/* 提供商配置 */}
-        {renderOptionSelector('AI提供商', provider, providerOptions, handleProviderChange)}
-        
-        {/* 模型选择 */}
-        {getCurrentProvider().models.length > 0 && (
-          renderOptionSelector('模型选择', model, getCurrentProvider().models, setModel, 'psychology')
-        )}
-        
-        {/* 自定义模型名称 - 仅在选择自定义提供商或没有预设模型时显示 */}
-        {(provider === 'custom' || getCurrentProvider().models.length === 0) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>自定义模型</Text>
-            <View style={styles.card}>
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="edit" size={24} color={theme?.colors?.primary} />
-                  <Text style={styles.inputLabel}>模型名称</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={customModelName}
-                  onChangeText={setCustomModelName}
-                  placeholder="例如: gpt-4, claude-3-opus, llama2 等"
-                  placeholderTextColor={theme?.colors?.onSurfaceVariant}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Text style={styles.inputHint}>请输入具体的模型名称</Text>
-              </View>
-            </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>功能绑定</Text>
+          <View style={styles.card}>
+            {renderSelectorRow(
+              'binding_translation',
+              '翻译',
+              'translate',
+              bindings.translation,
+              profileOptions,
+              (value) => handleBindingChange('translation', value),
+              'badge'
+            )}
+            <View style={styles.optionDivider} />
+            {renderSelectorRow(
+              'binding_dictionary',
+              '查词',
+              'menu-book',
+              bindings.dictionary,
+              profileOptions,
+              (value) => handleBindingChange('dictionary', value),
+              'badge'
+            )}
+            <View style={styles.optionDivider} />
+            {renderSelectorRow(
+              'binding_titleTranslation',
+              '标题翻译',
+              'title',
+              bindings.titleTranslation,
+              profileOptions,
+              (value) => handleBindingChange('titleTranslation', value),
+              'badge'
+            )}
           </View>
-        )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>档案管理</Text>
+          <View style={styles.card}>
+            {renderSelectorRow(
+              'editing_profile',
+              '当前编辑档案',
+              'manage-accounts',
+              editingProfileId,
+              profileOptions,
+              (value) => handleEditingProfileChange(value),
+              'badge'
+            )}
+            <View style={styles.optionDivider} />
+            <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
+              <View style={styles.inputHeader}>
+                <MaterialIcons name="badge" size={24} color={theme?.colors?.primary} />
+                <Text style={styles.inputLabel}>档案名称</Text>
+              </View>
+              <TextInput
+                style={styles.textInput}
+                value={profileName}
+                onChangeText={setProfileName}
+                placeholder="例如：查词-便宜模型"
+                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            <View style={styles.optionDivider} />
+            <TouchableOpacity style={styles.optionItem} onPress={handleCreateProfile}>
+              <View style={styles.optionLeft}>
+                <MaterialIcons name="add" size={24} color={theme?.colors?.primary} />
+                <Text style={styles.optionText}>新建档案</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.optionDivider} />
+            <TouchableOpacity style={styles.optionItem} onPress={handleDuplicateProfile}>
+              <View style={styles.optionLeft}>
+                <MaterialIcons name="content-copy" size={24} color={theme?.colors?.primary} />
+                <Text style={styles.optionText}>复制当前档案</Text>
+              </View>
+            </TouchableOpacity>
+            <View style={styles.optionDivider} />
+            <TouchableOpacity style={styles.optionItem} onPress={handleDeleteProfile}>
+              <View style={styles.optionLeft}>
+                <MaterialIcons name="delete" size={24} color={theme?.colors?.error || '#B3261E'} />
+                <Text style={[styles.optionText, { color: theme?.colors?.error || '#B3261E' }]}>
+                  删除当前档案
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>档案配置</Text>
+          <View style={styles.card}>
+            {renderSelectorRow(
+              'provider',
+              'AI 提供商',
+              'hub',
+              provider,
+              providerOptions,
+              handleProviderChange
+            )}
+            {getCurrentProvider().models.length > 0 && (
+              <>
+                <View style={styles.optionDivider} />
+                {renderSelectorRow(
+                  'model',
+                  '模型',
+                  'psychology',
+                  model,
+                  getCurrentProvider().models,
+                  setModel,
+                  'psychology'
+                )}
+              </>
+            )}
+            {(provider === 'custom' || getCurrentProvider().models.length === 0) && (
+              <>
+                <View style={styles.optionDivider} />
+                <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="edit" size={24} color={theme?.colors?.primary} />
+                    <Text style={styles.inputLabel}>自定义模型</Text>
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={customModelName}
+                    onChangeText={setCustomModelName}
+                    placeholder="例如: gpt-4, claude-3-opus, llama2 等"
+                    placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <Text style={styles.inputHint}>请输入具体的模型名称</Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
         
         {/* API配置 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>API配置</Text>
+          <Text style={styles.sectionTitle}>API 配置</Text>
           <View style={styles.card}>
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
@@ -434,12 +761,11 @@ const LLMSettingsScreen: React.FC = () => {
               </View>
               <TextInput
                 style={styles.textInput}
-                value={showApiKey ? apiKey : '••••••••••••••••'}
+                value={apiKey}
                 onChangeText={handleApiKeyChange}
                 placeholder="请输入API密钥"
                 placeholderTextColor={theme?.colors?.onSurfaceVariant}
                 secureTextEntry={!showApiKey}
-                editable={showApiKey}
               />
               <Text style={styles.inputHint}>状态: {apiKey ? '已配置' : '未配置'}</Text>
             </View>
@@ -571,30 +897,6 @@ const LLMSettingsScreen: React.FC = () => {
             </View>
           </View>
         </View>
-
-
-
-        {/* 使用统计 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>使用统计</Text>
-          <View style={styles.statsCard}>
-            <View style={styles.statItem}>
-              <MaterialIcons name="analytics" size={24} color={theme?.colors?.primary} />
-              <View style={styles.statContent}>
-                <Text style={styles.statLabel}>本月请求</Text>
-                <Text style={styles.statValue}>{usageStats.monthly}次</Text>
-              </View>
-            </View>
-            <View style={[styles.statItem, styles.lastStatItem]}>
-              <MaterialIcons name="account-balance" size={24} color={theme?.colors?.primary} />
-              <View style={styles.statContent}>
-                <Text style={styles.statLabel}>总请求数</Text>
-                <Text style={styles.statValue}>{usageStats.total}次</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* 保存按钮 */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
@@ -621,13 +923,13 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-      marginBottom: 10,
-      marginTop: -5,  // 👈 增加与上方容器的距离
-      textTransform: 'uppercase',
-      letterSpacing: 0.3,
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    marginBottom: 10,
+    marginTop: -5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   card: {
     backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
@@ -656,6 +958,24 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  optionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+  },
+  optionValueText: {
+    fontSize: 13,
+    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    marginRight: 8,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  expandedOptions: {
+    paddingBottom: 6,
+  },
+  expandedOptionItem: {
+    paddingLeft: 24,
   },
   selectedOption: {
     backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
@@ -700,6 +1020,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     padding: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+  },
+  inputContainerNoDivider: {
+    borderBottomWidth: 0,
   },
   inputHeader: {
     flexDirection: 'row',
@@ -773,6 +1096,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 2,
   },
   statValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+  },
+  statValueText: {
     fontSize: 15,
     fontWeight: '600',
     color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),

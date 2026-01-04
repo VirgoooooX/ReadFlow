@@ -150,7 +150,10 @@ const createStyles = (isDark: boolean, theme: any) =>
     translatedText: {
       fontSize: 16,
       lineHeight: 24,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color:
+        theme?.colors?.onSecondaryContainer ||
+        theme?.colors?.onSurface ||
+        (isDark ? '#E2E8F0' : '#0F172A'),
       padding: 12,
       backgroundColor: theme?.colors?.secondaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
       borderRadius: 8,

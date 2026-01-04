@@ -319,18 +319,21 @@ const applyCustomColors = (
       merged.secondary = customConfig.secondary;
       merged.onSecondary = getContrastColor(customConfig.secondary);
       merged.secondaryContainer = generateContainerColor(customConfig.secondary, isDark);
+      merged.onSecondaryContainer = getContrastColor(merged.secondaryContainer);
     }
 
     if (customConfig.tertiary) {
       merged.tertiary = customConfig.tertiary;
       merged.onTertiary = getContrastColor(customConfig.tertiary);
       merged.tertiaryContainer = generateContainerColor(customConfig.tertiary, isDark);
+      merged.onTertiaryContainer = getContrastColor(merged.tertiaryContainer);
     }
 
     if (customConfig.error) {
       merged.error = customConfig.error;
       merged.onError = getContrastColor(customConfig.error);
       merged.errorContainer = generateContainerColor(customConfig.error, isDark);
+      merged.onErrorContainer = getContrastColor(merged.errorContainer);
     }
 
     if (customConfig.background) {
@@ -353,18 +356,21 @@ const applyCustomColors = (
     newColors.secondary = customConfig.secondary;
     newColors.onSecondary = getContrastColor(customConfig.secondary);
     newColors.secondaryContainer = generateContainerColor(customConfig.secondary, isDark);
+    newColors.onSecondaryContainer = getContrastColor(newColors.secondaryContainer);
   }
 
   if (customConfig.tertiary) {
     newColors.tertiary = customConfig.tertiary;
     newColors.onTertiary = getContrastColor(customConfig.tertiary);
     newColors.tertiaryContainer = generateContainerColor(customConfig.tertiary, isDark);
+    newColors.onTertiaryContainer = getContrastColor(newColors.tertiaryContainer);
   }
 
   if (customConfig.error) {
     newColors.error = customConfig.error;
     newColors.onError = getContrastColor(customConfig.error);
     newColors.errorContainer = generateContainerColor(customConfig.error, isDark);
+    newColors.onErrorContainer = getContrastColor(newColors.errorContainer);
   }
 
   if (customConfig.background) {

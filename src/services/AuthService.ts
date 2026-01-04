@@ -403,10 +403,20 @@ export class AuthService {
       remoteSettings && typeof remoteSettings === 'object' && remoteSettings.readingSettings && typeof remoteSettings.readingSettings === 'object'
         ? remoteSettings.readingSettings
         : null;
+    const remoteLLMSettings =
+      remoteSettings && typeof remoteSettings === 'object' && remoteSettings.llmSettings && typeof remoteSettings.llmSettings === 'object'
+        ? remoteSettings.llmSettings
+        : null;
 
     if (remoteReadingSettings) {
       try {
         await this.getSettingsService().saveReadingSettingsNoCloudSync(remoteReadingSettings);
+      } catch {
+      }
+    }
+    if (remoteLLMSettings) {
+      try {
+        await this.getSettingsService().saveLLMSettingsNoCloudSync(remoteLLMSettings);
       } catch {
       }
     }
@@ -422,7 +432,8 @@ export class AuthService {
     };
     await this.getSettingsService().saveAppSettingsNoCloudSync(merged);
     const readingSettings = await this.getSettingsService().getReadingSettings();
-    await this.pushCloudSettingsFromLocal(token, userId, { appSettings: merged, readingSettings });
+    const llmSettings = await this.getSettingsService().getLLMSettingsStore();
+    await this.pushCloudSettingsFromLocal(token, userId, { appSettings: merged, readingSettings, llmSettings });
   }
 
   private async performCloudLogin(credentials: LoginCredentials): Promise<AuthResponse> {

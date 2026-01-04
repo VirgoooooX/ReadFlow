@@ -140,7 +140,7 @@ export class TranslationService {
     targetLang: string
   ): Promise<string | null> {
     try {
-      const llmSettings = await this.settingsService.getLLMSettings();
+      const llmSettings = await this.settingsService.getLLMSettingsFor('translation');
       
       if (!llmSettings?.apiKey) {
         logger.warn('LLM API key not configured');
@@ -162,7 +162,7 @@ export class TranslationService {
     } catch (error) {
       logger.error('Error translating with LLM:', error);
       // 记录失败统计
-      const llmSettings = await this.settingsService.getLLMSettings();
+      const llmSettings = await this.settingsService.getLLMSettingsFor('translation');
       if (llmSettings) {
         await this.logUsage('translation', llmSettings.provider, llmSettings.model, false);
       }
