@@ -1662,18 +1662,123 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         
         // 【新增】监听图片加载，动态更新进度
         setupImageLoadListener();
+
+        function parseBestFromSrcset(srcset) {
+          if (!srcset) return '';
+          const candidates = srcset.split(',').map(function(s) { return (s || '').trim(); }).filter(Boolean);
+          let bestUrl = '';
+          let bestScore = -1;
+          candidates.forEach(function(candidate) {
+            const tokens = candidate.split(/\s+/).filter(Boolean);
+            if (tokens.length === 0) return;
+            const url = tokens[0];
+            const descriptor = tokens.slice(1).join(' ');
+            let score = 0;
+            if (descriptor && descriptor.endsWith('w')) {
+              score = parseInt(descriptor, 10) || 0;
+            } else if (descriptor && descriptor.endsWith('x')) {
+              score = (parseFloat(descriptor) || 0) * 10000;
+            }
+            if (score > bestScore) {
+              bestScore = score;
+              bestUrl = url;
+            }
+          });
+          return bestUrl;
+        }
+
+        function unwrapProxyUrl(url) {
+          try {
+            const u = new URL(url);
+            if (u.hostname === 'images.weserv.nl') {
+              const inner = u.searchParams.get('url');
+              if (inner) {
+                let decoded = inner;
+                try { decoded = decodeURIComponent(inner); } catch {}
+                return { kind: 'weserv', base: u.origin + u.pathname, params: new URLSearchParams(u.searchParams.toString()), innerUrl: decoded };
+              }
+            }
+            if (u.pathname && u.pathname.endsWith('/api/image')) {
+              const inner = u.searchParams.get('url');
+              if (inner) {
+                let decoded = inner;
+                try { decoded = decodeURIComponent(inner); } catch {}
+                return { kind: 'self', base: u.origin + u.pathname, params: new URLSearchParams(u.searchParams.toString()), innerUrl: decoded };
+              }
+            }
+          } catch {}
+          return { kind: 'none', base: '', params: null, innerUrl: url };
+        }
+
+        function rewrapProxyUrl(wrapper) {
+          if (!wrapper || wrapper.kind === 'none') return wrapper ? wrapper.innerUrl : '';
+          try {
+            const u = new URL(wrapper.base);
+            if (wrapper.params) {
+              wrapper.params.forEach(function(value, key) {
+                if (key === 'url') return;
+                u.searchParams.set(key, value);
+              });
+            }
+            u.searchParams.set('url', wrapper.innerUrl || '');
+            return u.toString();
+          } catch {
+            return wrapper.innerUrl || '';
+          }
+        }
+
+        function upgradeSspaiUrl(originalUrl) {
+          try {
+            const u = new URL(originalUrl);
+            if (!u.hostname || !u.hostname.includes('cdnfile.sspai.com')) return originalUrl;
+            const base = u.origin + u.pathname;
+            const search = u.search || '';
+            if (search.includes('imageView2/2/w/')) {
+              return base + '?imageView2/2/format/webp?imageMogr2/auto-orient/quality/90/ignore-error/1';
+            }
+          } catch {}
+          return originalUrl;
+        }
+
+        function getBestImageUrl(img) {
+          if (!img) return '';
+          const getAttr = function(name) {
+            try { return img.getAttribute(name) || ''; } catch { return ''; }
+          };
+
+          const candidates = [];
+          const dataAttrs = ['data-original', 'data-src', 'data-url', 'data-lazy-src', 'data-zoom-src', 'data-large', 'data-highres'];
+          dataAttrs.forEach(function(attr) {
+            const v = getAttr(attr);
+            if (v) candidates.push(v);
+          });
+
+          const srcset = getAttr('srcset') || getAttr('data-srcset');
+          const bestSrcset = parseBestFromSrcset(srcset);
+          if (bestSrcset) candidates.unshift(bestSrcset);
+
+          if (img.currentSrc) candidates.unshift(img.currentSrc);
+          if (img.src) candidates.push(img.src);
+
+          const chosen = candidates.find(Boolean) || '';
+          if (!chosen) return '';
+
+          const wrapper = unwrapProxyUrl(chosen);
+          wrapper.innerUrl = upgradeSspaiUrl(wrapper.innerUrl);
+          return rewrapProxyUrl(wrapper);
+        }
         
         // 【修复】图片点击事件代理 - 移到 init() 中确保 DOM 已就绪
         const articleContent = document.querySelector('.article-content');
         if (articleContent) {
           articleContent.addEventListener('click', function(e) {
-            if (e.target.tagName === 'IMG') {
+            if (e.target && e.target.tagName === 'IMG') {
               e.stopPropagation();
               e.preventDefault();
               
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'imageClick',
-                url: e.target.src
+                url: getBestImageUrl(e.target) || e.target.src
               }));
             }
           });
