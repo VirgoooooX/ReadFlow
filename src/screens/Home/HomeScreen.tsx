@@ -86,7 +86,7 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl
   // 🔥 处理防盗链图片代理
   const imageUri = useMemo(() => {
     if (!item.imageUrl) return null;
-    
+
     // 只要 needsProxy 为 true，就应该尝试获取代理 URL (自建或公共)
     if (needsProxy(item.imageUrl)) {
       const finalUrl = toProxyUrl(item.imageUrl, proxyServerUrl);
@@ -95,7 +95,7 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl
       }
       return finalUrl;
     }
-    
+
     return item.imageUrl;
   }, [item.imageUrl, proxyServerUrl]);
 
@@ -188,7 +188,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
   const flatListRef = useRef<any>(null);
   const ITEM_HEIGHT = 110;
-  
+
   // 🌟 中間层优化：传入 isNeighbor 下，得以组件本身接收 props
   const hasTriedLoad = useRef(false);
   const pendingMarkIdsRef = useRef<Set<number>>(new Set());
@@ -245,13 +245,13 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
     scrollToArticleId: (articleId: number) => {
       const index = articles.findIndex((a: Article) => a.id === articleId);
       if (index < 0 || !flatListRef.current) return;
-      
+
       logger.info(`[ArticleListScene] Scrolling to article: ${articleId} index: ${index}`);
       // viewPosition: 0.5 让文章显示在屏幕中间
       flatListRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
     }
   }), [articles]);
-  
+
   // 【删除】不再需要 onViewableItemsChanged 和 handleScroll
   // -> 恢复用于 autoMarkReadOnScroll
 
@@ -273,8 +273,8 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       onScrollToIndexFailed={(info: any) => {
         // 处理滚动失败的情况
         setTimeout(() => {
-          flatListRef.current?.scrollToIndex({ 
-            index: info.index, 
+          flatListRef.current?.scrollToIndex({
+            index: info.index,
             animated: false,
             viewPosition: 0.5,
           });
@@ -367,14 +367,28 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const styles = createStyles(isDark, theme);
 
   const routes = useMemo(() => {
-    let baseRoutes = [{ key: 'all', title: '全部' }];
+    let baseRoutes: Array<{ key: string; title: string; unreadCount?: number }> = [{ key: 'all', title: '全部' }];
     if (settings && settings.showAllTab === false) {
       baseRoutes = [];
     }
+
+    // 计算"全部"tab的未读数（所有活跃源的未读数总和）
+    const totalUnread = rssSources
+      .filter(s => s.isActive)
+      .reduce((sum, s) => sum + (s.unread_count || 0), 0);
+
+    // 为"全部"tab添加未读数
+    if (baseRoutes.length > 0) {
+      baseRoutes[0] = { ...baseRoutes[0], unreadCount: totalUnread };
+    }
+
+    // 为各源tab添加未读数
     const sourceRoutes = rssSources.map(source => ({
       key: `source-${source.id}`,
-      title: source.name
+      title: source.name,
+      unreadCount: source.unread_count || 0
     }));
+
     return [...baseRoutes, ...sourceRoutes];
   }, [rssSources, settings?.showAllTab]);
 
@@ -399,7 +413,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       const tabData = getTabData(tabKey);
       const offset = append ? tabData.articles.length : 0;
       const limit = 15;
-      
+
       let newArticles: Article[];
 
       // 【新增】构建过滤条件
@@ -409,11 +423,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         sortBy: 'published_at',
         sortOrder: 'DESC',
       };
-      
+
       if (showOnlyUnread) {
         filterOptions.isRead = false;
       }
-      
+
       // 根据 tabKey 决定加载哪个源的数据
       if (tabKey === 'all') {
         // 全部标签：加载所有源的文章
@@ -470,7 +484,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         });
         return updated;
       });
-      
+
       logger.info(`[HomeScreen] Loaded ${newArticles.length} articles for tab "${tabKey}", append: ${append}`);
     } catch (error) {
       logger.error(`Failed to load articles for tab "${tabKey}":`, error);
@@ -501,7 +515,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       loadArticles(routes[1].key);
     }
   }, [routes, loadArticles, tabDataMap]);
-  
+
   // 🔥 获取代理配置
   useEffect(() => {
     const loadProxyConfig = async () => {
@@ -516,25 +530,25 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     };
     loadProxyConfig();
   }, []);
-  
+
   // 🌟 【已移除】原有的强制后台刷新逻辑已移除，改由 RSSStartupSettings 控制
   // 详见 AppNavigator.tsx 中的 triggerStartupRefresh 调用
-  
+
   // 【分离】监听配置变化，仅管理定时器，不触发立即刷新
   useEffect(() => {
     let refreshInterval: NodeJS.Timeout | null = null;
-    
+
     const triggerBackgroundSync = async () => {
       if (rssSources.length === 0) return;
       logger.info('[HomeScreen] ⏰ 触发定时后台刷新...');
       cacheEventEmitter.batchSyncStart();
-      
+
       try {
         await RSSService.getInstance().refreshAllSourcesBackground({
           maxConcurrent: 3,
           onArticlesReady: (articles, sourceName) => {
-             // 可选：这里可以不做任何事，因为 refreshAllSourcesBackground 完成后不自动清除缓存
-             // 我们依赖 cacheEventEmitter 来通知更新
+            // 可选：这里可以不做任何事，因为 refreshAllSourcesBackground 完成后不自动清除缓存
+            // 我们依赖 cacheEventEmitter 来通知更新
           }
         });
         cacheEventEmitter.refreshAllSources();
@@ -559,19 +573,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       if (refreshInterval) clearInterval(refreshInterval);
     };
   }, [readingSettings?.autoRefreshInterval, rssSources.length]);
-  
- // 【新增】监听 rssSources 变化，清理已删除源的缓存和"全部"标签缓存
+
+  // 【新增】监听 rssSources 变化，清理已删除源的缓存和"全部"标签缓存
   useEffect(() => {
     const currentSourceKeys = new Set([
       'all',
       ...rssSources.map(source => `source-${source.id}`)
     ]);
-    
+
     // 清理不存在的源的缓存
     setTabDataMap(prev => {
       const updated = new Map(prev);
       let hasChanges = false;
-      
+
       for (const key of updated.keys()) {
         if (!currentSourceKeys.has(key)) {
           logger.info(`[HomeScreen] 🗑️ 清理已删除源的缓存: ${key}`);
@@ -579,28 +593,28 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           hasChanges = true;
         }
       }
-      
+
       // 【关键修复】如果有源被删除，也清理"全部"标签的缓存
       if (hasChanges && updated.has('all')) {
         logger.info(`[HomeScreen] 🗑️ 清理"全部"标签缓存（源已变更）`);
         updated.delete('all');
       }
-      
+
       return hasChanges ? updated : prev;
     });
   }, [rssSources]);
-  
+
   // 【升级】监听全局缓存事件，支持细粒度刷新
   useEffect(() => {
     const unsubscribe = cacheEventEmitter.subscribe((eventData) => {
       const { type, sourceId, sourceIds, sourceName } = eventData;
-      
+
       // 辅助函数：重新加载当前标签（如果匹配条件）
       const reloadCurrentIfMatches = (shouldReload: (currentKey: string) => boolean) => {
         const currentRoute = routesRef.current[currentIndexRef.current];
         if (currentRoute && shouldReload(currentRoute.key)) {
           logger.info(`[HomeScreen] 🔄 事件触发自动刷新: ${currentRoute.title}`);
-          
+
           // 【优化】如果有正在等待的防抖刷新，取消它，因为我们要立即刷新了
           if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
@@ -609,7 +623,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 
           // 稍微延迟一下确保 map 已清空（虽然 React 批处理通常会处理好，但为了保险）
           setTimeout(() => {
-             loadArticlesRef.current(currentRoute.key, false);
+            loadArticlesRef.current(currentRoute.key, false);
           }, 50);
         }
       };
@@ -621,14 +635,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           setTabDataMap(new Map());
           reloadCurrentIfMatches(() => true);
           break;
-          
+
         case 'clearArticles':
           // 清除所有文章缓存
           logger.info('[HomeScreen] 🧹 收到清除文章缓存事件，清除所有标签的文章数据');
           setTabDataMap(new Map());
           reloadCurrentIfMatches(() => true);
           break;
-          
+
         case 'clearSourceArticles':
           // 清除单个源的文章缓存：同时刷新该源tab和"全部"tab
           if (sourceId) {
@@ -642,7 +656,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             reloadCurrentIfMatches(key => key === 'all' || key === `source-${sourceId}`);
           }
           break;
-          
+
         case 'refreshSource':
           // 单个源刷新完成：刷新该源tab和"全部"tab
           if (sourceId) {
@@ -711,7 +725,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           setTabDataMap(new Map());
           reloadCurrentIfMatches(() => true);
           break;
-          
+
         case 'sourceDeleted':
           // 源被删除：移除该源缓存，刷新"全部"tab
           if (sourceId) {
@@ -725,7 +739,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             reloadCurrentIfMatches(key => key === 'all'); // 源删了，不需要刷新该源的 tab（会消失），只刷新 all
           }
           break;
-          
+
         case 'sourceUpdated':
           // 源被更新：刷新该源tab
           if (sourceId) {
@@ -738,13 +752,13 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             reloadCurrentIfMatches(key => key === `source-${sourceId}`);
           }
           break;
-          
+
         case 'updateRSSStats':
           // RSS统计更新：说明有新数据写入，需要刷新当前视图
           // 🛑 优化：如果是手动下拉刷新 或 后台批量刷新中，忽略此事件
           if (isRefreshingRef.current || isBatchSyncingRef.current) {
-             logger.info('[HomeScreen] 📊 收到RSS统计更新事件，但正在批量操作中，跳过自动刷新');
-             break;
+            logger.info('[HomeScreen] 📊 收到RSS统计更新事件，但正在批量操作中，跳过自动刷新');
+            break;
           }
 
           // 🔥 优化：如果是标记已读/未读触发的统计更新，且当前不是"仅看未读"模式，则忽略刷新
@@ -755,12 +769,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           }
 
           logger.info('[HomeScreen] 📊 收到RSS统计更新事件，准备刷新（防抖处理）');
-          
+
           // 🛑 防抖：2秒内多次收到事件，只刷新一次
           if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
           }
-          
+
           debounceTimerRef.current = setTimeout(() => {
             logger.info('[HomeScreen] 📊 执行防抖后的刷新');
             // 既然统计数据变了，说明有新文章或状态变更，清除所有缓存是安全的
@@ -768,7 +782,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             reloadCurrentIfMatches(() => true);
           }, 1000); // 1秒防抖，足够覆盖大部分并发写入
           break;
-          
+
         case 'articleRead':
           // 单篇文章标记为已读：更新本地状态，避免刷新列表
           if (eventData.articleId) {
@@ -776,7 +790,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             logger.info(`[HomeScreen] 📖 收到文章已读事件: ${id}`);
             setTabDataMap(prev => {
               const updated = new Map(prev);
-              
+
               // 遍历所有 tab，找到包含该文章的列表并更新
               for (const [key, data] of updated.entries()) {
                 const articleIndex = data.articles.findIndex(a => a.id === id);
@@ -794,16 +808,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           break;
       }
     });
-    
+
     return unsubscribe; // 组件卸载时自动取消订阅
   }, []);
   useFocusEffect(useCallback(() => {
     // 获取滚动信息和刷新标记
     const { shouldScroll, articleId, shouldRefresh } = getPendingScrollInfo();
     logger.info('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId, 'shouldRefresh:', shouldRefresh);
-    
+
     const currentRoute = routes[index];
-    
+
     // 定义滚动操作
     const performScroll = () => {
       if (shouldScroll && articleId !== null && currentRoute) {
@@ -829,11 +843,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       // 不需要刷新，直接滚动
       performScroll();
     }
-    
+
     // 🔀 检查是否从订阅源管理页穿透过来
     const sourceId = (route?.params as any)?.sourceId;
     const sourceName = (route?.params as any)?.sourceName;
-    
+
     if (sourceId && sourceName) {
       // 找到对应源的 tab 索引
       const sourceTabIndex = routes.findIndex(r => r.key === `source-${sourceId}`);
@@ -841,7 +855,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         logger.info(`[HomeScreen] 🔀 穿透到源标签: ${sourceName} (index: ${sourceTabIndex})`);
         setIndex(sourceTabIndex);
         setLoadedTabs(prev => new Set(prev).add(sourceTabIndex));
-        
+
         // 🔥 修复：明确加载目标标签的数据，防止出现空页面
         if (routes[sourceTabIndex]) {
           loadArticles(routes[sourceTabIndex].key);
@@ -863,7 +877,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     setIsRefreshing(true);
     // 立即同步状态到 ref，确保事件监听器能读到最新状态
     isRefreshingRef.current = true;
-    
+
     try {
       const currentRoute = routes[index];
       if (currentRoute) {
@@ -872,7 +886,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         } else if (currentRoute.key.startsWith('source-')) {
           const sourceId = parseInt(currentRoute.key.replace('source-', ''), 10);
           if (!isNaN(sourceId)) {
-             await syncSource(sourceId);
+            await syncSource(sourceId);
           }
         }
       }
@@ -884,14 +898,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       isRefreshingRef.current = false;
     }
   }, [index, routes, syncAllSources, syncSource]);
-  
+
   // 【重构】加载更多回调（支持每个标签独立加载）
   const handleLoadMore = useCallback(async (tabKey: string) => {
     const tabData = getTabData(tabKey);
     if (tabData.isLoadingMore || !tabData.hasMore || isRefreshing) return;
-    
+
     logger.info(`[HomeScreen] Loading more articles for tab "${tabKey}"...`);
-    
+
     // 设置加载状态
     setTabDataMap(prev => {
       const updated = new Map(prev);
@@ -899,7 +913,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       updated.set(tabKey, { ...currentData, isLoadingMore: true });
       return updated;
     });
-    
+
     try {
       await loadArticles(tabKey, true); // 追加加载
     } catch (error) {
@@ -910,7 +924,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleIndexChange = useCallback((newIndex: number) => {
     setIndex(newIndex);
     setLoadedTabs(prev => new Set(prev).add(newIndex));
-    
+
     // 切换标签时，如果该标签或相邻标签还没加载过数据，则加载
     [newIndex, newIndex - 1, newIndex + 1].forEach(idx => {
       if (idx >= 0 && idx < routes.length) {
@@ -926,7 +940,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     setIndex(tabIndex);
     setLoadedTabs(prev => new Set(prev).add(tabIndex));
     tabContentRef.current?.scrollToIndex(tabIndex);
-    
+
     // 点击标签时，预加载该标签及其相邻标签
     [tabIndex, tabIndex - 1, tabIndex + 1].forEach(idx => {
       if (idx >= 0 && idx < routes.length) {
@@ -938,19 +952,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [routes, tabDataMap, loadArticles]);
 
-  const renderScene = useCallback(({ route, index: tabIndex }: { route: { key: string; title: string }; index: number }) => {
+  const renderScene = useCallback(({ route, index: tabIndex }: { route: { key: string; title: string; unreadCount?: number }; index: number }) => {
     const isActive = loadedTabs.has(tabIndex);
     const isCloseToFocus = Math.abs(index - tabIndex) <= 1;
     const isNeighbor = !isActive && isCloseToFocus;
-  
+
     if (!isActive && !isCloseToFocus) {
       return <View style={[styles.lazyPlaceholder, { width: screenWidth }]} />;
     }
-  
+
     // 【修改】从 tabDataMap 获取该标签的数据
     const tabData = getTabData(route.key);
     const articleIds = tabData.articles.map(a => a.id);
-      
+
     return (
       <View style={{ width: screenWidth, flex: 1 }}>
         <ArticleListScene
@@ -970,7 +984,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               const updated = new Map(prev);
               const currentData = updated.get(route.key);
               if (currentData) {
-                const newArticles = currentData.articles.map(a => 
+                const newArticles = currentData.articles.map(a =>
                   a.id === id ? { ...a, isRead: true } : a
                 );
                 updated.set(route.key, { ...currentData, articles: newArticles });
@@ -979,7 +993,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               if (route.key !== 'all' && updated.has('all')) {
                 const allData = updated.get('all');
                 if (allData) {
-                  const newAllArticles = allData.articles.map(a => 
+                  const newAllArticles = allData.articles.map(a =>
                     a.id === id ? { ...a, isRead: true } : a
                   );
                   updated.set('all', { ...allData, articles: newAllArticles });
@@ -990,31 +1004,31 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 
             const currentIndex = articleIds.indexOf(id);
             setLastViewedArticleId(id);
-      const quickArticle = tabData.articles.find(a => a.id === id);
+            const quickArticle = tabData.articles.find(a => a.id === id);
             const tNavigateMs = nowMs();
             logger.info(
               `[Perf] [List->Detail] press id=${perfId} dtBeforeNavigateMs=${Math.round(
                 tNavigateMs - tPressMs
               )} tab=${route.key} listCount=${tabData.articles.length} articleId=${id}`
             );
-            navigation.navigate('ArticleDetail', { 
+            navigation.navigate('ArticleDetail', {
               articleId: id,
               articleIds,
               currentIndex: currentIndex >= 0 ? currentIndex : 0,
               perf: { id: perfId, tPressMs, tNavigateMs, sourceTabKey: route.key },
               article: quickArticle
                 ? {
-                    ...quickArticle,
-                    publishedAt:
-                      quickArticle.publishedAt instanceof Date
-                        ? quickArticle.publishedAt.toISOString()
-                        : new Date((quickArticle as any).publishedAt).toISOString(),
-                    readAt: quickArticle.readAt
-                      ? (quickArticle.readAt instanceof Date
-                          ? quickArticle.readAt.toISOString()
-                          : new Date((quickArticle as any).readAt).toISOString())
-                      : undefined,
-                  }
+                  ...quickArticle,
+                  publishedAt:
+                    quickArticle.publishedAt instanceof Date
+                      ? quickArticle.publishedAt.toISOString()
+                      : new Date((quickArticle as any).publishedAt).toISOString(),
+                  readAt: quickArticle.readAt
+                    ? (quickArticle.readAt instanceof Date
+                      ? quickArticle.readAt.toISOString()
+                      : new Date((quickArticle as any).readAt).toISOString())
+                    : undefined,
+                }
                 : undefined
             });
           }}
@@ -1033,7 +1047,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               const updated = new Map(prev);
               const currentData = updated.get(route.key);
               if (currentData) {
-                const newArticles = currentData.articles.map(a => 
+                const newArticles = currentData.articles.map(a =>
                   idSet.has(a.id) ? { ...a, isRead: true } : a
                 );
                 updated.set(route.key, { ...currentData, articles: newArticles });
@@ -1042,7 +1056,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               if (route.key !== 'all' && updated.has('all')) {
                 const allData = updated.get('all');
                 if (allData) {
-                  const newAllArticles = allData.articles.map(a => 
+                  const newAllArticles = allData.articles.map(a =>
                     idSet.has(a.id) ? { ...a, isRead: true } : a
                   );
                   updated.set('all', { ...allData, articles: newAllArticles });
@@ -1068,11 +1082,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             try {
               const currentRoute = routes[index];
               let sourceId: number | undefined;
-              
+
               if (currentRoute.key.startsWith('source-')) {
                 sourceId = parseInt(currentRoute.key.replace('source-', ''), 10);
               }
-              
+
               await articleService.markAllAsRead(sourceId);
               setTabDataMap(prev => {
                 const updated = new Map(prev);
@@ -1130,19 +1144,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       title="文章"
       showBackButton={false}
       rightComponent={
-        <View style={{ 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          height: '100%', 
-          paddingRight: 12, 
-          marginTop: -1.5 
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          height: '100%',
+          paddingRight: 12,
+          marginTop: -1.5
         }}>
           <TouchableOpacity
             onPress={toggleShowOnlyUnread}
-            style={{ 
-              width: 24, 
-              height: 24, 
-              alignItems: 'center', 
+            style={{
+              width: 24,
+              height: 24,
+              alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 10,
               marginRight: 10,
@@ -1153,19 +1167,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             }}
             hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
           >
-            <MaterialIcons 
-              name={showOnlyUnread ? "filter-list" : "filter-list-off"} 
-              size={18} 
-              color={showOnlyUnread ? (isDark ? theme.colors.onPrimary : theme.colors.primary) : (isDark ? theme.colors.onSurfaceVariant : '#FFFFFF')} 
+            <MaterialIcons
+              name={showOnlyUnread ? "filter-list" : "filter-list-off"}
+              size={18}
+              color={showOnlyUnread ? (isDark ? theme.colors.onPrimary : theme.colors.primary) : (isDark ? theme.colors.onSurfaceVariant : '#FFFFFF')}
             />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleMarkAllRead}
-            style={{ 
-              width: 24, 
-              height: 24, 
-              alignItems: 'center', 
+            style={{
+              width: 24,
+              height: 24,
+              alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 10,
               // 描边风格
@@ -1175,10 +1189,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             }}
             hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
           >
-            <MaterialIcons 
-              name="done-all" 
-              size={18} 
-              color={isDark ? theme.colors.onSurface : '#FFFFFF'} 
+            <MaterialIcons
+              name="done-all"
+              size={18}
+              color={isDark ? theme.colors.onSurface : '#FFFFFF'}
             />
           </TouchableOpacity>
         </View>
@@ -1194,7 +1208,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             onTabPress={handleTabPress}
           />
         </View>
-        
+
         <CustomTabContent
           ref={tabContentRef}
           tabs={routes}

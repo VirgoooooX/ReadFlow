@@ -15,6 +15,7 @@ import { useThemeContext } from '../theme';
 interface Tab {
     key: string;
     title: string;
+    unreadCount?: number;
 }
 
 interface CustomTabBarProps {
@@ -39,7 +40,8 @@ const TabItem = React.memo(({
     onLayout,
     scrollX,
     screenWidth,
-    inactiveColor
+    inactiveColor,
+    errorColor
 }: {
     item: Tab;
     index: number;
@@ -48,6 +50,7 @@ const TabItem = React.memo(({
     scrollX: SharedValue<number>;
     screenWidth: number;
     inactiveColor: string;
+    errorColor: string;
 }) => {
     // 文字颜色动画样式 - O(1) 复杂度优化
     // 只关注当前 index 附近的区间，使用相邻插值法
@@ -79,6 +82,15 @@ const TabItem = React.memo(({
             >
                 {item.title}
             </Animated.Text>
+            {/* 未读小红点 */}
+            {item.unreadCount && item.unreadCount > 0 ? (
+                <View
+                    style={[
+                        styles.unreadBadge,
+                        { backgroundColor: errorColor }
+                    ]}
+                />
+            ) : null}
         </TouchableOpacity>
     );
 });
@@ -110,7 +122,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     // 处理标签布局测量 - 收集完毕后一次性写入 SharedValue
     const handleTabLayout = useCallback((index: number, event: LayoutChangeEvent) => {
         const { x, width } = event.nativeEvent.layout;
-        
+
         // 检查是否真的变化了
         const cached = layoutCache.current[index];
         if (cached && Math.abs(cached.x - x) < 0.5 && Math.abs(cached.width - width) < 0.5) {
@@ -223,6 +235,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
                         scrollX={scrollX}
                         screenWidth={screenWidth}
                         inactiveColor={inactiveColor}
+                        errorColor={theme.colors.error}
                     />
                 ))}
             </Animated.ScrollView>
@@ -268,6 +281,15 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         textAlign: 'center',
+    },
+    unreadBadge: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        zIndex: 2,
     },
 });
 
