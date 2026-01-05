@@ -261,6 +261,55 @@ export class ArticleService {
     }
   }
 
+  public async markManyAsRead(ids: number[], progress: number = 100): Promise<void> {
+    try {
+      if (!ids || ids.length === 0) return;
+
+      await this.databaseService.initializeDatabase();
+
+      const now = new Date().toISOString();
+      const placeholders = ids.map(() => '?').join(',');
+
+      await this.databaseService.executeStatement(
+        `UPDATE articles SET is_read = 1, read_progress = ?, read_at = ? WHERE id IN (${placeholders})`,
+        [progress, now, ...ids]
+      );
+
+      const rows = await this.databaseService
+        .executeQuery(
+          `SELECT id, rss_source_id as sourceId FROM articles WHERE id IN (${placeholders})`,
+          ids
+        )
+        .catch(() => []);
+
+      const affectedSourceIds = new Set<number>();
+      for (const row of rows) {
+        const articleId = Number((row as any).id);
+        const sourceIdRaw = (row as any).sourceId;
+        const sourceId = sourceIdRaw === null || sourceIdRaw === undefined ? null : Number(sourceIdRaw);
+
+        if (!Number.isNaN(articleId)) {
+          cacheEventEmitter.emit({
+            type: 'articleRead',
+            articleId,
+            sourceId: sourceId ?? undefined,
+          });
+        }
+        if (sourceId !== null && !Number.isNaN(sourceId)) {
+          affectedSourceIds.add(sourceId);
+        }
+      }
+
+      for (const sourceId of affectedSourceIds) {
+        await this.updateSourceStats(sourceId, { reason: 'markRead' });
+      }
+
+      cloudSyncService.syncUserArticleStates().catch(e => logger.warn('[ArticleService] Cloud sync failed:', e));
+    } catch (error) {
+      logger.error('Error marking many articles as read:', error);
+    }
+  }
+
   /**
    * 标记所有（或指定源）文章为已读
    */
@@ -280,12 +329,9 @@ export class ArticleService {
       
       if (sourceId !== undefined) {
         await this.updateSourceStats(sourceId, { reason: 'markAllRead' });
-        cacheEventEmitter.clearSourceArticles(sourceId);
       } else {
-        // 更新所有源的统计为 0
         await this.databaseService.executeStatement('UPDATE rss_sources SET unread_count = 0');
-        cacheEventEmitter.updateRSSStats(); // 全局刷新，不需要 reason，反正都要刷
-        cacheEventEmitter.clearArticles();
+        cacheEventEmitter.updateRSSStats();
       }
     } catch (error) {
       logger.error('Error marking all as read:', error);
@@ -518,6 +564,81 @@ export class ArticleService {
     } catch (error) {
       logger.error('Error getting recommended articles:', error);
       return [];
+    }
+  }
+
+  public async getNextUnreadAfter(options: {
+    afterPublishedAt: string;
+    afterId: number;
+    rssSourceId?: number;
+  }): Promise<number | null> {
+    try {
+      await this.databaseService.initializeDatabase();
+
+      const { afterPublishedAt, afterId, rssSourceId } = options;
+
+      let whereClause =
+        'a.is_read = 0 AND (a.published_at < ? OR (a.published_at = ? AND a.id < ?))';
+      const params: any[] = [afterPublishedAt, afterPublishedAt, afterId];
+
+      if (rssSourceId !== undefined) {
+        whereClause += ' AND a.rss_source_id = ?';
+        params.push(rssSourceId);
+      }
+
+      const results = await this.databaseService
+        .executeQuery(
+          `SELECT a.id
+           FROM articles a
+           WHERE ${whereClause}
+           ORDER BY a.published_at DESC, a.id DESC
+           LIMIT 1`,
+          params
+        )
+        .catch(() => []);
+
+      if (!results || results.length === 0) return null;
+      return Number(results[0].id);
+    } catch (error) {
+      logger.error('Error getting next unread article:', error);
+      return null;
+    }
+  }
+
+  public async hasAnyArticleAfter(options: {
+    afterPublishedAt: string;
+    afterId: number;
+    rssSourceId?: number;
+  }): Promise<boolean> {
+    try {
+      await this.databaseService.initializeDatabase();
+
+      const { afterPublishedAt, afterId, rssSourceId } = options;
+
+      let whereClause =
+        '(a.published_at < ? OR (a.published_at = ? AND a.id < ?))';
+      const params: any[] = [afterPublishedAt, afterPublishedAt, afterId];
+
+      if (rssSourceId !== undefined) {
+        whereClause += ' AND a.rss_source_id = ?';
+        params.push(rssSourceId);
+      }
+
+      const results = await this.databaseService
+        .executeQuery(
+          `SELECT a.id
+           FROM articles a
+           WHERE ${whereClause}
+           ORDER BY a.published_at DESC, a.id DESC
+           LIMIT 1`,
+          params
+        )
+        .catch(() => []);
+
+      return !!(results && results.length > 0);
+    } catch (error) {
+      logger.error('Error checking next article:', error);
+      return false;
     }
   }
 

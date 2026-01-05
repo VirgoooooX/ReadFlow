@@ -34,6 +34,19 @@ export interface TypographyTokens {
 export const fontFamilies = {
   // 系统默认字体
   default: undefined, // 使用系统默认字体
+  system: undefined,
+  
+  serif: {
+    ios: 'Georgia',
+    android: 'serif',
+    default: 'serif',
+  },
+  
+  sansSerif: {
+    ios: 'Helvetica Neue',
+    android: 'sans-serif',
+    default: 'System',
+  },
   
   // 中文字体优化
   chinese: {
@@ -295,7 +308,18 @@ export const adjustTypography = (
 
 // 工具函数：获取平台特定字体
 export const getPlatformFont = (type: string = 'chinese'): string | undefined => {
-  const fontFamily = fontFamilies[type as keyof typeof fontFamilies];
+  const raw = `${type || ''}`;
+  const lower = raw.toLowerCase();
+  const normalizedKey =
+    lower === 'system'
+      ? 'system'
+      : lower === 'sansserif'
+        ? 'sansSerif'
+        : lower === 'default'
+          ? 'default'
+          : raw;
+
+  const fontFamily = fontFamilies[normalizedKey as keyof typeof fontFamilies];
   if (typeof fontFamily === 'string') {
     return fontFamily;
   }

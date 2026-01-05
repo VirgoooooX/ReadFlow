@@ -1,4 +1,4 @@
-import { RSSSource, Article } from '../../types';
+import { RSSSource, Article, FetchArticlesWithStatsResult } from '../../types';
 import { IRSSProvider, FeedInfo } from './RSSProvider';
 import { DatabaseService } from '../../database/DatabaseService';
 import { SettingsService } from '../SettingsService';
@@ -48,6 +48,14 @@ export class CloudSyncService implements IRSSProvider {
    * options.triggerRefresh: If true, force server to refresh feed
    */
   public async fetchArticles(source: RSSSource, options: { triggerRefresh?: boolean } = {}): Promise<Article[]> {
+    const result = await this.fetchArticlesWithStats(source, options);
+    return result.articles;
+  }
+
+  public async fetchArticlesWithStats(
+    source: RSSSource,
+    options: { triggerRefresh?: boolean } = {}
+  ): Promise<FetchArticlesWithStatsResult> {
     try {
       const serverUrl = await this.getServerUrl();
       const settings = await this.settingsService.getAppSettings();
@@ -76,8 +84,10 @@ export class CloudSyncService implements IRSSProvider {
       const sourceId = typeof source.id === 'string' ? parseInt(source.id, 10) : source.id;
       let cursor = since;
       let latestCursor = since;
-      const aggregated: Article[] = [];
-      const seenUrls = new Set<string>();
+      const insertedArticles: Article[] = [];
+      let insertedCount = 0;
+      let updatedCount = 0;
+      let upsertedCount = 0;
 
       const maxPages = 100;
       let page = 0;
@@ -98,14 +108,11 @@ export class CloudSyncService implements IRSSProvider {
 
           const filteredPage = await filterService.applyFilterRules<Article>(pageArticles, sourceId);
           logger.info(`[CloudSync] Filtered articles: ${pageArticles.length} -> ${filteredPage.length}`);
-          await this.saveArticles(filteredPage);
-
-          for (const a of filteredPage) {
-            if (!a?.url) continue;
-            if (seenUrls.has(a.url)) continue;
-            seenUrls.add(a.url);
-            aggregated.push(a);
-          }
+          const pageSaveResult = await this.saveArticles(filteredPage);
+          insertedArticles.push(...pageSaveResult.insertedArticles);
+          insertedCount += pageSaveResult.insertedCount;
+          updatedCount += pageSaveResult.updatedCount;
+          upsertedCount += pageSaveResult.upsertedCount;
 
           if (pageLatest > cursor) {
             cursor = pageLatest;
@@ -144,14 +151,19 @@ export class CloudSyncService implements IRSSProvider {
           const articles = Array.isArray(data) ? data.map((item: any) => this.mapServerArticle(item, source)) : [];
           const filteredArticles = await filterService.applyFilterRules<Article>(articles, sourceId);
           logger.info(`[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`);
-          await this.saveArticles(filteredArticles);
-          return filteredArticles;
+          const saveResult = await this.saveArticles(filteredArticles);
+          return {
+            articles: saveResult.insertedArticles,
+            insertedCount: saveResult.insertedCount,
+            updatedCount: saveResult.updatedCount,
+            upsertedCount: saveResult.upsertedCount,
+          };
         }
 
         throw new Error(`Server returned ${syncResp.status}: ${syncResp.statusText}`);
       }
 
-      return aggregated;
+      return { articles: insertedArticles, insertedCount, updatedCount, upsertedCount };
     } catch (error) {
       logger.error('[CloudSync] Fetch failed:', error);
       throw error;
@@ -402,12 +414,28 @@ export class CloudSyncService implements IRSSProvider {
     };
   }
 
-  private async saveArticles(articles: Article[]): Promise<void> {
-    if (articles.length === 0) return;
+  private async saveArticles(articles: Article[]): Promise<{
+    insertedArticles: Article[];
+    insertedCount: number;
+    updatedCount: number;
+    upsertedCount: number;
+  }> {
+    if (articles.length === 0) {
+      return { insertedArticles: [], insertedCount: 0, updatedCount: 0, upsertedCount: 0 };
+    }
 
     const affectedSourceIds = new Set<number>();
-
+    const uniqueByUrl = new Map<string, Article>();
     for (const article of articles) {
+      if (!article?.url) continue;
+      uniqueByUrl.set(article.url, article);
+    }
+
+    const insertedArticles: Article[] = [];
+    let insertedCount = 0;
+    let updatedCount = 0;
+
+    for (const article of uniqueByUrl.values()) {
       if (article.sourceId) {
         // Handle both string and number types for sourceId
         const sId = typeof article.sourceId === 'string' ? parseInt(article.sourceId, 10) : article.sourceId;
@@ -447,6 +475,8 @@ export class CloudSyncService implements IRSSProvider {
             article.difficulty
           ]
         );
+        insertedCount += 1;
+        insertedArticles.push(article);
       } else {
         // Update existing article content to ensure we get the latest version (e.g. with proxied images)
         // We preserve user states (is_read, is_favorite, etc.)
@@ -467,6 +497,7 @@ export class CloudSyncService implements IRSSProvider {
             article.url
           ]
         );
+        updatedCount += 1;
       }
     }
 
@@ -474,6 +505,13 @@ export class CloudSyncService implements IRSSProvider {
     for (const sourceId of affectedSourceIds) {
       await this.updateSourceStats(sourceId);
     }
+
+    return {
+      insertedArticles,
+      insertedCount,
+      updatedCount,
+      upsertedCount: insertedCount + updatedCount,
+    };
   }
 
   /**

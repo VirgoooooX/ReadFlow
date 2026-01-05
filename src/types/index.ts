@@ -239,6 +239,23 @@ export interface RSSStartupSettings {
   sourceIds: number[]; // 需要刷新的源ID列表
 }
 
+export interface ArticleSyncStats {
+  insertedCount: number;
+  updatedCount: number;
+  upsertedCount: number;
+}
+
+export interface FetchArticlesWithStatsResult extends ArticleSyncStats {
+  articles: Article[];
+}
+
+export interface RefreshSourcesResult extends ArticleSyncStats {
+  success: number;
+  failed: number;
+  totalArticles: number;
+  errors: Array<{ source: string; error: string }>;
+}
+
 // 文章加载状态
 export interface ArticleLoadingState {
   isLoading: boolean;

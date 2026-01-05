@@ -38,13 +38,15 @@ import { cloudConfigService } from '../../services/CloudConfigService';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
-const { width: screenWidth } = Dimensions.get('window');
+const { height: screenHeight } = Dimensions.get('window');
 
 const nowMs = () => {
   const p = (globalThis as any)?.performance;
   if (p && typeof p.now === 'function') return p.now();
   return Date.now();
 };
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 const formatDateForMeta = (date: Date | string): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -288,24 +290,46 @@ const BottomProgressBar: React.FC<{
   );
 };
 
-const ArticleBodyLinesSkeleton: React.FC<{ isDark: boolean; theme: any }> = ({ isDark, theme }) => {
+const ArticleBodyLinesSkeleton: React.FC<{
+  isDark: boolean;
+  baseFontSize: number;
+  lineHeightMultiplier: number;
+}> = ({ isDark, baseFontSize, lineHeightMultiplier }) => {
   const lineBase = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const textLineHeight = Math.max(16, Math.round(baseFontSize * lineHeightMultiplier));
+  const barH = Math.max(12, Math.round(textLineHeight * 0.55));
+  const gap = Math.max(6, textLineHeight - barH);
+  const gapPara = Math.max(14, Math.round(baseFontSize * 1.5));
 
-  const lines = [
-    { w: '92%', h: 14, mt: 0, c: lineBase },
-    { w: '90%', h: 14, mt: 10, c: lineBase },
-    { w: '90%', h: 14, mt: 10, c: lineBase },
-    { w: '78%', h: 14, mt: 10, c: lineBase },
-    { w: '94%', h: 14, mt: 18, c: lineBase },
-    { w: '88%', h: 14, mt: 10, c: lineBase },
-    { w: '72%', h: 14, mt: 10, c: lineBase },
-    { w: '96%', h: 14, mt: 18, c: lineBase },
-    { w: '82%', h: 14, mt: 10, c: lineBase },
-    { w: '90%', h: 14, mt: 10, c: lineBase },
-  ];
+  const lines = useMemo(() => {
+    const widths = [94, 88, 92, 86, 96, 80, 90, 84, 98, 76, 93, 87];
+    const rows: Array<{ w: string; h: number; mt: number; c: string }> = [];
+    const targetHeight = screenHeight * 1.2;
+
+    let usedH = 0;
+    let paraIndex = 0;
+
+    while (usedH < targetHeight) {
+      const linesInPara = 3 + (paraIndex % 3); // 3~5 行
+      for (let i = 0; i < linesInPara; i++) {
+        const mt = rows.length === 0 ? 0 : i === 0 ? gapPara : gap;
+        rows.push({
+          w: `${widths[(paraIndex * 5 + i) % widths.length]}%`,
+          h: barH,
+          mt,
+          c: lineBase,
+        });
+        usedH += mt + barH;
+        if (usedH >= targetHeight) break;
+      }
+      paraIndex += 1;
+    }
+
+    return rows;
+  }, [barH, gap, gapPara, lineBase]);
 
   return (
-    <View style={{ marginTop: 22 }}>
+    <View style={{ marginTop: 32 }}>
       {lines.map((l, idx) => (
         <View
           key={idx}
@@ -325,38 +349,50 @@ const ArticleBodyLinesSkeleton: React.FC<{ isDark: boolean; theme: any }> = ({ i
 const ArticleHeaderSkeletonOverlay: React.FC<{
   article: Article;
   isDark: boolean;
-  theme: any;
-  publishedAtText: string;
-}> = ({ article, isDark, theme, publishedAtText }) => {
-  const bg = theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE');
-  const textColor = isDark ? '#E6E1E5' : '#202124';
-  const secondaryTextColor = isDark ? '#CAC4D0' : '#5F6368';
+  readingSettings: any | null;
+}> = ({ article, isDark, readingSettings }) => {
+  const bg = isDark ? '#1C1B1F' : '#FFFFFF';
+  const baseFontSize = Number(readingSettings?.fontSize) > 0 ? Number(readingSettings.fontSize) : 16;
+  const baseLineHeightMultiplier = Number(readingSettings?.lineHeight) > 0 ? Number(readingSettings.lineHeight) : 1.8;
+  const lineBase = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
-  const metaText = useMemo(() => {
-    const parts: string[] = [];
-    if (article.sourceName) parts.push(article.sourceName);
-    if (publishedAtText) parts.push(publishedAtText);
-    if (article.author) parts.push(article.author);
-    return parts.join(' · ');
-  }, [article.author, article.sourceName, publishedAtText]);
+  const titleLineHeight = baseFontSize * 1.6 * 1.25;
+  const subtitleLineHeight = baseFontSize * 1.2 * 1.5;
+  const metaLineHeight = baseFontSize * 0.9 * baseLineHeightMultiplier;
+
+  const titleBarH = Math.max(16, Math.round(titleLineHeight * 0.55));
+  const subtitleBarH = Math.max(14, Math.round(subtitleLineHeight * 0.55));
+  const metaBarH = Math.max(10, Math.round(metaLineHeight * 0.5));
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       <View style={{ paddingHorizontal: 20, paddingTop: 20, maxWidth: 800, alignSelf: 'center', width: '100%' }}>
-        <Text style={{ fontSize: 24, fontWeight: '800', lineHeight: 30, color: textColor }} numberOfLines={3}>
-          {article.title}
-        </Text>
+        <View style={{ marginBottom: 12 }}>
+          <View style={{ width: '92%', height: titleBarH, borderRadius: 10, backgroundColor: lineBase }} />
+          <View style={{ width: '78%', height: titleBarH, marginTop: Math.max(6, Math.round(titleLineHeight - titleBarH)), borderRadius: 10, backgroundColor: lineBase }} />
+        </View>
+
         {!!article.titleCn && (
-          <Text style={{ marginTop: 10, fontSize: 17, fontWeight: '400', lineHeight: 24, color: secondaryTextColor }} numberOfLines={3}>
-            {article.titleCn}
-          </Text>
+          <View style={{ marginBottom: 16 }}>
+            <View style={{ width: '88%', height: subtitleBarH, borderRadius: 10, backgroundColor: lineBase }} />
+            <View
+              style={{
+                width: '70%',
+                height: subtitleBarH,
+                marginTop: Math.max(6, Math.round(subtitleLineHeight - subtitleBarH)),
+                borderRadius: 10,
+                backgroundColor: lineBase,
+              }}
+            />
+          </View>
         )}
-        {!!metaText && (
-          <Text style={{ marginTop: 12, fontSize: 13, fontWeight: '600', color: secondaryTextColor }} numberOfLines={2}>
-            {metaText}
-          </Text>
-        )}
-        <ArticleBodyLinesSkeleton isDark={isDark} theme={theme} />
+
+        <View style={{ marginBottom: 24, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+          <View style={{ width: 120, height: metaBarH, borderRadius: 8, backgroundColor: lineBase, marginRight: 12, marginBottom: 8 }} />
+          <View style={{ width: 150, height: metaBarH, borderRadius: 8, backgroundColor: lineBase, marginRight: 12, marginBottom: 8 }} />
+          <View style={{ width: 100, height: metaBarH, borderRadius: 8, backgroundColor: lineBase, marginRight: 12, marginBottom: 8 }} />
+        </View>
+        <ArticleBodyLinesSkeleton isDark={isDark} baseFontSize={baseFontSize} lineHeightMultiplier={baseLineHeightMultiplier} />
       </View>
     </View>
   );
@@ -394,7 +430,6 @@ const ArticleDetailScreen: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(false); // 收藏状态
   const [webViewReady, setWebViewReady] = useState(false); // WebView 准备就绪
   const [initialScrollY, setInitialScrollY] = useState(0);
-  const [showRefTitle, setShowRefTitle] = useState(false); // 控制顶部标题显示
   // 【新增】标题透明度动画值 (0: 显示"文章详情", 1: 显示文章标题)
   const titleFadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -425,14 +460,23 @@ const ArticleDetailScreen: React.FC = () => {
   const [showNextHint, setShowNextHint] = useState(false);
   const [showLastArticleHint, setShowLastArticleHint] = useState(false); // 【新增】已是最后一篇提示
   const [noUnreadArticle, setNoUnreadArticle] = useState(false); // 【新增】无未读文章提示
+  const lastInBlankAreaRef = useRef(false);
   const [nextUnreadIndex, setNextUnreadIndex] = useState<number | null>(null); // 【新增】下一篇未读文章索引
+  const [nextUnreadArticleId, setNextUnreadArticleId] = useState<number | null>(null);
   
   // 【新增】代理服务器地址，用于处理防盗链图片
   const [proxyServerUrl, setProxyServerUrl] = useState<string>('');
   const aliveRef = useRef(true);
   
   // 【修改】检查是否有下一篇未读文章
-  const hasNextArticle = nextUnreadIndex !== null;
+  const hasNextArticle = nextUnreadIndex !== null || nextUnreadArticleId !== null;
+
+  useEffect(() => {
+    if (!lastInBlankAreaRef.current) return;
+    if (hasNextArticle || showLastArticleHint || noUnreadArticle) {
+      setShowNextHint(true);
+    }
+  }, [hasNextArticle, showLastArticleHint, noUnreadArticle]);
 
   const styles = createStyles(isDark, theme, readingSettings);
 
@@ -449,6 +493,12 @@ const ArticleDetailScreen: React.FC = () => {
     deferredWorkStartedRef.current = false;
     vocabularyWordsRef.current = [];
     bodyFadeAnim.setValue(0);
+    lastInBlankAreaRef.current = false;
+    setShowNextHint(false);
+    setShowLastArticleHint(false);
+    setNoUnreadArticle(false);
+    setNextUnreadIndex(null);
+    setNextUnreadArticleId(null);
     if (webViewReadyFallbackTimerRef.current) {
       clearTimeout(webViewReadyFallbackTimerRef.current);
       webViewReadyFallbackTimerRef.current = null;
@@ -567,15 +617,7 @@ const ArticleDetailScreen: React.FC = () => {
     }
   }, [navigation, route]);
 
-  // 【新增】监听 showRefTitle 变化，执行平滑动画
-  useEffect(() => {
-    Animated.timing(titleFadeAnim, {
-      toValue: showRefTitle ? 1 : 0,
-      duration: 500, // 动画时长 500ms，让切换更加柔和缓慢
-      useNativeDriver: true,
-      easing: Easing.out(Easing.ease),
-    }).start();
-  }, [showRefTitle]);
+  const titleFadeLastRef = useRef<number>(0);
 
   // 【新增函数】提取注入逻辑为独立函数，方便复用
   const injectHighlights = useCallback((words: string[]) => {
@@ -620,10 +662,11 @@ const ArticleDetailScreen: React.FC = () => {
         injectHighlights(words);
       }
 
+      const tFindNextStart = nowMs();
+      let checkedCount = 0;
+      let foundNextUnread = false;
+
       if (articleIds && currentIndex !== undefined) {
-        const tFindNextStart = nowMs();
-        let checkedCount = 0;
-        let foundNextUnread = false;
         for (let i = currentIndex + 1; i < articleIds.length; i++) {
           if (!aliveRef.current) return;
           try {
@@ -632,6 +675,9 @@ const ArticleDetailScreen: React.FC = () => {
             if (!aliveRef.current) return;
             if (nextArticle && !nextArticle.isRead) {
               setNextUnreadIndex(i);
+              setNextUnreadArticleId(null);
+              setShowLastArticleHint(false);
+              setNoUnreadArticle(false);
               foundNextUnread = true;
               break;
             }
@@ -639,19 +685,66 @@ const ArticleDetailScreen: React.FC = () => {
             logger.warn('[ArticleDetail] Failed to check article:', articleIds[i]);
           }
         }
-        if (!aliveRef.current) return;
-        if (!foundNextUnread) {
-          setNextUnreadIndex(null);
-          if (currentIndex >= articleIds.length - 1) {
-            setShowLastArticleHint(true);
-          } else {
-            setNoUnreadArticle(true);
-          }
-        }
-        logger.info(
-          `[Perf] [Detail] findNextUnreadDone id=${perfId} ms=${Math.round(nowMs() - tFindNextStart)} checked=${checkedCount}`
-        );
       }
+
+      if (!aliveRef.current) return;
+
+      if (!foundNextUnread) {
+        setNextUnreadIndex(null);
+        setNextUnreadArticleId(null);
+
+        const currentArticle = await articleService.getArticleById(articleId).catch(() => null);
+        if (!aliveRef.current) return;
+
+        const sourceTabKey = perfRef.current?.sourceTabKey as string | undefined;
+        const rssSourceId =
+          sourceTabKey && sourceTabKey.startsWith('source-')
+            ? parseInt(sourceTabKey.replace('source-', ''), 10)
+            : undefined;
+
+        const afterPublishedAt =
+          currentArticle?.publishedAt instanceof Date
+            ? currentArticle.publishedAt.toISOString()
+            : currentArticle?.publishedAt
+              ? new Date(currentArticle.publishedAt as any).toISOString()
+              : null;
+
+        if (afterPublishedAt) {
+          const nextId = await articleService.getNextUnreadAfter({
+            afterPublishedAt,
+            afterId: articleId,
+            rssSourceId,
+          });
+          if (!aliveRef.current) return;
+
+          if (nextId !== null && Number.isFinite(nextId)) {
+            setNextUnreadArticleId(nextId);
+            setShowLastArticleHint(false);
+            setNoUnreadArticle(false);
+          } else {
+            const hasAnyAfter = await articleService.hasAnyArticleAfter({
+              afterPublishedAt,
+              afterId: articleId,
+              rssSourceId,
+            });
+            if (!aliveRef.current) return;
+            if (hasAnyAfter) {
+              setNoUnreadArticle(true);
+              setShowLastArticleHint(false);
+            } else {
+              setShowLastArticleHint(true);
+              setNoUnreadArticle(false);
+            }
+          }
+        } else {
+          setNoUnreadArticle(true);
+          setShowLastArticleHint(false);
+        }
+      }
+
+      logger.info(
+        `[Perf] [Detail] findNextUnreadDone id=${perfId} ms=${Math.round(nowMs() - tFindNextStart)} checked=${checkedCount}`
+      );
     });
   }, [articleId, articleIds, currentIndex, injectHighlights]);
 
@@ -723,7 +816,14 @@ const ArticleDetailScreen: React.FC = () => {
    * 【修改】导航到下一篇未读文章
    */
   const navigateToNextArticle = useCallback(() => {
-    if (nextUnreadIndex === null || !articleIds) {
+    const nextArticleId =
+      nextUnreadArticleId !== null
+        ? nextUnreadArticleId
+        : nextUnreadIndex !== null && articleIds
+          ? articleIds[nextUnreadIndex]
+          : null;
+
+    if (!nextArticleId) {
       // 没有未读文章
       setNoUnreadArticle(true);
       setTimeout(() => setNoUnreadArticle(false), 2000);
@@ -734,19 +834,19 @@ const ArticleDetailScreen: React.FC = () => {
     // 相比 Medium 更快、更干脆，体验更爽快
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
     
-    const nextArticleId = articleIds[nextUnreadIndex];
-    
     // 【新增】更新最后查看的文章ID，用于返回时滚动定位
     setLastViewedArticleId(nextArticleId);
     
     // 使用 replace 替代当前页面，这样返回时直接回到列表
     (navigation as any).replace('ArticleDetail', {
       articleId: nextArticleId,
-      articleIds,
-      currentIndex: nextUnreadIndex,
+      ...(nextUnreadIndex !== null && articleIds
+        ? { articleIds, currentIndex: nextUnreadIndex }
+        : { articleIds: undefined, currentIndex: 0 }),
       isNextArticle: true,
+      perf: perfRef.current ? { ...perfRef.current, id: `a${nextArticleId}` } : undefined,
     });
-  }, [nextUnreadIndex, articleIds, navigation]);
+  }, [nextUnreadArticleId, nextUnreadIndex, articleIds, navigation]);
 
   /**
    * 添加到单词本
@@ -951,12 +1051,13 @@ const ArticleDetailScreen: React.FC = () => {
           if (data.scrollY !== undefined) {
             currentScrollYRef.current = data.scrollY;
             hasScrolledRef.current = true;
-
-            // 简单的防抖/节流逻辑，根据滚动距离决定是否显示标题
-            if (data.scrollY > 60 && !showRefTitle) {
-              setShowRefTitle(true);
-            } else if (data.scrollY <= 60 && showRefTitle) {
-              setShowRefTitle(false);
+            
+            const fadeStartY = 24;
+            const fadeEndY = 140;
+            const titleFade = clamp01((Number(data.scrollY) - fadeStartY) / (fadeEndY - fadeStartY));
+            if (Math.abs(titleFade - titleFadeLastRef.current) > 0.01) {
+              titleFadeLastRef.current = titleFade;
+              titleFadeAnim.setValue(titleFade);
             }
             
             // 【新增】更新阅读进度
@@ -964,16 +1065,14 @@ const ArticleDetailScreen: React.FC = () => {
               setReadingProgress(data.progress);
             }
                         
-            // 【修复】使用 shouldShowHint 判断是否进入空白区域（基于物理滚动距离，而非 DOM 元素）
             if (data.shouldShowHint !== undefined) {
               const inBlankArea = data.shouldShowHint;
+              lastInBlankAreaRef.current = inBlankArea;
               setIsAtBottom(data.isAtBottom || false);
-                          
-              // 【关键修复】在进入空白区域时，根据文章状态显示相应提示
-              // 包括三种情况：有下一篇 / 最后一篇 / 无未读文章
               if (inBlankArea && (hasNextArticle || showLastArticleHint || noUnreadArticle)) {
                 setShowNextHint(true);
-              } else {
+              }
+              if (!inBlankArea) {
                 setShowNextHint(false);
               }
             }
@@ -1007,7 +1106,7 @@ const ArticleDetailScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to parse WebView message:', error);
     }
-  }, [handleWordPress, handleSentenceDoubleTap, showRefTitle, hasNextArticle, navigateToNextArticle, showLastArticleHint, noUnreadArticle]);
+  }, [handleWordPress, handleSentenceDoubleTap, hasNextArticle, navigateToNextArticle, showLastArticleHint, noUnreadArticle]);
 
   // 【关键修改】在组件卸载（用户退出页面）时，统一保存一次
   // 滚动位置实时记录在 currentScrollYRef 中，只在退出时写入数据库
@@ -1078,7 +1177,6 @@ const ArticleDetailScreen: React.FC = () => {
   const webViewSource = useMemo(() => ({ html: htmlContent }), [htmlContent]);
 
   const shouldShowSkeleton = !htmlContent || !webViewReady;
-  const headerPublishedAtText = useMemo(() => formatDateForMeta(article?.publishedAt || ''), [article?.publishedAt]);
 
   if (!article && (loading || settingsLoading)) {
     return (
@@ -1236,8 +1334,7 @@ const ArticleDetailScreen: React.FC = () => {
             <ArticleHeaderSkeletonOverlay
               article={article}
               isDark={isDark}
-              theme={theme}
-              publishedAtText={headerPublishedAtText}
+              readingSettings={readingSettings}
             />
           </Animated.View>
         )}
@@ -1341,11 +1438,6 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
       alignItems: 'center',
       paddingHorizontal: 16,
       position: 'relative', // 相对定位，作为绝对定位子元素的锚点
-    },
-    headerTitleTextContainer: {
-      ...StyleSheet.absoluteFillObject, // 铺满父容器
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     headerTitle: {
       fontSize: 18,      // 严格同步 CustomHeader 字号

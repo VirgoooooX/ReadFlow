@@ -4,7 +4,7 @@
  */
 
 import { DatabaseService } from '../../database/DatabaseService';
-import { RSSSource, Article, AppError } from '../../types';
+import { RSSSource, Article, AppError, FetchArticlesWithStatsResult, RefreshSourcesResult } from '../../types';
 import { SettingsService } from '../SettingsService';
 import { localRSSService } from './LocalRSSService';
 import { proxyRSSService } from './ProxyRSSService';
@@ -317,15 +317,20 @@ export class RSSService {
     source: RSSSource,
     options: { mode?: 'sync' | 'refresh' } = {}
   ): Promise<Article[]> {
+    const result = await this.fetchArticlesFromSourceWithStats(source, options);
+    return result.articles;
+  }
+
+  public async fetchArticlesFromSourceWithStats(
+    source: RSSSource,
+    options: { mode?: 'sync' | 'refresh' } = {}
+  ): Promise<FetchArticlesWithStatsResult> {
     if (source.isActive === false) {
       logger.info(`[fetchArticlesFromSource] 源已停用，跳过刷新: ${source.name}`);
-      return [];
+      return { articles: [], insertedCount: 0, updatedCount: 0, upsertedCount: 0 };
     }
 
-    const [appSettings, cloudConfig] = await Promise.all([
-      SettingsService.getInstance().getAppSettings(),
-      cloudConfigService.getConfig(),
-    ]);
+    const cloudConfig = await cloudConfigService.getConfig();
     logger.info(`[fetchArticlesFromSource] Checking sync mode. Enabled: ${cloudConfig.mode === 'cloud'}, URL: ${cloudConfig.serverUrl}`);
     
     if (cloudConfig.mode === 'cloud' && cloudConfig.serverUrl) {
@@ -333,7 +338,7 @@ export class RSSService {
       try {
         // If mode is 'refresh' (manual pull), trigger server refresh
         const triggerRefresh = options.mode === 'refresh';
-        return await cloudSyncService.fetchArticles(source, { triggerRefresh });
+        return await cloudSyncService.fetchArticlesWithStats(source, { triggerRefresh });
       } catch (error) {
         logger.error(`[fetchArticlesFromSource] 云端同步失败，降级到直连模式: ${source.name}`, error);
         // Fallback to local/direct mode
@@ -346,15 +351,18 @@ export class RSSService {
       const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
       if (!proxyConfig.serverUrl) {
         logger.warn(`[fetchArticlesFromSource] 源 ${source.name} 配置为代理模式，但未配置代理服务器，回退到直连模式`);
-        return await localRSSService.fetchArticlesWithRetry(source, 3);
+        const articles = await localRSSService.fetchArticlesWithRetry(source, 3);
+        return { articles, insertedCount: articles.length, updatedCount: 0, upsertedCount: articles.length };
       }
       const mode = options.mode || 'refresh';
       logger.info(`[fetchArticlesFromSource] 🚀 代理模式: ${source.name} (mode: ${mode})`);
-      return await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
+      const articles = await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
+      return { articles, insertedCount: articles.length, updatedCount: 0, upsertedCount: articles.length };
     } else {
       // 直连模式
       logger.info(`[fetchArticlesFromSource] 直连模式: ${source.name}`);
-      return await localRSSService.fetchArticlesWithRetry(source, 3);
+      const articles = await localRSSService.fetchArticlesWithRetry(source, 3);
+      return { articles, insertedCount: articles.length, updatedCount: 0, upsertedCount: articles.length };
     }
   }
 
@@ -369,23 +377,15 @@ export class RSSService {
       onProgress?: (current: number, total: number, sourceName: string) => void;
       onError?: (error: Error, sourceName: string) => void;
     } = {}
-  ): Promise<{ 
-    success: number; 
-    failed: number; 
-    totalArticles: number;
-    errors: Array<{ source: string; error: string }>;
-  }> {
+  ): Promise<RefreshSourcesResult> {
     const sources = await this.getActiveRSSSources();
     
     if (sources.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, errors: [] };
+      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
     }
 
     // 检查全局同步设置
-    const [appSettings, cloudConfig] = await Promise.all([
-      SettingsService.getInstance().getAppSettings(),
-      cloudConfigService.getConfig(),
-    ]);
+    const cloudConfig = await cloudConfigService.getConfig();
     const isCloudMode = cloudConfig.mode === 'cloud' && !!cloudConfig.serverUrl;
 
     if (isCloudMode) {
@@ -402,6 +402,9 @@ export class RSSService {
     let success = 0;
     let failed = 0;
     let totalArticles = 0;
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let upsertedCount = 0;
     const errors: Array<{ source: string; error: string }> = [];
     let completed = 0;
     const total = sources.length;
@@ -419,6 +422,8 @@ export class RSSService {
       success += directResult.success;
       failed += directResult.failed;
       totalArticles += directResult.totalArticles;
+      insertedCount += directResult.totalArticles;
+      upsertedCount += directResult.totalArticles;
       errors.push(...directResult.errors);
     }
 
@@ -434,6 +439,8 @@ export class RSSService {
             const articles = await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
             success++;
             totalArticles += articles.length;
+            insertedCount += articles.length;
+            upsertedCount += articles.length;
           } catch (error: any) {
             failed++;
             errors.push({ source: source.name, error: error.message || '未知错误' });
@@ -453,7 +460,7 @@ export class RSSService {
       }
     }
 
-    return { success, failed, totalArticles, errors };
+    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
   }
 
   /**
@@ -467,12 +474,7 @@ export class RSSService {
       onError?: (error: Error, sourceName: string) => void;
       onArticlesReady?: (articles: Article[], sourceName: string) => void;
     } = {}
-  ): Promise<{ 
-    success: number; 
-    failed: number; 
-    totalArticles: number;
-    errors: Array<{ source: string; error: string }>;
-  }> {
+  ): Promise<RefreshSourcesResult> {
     const { maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
     
     // 1. 获取所有活跃源
@@ -482,7 +484,7 @@ export class RSSService {
     const sourcesToRefresh = allSources.filter(s => sourceIds.includes(s.id));
     
     if (sourcesToRefresh.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, errors: [] };
+      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
     }
 
     // 3. 复用并发逻辑
@@ -491,6 +493,9 @@ export class RSSService {
     let success = 0;
     let failed = 0;
     let totalArticles = 0;
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let upsertedCount = 0;
     const errors: Array<{ source: string; error: string }> = [];
     let completed = 0;
     const total = sourcesToRefresh.length;
@@ -499,14 +504,17 @@ export class RSSService {
       limiter(() => 
         new Promise<void>((resolve, reject) => {
           InteractionManager.runAfterInteractions(() => {
-            this.fetchArticlesFromSource(source)
-              .then((articles) => {
+            this.fetchArticlesFromSourceWithStats(source)
+              .then((result) => {
                 success++;
-                totalArticles += articles.length;
+                totalArticles += result.insertedCount;
+                insertedCount += result.insertedCount;
+                updatedCount += result.updatedCount;
+                upsertedCount += result.upsertedCount;
                 completed++;
                 
-                if (onArticlesReady && articles.length > 0) {
-                  onArticlesReady(articles, source.name);
+                if (onArticlesReady && result.articles.length > 0) {
+                  onArticlesReady(result.articles, source.name);
                 }
                 
                 onProgress?.(completed, total, source.name);
@@ -530,7 +538,7 @@ export class RSSService {
 
     await Promise.all(tasks);
 
-    return { success, failed, totalArticles, errors };
+    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
   }
 
   /**
@@ -544,17 +552,12 @@ export class RSSService {
       onError?: (error: Error, sourceName: string) => void;
       onArticlesReady?: (articles: Article[], sourceName: string) => void;
     } = {}
-  ): Promise<{ 
-    success: number; 
-    failed: number; 
-    totalArticles: number;
-    errors: Array<{ source: string; error: string }>;
-  }> {
+  ): Promise<RefreshSourcesResult> {
     const { maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
     const sources = await this.getActiveRSSSources();
     
     if (sources.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, errors: [] };
+      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
     }
 
     // 使用简单的并发控制器
@@ -563,6 +566,9 @@ export class RSSService {
     let success = 0;
     let failed = 0;
     let totalArticles = 0;
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let upsertedCount = 0;
     const errors: Array<{ source: string; error: string }> = [];
     let completed = 0;
 
@@ -570,14 +576,17 @@ export class RSSService {
       limiter(() => 
         new Promise<void>((resolve, reject) => {
           InteractionManager.runAfterInteractions(() => {
-            this.fetchArticlesFromSource(source)
-              .then((articles) => {
+            this.fetchArticlesFromSourceWithStats(source)
+              .then((result) => {
                 success++;
-                totalArticles += articles.length;
+                totalArticles += result.insertedCount;
+                insertedCount += result.insertedCount;
+                updatedCount += result.updatedCount;
+                upsertedCount += result.upsertedCount;
                 completed++;
                 
-                if (onArticlesReady && articles.length > 0) {
-                  onArticlesReady(articles, source.name);
+                if (onArticlesReady && result.articles.length > 0) {
+                  onArticlesReady(result.articles, source.name);
                 }
                 
                 onProgress?.(completed, sources.length, source.name);
@@ -601,7 +610,7 @@ export class RSSService {
 
     await Promise.all(tasks);
 
-    return { success, failed, totalArticles, errors };
+    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
   }
 
   /**

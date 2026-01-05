@@ -182,12 +182,12 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       setIsLoading(true);
       console.log('[RSSSourceContext.syncAllSources] 调用 rssService.refreshAllSources()');
       const result = await rssService.refreshAllSources({ onProgress });
-      console.log(`[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成，新增文章: ${result.totalArticles}`);
+      console.log(`[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成，新增文章: ${result.insertedCount}`);
       
       await loadRSSSources();
       
       // 只有当有新文章时才触发全局刷新，避免无意义的列表重载
-      if (result.totalArticles > 0) {
+      if (result.insertedCount > 0) {
         cacheEventEmitter.refreshAllSources();
         console.log('[RSSSourceContext.syncAllSources] 📢 触发 refreshAllSources 事件');
       } else {
@@ -195,7 +195,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       }
       
       if (Platform.OS === 'android') {
-        ToastAndroid.show(`已刷新，${result.totalArticles}篇新文章`, ToastAndroid.SHORT);
+        ToastAndroid.show(`已刷新，${result.insertedCount}篇新文章`, ToastAndroid.SHORT);
       }
 
       console.log('[RSSSourceContext.syncAllSources] ✅ 所有源同步完成');
@@ -261,11 +261,11 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       
       const result = await rssService.refreshSources(sourceIds, { onProgress });
       
-      logger.info(`[RSSSourceContext.syncSources] ✅ 批量同步完成，新增文章: ${result.totalArticles}`);
+      logger.info(`[RSSSourceContext.syncSources] ✅ 批量同步完成，新增文章: ${result.insertedCount}`);
       await loadRSSSources();
       
       // 只有当有新文章时才触发刷新
-      if (result.totalArticles > 0) {
+      if (result.insertedCount > 0) {
         cacheEventEmitter.refreshSources(sourceIds);
         logger.info('[RSSSourceContext.syncSources] 📢 触发 refreshSources 事件');
       } else {
@@ -273,7 +273,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       }
 
       if (Platform.OS === 'android') {
-        ToastAndroid.show(`已刷新，${result.totalArticles}篇新文章`, ToastAndroid.SHORT);
+        ToastAndroid.show(`已刷新，${result.insertedCount}篇新文章`, ToastAndroid.SHORT);
       }
     } catch (error) {
       console.error('[RSSSourceContext.syncSources] 💥 同步失败:', error);

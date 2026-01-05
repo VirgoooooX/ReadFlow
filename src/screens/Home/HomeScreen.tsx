@@ -183,7 +183,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   isLoadingMore: boolean;
   hasMore: boolean;
   autoMarkReadOnScroll?: boolean;
-  onMarkRead: (id: number) => void;
+  onMarkRead: (ids: number[]) => void;
 }, ref: React.Ref<any>) {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
   const flatListRef = useRef<any>(null);
@@ -191,26 +191,49 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   
   // 🌟 中間层优化：传入 isNeighbor 下，得以组件本身接收 props
   const hasTriedLoad = useRef(false);
+  const pendingMarkIdsRef = useRef<Set<number>>(new Set());
+  const markReadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 【新增】滚动自动标记已读逻辑
-  const onViewableItemsChanged = useCallback(({ changed, viewableItems }: { changed: any[]; viewableItems: any[] }) => {
-    if (!autoMarkReadOnScroll) return;
+  const onViewableItemsChanged = useCallback(
+    ({ changed, viewableItems }: { changed: any[]; viewableItems: any[] }) => {
+      if (!autoMarkReadOnScroll || !onMarkRead) return;
 
-    const firstViewable = viewableItems[0];
-    if (!firstViewable) return;
+      const firstViewable = viewableItems[0];
+      if (!firstViewable) return;
 
-    changed.forEach((change: any) => {
-      // 如果项变为不可见，且未读，且在当前可视区域上方（index更小）
-      if (!change.isViewable && !change.item.isRead && change.index < firstViewable.index) {
-        // 静默标记为已读
-        articleService.markAsRead(change.item.id).catch(err => logger.error('Auto mark read failed:', err));
-        // 通知父组件更新UI
-        if (onMarkRead) {
-          onMarkRead(change.item.id);
+      const pending = pendingMarkIdsRef.current;
+      let hasNew = false;
+
+      changed.forEach((change: any) => {
+        if (!change.isViewable && !change.item.isRead && change.index < firstViewable.index) {
+          const id = change.item.id as number;
+          if (!pending.has(id)) {
+            pending.add(id);
+            hasNew = true;
+          }
         }
+      });
+
+      if (!hasNew) return;
+
+      if (markReadTimerRef.current) {
+        clearTimeout(markReadTimerRef.current);
       }
-    });
-  }, [autoMarkReadOnScroll, onMarkRead]);
+
+      markReadTimerRef.current = setTimeout(() => {
+        const ids = Array.from(pendingMarkIdsRef.current);
+        pendingMarkIdsRef.current.clear();
+        markReadTimerRef.current = null;
+
+        if (ids.length === 0) return;
+
+        articleService.markManyAsRead(ids).catch(err => logger.error('Auto mark read failed:', err));
+
+        onMarkRead(ids);
+      }, 120);
+    },
+    [autoMarkReadOnScroll, onMarkRead]
+  );
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 0, // 完全移出视口才触发
@@ -726,7 +749,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 
           // 🔥 优化：如果是标记已读/未读触发的统计更新，且当前不是"仅看未读"模式，则忽略刷新
           // 因为列表项的已读状态已通过 articleRead 事件或本地乐观更新处理了
-          if ((eventData.reason === 'markRead' || eventData.reason === 'markUnread') && !showOnlyUnread) {
+          if ((eventData.reason === 'markRead' || eventData.reason === 'markUnread' || eventData.reason === 'markAllRead') && !showOnlyUnread) {
             logger.info(`[HomeScreen] 📊 收到 ${eventData.reason} 触发的统计更新，忽略全量刷新`);
             break;
           }
@@ -1004,13 +1027,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           isLoadingMore={tabData.isLoadingMore}
           hasMore={tabData.hasMore}
           autoMarkReadOnScroll={settings?.autoMarkReadOnScroll}
-          onMarkRead={(id: number) => {
+          onMarkRead={(ids: number[]) => {
+            const idSet = new Set(ids);
             setTabDataMap(prev => {
               const updated = new Map(prev);
               const currentData = updated.get(route.key);
               if (currentData) {
                 const newArticles = currentData.articles.map(a => 
-                  a.id === id ? { ...a, isRead: true } : a
+                  idSet.has(a.id) ? { ...a, isRead: true } : a
                 );
                 updated.set(route.key, { ...currentData, articles: newArticles });
               }
@@ -1019,7 +1043,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
                 const allData = updated.get('all');
                 if (allData) {
                   const newAllArticles = allData.articles.map(a => 
-                    a.id === id ? { ...a, isRead: true } : a
+                    idSet.has(a.id) ? { ...a, isRead: true } : a
                   );
                   updated.set('all', { ...allData, articles: newAllArticles });
                 }
@@ -1050,6 +1074,35 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               }
               
               await articleService.markAllAsRead(sourceId);
+              setTabDataMap(prev => {
+                const updated = new Map(prev);
+                const tabKey = currentRoute.key;
+
+                const applyToKey = (key: string) => {
+                  const data = updated.get(key);
+                  if (!data) return;
+
+                  if (showOnlyUnread) {
+                    updated.set(key, { ...data, articles: [] });
+                    return;
+                  }
+
+                  let hasChange = false;
+                  const newArticles = data.articles.map(a => {
+                    if (a.isRead) return a;
+                    hasChange = true;
+                    return { ...a, isRead: true };
+                  });
+
+                  if (hasChange) {
+                    updated.set(key, { ...data, articles: newArticles });
+                  }
+                };
+
+                applyToKey(tabKey);
+                if (tabKey !== 'all') applyToKey('all');
+                return updated;
+              });
             } catch (error) {
               logger.error('Mark all read failed:', error);
             }

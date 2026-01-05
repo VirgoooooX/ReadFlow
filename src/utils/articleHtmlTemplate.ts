@@ -1271,6 +1271,9 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       let lastSentY = -1;          // 上次发送的 Y 坐标
       let lastSentProgress = -1;   // 上次发送的进度
       let lastIsAtBottom = false;  // 上次发送的底部状态 - 防止重复触发
+      let lastSentShowHint = false;
+      let stickyShowHint = false;
+      let maxYSeen = 0;
       
       // 【优化】计算阅读进度百分比 - 基于距离底部的像素值
       function calculateProgress() {
@@ -1328,9 +1331,16 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         let y = window.scrollY || window.pageYOffset;
         y = Math.max(0, Math.round(y));
       
+        if (y > maxYSeen) maxYSeen = y;
+        if (stickyShowHint && y < maxYSeen - 80) {
+          stickyShowHint = false;
+        }
+
         const progress = calculateProgress();
         const atBottom = isAtBottom();
-        const showHint = shouldShowNextHint();
+        const showHintRaw = shouldShowNextHint();
+        if (showHintRaw) stickyShowHint = true;
+        const showHint = showHintRaw || stickyShowHint;
       
         // 【关键】数据去重：只有当关键状态发生变化时才发送消息
         // 1. 滚动位置变化
@@ -1338,13 +1348,15 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         // 3. 到底状态变化（这很重要，保证 UI 及时响应）
         if (y === lastSentY && 
             progress === lastSentProgress && 
-            atBottom === lastIsAtBottom) {
+            atBottom === lastIsAtBottom &&
+            showHint === lastSentShowHint) {
           return; // 数据没变，不发送
         }
       
         lastSentY = y;
         lastSentProgress = progress;
         lastIsAtBottom = atBottom;
+        lastSentShowHint = showHint;
       
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'scroll',
