@@ -188,7 +188,7 @@ async function logServerStatus() {
     const uptimeM = Math.floor((uptime % 3600) / 60);
     
     const users = (await storageService.getUsers()).length;
-    const feeds = (await storageService.getFeeds()).length;
+    const feeds = (await storageService.getFeedsLight()).length;
     
     logger.system(`Status Update | Memory: ${memUsage}MB | Uptime: ${uptimeH}h ${uptimeM}m | Users: ${users} | Feeds: ${feeds}`);
   } catch (e) {

@@ -446,7 +446,7 @@
                                         <input type="number" id="setting-quality" min="1" max="100" class="w-full pl-4 pr-12 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
                                         <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-sm">%</div>
                                     </div>
-                                    <p class="mt-2 text-xs text-slate-400">数值越低体积越小，建议 70-80。</p>
+                                    <p class="mt-2 text-xs text-slate-400">数值越低体积越小。推荐：70–80（日常省流），80–90（更清晰），100（接近不压缩）。</p>
                                 </div>
                             </div>
                         </div>
@@ -462,22 +462,27 @@
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
                                     <input type="number" id="setting-refresh-interval" min="15" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">全局默认的 RSS 自动刷新间隔。单位秒，单个源如配置了独立刷新频率则以源配置为准。推荐：300–1800（5–30 分钟）。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">单次解析保护上限</label>
                                     <input type="number" id="setting-max-articles" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">每次抓取单个订阅源时最多解析的条目数量，用于防止某些源一次返回上万条导致内存和 CPU 暴涨。推荐：20–100；0 表示不限制（不推荐）。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">同步最大分页大小</label>
                                     <input type="number" id="setting-max-blocks" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">云同步接口单页允许返回的最大文章数量。客户端即使请求更大的 limit 也会被限制在该值以内。推荐：200–500；过大可能导致内存峰值过高。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">抓取超时 (毫秒)</label>
                                     <input type="number" id="setting-fetch-timeout" min="1000" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">抓取 RSS 源或文章全文时的网络超时时间，单位毫秒。超过该时间请求会被中止并记录为失败。推荐：10000–20000。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">同步默认分页大小</label>
                                     <input type="number" id="setting-sync-default-page" min="10" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">云同步接口在客户端未指定 limit 时使用的默认分页大小。推荐：50–200（首次追平历史不宜过大）。</p>
                                 </div>
                             </div>
                         </div>
@@ -492,14 +497,17 @@
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">文章保留天数 (0=不限制)</label>
                                     <input type="number" id="setting-retention-days" min="0" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">定期清理早于该天数的旧文章，按发布时间计算。推荐：30–365；0 表示永久保留（数据库会持续增大）。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">每源库存上限 (0=不限制)</label>
                                     <input type="number" id="setting-max-count-per-feed" min="0" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">为每个订阅源最多保留的最新文章数量。超出部分会从最旧的开始批量删除。推荐：500–5000；0 表示不限制。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">清理频率 (小时)</label>
                                     <input type="number" id="setting-cleanup-interval" min="1" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">后台文章清理任务的执行间隔，单位小时。包括按保留天数和每源库存上限的自动删除。推荐：6–24。</p>
                                 </div>
                             </div>
                         </div>

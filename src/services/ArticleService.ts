@@ -331,7 +331,7 @@ export class ArticleService {
         await this.updateSourceStats(sourceId, { reason: 'markAllRead' });
       } else {
         await this.databaseService.executeStatement('UPDATE rss_sources SET unread_count = 0');
-        cacheEventEmitter.updateRSSStats();
+        cacheEventEmitter.emit({ type: 'updateRSSStats', reason: 'markAllRead' });
       }
     } catch (error) {
       logger.error('Error marking all as read:', error);

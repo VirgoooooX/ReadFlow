@@ -355,6 +355,34 @@ export class StorageService {
     }));
   }
 
+  public async getFeedsLight(): Promise<Feed[]> {
+    const sources = await prisma.rSSSource.findMany({
+      select: {
+        id: true,
+        url: true,
+        name: true,
+        category: true,
+        createdAt: true,
+        updatedAt: true,
+        refreshIntervalSeconds: true,
+        lastFetchAt: true,
+      },
+    });
+
+    return sources.map((s: any) => ({
+      id: String(s.id),
+      url: s.url,
+      name: s.name,
+      category: s.category,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt.toISOString(),
+      refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
+      lastRefreshAt: s.lastFetchAt?.toISOString(),
+      lastRefreshStatus: 'ok',
+      lastRefreshError: undefined,
+    }));
+  }
+
   public async getFeedsForUser(userId: string): Promise<Feed[]> {
     const userFeeds = await prisma.userFeed.findMany({
       where: { userId: userId },

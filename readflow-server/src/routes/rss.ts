@@ -154,7 +154,7 @@ async function refreshAllFeedsOnce() {
   if (refreshRunning) return;
   refreshRunning = true;
   try {
-    const feeds = await storageService.getFeeds();
+    const feeds = await storageService.getFeedsLight();
     if (!feeds || feeds.length === 0) return;
 
     const now = Date.now();
@@ -228,7 +228,7 @@ export function startRssAutoRefresh() {
   refreshAllFeedsOnce().catch(() => {});
   refreshTimer = setInterval(() => {
     refreshAllFeedsOnce().catch(() => {});
-  }, 15_000);
+  }, 60_000);
 }
 
 // GET /api/rss?url=...
@@ -290,7 +290,12 @@ router.get('/sync', async (req: Request, res: Response) => {
     const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
     const defaultLimit = settings.syncPageSizeDefault ?? 200;
     const maxLimit = settings.syncPageSizeMax ?? 2000;
-    const effectiveLimit = Math.max(1, Math.min(Number.isFinite(limitRaw as number) ? (limitRaw as number) : defaultLimit, maxLimit));
+    const hardMaxLimit = 500;
+    const effectiveMax = Math.min(maxLimit, hardMaxLimit);
+    const effectiveLimit = Math.max(
+      1,
+      Math.min(Number.isFinite(limitRaw as number) ? (limitRaw as number) : defaultLimit, effectiveMax)
+    );
     const { latest, blocks, hasMore } = await storageService.getSyncBlocksForSource(
       url,
       Number.isFinite(since) ? since : 0,
