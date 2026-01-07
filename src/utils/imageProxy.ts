@@ -52,7 +52,7 @@ const WORDPRESS_PROXY_DOMAINS = [
  * 检查是否需要代理
  * @param url 图片原始URL
  */
-export function needsProxy(url: string): boolean {
+export function needsProxy(url: string, proxyServerUrl?: string): boolean {
   if (!url || url.startsWith('data:')) return false;
   
   // 防止二次代理：如果已经是代理链接，则跳过
@@ -65,6 +65,11 @@ export function needsProxy(url: string): boolean {
   if (url.includes('i0.wp.com') || url.includes('i1.wp.com') || url.includes('i2.wp.com')) return false;
   
   const urlLower = url.toLowerCase();
+
+  if (proxyServerUrl) {
+    const isHttp = urlLower.startsWith('http://') || urlLower.startsWith('https://');
+    return isHttp;
+  }
   
   // 检查是否在被墙列表或防盗链列表中
   return BLOCKED_DOMAINS.some(d => urlLower.includes(d)) || 
@@ -80,7 +85,7 @@ export function toProxyUrl(url: string, proxyServerUrl?: string): string {
   if (!url) return url;
   
   // 如果不需要代理（或者是已代理的链接），直接返回
-  if (!needsProxy(url)) return url;
+  if (!needsProxy(url, proxyServerUrl)) return url;
 
   const urlLower = url.toLowerCase();
 

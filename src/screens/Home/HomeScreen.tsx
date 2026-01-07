@@ -88,7 +88,7 @@ const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl
     if (!item.imageUrl) return null;
 
     // 只要 needsProxy 为 true，就应该尝试获取代理 URL (自建或公共)
-    if (needsProxy(item.imageUrl)) {
+    if (needsProxy(item.imageUrl, proxyServerUrl)) {
       const finalUrl = toProxyUrl(item.imageUrl, proxyServerUrl);
       if (finalUrl !== item.imageUrl) {
         logger.info(`[ImageProxy] Redirecting: ${item.imageUrl} -> ${finalUrl}`);

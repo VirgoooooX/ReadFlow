@@ -346,7 +346,7 @@
                             <label class="block text-xs font-semibold text-slate-500 mb-1">名称</label>
                             <input type="text" id="feed-name" placeholder="例如: TechCrunch" class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         </div>
-                        <div class="md:col-span-5">
+                        <div class="md:col-span-4">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">RSS 地址</label>
                             <input type="text" id="feed-url" placeholder="https://..." class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         </div>
@@ -357,6 +357,10 @@
                         <div class="md:col-span-1">
                             <label class="block text-xs font-semibold text-slate-500 mb-1">间隔(秒)</label>
                             <input type="number" id="feed-interval" placeholder="900" class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Cron</label>
+                            <input type="text" id="feed-cron" placeholder="*/15 * * * *" class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
                         </div>
                         <div class="md:col-span-1">
                             <button onclick="addFeed()" class="w-full bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium h-[38px] shadow-lg shadow-slate-800/20">
@@ -376,7 +380,8 @@
                                     <th class="px-6 py-4 w-1/3">源地址</th>
                                     <th class="px-6 py-4 text-center">文章数</th>
                                     <th class="px-6 py-4 text-center">订阅用户</th>
-                                    <th class="px-6 py-4 text-center">抓取间隔</th>
+                                    <th class="px-6 py-4 text-center">间隔(秒)</th>
+                                    <th class="px-6 py-4 text-center">Cron</th>
                                     <th class="px-6 py-4">最后更新</th>
                                     <th class="px-6 py-4 text-center">状态</th>
                                     <th class="px-6 py-4 text-right">操作</th>
@@ -463,6 +468,11 @@
                                     <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
                                     <input type="number" id="setting-refresh-interval" min="15" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">全局默认的 RSS 自动刷新间隔。单位秒，单个源如配置了独立刷新频率则以源配置为准。推荐：300–1800（5–30 分钟）。</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新 Cron</label>
+                                    <input type="text" id="setting-refresh-cron" placeholder="*/15 * * * *" class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono">
+                                    <p class="mt-2 text-xs text-slate-400">留空则使用默认刷新间隔（秒）。示例：*/15 * * * *（每15分钟）、0 * * * *（每小时）、0 8 * * *（每天8点）。</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-2">单次解析保护上限</label>
@@ -908,6 +918,15 @@
         setTimeout(() => el.classList.add('translate-y-32', 'opacity-0'), 3000);
     }
 
+    function isLikelyValidCronExpression(expr) {
+        const s = String(expr || '').trim();
+        if (!s) return true;
+        const parts = s.split(/\s+/).filter(Boolean);
+        if (parts.length !== 5 && parts.length !== 6) return false;
+        const allowed = /^[0-9*/,\-]+$/;
+        return parts.every(p => allowed.test(p));
+    }
+
     // --- Data Logic ---
 
     // 1. Dashboard / Status
@@ -979,6 +998,7 @@
             const data = await res.json();
             document.getElementById('setting-quality').value = data.imageQuality || 80;
             document.getElementById('setting-refresh-interval').value = data.rssDefaultRefreshIntervalSeconds ?? data.rssRefreshIntervalSeconds ?? 900;
+            document.getElementById('setting-refresh-cron').value = data.rssDefaultRefreshCron ?? data.rssRefreshCron ?? '';
             document.getElementById('setting-max-articles').value = data.rssMaxItemsPerFetch ?? data.rssMaxArticlesPerFeed ?? data.fetchParseItemCap ?? 1000;
             document.getElementById('setting-max-blocks').value = data.syncPageSizeMax ?? data.syncMaxPageSize ?? data.rssSyncMaxBlocksPerFeed ?? 2000;
             document.getElementById('setting-fetch-timeout').value = data.rssFetchTimeoutMs ?? data.fetchTimeoutMs ?? 15000;
@@ -993,6 +1013,8 @@
     async function saveSettings() {
         const quality = parseInt(document.getElementById('setting-quality').value);
         const rssDefaultRefreshIntervalSeconds = parseInt(document.getElementById('setting-refresh-interval').value);
+        const rssDefaultRefreshCronRaw = document.getElementById('setting-refresh-cron').value;
+        const rssDefaultRefreshCron = (rssDefaultRefreshCronRaw || '').trim();
         const rssMaxItemsPerFetch = parseInt(document.getElementById('setting-max-articles').value);
         const syncPageSizeMax = parseInt(document.getElementById('setting-max-blocks').value);
         const rssFetchTimeoutMs = parseInt(document.getElementById('setting-fetch-timeout').value);
@@ -1001,6 +1023,10 @@
         const retentionMaxArticlesPerFeed = parseInt(document.getElementById('setting-max-count-per-feed').value);
         const cleanupIntervalHours = parseInt(document.getElementById('setting-cleanup-interval').value);
         const adminPassword = document.getElementById('setting-password').value;
+
+        if (rssDefaultRefreshCron && !isLikelyValidCronExpression(rssDefaultRefreshCron)) {
+            return showToast('默认刷新 Cron 格式不正确（需5或6段，用空格分隔）', 'error');
+        }
         
         await fetch(`${API_BASE}/settings`, {
             method: 'POST',
@@ -1008,6 +1034,7 @@
             body: JSON.stringify({
                 imageQuality: quality,
                 rssDefaultRefreshIntervalSeconds,
+                rssDefaultRefreshCron: rssDefaultRefreshCron ? rssDefaultRefreshCron : null,
                 rssFetchTimeoutMs,
                 rssMaxItemsPerFetch,
                 retentionDays,
@@ -1087,6 +1114,11 @@
                         class="w-20 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm"
                         onchange="updateFeedInterval('${f.id}', this.value)" placeholder="Default">
                 </td>
+                <td class="px-6 py-4 text-center">
+                    <input type="text" value="${f.refreshCron ?? ''}" 
+                        class="w-44 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm font-mono"
+                        onchange="updateFeedCron('${f.id}', this.value)" placeholder="Cron">
+                </td>
                 <td class="px-6 py-4 text-xs">
                     <div class="text-slate-700 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
                     <div class="text-slate-500 text-[10px] mt-0.5 scale-90 origin-left">Last check</div>
@@ -1122,19 +1154,26 @@
         const name = document.getElementById('feed-name').value;
         const url = document.getElementById('feed-url').value;
         const category = document.getElementById('feed-category').value;
-        const refreshIntervalSeconds = parseInt(document.getElementById('feed-interval').value);
+        const intervalRaw = document.getElementById('feed-interval').value;
+        const refreshIntervalSeconds = intervalRaw === '' ? null : parseInt(intervalRaw);
+        const refreshCronRaw = document.getElementById('feed-cron').value;
+        const refreshCron = (refreshCronRaw || '').trim();
         
         if (!name || !url) return showToast('请填写名称和URL', 'error');
+        if (refreshCron && !isLikelyValidCronExpression(refreshCron)) {
+            return showToast('Cron 表达式格式不正确（需5或6段，用空格分隔）', 'error');
+        }
         
         await fetch(`${API_BASE}/feeds`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name, url, category, refreshIntervalSeconds })
+            body: JSON.stringify({ name, url, category, refreshIntervalSeconds, refreshCron: refreshCron ? refreshCron : null })
         });
         
         document.getElementById('feed-name').value = '';
         document.getElementById('feed-url').value = '';
         document.getElementById('feed-category').value = '';
+        document.getElementById('feed-cron').value = '';
         document.getElementById('add-feed-panel').classList.add('hidden');
         loadFeeds();
         showToast('订阅源添加成功');
@@ -1201,6 +1240,22 @@
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ refreshIntervalSeconds })
+        });
+        showToast('更新成功');
+    }
+
+    window.updateFeedCron = async function(id, val) {
+        const raw = String(val ?? '').trim();
+        if (raw && !isLikelyValidCronExpression(raw)) {
+            showToast('Cron 表达式格式不正确（需5或6段，用空格分隔）', 'error');
+            loadFeeds();
+            return;
+        }
+        const refreshCron = raw ? raw : null;
+        await fetch(`${API_BASE}/feeds/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ refreshCron })
         });
         showToast('更新成功');
     }

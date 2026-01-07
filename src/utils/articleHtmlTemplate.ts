@@ -13,7 +13,7 @@ function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
   
   // 1. 替换 src 属性
   let processedHtml = html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
-    if (needsProxy(url)) {
+    if (needsProxy(url, proxyServerUrl)) {
       return `${prefix}${toProxyUrl(url, proxyServerUrl)}${suffix}`;
     }
     return match;
@@ -27,7 +27,7 @@ function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
       const parts = item.trim().split(/\s+/);
       if (parts.length > 0) {
         const url = parts[0];
-        if (needsProxy(url)) {
+        if (needsProxy(url, proxyServerUrl)) {
           // 替换 URL 部分
           parts[0] = toProxyUrl(url, proxyServerUrl);
           return parts.join(' ');
@@ -118,7 +118,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
 
   // 处理封面图片的代理
   let proxiedImageUrl = imageUrl || '';
-  if (imageUrl && needsProxy(imageUrl)) {
+  if (imageUrl && needsProxy(imageUrl, proxyServerUrl)) {
     proxiedImageUrl = toProxyUrl(imageUrl, proxyServerUrl);
   }
 

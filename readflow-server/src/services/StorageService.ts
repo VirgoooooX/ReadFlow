@@ -21,6 +21,7 @@ export interface ServerSettings {
   imageQuality: number;
   adminPassword?: string;
   rssDefaultRefreshIntervalSeconds?: number;
+  rssDefaultRefreshCron?: string;
   rssMaxItemsPerFetch?: number;
   rssFetchTimeoutMs?: number;
   retentionDays?: number;
@@ -51,6 +52,7 @@ export interface Feed {
   createdAt: string | Date;
   updatedAt?: string;
   refreshIntervalSeconds?: number;
+  refreshCron?: string;
   lastRefreshAt?: string;
   lastRefreshStatus?: 'ok' | 'error';
   lastRefreshError?: string;
@@ -98,6 +100,7 @@ export class StorageService {
     this.settings = {
       imageQuality: 80,
       rssDefaultRefreshIntervalSeconds: 900,
+      rssDefaultRefreshCron: undefined,
       rssMaxItemsPerFetch: 20,
       rssFetchTimeoutMs: 15000,
       retentionDays: 0,
@@ -149,6 +152,64 @@ export class StorageService {
     }
   }
 
+  private normalizeArticleUrl(url: string): string {
+    let raw = String(url || '').trim();
+    if (!raw) return '';
+    raw = raw.replace(/`/g, '').trim();
+    while (
+      (raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'"))
+    ) {
+      raw = raw.slice(1, -1).trim();
+    }
+    return this.normalizeUrl(raw);
+  }
+
+  private buildArticleDedupSuffixes(url: string): string[] {
+    const cleaned = this.normalizeArticleUrl(url);
+    if (!cleaned) return [];
+    try {
+      const u = new URL(cleaned);
+      const pathname = u.pathname || '';
+      if (!pathname || pathname === '/') return [];
+
+      const trackingKeys = new Set([
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_term',
+        'utm_content',
+        'spm',
+        'from',
+        'ref',
+        'referer',
+      ]);
+
+      const params = new URLSearchParams(u.search);
+      for (const key of Array.from(params.keys())) {
+        if (trackingKeys.has(key.toLowerCase()) || key.toLowerCase().startsWith('utm_')) {
+          params.delete(key);
+        }
+      }
+
+      const entries = Array.from(params.entries()).sort((a, b) => {
+        if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
+        return a[1].localeCompare(b[1]);
+      });
+
+      const normalizedParams = new URLSearchParams();
+      for (const [k, v] of entries) normalizedParams.append(k, v);
+
+      const query = normalizedParams.toString();
+      const suffixes: string[] = [];
+      suffixes.push(pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname);
+      if (query) suffixes.unshift(`${suffixes[0]}?${query}`);
+      return Array.from(new Set(suffixes.filter(Boolean)));
+    } catch {
+      return [];
+    }
+  }
+
   // Settings
   public getSettings(): ServerSettings {
     return { ...this.settings };
@@ -184,12 +245,27 @@ export class StorageService {
       (out as any)[key] = s;
     };
 
+    const setOptionalStr = (key: keyof ServerSettings, v: any) => {
+      if (v === undefined) return;
+      if (v === null) {
+        (out as any)[key] = undefined;
+        return;
+      }
+      const s = String(v).trim();
+      if (!s) {
+        (out as any)[key] = undefined;
+        return;
+      }
+      (out as any)[key] = s;
+    };
+
     setNum('imageQuality', input.imageQuality, 1, 100);
     setNum(
       'rssDefaultRefreshIntervalSeconds',
       input.rssDefaultRefreshIntervalSeconds ?? input.rssRefreshIntervalSeconds,
       60
     );
+    setOptionalStr('rssDefaultRefreshCron', input.rssDefaultRefreshCron ?? input.rssRefreshCron);
 
     setNum(
       'rssMaxItemsPerFetch',
@@ -347,6 +423,7 @@ export class StorageService {
       createdAt: s.createdAt,
       updatedAt: s.updatedAt.toISOString(),
       refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
+      refreshCron: s.refreshCron ?? undefined,
       lastRefreshAt: s.lastFetchAt?.toISOString(),
       lastRefreshStatus: 'ok', // Simplified
       lastRefreshError: undefined,
@@ -365,6 +442,7 @@ export class StorageService {
         createdAt: true,
         updatedAt: true,
         refreshIntervalSeconds: true,
+        refreshCron: true,
         lastFetchAt: true,
       },
     });
@@ -377,6 +455,7 @@ export class StorageService {
       createdAt: s.createdAt,
       updatedAt: s.updatedAt.toISOString(),
       refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
+      refreshCron: s.refreshCron ?? undefined,
       lastRefreshAt: s.lastFetchAt?.toISOString(),
       lastRefreshStatus: 'ok',
       lastRefreshError: undefined,
@@ -396,6 +475,7 @@ export class StorageService {
       createdAt: uf.source.createdAt,
       updatedAt: uf.source.updatedAt.toISOString(),
       refreshIntervalSeconds: uf.source.refreshIntervalSeconds ?? undefined,
+      refreshCron: uf.source.refreshCron ?? undefined,
       lastRefreshAt: uf.source.lastFetchAt?.toISOString(),
       articleCount: uf.source._count?.articles ?? 0,
       subscriberCount: uf.source._count?.users ?? 0,
@@ -493,17 +573,41 @@ export class StorageService {
 
     let upsertsCount = 0;
     let maxId = 0;
+    const seenDedupKeys = new Set<string>();
 
     for (const a of articles) {
       if (!a.url) continue;
+
+      const normalizedArticleUrl = this.normalizeArticleUrl(a.url);
+      if (!normalizedArticleUrl) continue;
+
+      const dedupSuffixes = this.buildArticleDedupSuffixes(normalizedArticleUrl);
+      const localKey = dedupSuffixes[0] || normalizedArticleUrl;
+      if (seenDedupKeys.has(localKey)) {
+        continue;
+      }
+      seenDedupKeys.add(localKey);
+
+      if (dedupSuffixes.length > 0) {
+        const existing = await prisma.article.findFirst({
+          where: {
+            sourceId: source.id,
+            OR: dedupSuffixes.map(suffix => ({ url: { endsWith: suffix } })),
+          },
+          select: { id: true, url: true },
+        });
+        if (existing && existing.url !== normalizedArticleUrl) {
+          continue;
+        }
+      }
       
       // Upsert Article
       // Using upsert to handle updates
       const saved = await prisma.article.upsert({
-        where: { url: a.url },
+        where: { url: normalizedArticleUrl },
         update: {}, // Don't overwrite existing content to save perf, or maybe update?
         create: {
-          url: a.url,
+          url: normalizedArticleUrl,
           title: a.title || 'No Title',
           content: a.content || '',
           summary: a.summary,
@@ -536,22 +640,36 @@ export class StorageService {
     if (!source) return { latest: 0, blocks: [], hasMore: false };
 
     // Fetch articles newer than `since` (Article ID)
-    const articles = await prisma.article.findMany({
+    const rawArticles = await prisma.article.findMany({
       where: {
         sourceId: source.id,
         id: { gt: since }
       },
       orderBy: { id: 'asc' },
-      take: limit
+      take: limit * 3
     });
 
-    if (articles.length === 0) {
+    if (rawArticles.length === 0) {
       return { latest: since, blocks: [], hasMore: false };
     }
 
-    const latestId = articles[articles.length - 1].id;
+    const deduped: any[] = [];
+    const seen = new Set<string>();
+    for (const a of rawArticles) {
+      const suffixes = this.buildArticleDedupSuffixes(a.url);
+      const key = suffixes[0] || a.url;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(a);
+      if (deduped.length >= limit) break;
+    }
+
+    if (deduped.length === 0) {
+      return { latest: since, blocks: [], hasMore: false };
+    }
+
+    const latestId = deduped[deduped.length - 1].id;
     const hasMore =
-      articles.length === limit &&
       !!(await prisma.article.findFirst({
         where: { sourceId: source.id, id: { gt: latestId } },
         select: { id: true },
@@ -562,7 +680,7 @@ export class StorageService {
       id: latestId,
       sourceUrl: normalizedUrl,
       createdAt: new Date().toISOString(),
-      upserts: articles.map((a: any) => ({
+      upserts: deduped.map((a: any) => ({
         title: a.title,
         content: a.content,
         summary: a.summary || '',
@@ -664,6 +782,7 @@ export class StorageService {
         category: feed.category,
         lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
         refreshIntervalSeconds: feed.refreshIntervalSeconds === undefined ? undefined : (feed.refreshIntervalSeconds ?? null),
+        refreshCron: feed.refreshCron === undefined ? undefined : (feed.refreshCron ?? null),
       },
       create: {
         url: normalizedUrl,
@@ -671,6 +790,7 @@ export class StorageService {
         category: feed.category || 'General',
         lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
         refreshIntervalSeconds: feed.refreshIntervalSeconds ?? null,
+        refreshCron: feed.refreshCron ?? null,
       }
     });
   }
@@ -732,11 +852,20 @@ export class StorageService {
     if (!source) return { total: 0, articles: [] };
 
     const total = await prisma.article.count({ where: { sourceId: source.id } });
-    const articles = await prisma.article.findMany({
+    const rawArticles = await prisma.article.findMany({
       where: { sourceId: source.id },
       orderBy: { publishedAt: 'desc' },
       take: options.limit || 20,
       skip: options.offset || 0,
+    });
+
+    const seen = new Set<string>();
+    const articles = rawArticles.filter(a => {
+      const suffixes = this.buildArticleDedupSuffixes(a.url);
+      const key = suffixes[0] || a.url;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
 
     return { 
@@ -1048,3 +1177,4 @@ export class StorageService {
 }
 
 export const storageService = StorageService.getInstance();
+

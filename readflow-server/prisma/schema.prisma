@@ -45,6 +45,7 @@ model RSSSource {
   isActive    Boolean  @default(true)
   lastFetchAt DateTime?
   refreshIntervalSeconds Int? // Custom refresh interval
+  refreshCron String?
   errorCount  Int      @default(0)
   lastErrorMessage String?
   

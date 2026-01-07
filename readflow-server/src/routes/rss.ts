@@ -5,6 +5,7 @@ import { storageService } from '../services/StorageService';
 import { getProxyUrl, needsProxy, proxyImages } from '../utils/RSSUtils';
 import { logger } from '../utils/Logger';
 import fetch from 'node-fetch'; // For warm-up requests
+import cronParser from 'cron-parser';
 
 const router = express.Router();
 
@@ -157,18 +158,38 @@ async function refreshAllFeedsOnce() {
     const feeds = await storageService.getFeedsLight();
     if (!feeds || feeds.length === 0) return;
 
-    const now = Date.now();
+    const nowDate = new Date();
+    const now = nowDate.getTime();
     const settings = storageService.getSettings();
     const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
+    const globalCron = settings.rssDefaultRefreshCron;
 
     for (const feed of feeds) {
       if (!feed?.url) continue;
       try {
-        const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
-        if (intervalSeconds <= 0) continue;
+        let cronExpr = feed.refreshCron;
+        if (cronExpr) cronExpr = String(cronExpr).trim();
+        if (!cronExpr) cronExpr = globalCron ? String(globalCron).trim() : undefined;
 
-        const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
-        if (last && now - last < intervalSeconds * 1000) continue;
+        if (cronExpr) {
+          try {
+            const base = feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : new Date(0);
+            const interval = cronParser.parseExpression(cronExpr, { currentDate: base });
+            const next = interval.next().toDate();
+            if (next.getTime() > now) continue;
+          } catch (e) {
+            logger.warn(`[RSS Refresh] Invalid cron for ${feed.url}: ${cronExpr}`);
+            cronExpr = undefined;
+          }
+        }
+
+        if (!cronExpr) {
+          const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
+          if (intervalSeconds <= 0) continue;
+
+          const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
+          if (last && now - last < intervalSeconds * 1000) continue;
+        }
         if (refreshingFeedIds.has(feed.id)) continue;
         refreshingFeedIds.add(feed.id);
 

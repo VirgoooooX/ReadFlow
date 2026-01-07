@@ -2,8 +2,8 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '6.4.0',
-  buildNumber: 60400,
+  version: '6.4.1',
+  buildNumber: 60401,
   updateTime: '2026-01-05',
   changelog: [
     '优化RSS相关性能并添加文档说明',

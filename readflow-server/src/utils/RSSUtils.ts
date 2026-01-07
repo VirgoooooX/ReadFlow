@@ -417,6 +417,7 @@ export function needsProxy(url: string, baseUrl?: string, imageCompression: bool
   if (baseUrl) {
     const isHttp = urlLower.startsWith('http://') || urlLower.startsWith('https://');
     if (!isHttp) return false;
+    if (urlLower.startsWith('http://')) return true;
     if (imageCompression) return true;
     return ANTI_HOTLINK_DOMAINS.some(domain => urlLower.includes(domain)) ||
            BLOCKED_DOMAINS.some(domain => urlLower.includes(domain));

@@ -112,6 +112,13 @@ router.post('/feeds', async (req, res) => {
     const normalizedUrl = normalizeUrl(req.body?.url);
     if (!normalizedUrl) return res.status(400).json({ error: 'Feed url is required' });
     const id = String(simpleHash(normalizedUrl));
+    const refreshCronRaw = req.body?.refreshCron;
+    const refreshCron =
+      refreshCronRaw === undefined
+        ? undefined
+        : refreshCronRaw === null
+          ? null
+          : String(refreshCronRaw).trim() || null;
     const feed = {
       ...req.body,
       id,
@@ -119,6 +126,7 @@ router.post('/feeds', async (req, res) => {
       createdAt: req.body.createdAt || nowIso,
       updatedAt: nowIso,
       refreshIntervalSeconds: req.body.refreshIntervalSeconds ?? defaults.rssDefaultRefreshIntervalSeconds ?? 900,
+      refreshCron,
     };
     await storageService.saveFeed(feed);
     res.json(feed);
