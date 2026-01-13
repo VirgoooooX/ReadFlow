@@ -356,7 +356,7 @@ const ArticleHeaderSkeletonOverlay: React.FC<{
   const baseLineHeightMultiplier = Number(readingSettings?.lineHeight) > 0 ? Number(readingSettings.lineHeight) : 1.8;
   const lineBase = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
-  const titleLineHeight = baseFontSize * 1.6 * 1.25;
+  const titleLineHeight = baseFontSize * 1.4 * 1.25;
   const subtitleLineHeight = baseFontSize * 1.2 * 1.5;
   const metaLineHeight = baseFontSize * 0.9 * baseLineHeightMultiplier;
 
@@ -1440,7 +1440,7 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
       position: 'relative', // 相对定位，作为绝对定位子元素的锚点
     },
     headerTitle: {
-      fontSize: 18,      // 严格同步 CustomHeader 字号
+      fontSize: 17,      // 调小一点 (原为18)
       fontWeight: '900', // 严格同步 CustomHeader 字重 (Extra Bold)
       color: theme?.colors?.onPrimary || '#FFFFFF', // 确保白色文字
     },

@@ -218,28 +218,26 @@ export class LocalRSSService {
     try {
       const newArticles = await this.parseRSSFeed(xmlText, source);
       
+      const savedArticles: Article[] = [];
+
       if (!newArticles || newArticles.length === 0) {
         logger.info(`RSS 源 ${source.name} 没有新文章`);
-        return [];
-      }
-      
-      const savedArticles: Article[] = [];
-      
-      for (const article of newArticles) {
-        const existing = await this.databaseService.executeQuery(
-          'SELECT id FROM articles WHERE url = ?',
-          [article.url]
-        );
-        
-        if (existing.length === 0) {
-          const saved = await this.saveArticle(article);
-          if (saved) {
-            savedArticles.push(saved);
+      } else {
+        for (const article of newArticles) {
+          const existing = await this.databaseService.executeQuery(
+            'SELECT id FROM articles WHERE url = ?',
+            [article.url]
+          );
+          
+          if (existing.length === 0) {
+            const saved = await this.saveArticle(article);
+            if (saved) {
+              savedArticles.push(saved);
+            }
           }
         }
       }
-      
-      // 更新 RSS 源统计
+
       if (source.id) {
         await this.updateSourceStats(source.id.toString());
       }
@@ -748,6 +746,39 @@ export class LocalRSSService {
    */
   public async updateSourceStats(sourceId: string): Promise<void> {
     try {
+      try {
+        const sourceConfig = await this.databaseService.executeQuery(
+          'SELECT max_articles as maxArticles FROM rss_sources WHERE id = ?',
+          [sourceId]
+        );
+        const maxArticlesRaw = sourceConfig[0]?.maxArticles;
+        const maxArticles = typeof maxArticlesRaw === 'number' ? maxArticlesRaw : parseInt(String(maxArticlesRaw ?? '0'), 10);
+
+        if (Number.isFinite(maxArticles) && maxArticles > 0) {
+          const favCountResult = await this.databaseService.executeQuery(
+            'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_favorite = 1',
+            [sourceId]
+          );
+          const favCount = typeof favCountResult[0]?.count === 'number'
+            ? favCountResult[0]?.count
+            : parseInt(String(favCountResult[0]?.count ?? '0'), 10);
+          const keepNonFavorite = Math.max(0, maxArticles - (Number.isFinite(favCount) ? favCount : 0));
+
+          await this.databaseService.executeStatement(
+            `DELETE FROM articles 
+             WHERE id IN (
+               SELECT id FROM articles 
+               WHERE rss_source_id = ? AND is_favorite = 0
+               ORDER BY published_at DESC 
+               LIMIT -1 OFFSET ?
+             )`,
+            [sourceId, keepNonFavorite]
+          );
+        }
+      } catch (e) {
+        logger.warn('[updateSourceStats] Failed to enforce max_articles:', e);
+      }
+
       const articleCountResult = await this.databaseService.executeQuery(
         'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
         [sourceId]

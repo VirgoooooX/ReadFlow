@@ -152,6 +152,9 @@ export class CloudSyncService implements IRSSProvider {
           const filteredArticles = await filterService.applyFilterRules<Article>(articles, sourceId);
           logger.info(`[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`);
           const saveResult = await this.saveArticles(filteredArticles);
+          if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
+            await this.updateSourceStats(sourceId);
+          }
           return {
             articles: saveResult.insertedArticles,
             insertedCount: saveResult.insertedCount,
@@ -163,6 +166,9 @@ export class CloudSyncService implements IRSSProvider {
         throw new Error(`Server returned ${syncResp.status}: ${syncResp.statusText}`);
       }
 
+      if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
+        await this.updateSourceStats(sourceId);
+      }
       return { articles: insertedArticles, insertedCount, updatedCount, upsertedCount };
     } catch (error) {
       logger.error('[CloudSync] Fetch failed:', error);
@@ -519,6 +525,39 @@ export class CloudSyncService implements IRSSProvider {
    */
   private async updateSourceStats(sourceId: number): Promise<void> {
     try {
+      try {
+        const sourceConfig = await this.databaseService.executeQuery(
+          'SELECT max_articles as maxArticles FROM rss_sources WHERE id = ?',
+          [sourceId]
+        );
+        const maxArticlesRaw = sourceConfig[0]?.maxArticles;
+        const maxArticles = typeof maxArticlesRaw === 'number' ? maxArticlesRaw : parseInt(String(maxArticlesRaw ?? '0'), 10);
+
+        if (Number.isFinite(maxArticles) && maxArticles > 0) {
+          const favCountResult = await this.databaseService.executeQuery(
+            'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_favorite = 1',
+            [sourceId]
+          );
+          const favCount = typeof favCountResult[0]?.count === 'number'
+            ? favCountResult[0]?.count
+            : parseInt(String(favCountResult[0]?.count ?? '0'), 10);
+          const keepNonFavorite = Math.max(0, maxArticles - (Number.isFinite(favCount) ? favCount : 0));
+
+          await this.databaseService.executeStatement(
+            `DELETE FROM articles 
+             WHERE id IN (
+               SELECT id FROM articles 
+               WHERE rss_source_id = ? AND is_favorite = 0
+               ORDER BY published_at DESC 
+               LIMIT -1 OFFSET ?
+             )`,
+            [sourceId, keepNonFavorite]
+          );
+        }
+      } catch (e) {
+        logger.warn('[CloudSync] Failed to enforce max_articles:', e);
+      }
+
       const articleCountResult = await this.databaseService.executeQuery(
         'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
         [sourceId]

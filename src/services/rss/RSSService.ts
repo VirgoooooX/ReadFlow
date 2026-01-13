@@ -469,13 +469,14 @@ export class RSSService {
   public async refreshSources(
     sourceIds: number[],
     options: {
+      mode?: 'sync' | 'refresh';
       maxConcurrent?: number;
       onProgress?: (current: number, total: number, sourceName: string) => void;
       onError?: (error: Error, sourceName: string) => void;
       onArticlesReady?: (articles: Article[], sourceName: string) => void;
     } = {}
   ): Promise<RefreshSourcesResult> {
-    const { maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
+    const { mode, maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
     
     // 1. 获取所有活跃源
     const allSources = await this.getActiveRSSSources();
@@ -504,7 +505,7 @@ export class RSSService {
       limiter(() => 
         new Promise<void>((resolve, reject) => {
           InteractionManager.runAfterInteractions(() => {
-            this.fetchArticlesFromSourceWithStats(source)
+            this.fetchArticlesFromSourceWithStats(source, { mode })
               .then((result) => {
                 success++;
                 totalArticles += result.insertedCount;

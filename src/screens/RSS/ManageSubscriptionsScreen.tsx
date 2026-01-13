@@ -598,7 +598,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
                 最新文章：{formatTime(source.latest_published_at, '暂无')}
               </Text>
               <Text style={[styles.metaText, { marginTop: 2 }]}>
-                上次检查：{formatTime(source.last_updated, '从未')}
+                最近同步：{formatTime(source.last_updated, '从未')}
               </Text>
             </View>
           </View>

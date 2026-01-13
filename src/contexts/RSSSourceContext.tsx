@@ -181,7 +181,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       console.log('[RSSSourceContext.syncAllSources] 🚀 开始同步所有 RSS 源');
       setIsLoading(true);
       console.log('[RSSSourceContext.syncAllSources] 调用 rssService.refreshAllSources()');
-      const result = await rssService.refreshAllSources({ onProgress });
+      const result = await rssService.refreshAllSources({ onProgress, mode: 'refresh' });
       console.log(`[RSSSourceContext.syncAllSources] ✅ refreshAllSources 完成，新增文章: ${result.insertedCount}`);
       
       await loadRSSSources();
@@ -224,7 +224,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
         }
 
         // 直接调用 fetchArticlesFromSource，内部会自动判断代理模式
-        const newArticles = await rssService.fetchArticlesFromSource(source);
+        const newArticles = await rssService.fetchArticlesFromSource(source, { mode: 'refresh' });
         
         await loadRSSSources();
 
@@ -259,7 +259,7 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
       logger.info(`[RSSSourceContext.syncSources] 🚀 开始同步 ${sourceIds.length} 个 RSS 源`);
       setIsLoading(true);
       
-      const result = await rssService.refreshSources(sourceIds, { onProgress });
+      const result = await rssService.refreshSources(sourceIds, { onProgress, mode: 'refresh' });
       
       logger.info(`[RSSSourceContext.syncSources] ✅ 批量同步完成，新增文章: ${result.insertedCount}`);
       await loadRSSSources();
