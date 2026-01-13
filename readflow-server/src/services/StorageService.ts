@@ -809,7 +809,7 @@ export class StorageService {
       const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
       const result = await prisma.article.deleteMany({
         where: {
-          sourceId: { in: sources.map(s => s.id) },
+          sourceId: { in: sources.map((s: { id: number }) => s.id) },
           publishedAt: { lt: cutoff },
         },
       });
@@ -828,7 +828,7 @@ export class StorageService {
           });
           if (ids.length === 0) break;
           const result = await prisma.article.deleteMany({
-            where: { id: { in: ids.map(x => x.id) } },
+            where: { id: { in: ids.map((x: { id: number }) => x.id) } },
           });
           deletedByMaxCount += result.count;
           if (ids.length < 1000) break;
@@ -860,13 +860,13 @@ export class StorageService {
     });
 
     const seen = new Set<string>();
-    const articles = rawArticles.filter(a => {
-      const suffixes = this.buildArticleDedupSuffixes(a.url);
-      const key = suffixes[0] || a.url;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const articles = rawArticles.filter((a: any) => {
+        const suffixes = this.buildArticleDedupSuffixes(a.url);
+        const key = suffixes[0] || a.url;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
     return { 
       total, 
