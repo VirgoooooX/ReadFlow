@@ -16,7 +16,6 @@
 版本：`v6.1.1`（`app.json`） / `build 60101`（Android）
 
 ![ReadFlow Icon](./assets/icon.png)
-![ReadFlow Splash](./assets/splash.png)
 
 ## 目录
 
