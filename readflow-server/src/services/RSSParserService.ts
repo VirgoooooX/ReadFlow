@@ -335,18 +335,20 @@ export class RSSParserService {
       // Fix lazy loading images
       const imgs = document.querySelectorAll('img');
       Array.from(imgs).forEach((img: any) => {
-        const realSrc = img.getAttribute('data-src') || 
-                       img.getAttribute('data-original') || 
-                       img.getAttribute('data-url');
-        if (realSrc) img.setAttribute('src', realSrc);
-        
-        const src = img.getAttribute('src');
-        if (src && src.startsWith('/')) {
-          try {
-            const baseUrl = new URL(url).origin;
-            img.setAttribute('src', `${baseUrl}${src}`);
-          } catch (e) {}
-        }
+        const realSrc =
+          img.getAttribute('data-src') ||
+          img.getAttribute('data-original') ||
+          img.getAttribute('data-url') ||
+          img.getAttribute('data-actualsrc') ||
+          img.getAttribute('data-lazy-src');
+
+        const src = realSrc || img.getAttribute('src');
+        if (!src) return;
+
+        try {
+          const absolute = new URL(src, urlObj).toString();
+          img.setAttribute('src', absolute);
+        } catch (e) {}
       });
 
       if (this.isXchuxingArticleUrl(urlObj)) {
