@@ -188,7 +188,6 @@ export function fixRelativeImageUrls(htmlContent: string, articleLink: string): 
     // 1. 从文章链接中提取 Base URL (例如: http://military.people.com.cn)
     const urlObj = new URL(articleLink);
     const origin = urlObj.origin; // 结果如: "http://military.people.com.cn"
-    const protocol = urlObj.protocol;
 
     // 2. 修复 src="/..." 形式的相对路径
     let fixed = htmlContent.replace(/src="\/([^"]+)"/g, (match, path) => {
@@ -202,14 +201,6 @@ export function fixRelativeImageUrls(htmlContent: string, articleLink: string): 
       const fixedUrl = `src='${origin}/${path}'`;
       // logger.info(`[fixRelativeImageUrls] 修复: ${match} -> ${fixedUrl}`);
       return fixedUrl;
-    });
-
-    fixed = fixed.replace(/src="\/\/([^"]+)"/g, (match, path) => {
-      return `src="${protocol}//${path}"`;
-    });
-
-    fixed = fixed.replace(/src='\/\/([^']+)'/g, (match, path) => {
-      return `src='${protocol}//${path}'`;
     });
 
     // 4. 修复 data-src="/..." 等懒加载属性
@@ -406,8 +397,6 @@ const ANTI_HOTLINK_DOMAINS = [
   'jianshu.io',
   'toutiaoimg.com',
   '36krcdn.com',
-  'xchuxing.com',
-  's3.xchuxing.com',
 ];
 
 /**
@@ -463,6 +452,45 @@ export function getProxyUrl(
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&q=${quality}&output=webp`;
 }
 
+export function fixMalformedSelfImageProxyUrl(value: string, baseUrl?: string): string | null {
+  if (!value) return null;
+  const looksLikeApiImage = value.includes('/api/image');
+  if (!looksLikeApiImage) return null;
+
+  const isRelative = value.startsWith('/api/image');
+  if (isRelative && !baseUrl) return null;
+
+  try {
+    const u = new URL(value, baseUrl || 'http://localhost');
+    const isApiImagePath = u.pathname === '/api/image' || u.pathname.endsWith('/api/image');
+    if (!isApiImagePath) return null;
+
+    const inner = u.searchParams.get('url');
+    const rawParam = u.searchParams.get('raw');
+    if (!inner || !rawParam) return null;
+
+    const schemeOnly = inner === 'http://' || inner === 'https://';
+    if (!schemeOnly) return null;
+
+    if (!rawParam.startsWith('1') || rawParam.length <= 1) return null;
+
+    const tailRaw = rawParam.slice(1).trim();
+    if (!tailRaw) return null;
+    if (!tailRaw.includes('.')) return null;
+
+    const tail = tailRaw.startsWith('//') ? tailRaw.slice(2) : tailRaw;
+    const recoveredInnerUrl = `${inner}${tail}`;
+
+    u.searchParams.set('url', recoveredInnerUrl);
+    u.searchParams.set('raw', '1');
+
+    const rewritten = isRelative ? `${u.pathname}?${u.searchParams.toString()}` : u.toString();
+    return rewritten === value ? null : rewritten;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 替换 HTML 中需要代理的图片 URL
  */
@@ -479,10 +507,10 @@ export function proxyImages(
     let newAttributes = attributes;
 
     // 1.5 提取懒加载属性并提升为 src (针对 sspai 等网站)
-    // 查找 data-original, data-src, data-url 等
-    const lazyMatch = newAttributes.match(/\s+(data-original|data-src|data-url|data-actualsrc|data-lazy-src)=["']([^"']+)["']/i);
+    // 查找 data-original, data-src, data-url
+    const lazyMatch = newAttributes.match(/\s+(data-original|data-src|data-url)=["']([^"']+)["']/i);
     if (lazyMatch && lazyMatch[2]) {
-      const realUrl = lazyMatch[2].startsWith('//') ? `https:${lazyMatch[2]}` : lazyMatch[2];
+      const realUrl = lazyMatch[2];
       // 如果存在懒加载属性，强制替换 src
       // 先移除已有的 src (如果有)
       newAttributes = newAttributes.replace(/\s+src=["'][^"']*["']/gi, '');
@@ -495,9 +523,12 @@ export function proxyImages(
         // 匹配 src="...", src='...', src=...
         const regex = new RegExp(`(${attrName}=["']?)([^"'\s>]+)(["']?)`, 'gi');
         newAttributes = newAttributes.replace(regex, (m: string, prefix: string, url: string, suffix: string) => {
-           const normalizedUrl = url.startsWith('//') ? `https:${url}` : url;
-           if (needsProxy(normalizedUrl, baseUrl, imageCompression)) {
-             return `${prefix}${getProxyUrl(normalizedUrl, baseUrl, imageCompression, imageQuality)}${suffix}`;
+           const fixedExisting = fixMalformedSelfImageProxyUrl(url, baseUrl);
+           if (fixedExisting) {
+             return `${prefix}${fixedExisting}${suffix}`;
+           }
+           if (needsProxy(url, baseUrl, imageCompression)) {
+             return `${prefix}${getProxyUrl(url, baseUrl, imageCompression, imageQuality)}${suffix}`;
            }
            return m;
         });
@@ -507,9 +538,6 @@ export function proxyImages(
     // data-src 等也替换一下，以防万一
     replaceUrlInAttr('data-src');
     replaceUrlInAttr('data-original');
-    replaceUrlInAttr('data-url');
-    replaceUrlInAttr('data-actualsrc');
-    replaceUrlInAttr('data-lazy-src');
 
     const rewriteSrcsetValue = (value: string) => {
       const candidates = value
@@ -520,11 +548,14 @@ export function proxyImages(
       const rewritten = candidates.map(candidate => {
         const tokens = candidate.split(/\s+/).filter(Boolean);
         if (tokens.length === 0) return candidate;
-        const url = tokens[0].startsWith('//') ? `https:${tokens[0]}` : tokens[0];
+        const url = tokens[0];
         const descriptor = tokens.slice(1).join(' ');
-        const finalUrl = needsProxy(url, baseUrl, imageCompression)
-          ? getProxyUrl(url, baseUrl, imageCompression, imageQuality)
-          : url;
+        const fixedExisting = fixMalformedSelfImageProxyUrl(url, baseUrl);
+        const finalUrl = fixedExisting
+          ? fixedExisting
+          : needsProxy(url, baseUrl, imageCompression)
+            ? getProxyUrl(url, baseUrl, imageCompression, imageQuality)
+            : url;
         return descriptor ? `${finalUrl} ${descriptor}` : finalUrl;
       });
 
