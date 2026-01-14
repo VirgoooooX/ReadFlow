@@ -452,45 +452,6 @@ export function getProxyUrl(
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&q=${quality}&output=webp`;
 }
 
-export function fixMalformedSelfImageProxyUrl(value: string, baseUrl?: string): string | null {
-  if (!value) return null;
-  const looksLikeApiImage = value.includes('/api/image');
-  if (!looksLikeApiImage) return null;
-
-  const isRelative = value.startsWith('/api/image');
-  if (isRelative && !baseUrl) return null;
-
-  try {
-    const u = new URL(value, baseUrl || 'http://localhost');
-    const isApiImagePath = u.pathname === '/api/image' || u.pathname.endsWith('/api/image');
-    if (!isApiImagePath) return null;
-
-    const inner = u.searchParams.get('url');
-    const rawParam = u.searchParams.get('raw');
-    if (!inner || !rawParam) return null;
-
-    const schemeOnly = inner === 'http://' || inner === 'https://';
-    if (!schemeOnly) return null;
-
-    if (!rawParam.startsWith('1') || rawParam.length <= 1) return null;
-
-    const tailRaw = rawParam.slice(1).trim();
-    if (!tailRaw) return null;
-    if (!tailRaw.includes('.')) return null;
-
-    const tail = tailRaw.startsWith('//') ? tailRaw.slice(2) : tailRaw;
-    const recoveredInnerUrl = `${inner}${tail}`;
-
-    u.searchParams.set('url', recoveredInnerUrl);
-    u.searchParams.set('raw', '1');
-
-    const rewritten = isRelative ? `${u.pathname}?${u.searchParams.toString()}` : u.toString();
-    return rewritten === value ? null : rewritten;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * 替换 HTML 中需要代理的图片 URL
  */
@@ -508,12 +469,13 @@ export function proxyImages(
 
     // 1.5 提取懒加载属性并提升为 src (针对 sspai 等网站)
     // 查找 data-original, data-src, data-url
-    const lazyMatch = newAttributes.match(/\s+(data-original|data-src|data-url)=["']([^"']+)["']/i);
-    if (lazyMatch && lazyMatch[2]) {
-      const realUrl = lazyMatch[2];
+    const lazyMatch = newAttributes.match(/\s+(data-original|data-src|data-url)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i);
+    const lazyUrl = lazyMatch ? (lazyMatch[2] || lazyMatch[3] || lazyMatch[4] || '') : '';
+    if (lazyUrl) {
+      const realUrl = lazyUrl;
       // 如果存在懒加载属性，强制替换 src
       // 先移除已有的 src (如果有)
-      newAttributes = newAttributes.replace(/\s+src=["'][^"']*["']/gi, '');
+      newAttributes = newAttributes.replace(/\s+src\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
       // 添加新的 src
       newAttributes = ` src="${realUrl}"` + newAttributes;
     }
@@ -521,14 +483,10 @@ export function proxyImages(
     // 2. 辅助函数：替换指定属性中的 URL
       const replaceUrlInAttr = (attrName: string) => {
         // 匹配 src="...", src='...', src=...
-        const regex = new RegExp(`(${attrName}=["']?)([^"'\s>]+)(["']?)`, 'gi');
-        newAttributes = newAttributes.replace(regex, (m: string, prefix: string, url: string, suffix: string) => {
-           const fixedExisting = fixMalformedSelfImageProxyUrl(url, baseUrl);
-           if (fixedExisting) {
-             return `${prefix}${fixedExisting}${suffix}`;
-           }
+        const regex = new RegExp(`(^|\\s)(${escapeRegExp(attrName)}\\s*=\\s*["']?)([^"'\\s>]+)(["']?)`, 'gi');
+        newAttributes = newAttributes.replace(regex, (m: string, leading: string, prefix: string, url: string, suffix: string) => {
            if (needsProxy(url, baseUrl, imageCompression)) {
-             return `${prefix}${getProxyUrl(url, baseUrl, imageCompression, imageQuality)}${suffix}`;
+             return `${leading}${prefix}${getProxyUrl(url, baseUrl, imageCompression, imageQuality)}${suffix}`;
            }
            return m;
         });
@@ -550,12 +508,9 @@ export function proxyImages(
         if (tokens.length === 0) return candidate;
         const url = tokens[0];
         const descriptor = tokens.slice(1).join(' ');
-        const fixedExisting = fixMalformedSelfImageProxyUrl(url, baseUrl);
-        const finalUrl = fixedExisting
-          ? fixedExisting
-          : needsProxy(url, baseUrl, imageCompression)
-            ? getProxyUrl(url, baseUrl, imageCompression, imageQuality)
-            : url;
+        const finalUrl = needsProxy(url, baseUrl, imageCompression)
+          ? getProxyUrl(url, baseUrl, imageCompression, imageQuality)
+          : url;
         return descriptor ? `${finalUrl} ${descriptor}` : finalUrl;
       });
 
@@ -563,7 +518,7 @@ export function proxyImages(
     };
 
     const replaceSrcsetAttr = (attrName: string) => {
-      const regex = new RegExp(`\\s+${attrName}=(["'])([^"']*)\\1`, 'gi');
+      const regex = new RegExp(`\\s+${attrName}\\s*=\\s*(["'])([^"']*)\\1`, 'gi');
       newAttributes = newAttributes.replace(regex, (m: string, quote: string, value: string) => {
         return ` ${attrName}=${quote}${rewriteSrcsetValue(value)}${quote}`;
       });

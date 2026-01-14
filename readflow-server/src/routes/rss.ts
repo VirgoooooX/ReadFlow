@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { rssParserService } from '../services/RSSParserService';
 import { RSSSource, Article } from '../types';
 import { storageService } from '../services/StorageService';
-import { fixMalformedSelfImageProxyUrl, getProxyUrl, needsProxy, proxyImages } from '../utils/RSSUtils';
+import { getProxyUrl, needsProxy, proxyImages } from '../utils/RSSUtils';
 import { logger } from '../utils/Logger';
 import fetch from 'node-fetch'; // For warm-up requests
 import cronParser from 'cron-parser';
@@ -73,10 +73,6 @@ function applyProxyToArticle(
 ) {
   const content = proxyImages(article.content || '', baseUrl, imageCompression, imageQuality);
   let imageUrl = article.imageUrl;
-  if (typeof imageUrl === 'string') {
-    const fixed = fixMalformedSelfImageProxyUrl(imageUrl, baseUrl);
-    if (fixed) imageUrl = fixed;
-  }
   if (imageUrl && needsProxy(imageUrl, baseUrl, imageCompression)) {
     imageUrl = getProxyUrl(imageUrl, baseUrl, imageCompression, imageQuality);
   }
