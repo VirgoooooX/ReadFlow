@@ -1,12 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '.prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { logger } from '../utils/Logger';
 import { Article } from '../types';
-import { simpleHash } from '../utils/RSSUtils';
-
-console.log('StorageService initializing...');
-// console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Found' : 'Missing');
 
 const prisma = new PrismaClient({
   datasources: {
@@ -731,7 +727,7 @@ export class StorageService {
       return { deliveryId: null, since: 0, latest: 0, blocks: [], hasMore: false };
     }
 
-    const cursorRow = await prisma.userSourceCursor.findUnique({
+    const cursorRow = await (prisma as any).userSourceCursor.findUnique({
       where: { userId_sourceId: { userId, sourceId: source.id } },
       select: { lastAckedArticleId: true },
     });
@@ -772,7 +768,7 @@ export class StorageService {
         select: { id: true },
       }));
 
-    const delivery = await prisma.syncDelivery.create({
+    const delivery = await (prisma as any).syncDelivery.create({
       data: {
         userId,
         sourceId: source.id,
@@ -835,7 +831,7 @@ export class StorageService {
 
   public async ackSyncDelivery(userId: string, deliveryId: string) {
     const now = new Date();
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       const delivery = await tx.syncDelivery.findFirst({
         where: { id: deliveryId, userId },
         select: { id: true, sourceId: true, toInclusiveId: true, ackedAt: true },
