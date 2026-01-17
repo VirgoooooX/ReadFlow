@@ -13,9 +13,23 @@ export interface FilterableArticle {
   [key: string]: any; // Allow other properties
 }
 
+type CompiledFilterRule = {
+  mode: 'include' | 'exclude';
+  isRegex: boolean;
+  keywordLower: string;
+  regex: RegExp | null;
+};
+
+type CompiledRuleSet = {
+  whitelist: CompiledFilterRule[];
+  blacklist: CompiledFilterRule[];
+  expiresAt: number;
+};
+
 export class FilterService {
   private static instance: FilterService;
   private databaseService: DatabaseService;
+  private compiledRulesCache: Map<number, CompiledRuleSet> = new Map();
 
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
@@ -36,20 +50,67 @@ export class FilterService {
    */
   public async applyFilterRules<T extends FilterableArticle>(
     articles: T[],
-    sourceId: number
+    sourceId: number,
+    yieldEvery?: number
   ): Promise<T[]> {
     try {
-      // 1. Get effective rules for this source (global + specific)
-      const rules = await this.databaseService.getEffectiveRules(sourceId);
-      
-      if (rules.length === 0) {
-        return articles; // No rules, return original list
+      const now = Date.now();
+      const cacheTtlMs = 60_000;
+      const safeYieldEvery =
+        yieldEvery === undefined
+          ? 5
+          : Number.isFinite(yieldEvery)
+              ? Math.max(0, Math.floor(yieldEvery))
+              : 0;
+
+      let compiled = this.compiledRulesCache.get(sourceId);
+      if (!compiled || compiled.expiresAt <= now) {
+        const rules = await this.databaseService.getEffectiveRules(sourceId);
+        if (rules.length === 0) {
+          this.compiledRulesCache.set(sourceId, { whitelist: [], blacklist: [], expiresAt: now + cacheTtlMs });
+          return articles;
+        }
+
+        const whitelist: CompiledFilterRule[] = [];
+        const blacklist: CompiledFilterRule[] = [];
+
+        for (const r of rules) {
+          const keywordRaw = typeof r?.keyword === 'string' ? r.keyword : '';
+          const keywordLower = keywordRaw.toLowerCase();
+          const isRegex = r?.is_regex === 1;
+          const mode: 'include' | 'exclude' = r?.mode === 'include' ? 'include' : 'exclude';
+          const compiledRule: CompiledFilterRule = {
+            mode,
+            isRegex,
+            keywordLower,
+            regex: null,
+          };
+
+          if (isRegex) {
+            try {
+              compiledRule.regex = new RegExp(keywordRaw, 'i');
+            } catch (e) {
+              logger.warn(`[FilterService] Invalid regex: ${keywordRaw}`);
+              compiledRule.regex = null;
+            }
+          }
+
+          if (mode === 'include') {
+            whitelist.push(compiledRule);
+          } else {
+            blacklist.push(compiledRule);
+          }
+        }
+
+        compiled = { whitelist, blacklist, expiresAt: now + cacheTtlMs };
+        this.compiledRulesCache.set(sourceId, compiled);
       }
-      
-      // 2. Classify rules
-      const whitelist = rules.filter((r: any) => r.mode === 'include');
-      const blacklist = rules.filter((r: any) => r.mode === 'exclude');
-      
+
+      const { whitelist, blacklist } = compiled;
+      if (whitelist.length === 0 && blacklist.length === 0) {
+        return articles;
+      }
+
       logger.info(`[FilterService] Source ${sourceId}: Whitelist=${whitelist.length}, Blacklist=${blacklist.length}`);
       
       // 3. Apply filtering
@@ -58,8 +119,7 @@ export class FilterService {
       for (let i = 0; i < articles.length; i++) {
         const article = articles[i];
         
-        // Yield to main thread every 5 articles to prevent blocking
-        if (i % 5 === 0) {
+        if (safeYieldEvery > 0 && i > 0 && i % safeYieldEvery === 0) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }
 
@@ -68,20 +128,13 @@ export class FilterService {
         const content = (article.content || '').toLowerCase();
         const contentToCheck = `${title} ${summary} ${content}`;
         
-        // Helper: Check if content matches a rule
-        const checkMatch = (rule: any): boolean => {
-          if (rule.is_regex === 1) {
-            try {
-              const regex = new RegExp(rule.keyword, 'i');
-              return regex.test(contentToCheck);
-            } catch (e) {
-              logger.warn(`[FilterService] Invalid regex: ${rule.keyword}`);
-              return false;
-            }
-          } else {
-            // Simple string match
-            return contentToCheck.includes(rule.keyword.toLowerCase());
+        const checkMatch = (rule: CompiledFilterRule): boolean => {
+          if (rule.isRegex) {
+            if (!rule.regex) return false;
+            return rule.regex.test(contentToCheck);
           }
+          if (!rule.keywordLower) return false;
+          return contentToCheck.includes(rule.keywordLower);
         };
         
         let keep = true;
@@ -253,6 +306,7 @@ export class FilterService {
         }
         
         await this.databaseService.commitTransaction();
+        this.compiledRulesCache.clear();
         return;
       }
 
@@ -336,6 +390,7 @@ export class FilterService {
       }
       
       await this.databaseService.commitTransaction();
+      this.compiledRulesCache.clear();
     } catch (error) {
       await this.databaseService.rollbackTransaction();
       logger.error('Error importing filter rules:', error);

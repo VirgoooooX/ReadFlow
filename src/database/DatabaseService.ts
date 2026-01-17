@@ -235,6 +235,18 @@ export class DatabaseService {
       } catch (error) {
         console.warn('⚠️ Could not create group_id index:', error);
       }
+
+      try {
+        await this.db.execAsync('DELETE FROM articles WHERE id NOT IN (SELECT MIN(id) FROM articles GROUP BY url)');
+      } catch (error) {
+        console.warn('⚠️ Could not dedupe articles by url:', error);
+      }
+
+      try {
+        await this.db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_url_unique ON articles(url)');
+      } catch (error) {
+        console.warn('⚠️ Could not create articles url unique index:', error);
+      }
     } catch (error) {
       console.error('❌ 数据库迁移异常:', error);
       // 不抛出错误，让应用继续运行
@@ -415,6 +427,7 @@ export class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at)',
       'CREATE INDEX IF NOT EXISTS idx_articles_is_read ON articles(is_read)',
       'CREATE INDEX IF NOT EXISTS idx_articles_is_favorite ON articles(is_favorite)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_url_unique ON articles(url)',
       'CREATE INDEX IF NOT EXISTS idx_vocabulary_word ON vocabulary(word)',
       'CREATE INDEX IF NOT EXISTS idx_vocabulary_added_at ON vocabulary(added_at)',
       'CREATE INDEX IF NOT EXISTS idx_reading_history_article_id ON reading_history(article_id)',

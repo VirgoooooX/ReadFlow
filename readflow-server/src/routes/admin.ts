@@ -57,7 +57,17 @@ router.post('/settings', (req, res) => {
   (async () => {
     try {
       await storageService.saveSettings(req.body);
-      res.json(storageService.getSettings());
+      const next = storageService.getSettings();
+      if ((next.retentionDays ?? 0) > 0 || (next.retentionMaxArticlesPerFeed ?? 0) > 0) {
+        void storageService.cleanupArticles()
+          .then(result => {
+            logger.system(
+              `Settings-triggered cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount}`
+            );
+          })
+          .catch(error => logger.error('Settings-triggered cleanup failed', error));
+      }
+      res.json(next);
     } catch (error) {
       res.status(500).json({ error: 'Failed to save settings' });
     }

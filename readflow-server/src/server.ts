@@ -154,23 +154,32 @@ async function start(): Promise<void> {
     setInterval(logServerStatus, 60 * 60 * 1000);
 
     let lastCleanupAt = 0;
+    let cleanupRunning = false;
     const runCleanupIfDue = async () => {
+      if (cleanupRunning) return;
       const settings = storageService.getSettings();
       const hours = settings.cleanupIntervalHours ?? 24;
       const intervalMs = Math.max(1, hours) * 60 * 60 * 1000;
       const now = Date.now();
       if (now - lastCleanupAt < intervalMs) return;
-      lastCleanupAt = now;
-      const result = await storageService.cleanupArticles();
-      logger.system(`Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount}`);
+      cleanupRunning = true;
+      try {
+        const result = await storageService.cleanupArticles();
+        lastCleanupAt = Date.now();
+        logger.system(`Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount}`);
+      } catch (e) {
+        logger.error('Cleanup failed', e);
+      } finally {
+        cleanupRunning = false;
+      }
     };
 
     setTimeout(() => {
-      runCleanupIfDue().catch(e => logger.error('Cleanup failed', e));
+      runCleanupIfDue().catch(() => {});
     }, 30_000);
 
     setInterval(() => {
-      runCleanupIfDue().catch(e => logger.error('Cleanup failed', e));
+      runCleanupIfDue().catch(() => {});
     }, 60_000);
   });
 }

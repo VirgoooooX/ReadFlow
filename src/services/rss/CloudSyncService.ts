@@ -106,7 +106,7 @@ export class CloudSyncService implements IRSSProvider {
           const pageLatest = typeof payload?.latest === 'number' ? payload.latest : cursor;
           const hasMore = payload?.hasMore === true;
 
-          const filteredPage = await filterService.applyFilterRules<Article>(pageArticles, sourceId);
+          const filteredPage = await filterService.applyFilterRules<Article>(pageArticles, sourceId, 50);
           logger.info(`[CloudSync] Filtered articles: ${pageArticles.length} -> ${filteredPage.length}`);
           const pageSaveResult = await this.saveArticles(filteredPage);
           insertedArticles.push(...pageSaveResult.insertedArticles);
@@ -117,11 +117,6 @@ export class CloudSyncService implements IRSSProvider {
           if (pageLatest > cursor) {
             cursor = pageLatest;
             latestCursor = pageLatest;
-            const nextSync = {
-              ...settings.sync,
-              cloudCursors: { ...cursors, [source.url]: latestCursor },
-            };
-            await this.settingsService.updateAppSettingNoCloudSync('sync', nextSync);
           } else if (pageLatest < cursor) {
             logger.warn(`[CloudSync] Sync cursor regressed for ${source.name}, stopping pagination`);
             break;
@@ -149,7 +144,7 @@ export class CloudSyncService implements IRSSProvider {
 
           const data = await response.json();
           const articles = Array.isArray(data) ? data.map((item: any) => this.mapServerArticle(item, source)) : [];
-          const filteredArticles = await filterService.applyFilterRules<Article>(articles, sourceId);
+          const filteredArticles = await filterService.applyFilterRules<Article>(articles, sourceId, 50);
           logger.info(`[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`);
           const saveResult = await this.saveArticles(filteredArticles);
           if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
@@ -164,6 +159,16 @@ export class CloudSyncService implements IRSSProvider {
         }
 
         throw new Error(`Server returned ${syncResp.status}: ${syncResp.statusText}`);
+      }
+
+      if (latestCursor > since) {
+        const currentSettings = await this.settingsService.getAppSettings();
+        const currentCursors = currentSettings.sync.cloudCursors || {};
+        const nextSync = {
+          ...currentSettings.sync,
+          cloudCursors: { ...currentCursors, [source.url]: latestCursor },
+        };
+        await this.settingsService.updateAppSettingNoCloudSync('sync', nextSync);
       }
 
       if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
@@ -430,42 +435,50 @@ export class CloudSyncService implements IRSSProvider {
       return { insertedArticles: [], insertedCount: 0, updatedCount: 0, upsertedCount: 0 };
     }
 
-    const affectedSourceIds = new Set<number>();
     const uniqueByUrl = new Map<string, Article>();
     for (const article of articles) {
       if (!article?.url) continue;
       uniqueByUrl.set(article.url, article);
     }
 
-    const insertedArticles: Article[] = [];
-    let insertedCount = 0;
-    let updatedCount = 0;
+    const uniqueArticles = Array.from(uniqueByUrl.values());
+    const urls = uniqueArticles.map(a => a.url).filter(Boolean);
+    const existingUrls = new Set<string>();
+    const inChunkSize = 200;
 
-    for (const article of uniqueByUrl.values()) {
-      if (article.sourceId) {
-        // Handle both string and number types for sourceId
-        const sId = typeof article.sourceId === 'string' ? parseInt(article.sourceId, 10) : article.sourceId;
-        if (!isNaN(sId)) {
-          affectedSourceIds.add(sId);
-        }
-      }
-
-      // Check existence by URL
-      const existing = await this.databaseService.executeQuery(
-        'SELECT id FROM articles WHERE url = ?',
-        [article.url]
+    for (let i = 0; i < urls.length; i += inChunkSize) {
+      const chunk = urls.slice(i, i + inChunkSize);
+      if (chunk.length === 0) continue;
+      const placeholders = chunk.map(() => '?').join(',');
+      const rows = await this.databaseService.executeQuery(
+        `SELECT url FROM articles WHERE url IN (${placeholders})`,
+        chunk
       );
-      
-      if (existing.length === 0) {
-        // Re-use DatabaseService logic to insert
-        // Note: DatabaseService might need a dedicated insert method that takes Article object
-        // For now, we manually construct the insert query matching DatabaseService pattern
-        await this.databaseService.executeInsert(
-          `INSERT INTO articles (
-            title, content, summary, published_at, rss_source_id, source_name, 
-            url, image_url, author, category, word_count, reading_time, difficulty
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
+      for (const r of rows) {
+        if (r?.url) existingUrls.add(String(r.url));
+      }
+    }
+
+    const toInsert = uniqueArticles.filter(a => a?.url && !existingUrls.has(a.url));
+    const insertedArticles = toInsert;
+    let insertedCount = 0;
+
+    const batchSize = 40;
+    await this.databaseService.beginTransaction();
+    try {
+      for (let i = 0; i < toInsert.length; i += batchSize) {
+        const batch = toInsert.slice(i, i + batchSize);
+        if (batch.length === 0) continue;
+
+        const valuesSql = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+        const sql = `INSERT OR IGNORE INTO articles (
+          title, content, summary, published_at, rss_source_id, source_name,
+          url, image_url, author, category, word_count, reading_time, difficulty
+        ) VALUES ${valuesSql}`;
+
+        const params: any[] = [];
+        for (const article of batch) {
+          params.push(
             article.title,
             article.content,
             article.summary,
@@ -479,44 +492,23 @@ export class CloudSyncService implements IRSSProvider {
             article.wordCount,
             article.readingTime,
             article.difficulty
-          ]
-        );
-        insertedCount += 1;
-        insertedArticles.push(article);
-      } else {
-        // Update existing article content to ensure we get the latest version (e.g. with proxied images)
-        // We preserve user states (is_read, is_favorite, etc.)
-        await this.databaseService.executeQuery(
-          `UPDATE articles SET 
-            content = ?, 
-            summary = ?, 
-            image_url = ?,
-            word_count = ?,
-            reading_time = ?
-           WHERE url = ?`,
-          [
-            article.content,
-            article.summary,
-            article.imageUrl,
-            article.wordCount,
-            article.readingTime,
-            article.url
-          ]
-        );
-        updatedCount += 1;
-      }
-    }
+          );
+        }
 
-    // Refresh stats for affected sources after sync
-    for (const sourceId of affectedSourceIds) {
-      await this.updateSourceStats(sourceId);
+        const result = await this.databaseService.executeInsert(sql, params);
+        insertedCount += result.changes || 0;
+      }
+      await this.databaseService.commitTransaction();
+    } catch (e) {
+      await this.databaseService.rollbackTransaction();
+      throw e;
     }
 
     return {
       insertedArticles,
       insertedCount,
-      updatedCount,
-      upsertedCount: insertedCount + updatedCount,
+      updatedCount: 0,
+      upsertedCount: insertedCount,
     };
   }
 
