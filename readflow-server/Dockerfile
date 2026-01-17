@@ -45,6 +45,16 @@ COPY --from=builder /app/prisma ./prisma
 # 创建数据目录
 RUN mkdir -p data public/cache
 
+ARG SERVER_VERSION
+ARG SERVER_BUILD
+ARG SERVER_BUILD_TIME
+ARG SERVER_CHANGELOG
+
+ENV SERVER_VERSION=${SERVER_VERSION}
+ENV SERVER_BUILD=${SERVER_BUILD}
+ENV SERVER_BUILD_TIME=${SERVER_BUILD_TIME}
+ENV SERVER_CHANGELOG=${SERVER_CHANGELOG}
+
 EXPOSE 3000
 
 CMD ["/bin/sh", "-c", "npx prisma migrate deploy && npm start"]

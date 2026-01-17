@@ -106,6 +106,62 @@ async function main() {
     const data = await res.json();
     console.log('Status:', res.status);
     console.log('Data:', JSON.stringify(data, null, 2));
+
+    const feedUrl = data?.feeds?.[0]?.url;
+    if (!feedUrl) {
+      console.log('No feeds found. Skipping sync tests.');
+      return;
+    }
+
+    console.log('\n--- Testing GET /api/rss/sync (mode=serverCursor) ---');
+    const sync1 = await fetch(`${API_URL}/rss/sync?url=${encodeURIComponent(feedUrl)}&mode=serverCursor&since=0`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    const sync1Data = await sync1.json();
+    console.log('Status:', sync1.status);
+    console.log('Data:', JSON.stringify({
+      deliveryId: sync1Data?.deliveryId,
+      since: sync1Data?.since,
+      latest: sync1Data?.latest,
+      hasMore: sync1Data?.hasMore,
+      upserts: Array.isArray(sync1Data?.blocks) && sync1Data.blocks[0]?.upserts ? sync1Data.blocks[0].upserts.length : 0,
+    }, null, 2));
+
+    const deliveryId = sync1Data?.deliveryId;
+    if (deliveryId) {
+      console.log('\n--- Testing POST /api/rss/syncAck ---');
+      const ack = await fetch(`${API_URL}/rss/syncAck`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deliveryId }),
+      });
+      const ackData = await ack.json();
+      console.log('Status:', ack.status);
+      console.log('Data:', JSON.stringify(ackData, null, 2));
+
+      console.log('\n--- Testing GET /api/rss/sync again (after ACK) ---');
+      const sync2 = await fetch(`${API_URL}/rss/sync?url=${encodeURIComponent(feedUrl)}&mode=serverCursor&since=0`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      const sync2Data = await sync2.json();
+      console.log('Status:', sync2.status);
+      console.log('Data:', JSON.stringify({
+        deliveryId: sync2Data?.deliveryId,
+        since: sync2Data?.since,
+        latest: sync2Data?.latest,
+        hasMore: sync2Data?.hasMore,
+        upserts: Array.isArray(sync2Data?.blocks) && sync2Data.blocks[0]?.upserts ? sync2Data.blocks[0].upserts.length : 0,
+      }, null, 2));
+    }
   } catch (err) {
     console.error('Failed to fetch profile:', err);
   }

@@ -31,6 +31,8 @@ model User {
   // Relations
   feeds         UserFeed[]
   articleStates UserArticleState[]
+  sourceCursors UserSourceCursor[]
+  syncDeliveries SyncDelivery[]
 
   @@map("users")
 }
@@ -55,6 +57,8 @@ model RSSSource {
   // Relations
   articles    Article[]
   users       UserFeed[]
+  userCursors UserSourceCursor[]
+  syncDeliveries SyncDelivery[]
 
   @@map("rss_sources")
 }
@@ -120,6 +124,36 @@ model UserArticleState {
 
   @@unique([userId, articleId])
   @@map("user_article_states")
+}
+
+model UserSourceCursor {
+  userId             String
+  sourceId           Int
+  lastAckedArticleId Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user   User      @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  source RSSSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sourceId])
+  @@map("user_source_cursors")
+}
+
+model SyncDelivery {
+  id              String   @id @default(uuid())
+  userId          String
+  sourceId        Int
+  fromExclusiveId Int
+  toInclusiveId   Int
+  createdAt       DateTime @default(now())
+  ackedAt         DateTime?
+
+  user   User      @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  source RSSSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sourceId, ackedAt])
+  @@map("sync_deliveries")
 }
 
 model Vocabulary {

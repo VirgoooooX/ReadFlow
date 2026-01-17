@@ -205,10 +205,35 @@
                 </div>
             </div>
             
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-4 relative">
                 <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border border-emerald-100 text-xs font-medium shadow-sm">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
                     <span id="header-status">系统正常</span>
+                </div>
+
+                <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-white/60 backdrop-blur-sm text-slate-700 border border-white/80 text-xs font-medium shadow-sm" id="server-meta-badge">
+                    <i class="fa-solid fa-server mr-2 text-slate-500"></i>
+                    <span id="server-meta-text">Server</span>
+                    <button id="server-changelog-toggle" class="ml-2 px-2 py-0.5 rounded-full bg-slate-100/80 hover:bg-slate-200/80 text-slate-600 transition">更新</button>
+                </div>
+
+                <div id="server-changelog-panel" class="hidden absolute right-0 top-12 w-96 max-w-[90vw] glass-card rounded-2xl overflow-hidden shadow-xl">
+                    <div class="px-5 py-4 border-b border-slate-100/50 flex items-center justify-between bg-white/40">
+                        <div class="flex items-center">
+                            <i class="fa-solid fa-circle-info text-blue-500 mr-2"></i>
+                            <div>
+                                <div class="font-bold text-slate-800">服务端版本</div>
+                                <div class="text-xs text-slate-500" id="server-meta-subtitle"></div>
+                            </div>
+                        </div>
+                        <button id="server-changelog-close" class="p-2 text-slate-400 hover:text-slate-600 transition">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="p-5">
+                        <ul id="server-changelog-list" class="space-y-2 text-sm text-slate-700"></ul>
+                        <div id="server-changelog-empty" class="text-sm text-slate-500 hidden">暂无更新日志</div>
+                    </div>
                 </div>
                 
                 <button class="relative p-2 text-slate-400 hover:text-slate-600 transition">
@@ -845,7 +870,75 @@
                 }
             });
         }
+
+        loadServerMeta().catch(() => {});
     });
+
+    async function loadServerMeta() {
+        const badge = document.getElementById('server-meta-badge');
+        const text = document.getElementById('server-meta-text');
+        const subtitle = document.getElementById('server-meta-subtitle');
+        const list = document.getElementById('server-changelog-list');
+        const empty = document.getElementById('server-changelog-empty');
+        const toggle = document.getElementById('server-changelog-toggle');
+        const panel = document.getElementById('server-changelog-panel');
+        const closeBtn = document.getElementById('server-changelog-close');
+
+        if (!badge || !text || !subtitle || !list || !empty || !toggle || !panel || !closeBtn) return;
+
+        const res = await originalFetch('/api/meta', { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const meta = await res.json();
+        const server = meta && meta.server ? meta.server : {};
+        const version = typeof server.version === 'string' ? server.version : (typeof meta.version === 'string' ? meta.version : '');
+        const build = typeof server.build === 'string' ? server.build : '';
+        const builtAt = typeof server.builtAt === 'string' ? server.builtAt : '';
+        const changelog = Array.isArray(server.changelog) ? server.changelog.filter(v => typeof v === 'string' && v.trim()) : [];
+
+        const titleParts = [];
+        if (version) titleParts.push(`v${version}`);
+        if (build) titleParts.push(`#${build}`);
+        text.textContent = titleParts.length > 0 ? titleParts.join(' ') : 'Server';
+
+        const subtitleParts = [];
+        if (builtAt) subtitleParts.push(`构建时间：${builtAt}`);
+        if (build && !subtitleParts.length) subtitleParts.push(`构建号：${build}`);
+        subtitle.textContent = subtitleParts.join(' ');
+
+        list.innerHTML = '';
+        if (changelog.length > 0) {
+            empty.classList.add('hidden');
+            for (const item of changelog) {
+                const li = document.createElement('li');
+                li.className = 'flex items-start';
+                li.innerHTML = `<span class="mt-1 mr-2 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span><span>${escapeHtml(item)}</span>`;
+                list.appendChild(li);
+            }
+            toggle.classList.remove('hidden');
+        } else {
+            empty.classList.remove('hidden');
+            toggle.classList.add('hidden');
+        }
+
+        const show = () => panel.classList.remove('hidden');
+        const hide = () => panel.classList.add('hidden');
+        toggle.onclick = (e) => { e.preventDefault(); e.stopPropagation(); panel.classList.contains('hidden') ? show() : hide(); };
+        closeBtn.onclick = (e) => { e.preventDefault(); hide(); };
+
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+            if (panel.classList.contains('hidden')) return;
+            if (panel.contains(target) || toggle.contains(target)) return;
+            hide();
+        });
+    }
+
+    function escapeHtml(input) {
+        const div = document.createElement('div');
+        div.textContent = String(input);
+        return div.innerHTML;
+    }
 
     const ARTICLES_PAGE_SIZE = 50;
     const articlesState = {

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import rssRoutes from './routes/rss';
 import vocabRoutes from './routes/vocabulary';
@@ -49,6 +50,48 @@ app.use((req, res, next) => {
 
 // Meta Endpoint (Public) - For client capability detection
 app.get('/api/meta', (req, res) => {
+  let pkg: any = null;
+  try {
+    const pkgPath = path.join(__dirname, '../package.json');
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  } catch {
+    pkg = null;
+  }
+
+  const envVersion =
+    (process.env.SERVER_VERSION || process.env.APP_VERSION || process.env.VERSION || '').trim();
+  const envBuild =
+    (process.env.SERVER_BUILD || process.env.BUILD_NUMBER || process.env.BUILD_ID || '').trim();
+  const envBuiltAt =
+    (process.env.SERVER_BUILD_TIME || process.env.BUILD_TIME || process.env.BUILT_AT || '').trim();
+  const envChangelogRaw =
+    (process.env.SERVER_CHANGELOG || process.env.CHANGELOG || '').trim();
+
+  let changelog: string[] = [];
+  if (envChangelogRaw) {
+    try {
+      const parsed = JSON.parse(envChangelogRaw);
+      if (Array.isArray(parsed)) {
+        changelog = parsed.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim());
+      }
+    } catch {
+      changelog = envChangelogRaw
+        .split('\n')
+        .map((v: string) => v.trim())
+        .filter(Boolean);
+    }
+  } else if (pkg && Array.isArray(pkg.changelog)) {
+    changelog = pkg.changelog.filter((v: any) => typeof v === 'string' && v.trim()).map((v: string) => v.trim());
+  }
+
+  const serverInfo = {
+    name: typeof pkg?.name === 'string' ? pkg.name : 'readflow-server',
+    version: envVersion || (typeof pkg?.version === 'string' ? pkg.version : 'unknown'),
+    build: envBuild || null,
+    builtAt: envBuiltAt || null,
+    changelog,
+  };
+
   const serverToken = process.env.SERVER_TOKEN;
   const requiresServerAccessKey = !!serverToken;
   let accessKeyValid: boolean | undefined = undefined;
@@ -60,7 +103,8 @@ app.get('/api/meta', (req, res) => {
 
   res.json({
     ok: true,
-    version: '1.0.0',
+    version: serverInfo.version,
+    server: serverInfo,
     requiresServerAccessKey,
     accessKeyValid,
   });

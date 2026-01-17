@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -40,5 +40,24 @@
     "@types/node-fetch": "^2.6.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
-  }
+  },
+  "changelog": [
+    "feat(数据库): 添加文章URL唯一索引并优化同步性能",
+    "refactor(RSSUtils): 移除未使用的图片代理URL修复功能并改进懒加载属性匹配",
+    "fix(rss): 修复图片代理URL处理逻辑",
+    "feat: 升级应用版本至6.5.0并优化图片处理逻辑",
+    "feat(rss): 添加全文本抓取速率限制和特定网站内容提取",
+    "feat(RSS解析): 为RSS解析服务添加请求限流和特殊站点处理逻辑",
+    "feat(rss): 添加基于cron表达式的定时刷新功能",
+    "perf(rss): 优化RSS相关性能并添加文档说明",
+    "feat(LLM): 实现多档案管理和功能绑定功能",
+    "feat: 添加RSS源停用检查并更新版本至6.2.0",
+    "feat: 优化云同步配置指纹检测及文章清理功能",
+    "feat: 优化图片代理策略并修复懒加载图片问题",
+    "fix(StorageService): 修正文章字数统计和阅读时间的映射",
+    "feat: 实现词汇表功能并优化图片代理策略",
+    "feat: 增强图片代理功能并添加同步设置",
+    "feat(注册流程): 实现注册后自动登录功能",
+    "refactor: 重命名项目从 TechFlow 到 ReadFlow 并重构服务端架构"
+  ]
 }

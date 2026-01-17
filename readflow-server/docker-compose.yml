@@ -1,7 +1,13 @@
 services:
   readflow-server:
     image: virgoooox/readflowserver:latest
-    build: .
+    build:
+      context: .
+      args:
+        SERVER_VERSION: ${SERVER_VERSION:-}
+        SERVER_BUILD: ${SERVER_BUILD:-}
+        SERVER_BUILD_TIME: ${SERVER_BUILD_TIME:-}
+        SERVER_CHANGELOG: ${SERVER_CHANGELOG:-}
     container_name: readflow-server
     restart: unless-stopped
     ports:

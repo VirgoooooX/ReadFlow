@@ -674,6 +674,20 @@ export class StorageService {
         where: { sourceId: source.id, id: { gt: latestId } },
         select: { id: true },
       }));
+    logger.request(
+      '[RSS Sync] blocks',
+      JSON.stringify({
+        sourceUrl: sourceUrl,
+        normalizedUrl,
+        sourceId: source.id,
+        since,
+        limit,
+        raw: rawArticles.length,
+        deduped: deduped.length,
+        latestId,
+        hasMore,
+      })
+    );
     
     // Wrap as a single block
     const block: StoredSyncBlock = {
@@ -706,6 +720,154 @@ export class StorageService {
       blocks: [block],
       hasMore,
     };
+  }
+
+  public async getSyncDeliveryForSourceUser(userId: string, sourceUrl: string, maxBlocks: number) {
+    const normalizedUrl = this.normalizeUrl(sourceUrl);
+    const source = await prisma.rSSSource.findUnique({ where: { url: normalizedUrl } });
+    const limit = Number.isFinite(maxBlocks) && maxBlocks > 0 ? maxBlocks : 50;
+
+    if (!source) {
+      return { deliveryId: null, since: 0, latest: 0, blocks: [], hasMore: false };
+    }
+
+    const cursorRow = await prisma.userSourceCursor.findUnique({
+      where: { userId_sourceId: { userId, sourceId: source.id } },
+      select: { lastAckedArticleId: true },
+    });
+    const since = cursorRow?.lastAckedArticleId ?? 0;
+
+    const rawArticles = await prisma.article.findMany({
+      where: {
+        sourceId: source.id,
+        id: { gt: since },
+      },
+      orderBy: { id: 'asc' },
+      take: limit * 3,
+    });
+
+    if (rawArticles.length === 0) {
+      return { deliveryId: null, since, latest: since, blocks: [], hasMore: false };
+    }
+
+    const deduped: any[] = [];
+    const seen = new Set<string>();
+    for (const a of rawArticles) {
+      const suffixes = this.buildArticleDedupSuffixes(a.url);
+      const key = suffixes[0] || a.url;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(a);
+      if (deduped.length >= limit) break;
+    }
+
+    if (deduped.length === 0) {
+      return { deliveryId: null, since, latest: since, blocks: [], hasMore: false };
+    }
+
+    const latestId = deduped[deduped.length - 1].id;
+    const hasMore =
+      !!(await prisma.article.findFirst({
+        where: { sourceId: source.id, id: { gt: latestId } },
+        select: { id: true },
+      }));
+
+    const delivery = await prisma.syncDelivery.create({
+      data: {
+        userId,
+        sourceId: source.id,
+        fromExclusiveId: since,
+        toInclusiveId: latestId,
+      },
+      select: { id: true },
+    });
+
+    logger.request(
+      '[RSS Sync] delivery',
+      JSON.stringify({
+        userId,
+        sourceUrl,
+        normalizedUrl,
+        sourceId: source.id,
+        since,
+        limit,
+        raw: rawArticles.length,
+        deduped: deduped.length,
+        latestId,
+        hasMore,
+        deliveryId: delivery.id,
+      })
+    );
+
+    const block: StoredSyncBlock = {
+      id: latestId,
+      sourceUrl: normalizedUrl,
+      createdAt: new Date().toISOString(),
+      upserts: deduped.map((a: any) => ({
+        title: a.title,
+        content: a.content,
+        summary: a.summary || '',
+        url: a.url,
+        publishedAt: a.publishedAt,
+        author: a.author || undefined,
+        imageUrl: a.imageUrl || undefined,
+        sourceId: source.id,
+        sourceName: source.name,
+        wordCount: (a as any).wordCount || 0,
+        readingTime: (a as any).readingTime || 0,
+        difficulty: 'intermediate',
+        isRead: false,
+        isFavorite: false,
+        readProgress: 0,
+        tags: [],
+        category: source.category,
+      })),
+    };
+
+    return {
+      deliveryId: delivery.id,
+      since,
+      latest: latestId,
+      blocks: [block],
+      hasMore,
+    };
+  }
+
+  public async ackSyncDelivery(userId: string, deliveryId: string) {
+    const now = new Date();
+    const result = await prisma.$transaction(async (tx) => {
+      const delivery = await tx.syncDelivery.findFirst({
+        where: { id: deliveryId, userId },
+        select: { id: true, sourceId: true, toInclusiveId: true, ackedAt: true },
+      });
+      if (!delivery) {
+        return { ok: false, advancedTo: null as number | null };
+      }
+      if (delivery.ackedAt) {
+        return { ok: true, advancedTo: delivery.toInclusiveId };
+      }
+
+      const existing = await tx.userSourceCursor.findUnique({
+        where: { userId_sourceId: { userId, sourceId: delivery.sourceId } },
+        select: { lastAckedArticleId: true },
+      });
+      const next = Math.max(existing?.lastAckedArticleId ?? 0, delivery.toInclusiveId);
+
+      await tx.userSourceCursor.upsert({
+        where: { userId_sourceId: { userId, sourceId: delivery.sourceId } },
+        update: { lastAckedArticleId: next },
+        create: { userId, sourceId: delivery.sourceId, lastAckedArticleId: next },
+      });
+      await tx.syncDelivery.update({
+        where: { id: delivery.id },
+        data: { ackedAt: now },
+      });
+
+      return { ok: true, advancedTo: next };
+    });
+
+    logger.request('[RSS Sync] ack', JSON.stringify({ userId, deliveryId, ...result }));
+    return result;
   }
 
   // User Article States
@@ -1177,4 +1339,3 @@ export class StorageService {
 }
 
 export const storageService = StorageService.getInstance();
-

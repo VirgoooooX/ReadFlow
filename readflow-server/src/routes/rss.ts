@@ -12,6 +12,8 @@ const router = express.Router();
 let refreshTimer: NodeJS.Timeout | null = null;
 let refreshRunning = false;
 const refreshingFeedIds = new Set<string>();
+const syncModeCounters = { serverCursor: 0, legacy: 0 };
+let lastSyncModeLogAt = 0;
 
 function redactForLog(input: any, depth: number = 0): any {
   if (depth > 8) return '[Truncated]';
@@ -297,6 +299,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/sync', async (req: Request, res: Response) => {
   try {
     const url = req.query.url as string;
+    const mode = String(req.query.mode || '');
     const since = req.query.since ? parseInt(req.query.since as string) : 0;
     const maxBlocks = req.query.maxBlocks ? parseInt(req.query.maxBlocks as string) : 20;
     const limitRaw = req.query.limit ? parseInt(req.query.limit as string) : undefined;
@@ -317,10 +320,107 @@ router.get('/sync', async (req: Request, res: Response) => {
       1,
       Math.min(Number.isFinite(limitRaw as number) ? (limitRaw as number) : defaultLimit, effectiveMax)
     );
-    const { latest, blocks, hasMore } = await storageService.getSyncBlocksForSource(
-      url,
-      Number.isFinite(since) ? since : 0,
-      effectiveLimit
+    logger.request(
+      '[RSS Sync] request',
+      safeJsonForLog({
+        url,
+        mode,
+        since,
+        maxBlocks,
+        limitRaw,
+        effectiveLimit,
+        imageCompression,
+      })
+    );
+
+    if (mode === 'serverCursor') {
+      syncModeCounters.serverCursor += 1;
+      {
+        const total = syncModeCounters.serverCursor + syncModeCounters.legacy;
+        const now = Date.now();
+        if ((total > 0 && total % 50 === 0) || now - lastSyncModeLogAt > 10 * 60 * 1000) {
+          lastSyncModeLogAt = now;
+          logger.system(
+            '[RSS Sync] mode stats',
+            safeJsonForLog({
+              total,
+              serverCursor: syncModeCounters.serverCursor,
+              legacy: syncModeCounters.legacy,
+              serverCursorRatio: total > 0 ? syncModeCounters.serverCursor / total : 0,
+            })
+          );
+        }
+      }
+      const userId = String((req as any)?.user?.id || '');
+      if (!userId || userId === 'admin') {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { deliveryId, since: cursorSince, latest, blocks, hasMore } =
+        await storageService.getSyncDeliveryForSourceUser(userId, url, effectiveLimit);
+      const totalUpserts = blocks.reduce((acc, b) => acc + (Array.isArray(b.upserts) ? b.upserts.length : 0), 0);
+      logger.request(
+        '[RSS Sync] response',
+        safeJsonForLog({
+          url,
+          mode,
+          userId,
+          since: cursorSince,
+          latest,
+          hasMore,
+          blocks: blocks.length,
+          upserts: totalUpserts,
+          deliveryId,
+        })
+      );
+
+      const mappedBlocks = blocks.map(b => ({
+        id: b.id,
+        createdAt: b.createdAt,
+        upserts: b.upserts.map(a => applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
+      }));
+
+      return res.json({
+        sourceUrl: url,
+        mode,
+        deliveryId,
+        since: cursorSince,
+        latest,
+        blocks: mappedBlocks,
+        hasMore,
+      });
+    }
+
+    syncModeCounters.legacy += 1;
+    {
+      const total = syncModeCounters.serverCursor + syncModeCounters.legacy;
+      const now = Date.now();
+      if ((total > 0 && total % 50 === 0) || now - lastSyncModeLogAt > 10 * 60 * 1000) {
+        lastSyncModeLogAt = now;
+        logger.system(
+          '[RSS Sync] mode stats',
+          safeJsonForLog({
+            total,
+            serverCursor: syncModeCounters.serverCursor,
+            legacy: syncModeCounters.legacy,
+            serverCursorRatio: total > 0 ? syncModeCounters.serverCursor / total : 0,
+          })
+        );
+      }
+    }
+    const { latest, blocks, hasMore } = await storageService.getSyncBlocksForSource(url, Number.isFinite(since) ? since : 0, effectiveLimit);
+    const totalUpserts = blocks.reduce((acc, b) => acc + (Array.isArray(b.upserts) ? b.upserts.length : 0), 0);
+    logger.request(
+      '[RSS Sync] response',
+      safeJsonForLog({
+        url,
+        mode,
+        since,
+        latest,
+        hasMore,
+        blocks: blocks.length,
+        upserts: totalUpserts,
+      })
     );
 
     const mappedBlocks = blocks.map(b => ({
@@ -331,10 +431,33 @@ router.get('/sync', async (req: Request, res: Response) => {
 
     res.json({
       sourceUrl: url,
+      mode,
       latest,
       blocks: mappedBlocks,
       hasMore,
     });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+router.post('/syncAck', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any)?.user?.id || '');
+    if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const deliveryId = String(req.body?.deliveryId || '');
+    if (!deliveryId) {
+      return res.status(400).json({ error: 'deliveryId is required' });
+    }
+
+    const result = await storageService.ackSyncDelivery(userId, deliveryId);
+    if (!result.ok) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+    res.json({ ok: true, deliveryId, advancedTo: result.advancedTo });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
