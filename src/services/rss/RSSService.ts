@@ -334,11 +334,9 @@ export class RSSService {
     logger.info(`[fetchArticlesFromSource] Checking sync mode. Enabled: ${cloudConfig.mode === 'cloud'}, URL: ${cloudConfig.serverUrl}`);
     
     if (cloudConfig.mode === 'cloud' && cloudConfig.serverUrl) {
-      logger.info(`[fetchArticlesFromSource] ☁️ 云端模式: ${source.name} (Trigger: ${options.mode === 'refresh'})`);
+      logger.info(`[fetchArticlesFromSource] ☁️ 云端模式: ${source.name}`);
       try {
-        // If mode is 'refresh' (manual pull), trigger server refresh
-        const triggerRefresh = options.mode === 'refresh';
-        return await cloudSyncService.fetchArticlesWithStats(source, { triggerRefresh });
+        return await cloudSyncService.fetchArticlesWithStats(source);
       } catch (error) {
         logger.error(`[fetchArticlesFromSource] 云端同步失败，降级到直连模式: ${source.name}`, error);
         // Fallback to local/direct mode
@@ -534,6 +532,87 @@ export class RSSService {
               });
           });
         })
+      )
+    );
+
+    await Promise.all(tasks);
+
+    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
+  }
+
+  public async forceCloudRefreshSources(
+    sourceIds: number[],
+    options: {
+      maxConcurrent?: number;
+      onProgress?: (current: number, total: number, sourceName: string) => void;
+      onError?: (error: Error, sourceName: string) => void;
+      onArticlesReady?: (articles: Article[], sourceName: string) => void;
+    } = {}
+  ): Promise<RefreshSourcesResult> {
+    const { maxConcurrent = 2, onProgress, onError, onArticlesReady } = options;
+
+    if (!Array.isArray(sourceIds) || sourceIds.length === 0) {
+      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
+    }
+
+    const cloudConfig = await cloudConfigService.getConfig();
+    const isCloudMode = cloudConfig.mode === 'cloud' && !!cloudConfig.serverUrl;
+    if (!isCloudMode) {
+      return this.refreshSources(sourceIds, { maxConcurrent, onProgress, onError, onArticlesReady, mode: 'refresh' });
+    }
+
+    const allSources = await this.getActiveRSSSources();
+    const sourcesToRefresh = allSources.filter(s => sourceIds.includes(s.id));
+    if (sourcesToRefresh.length === 0) {
+      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
+    }
+
+    const limiter = this.createLimiter(maxConcurrent);
+
+    let success = 0;
+    let failed = 0;
+    let totalArticles = 0;
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let upsertedCount = 0;
+    const errors: Array<{ source: string; error: string }> = [];
+    let completed = 0;
+    const total = sourcesToRefresh.length;
+
+    const tasks = sourcesToRefresh.map(source =>
+      limiter(
+        () =>
+          new Promise<void>((resolve) => {
+            InteractionManager.runAfterInteractions(() => {
+              cloudSyncService
+                .fetchArticlesWithStats(source, { triggerRefresh: true })
+                .then((result) => {
+                  success++;
+                  totalArticles += result.insertedCount;
+                  insertedCount += result.insertedCount;
+                  updatedCount += result.updatedCount;
+                  upsertedCount += result.upsertedCount;
+                  completed++;
+
+                  if (onArticlesReady && result.articles.length > 0) {
+                    onArticlesReady(result.articles, source.name);
+                  }
+
+                  onProgress?.(completed, total, source.name);
+                  resolve();
+                })
+                .catch((error) => {
+                  failed++;
+                  completed++;
+                  const errorMsg = error?.message || '未知错误';
+                  errors.push({ source: source.name, error: errorMsg });
+
+                  onError?.(error, source.name);
+                  onProgress?.(completed, total, source.name);
+                  resolve();
+                });
+            });
+          })
       )
     );
 

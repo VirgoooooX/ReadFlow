@@ -41,7 +41,7 @@ type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
 const ManageSubscriptionsScreen: React.FC = () => {
   const { theme, isDark } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
-  const { rssSources, refreshRSSSources, syncAllSources, syncSource, syncSources } = useRSSSource();
+  const { rssSources, refreshRSSSources, syncAllSources, syncSource, syncSources, forceRefreshSources } = useRSSSource();
   const { groups, moveSourcesToGroup } = useRSSGroup();
   const { width: screenWidth } = useWindowDimensions();
   const tabContentRef = useRef<CustomTabContentHandle>(null);
@@ -372,7 +372,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
           setIsEditMode(false);
           setSelectedSources(new Set());
           try {
-            await syncSources(sourceIds, (current, total, name) => {
+            await forceRefreshSources(sourceIds, (current, total, name) => {
               logger.info(`[ManageSubscriptions] 进度: ${current}/${total} - ${name}`);
             });
           } catch (e) {

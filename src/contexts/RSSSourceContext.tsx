@@ -16,6 +16,8 @@ interface RSSSourceContextType {
   syncAllSources: (onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
   syncSource: (sourceId: number) => Promise<void>;
   syncSources: (sourceIds: number[], onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
+  forceRefreshSource: (sourceId: number) => Promise<void>;
+  forceRefreshSources: (sourceIds: number[], onProgress?: (current: number, total: number, sourceName: string) => void) => Promise<void>;
   
   // 启动刷新配置
   startupSettings: RSSStartupSettings;
@@ -284,6 +286,43 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     }
   };
 
+  const forceRefreshSources = async (
+    sourceIds: number[],
+    onProgress?: (current: number, total: number, sourceName: string) => void
+  ) => {
+    cacheEventEmitter.batchSyncStart();
+    try {
+      logger.info(`[RSSSourceContext.forceRefreshSources] 🚀 开始强制刷新 ${sourceIds.length} 个 RSS 源`);
+      setIsLoading(true);
+
+      const result = await rssService.forceCloudRefreshSources(sourceIds, { onProgress });
+
+      logger.info(`[RSSSourceContext.forceRefreshSources] ✅ 强制刷新完成，新增文章: ${result.insertedCount}`);
+      await loadRSSSources();
+
+      if (result.insertedCount > 0) {
+        cacheEventEmitter.refreshSources(sourceIds);
+        logger.info('[RSSSourceContext.forceRefreshSources] 📢 触发 refreshSources 事件');
+      } else {
+        logger.info('[RSSSourceContext.forceRefreshSources] 🔕 无新文章，跳过 refreshSources 事件');
+      }
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`已刷新，${result.insertedCount}篇新文章`, ToastAndroid.SHORT);
+      }
+    } catch (error) {
+      console.error('[RSSSourceContext.forceRefreshSources] 💥 强制刷新失败:', error);
+      throw error;
+    } finally {
+      cacheEventEmitter.batchSyncEnd();
+      setIsLoading(false);
+    }
+  };
+
+  const forceRefreshSource = async (sourceId: number) => {
+    await forceRefreshSources([sourceId]);
+  };
+
   const value: RSSSourceContextType = {
     rssSources,
     isLoading,
@@ -294,6 +333,8 @@ export const RSSSourceProvider: React.FC<RSSSourceProviderProps> = ({ children }
     syncAllSources,
     syncSource,
     syncSources,
+    forceRefreshSource,
+    forceRefreshSources,
     startupSettings,
     updateStartupSettings,
     triggerStartupRefresh,
