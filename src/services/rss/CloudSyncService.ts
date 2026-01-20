@@ -11,6 +11,9 @@ import cacheEventEmitter from '../CacheEventEmitter';
 export class CloudSyncService implements IRSSProvider {
   private databaseService = DatabaseService.getInstance();
   private settingsService = SettingsService.getInstance();
+  private stateSyncTimer: NodeJS.Timeout | null = null;
+  private stateSyncInFlight: Promise<void> | null = null;
+  private stateSyncNeedsRunAfter: boolean = false;
 
   private normalizeFeedUrl(url: string): string {
     return String(url || '').trim().replace(/\/$/, '');
@@ -45,6 +48,41 @@ export class CloudSyncService implements IRSSProvider {
       ...(options.headers || {})
     };
     return fetch(url, { ...options, headers });
+  }
+
+  public async scheduleStateSync(delayMs: number = 10000): Promise<void> {
+    this.stateSyncNeedsRunAfter = true;
+    if (this.stateSyncInFlight) return;
+    if (this.stateSyncTimer) return;
+
+    this.stateSyncTimer = setTimeout(() => {
+      this.stateSyncTimer = null;
+      this.runStateSync().catch(err => logger.warn('[CloudSync] Scheduled state sync failed:', err));
+    }, delayMs);
+  }
+
+  private async runStateSync(): Promise<void> {
+    if (this.stateSyncInFlight) {
+      this.stateSyncNeedsRunAfter = true;
+      return this.stateSyncInFlight;
+    }
+
+    const shouldRun = this.stateSyncNeedsRunAfter;
+    this.stateSyncNeedsRunAfter = false;
+    if (!shouldRun) return;
+
+    this.stateSyncInFlight = (async () => {
+      try {
+        await this.syncUserArticleStates();
+      } finally {
+        this.stateSyncInFlight = null;
+        if (this.stateSyncNeedsRunAfter) {
+          await this.scheduleStateSync(1000);
+        }
+      }
+    })();
+
+    return this.stateSyncInFlight;
   }
 
   /**

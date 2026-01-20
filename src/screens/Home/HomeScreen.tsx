@@ -189,10 +189,27 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   const flatListRef = useRef<any>(null);
   const ITEM_HEIGHT = 110;
 
-  // 🌟 中間层优化：传入 isNeighbor 下，得以组件本身接收 props
   const hasTriedLoad = useRef(false);
-  const pendingMarkIdsRef = useRef<Set<number>>(new Set());
-  const markReadTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUiMarkIdsRef = useRef<Set<number>>(new Set());
+  const pendingPersistMarkIdsRef = useRef<Set<number>>(new Set());
+  const markReadUiTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const markReadPersistTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isScrollingRef = useRef(false);
+
+  const flushPersistMarkRead = useCallback(() => {
+    if (markReadPersistTimerRef.current) {
+      clearTimeout(markReadPersistTimerRef.current);
+      markReadPersistTimerRef.current = null;
+    }
+
+    const ids = Array.from(pendingPersistMarkIdsRef.current);
+    pendingPersistMarkIdsRef.current.clear();
+    if (ids.length === 0) return;
+
+    articleService
+      .markManyAsReadQuiet(ids)
+      .catch(err => logger.error('Auto mark read persist failed:', err));
+  }, []);
 
   const onViewableItemsChanged = useCallback(
     ({ changed, viewableItems }: { changed: any[]; viewableItems: any[] }) => {
@@ -201,43 +218,60 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       const firstViewable = viewableItems[0];
       if (!firstViewable) return;
 
-      const pending = pendingMarkIdsRef.current;
-      let hasNew = false;
+      const pendingUi = pendingUiMarkIdsRef.current;
+      const pendingPersist = pendingPersistMarkIdsRef.current;
+      let hasNewUi = false;
+      let hasNewPersist = false;
 
-      changed.forEach((change: any) => {
-        if (!change.isViewable && !change.item.isRead && change.index < firstViewable.index) {
-          const id = change.item.id as number;
-          if (!pending.has(id)) {
-            pending.add(id);
-            hasNew = true;
-          }
+      for (let i = 0; i < changed.length; i++) {
+        const change = changed[i];
+        if (!change || change.isViewable) continue;
+        if (change.index >= firstViewable.index) continue;
+        if (change.item?.isRead) continue;
+
+        const id = change.item.id as number;
+        if (!pendingUi.has(id)) {
+          pendingUi.add(id);
+          hasNewUi = true;
         }
-      });
-
-      if (!hasNew) return;
-
-      if (markReadTimerRef.current) {
-        clearTimeout(markReadTimerRef.current);
+        if (!pendingPersist.has(id)) {
+          pendingPersist.add(id);
+          hasNewPersist = true;
+        }
       }
 
-      markReadTimerRef.current = setTimeout(() => {
-        const ids = Array.from(pendingMarkIdsRef.current);
-        pendingMarkIdsRef.current.clear();
-        markReadTimerRef.current = null;
+      if (!hasNewUi && !hasNewPersist) return;
 
-        if (ids.length === 0) return;
+      if (hasNewUi) {
+        if (markReadUiTimerRef.current) {
+          clearTimeout(markReadUiTimerRef.current);
+        }
 
-        articleService.markManyAsRead(ids).catch(err => logger.error('Auto mark read failed:', err));
+        markReadUiTimerRef.current = setTimeout(() => {
+          const ids = Array.from(pendingUiMarkIdsRef.current);
+          pendingUiMarkIdsRef.current.clear();
+          markReadUiTimerRef.current = null;
 
-        onMarkRead(ids);
-      }, 120);
+          if (ids.length === 0) return;
+          onMarkRead(ids);
+        }, 120);
+      }
+
+      if (hasNewPersist && !isScrollingRef.current) {
+        if (markReadPersistTimerRef.current) {
+          clearTimeout(markReadPersistTimerRef.current);
+        }
+        markReadPersistTimerRef.current = setTimeout(() => {
+          flushPersistMarkRead();
+        }, 600);
+      }
     },
-    [autoMarkReadOnScroll, onMarkRead]
+    [autoMarkReadOnScroll, onMarkRead, flushPersistMarkRead]
   );
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 0, // 完全移出视口才触发
-    minimumViewTime: 100, // 停留一小会儿才算（防止快速滑动误触，可选）
+    itemVisiblePercentThreshold: 40,
+    minimumViewTime: 300,
   }).current;
 
   // 【简化】直接滚动到指定文章，不做任何检查
@@ -251,6 +285,22 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       flatListRef.current.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
     }
   }), [articles]);
+
+  useEffect(() => {
+    return () => {
+      if (markReadUiTimerRef.current) {
+        clearTimeout(markReadUiTimerRef.current);
+        markReadUiTimerRef.current = null;
+      }
+      if (markReadPersistTimerRef.current) {
+        clearTimeout(markReadPersistTimerRef.current);
+        markReadPersistTimerRef.current = null;
+      }
+      if (pendingPersistMarkIdsRef.current.size > 0) {
+        flushPersistMarkRead();
+      }
+    };
+  }, [flushPersistMarkRead]);
 
   // 【删除】不再需要 onViewableItemsChanged 和 handleScroll
   // -> 恢复用于 autoMarkReadOnScroll
@@ -270,6 +320,17 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       showsVerticalScrollIndicator={false}
       onViewableItemsChanged={onViewableItemsChanged}
       viewabilityConfig={viewabilityConfig}
+      onMomentumScrollBegin={() => {
+        isScrollingRef.current = true;
+      }}
+      onMomentumScrollEnd={() => {
+        isScrollingRef.current = false;
+        flushPersistMarkRead();
+      }}
+      onScrollEndDrag={() => {
+        if (isScrollingRef.current) return;
+        flushPersistMarkRead();
+      }}
       onScrollToIndexFailed={(info: any) => {
         // 处理滚动失败的情况
         setTimeout(() => {

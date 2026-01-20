@@ -7,6 +7,8 @@ import { logger } from './rss/RSSUtils';
 export class ArticleService {
   private static instance: ArticleService;
   private databaseService: DatabaseService;
+  private pendingSourceStatsIds: Set<number> = new Set();
+  private sourceStatsTimer: NodeJS.Timeout | null = null;
 
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
@@ -253,8 +255,7 @@ export class ArticleService {
           await this.updateSourceStats(article.sourceId, { reason: 'markRead' });
         }
         
-        // 🔥 Trigger cloud sync (fire and forget)
-        cloudSyncService.syncUserArticleStates().catch(e => logger.warn('[ArticleService] Cloud sync failed:', e));
+        cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
       }
     } catch (error) {
       logger.error('Error marking article as read:', error);
@@ -304,9 +305,49 @@ export class ArticleService {
         await this.updateSourceStats(sourceId, { reason: 'markRead' });
       }
 
-      cloudSyncService.syncUserArticleStates().catch(e => logger.warn('[ArticleService] Cloud sync failed:', e));
+      cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
     } catch (error) {
       logger.error('Error marking many articles as read:', error);
+    }
+  }
+
+  public async markManyAsReadQuiet(ids: number[], progress: number = 100): Promise<void> {
+    try {
+      if (!ids || ids.length === 0) return;
+
+      await this.databaseService.initializeDatabase();
+
+      const now = new Date().toISOString();
+      const placeholders = ids.map(() => '?').join(',');
+
+      await this.databaseService.executeStatement(
+        `UPDATE articles SET is_read = 1, read_progress = ?, read_at = ? WHERE id IN (${placeholders})`,
+        [progress, now, ...ids]
+      );
+
+      const rows = await this.databaseService
+        .executeQuery(
+          `SELECT DISTINCT rss_source_id as sourceId FROM articles WHERE id IN (${placeholders})`,
+          ids
+        )
+        .catch(() => []);
+
+      const affectedSourceIds: number[] = [];
+      for (const row of rows) {
+        const sourceIdRaw = (row as any).sourceId;
+        const sourceId = sourceIdRaw === null || sourceIdRaw === undefined ? null : Number(sourceIdRaw);
+        if (sourceId !== null && !Number.isNaN(sourceId)) {
+          affectedSourceIds.push(sourceId);
+        }
+      }
+
+      if (affectedSourceIds.length > 0) {
+        this.scheduleSourceStatsUpdate(affectedSourceIds);
+      }
+
+      cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
+    } catch (error) {
+      logger.error('Error marking many articles as read (quiet):', error);
     }
   }
 
@@ -366,6 +407,60 @@ export class ArticleService {
     }
   }
 
+  private scheduleSourceStatsUpdate(sourceIds: number[]): void {
+    for (const sourceId of sourceIds) {
+      this.pendingSourceStatsIds.add(sourceId);
+    }
+
+    if (this.sourceStatsTimer) return;
+
+    this.sourceStatsTimer = setTimeout(() => {
+      this.flushSourceStatsUpdate().catch(err => logger.error('[ArticleService] Flush source stats failed:', err));
+    }, 800);
+  }
+
+  private async flushSourceStatsUpdate(): Promise<void> {
+    if (this.sourceStatsTimer) {
+      clearTimeout(this.sourceStatsTimer);
+      this.sourceStatsTimer = null;
+    }
+
+    const sourceIds = Array.from(this.pendingSourceStatsIds);
+    this.pendingSourceStatsIds.clear();
+    if (sourceIds.length === 0) return;
+
+    await this.databaseService.initializeDatabase();
+
+    const placeholders = sourceIds.map(() => '?').join(',');
+    const counts = await this.databaseService
+      .executeQuery(
+        `SELECT rss_source_id as sourceId, COUNT(*) as count
+         FROM articles
+         WHERE rss_source_id IN (${placeholders}) AND is_read = 0
+         GROUP BY rss_source_id`,
+        sourceIds
+      )
+      .catch(() => []);
+
+    const countMap = new Map<number, number>();
+    for (const row of counts) {
+      const sourceId = Number((row as any).sourceId);
+      const count = Number((row as any).count);
+      if (!Number.isNaN(sourceId)) {
+        countMap.set(sourceId, Number.isNaN(count) ? 0 : count);
+      }
+    }
+
+    for (const sourceId of sourceIds) {
+      await this.databaseService.executeStatement(
+        'UPDATE rss_sources SET unread_count = ? WHERE id = ?',
+        [countMap.get(sourceId) ?? 0, sourceId]
+      );
+    }
+
+    cacheEventEmitter.emit({ type: 'updateRSSStats', reason: 'markRead', sourceIds });
+  }
+
   /**
    * 标记文章为未读
    */
@@ -405,8 +500,7 @@ export class ArticleService {
         [newFavoriteStatus ? 1 : 0, id]
       );
 
-      // 🔥 Trigger cloud sync (fire and forget)
-      cloudSyncService.syncUserArticleStates().catch(e => logger.warn('[ArticleService] Cloud sync failed:', e));
+      cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
 
       return newFavoriteStatus;
     } catch (error) {

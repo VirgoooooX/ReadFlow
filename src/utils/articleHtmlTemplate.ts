@@ -302,7 +302,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     }
     
     /* 多媒体组件优化 (Video, Audio, Iframe) */
-    .video-container, audio, iframe {
+    .video-container, .embed-container, audio, iframe {
       position: relative;
       width: 100%;
       max-width: 100%;
@@ -349,6 +349,57 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     iframe {
       aspect-ratio: 16 / 9; /* 默认 16:9 比例，适合视频嵌入 */
       border: none;
+    }
+
+    .embed-container iframe {
+      width: 100%;
+      height: 100%;
+      display: block;
+      margin: 0;
+      border: none;
+    }
+
+    .media-cover {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(0,0,0,0.55), rgba(0,0,0,0.25));
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .media-cover img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      opacity: 0.85;
+    }
+
+    .media-cover-button {
+      position: relative;
+      width: 56px;
+      height: 56px;
+      border-radius: 28px;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 24px;
+      line-height: 1;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+      backdrop-filter: blur(6px);
     }
     
     /* 独立 video 标签样式（如果没有被脚本包裹） */
@@ -878,6 +929,24 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
         
         // 记录当前正在播放的视频
         let currentPlayingVideo = null;
+
+        function ensureCover(container) {
+          for (let i = 0; i < container.children.length; i++) {
+            const child = container.children[i];
+            if (child && child.classList && child.classList.contains('media-cover')) {
+              return child;
+            }
+          }
+          let cover = null;
+          cover = document.createElement('div');
+          cover.className = 'media-cover';
+          const button = document.createElement('div');
+          button.className = 'media-cover-button';
+          button.textContent = '▶';
+          cover.appendChild(button);
+          container.appendChild(cover);
+          return cover;
+        }
         
         videos.forEach(function(video) {
           // 1. 如果视频还没有被包裹，创建容器
@@ -887,15 +956,69 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
             video.parentNode.insertBefore(container, video);
             container.appendChild(video);
           }
+
+          const container = video.parentElement;
           
           // 2. 设置视频属性
           video.setAttribute('playsinline', 'true');
           video.setAttribute('webkit-playsinline', 'true');
           video.setAttribute('preload', 'metadata');
+          if (!video.hasAttribute('controls')) {
+            video.setAttribute('controls', 'true');
+          }
+
+          if (!video.getAttribute('poster') && !video.dataset.firstFramePrepared) {
+            video.dataset.firstFramePrepared = '1';
+            const cover = ensureCover(container);
+
+            const prepareFirstFrame = function() {
+              if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+              if (video.readyState < 1) return;
+
+              const target = Math.min(0.05, Math.max(0, video.duration - 0.05));
+              const onSeeked = function() {
+                video.removeEventListener('seeked', onSeeked);
+                try {
+                  video.pause();
+                } catch (e) {}
+                video.dataset.startAtZero = '1';
+                if (cover && cover.parentNode) {
+                  cover.parentNode.removeChild(cover);
+                }
+              };
+
+              video.addEventListener('seeked', onSeeked);
+              try {
+                video.currentTime = target;
+              } catch (e) {
+                video.removeEventListener('seeked', onSeeked);
+              }
+            };
+
+            if (video.readyState >= 1) {
+              prepareFirstFrame();
+            } else {
+              video.addEventListener('loadedmetadata', prepareFirstFrame, { once: true });
+            }
+
+            cover.addEventListener('click', function() {
+              try {
+                video.play();
+              } catch (e) {}
+            }, { once: true });
+          }
           
           // 3. 监听播放事件 - 暂停其他视频
           video.addEventListener('play', function() {
             video.parentElement.classList.remove('is-paused');
+            if (video.dataset.startAtZero === '1') {
+              video.dataset.startAtZero = '0';
+              try {
+                if (video.currentTime > 0.01) {
+                  video.currentTime = 0;
+                }
+              } catch (e) {}
+            }
             
             // 如果有其他视频正在播放，先暂停它
             if (currentPlayingVideo && currentPlayingVideo !== video) {
@@ -944,8 +1067,42 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       // 【新增】Iframe 优化：自动计算宽高比 + 平台特定优化
       function setupIframes() {
         const iframes = document.querySelectorAll('iframe');
+
+        function getYouTubeId(url) {
+          try {
+            const u = new URL(url);
+            if (u.hostname.includes('youtu.be')) {
+              return u.pathname.replace('/', '');
+            }
+            if (u.hostname.includes('youtube.com')) {
+              if (u.pathname.startsWith('/embed/')) return u.pathname.split('/embed/')[1].split('/')[0];
+              if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/shorts/')[1].split('/')[0];
+              const v = u.searchParams.get('v');
+              if (v) return v;
+            }
+          } catch (e) {}
+          return null;
+        }
+
+        function getThumbnail(src) {
+          const yt = getYouTubeId(src);
+          if (yt) return 'https://i.ytimg.com/vi/' + yt + '/hqdefault.jpg';
+          return null;
+        }
+
+        function ensureEmbedContainer(iframe) {
+          if (iframe.parentElement && iframe.parentElement.classList.contains('embed-container')) {
+            return iframe.parentElement;
+          }
+          const container = document.createElement('div');
+          container.className = 'embed-container';
+          iframe.parentNode.insertBefore(container, iframe);
+          container.appendChild(iframe);
+          return container;
+        }
+
         iframes.forEach(function(iframe) {
-          const src = iframe.src || '';
+          let src = iframe.src || '';
           
           // 1. 通用属性优化
           // 确保拥有全屏播放权限
@@ -1000,13 +1157,13 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
               if (!urlObj.searchParams.has('high_quality')) urlObj.searchParams.set('high_quality', '1');
               if (!urlObj.searchParams.has('danmaku')) urlObj.searchParams.set('danmaku', '0');
               // 某些情况下 iframe.src 赋值不会触发刷新，但在加载阶段修改是有效的
-              iframe.src = urlObj.toString();
+              src = urlObj.toString();
             } catch (e) {
               // URL 解析失败则手动拼接
               let newSrc = src;
               if (!newSrc.includes('high_quality')) newSrc += (newSrc.includes('?') ? '&' : '?') + 'high_quality=1';
               if (!newSrc.includes('danmaku')) newSrc += '&danmaku=0';
-              if (src !== newSrc) iframe.src = newSrc;
+              src = newSrc;
             }
           }
           
@@ -1015,11 +1172,11 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
              // 确保使用 embed 格式
              // 某些 RSS 可能会错误地包含 watch?v= 链接
              if (src.includes('watch?v=')) {
-                iframe.src = src.replace('watch?v=', 'embed/');
+                src = src.replace('watch?v=', 'embed/');
              }
              // Shorts 检测 (shorts/xxx -> embed/xxx)
              if (src.includes('/shorts/')) {
-                iframe.src = src.replace('/shorts/', '/embed/');
+                src = src.replace('/shorts/', '/embed/');
                 // Shorts 通常是竖屏 (9:16)，如果 RSS 没给尺寸，我们需要修正默认比例
                 if (ratio === 0.5625) { // 如果是默认的 16:9
                    ratio = 16 / 9; // 改为 9:16 (1.77)
@@ -1032,8 +1189,55 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
              // Vimeo 通常自适应较好，无需特殊处理
           }
           
-          // 应用计算出的比例
-          iframe.style.aspectRatio = String(1 / ratio);
+          const container = ensureEmbedContainer(iframe);
+          const thumb = getThumbnail(src);
+          container.style.aspectRatio = String(1 / ratio);
+          iframe.style.aspectRatio = '';
+
+          if (!iframe.dataset.src) {
+            iframe.dataset.src = src;
+            try {
+              iframe.src = 'about:blank';
+            } catch (e) {}
+          }
+
+          let hasCover = false;
+          for (let i = 0; i < container.children.length; i++) {
+            const child = container.children[i];
+            if (child && child.classList && child.classList.contains('media-cover')) {
+              hasCover = true;
+              break;
+            }
+          }
+
+          if (!hasCover) {
+            const cover = document.createElement('div');
+            cover.className = 'media-cover';
+
+            if (thumb) {
+              const img = document.createElement('img');
+              img.src = thumb;
+              img.alt = '';
+              cover.appendChild(img);
+            }
+
+            const button = document.createElement('div');
+            button.className = 'media-cover-button';
+            button.textContent = '▶';
+            cover.appendChild(button);
+
+            cover.addEventListener('click', function() {
+              const targetSrc = iframe.dataset.src;
+              if (targetSrc) {
+                iframe.src = targetSrc;
+              }
+              if (cover.parentNode) {
+                cover.parentNode.removeChild(cover);
+              }
+            }, { once: true });
+
+            container.appendChild(cover);
+          }
         });
       }
     
