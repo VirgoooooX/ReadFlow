@@ -38,6 +38,8 @@ const AddRSSSourceScreen: React.FC = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [useProxy, setUseProxy] = useState(false); // 是否通过代理获取
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null); // 📁 选中的分组
+  const [fetchLimit, setFetchLimit] = useState(50);
+  const [retentionLimit, setRetentionLimit] = useState(100);
 
   const categories = ['技术', '新闻', '博客', '科学', '设计', '其他'];
 
@@ -94,7 +96,9 @@ const AddRSSSourceScreen: React.FC = () => {
         name.trim() || '未命名RSS源',
         contentType,
         category,
-        useProxy ? 'proxy' : 'direct'
+        useProxy ? 'proxy' : 'direct',
+        fetchLimit,
+        retentionLimit
       );
       
       // 📁 如果选择了分组，将源添加到分组
@@ -343,6 +347,47 @@ const AddRSSSourceScreen: React.FC = () => {
                   }
                 />
               </View>
+            </View>
+
+            {/* 刷新与保留限制 */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>刷新获取数量</Text>
+              <TextInput
+                style={styles.input}
+                value={String(fetchLimit)}
+                onChangeText={(text) => {
+                  const value = parseInt(text, 10);
+                  if (!isNaN(value) && value >= 0) {
+                    setFetchLimit(value);
+                  } else if (text === '') {
+                    setFetchLimit(0);
+                  }
+                }}
+                placeholder="例如: 50"
+                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.contentTypeHint}>每次刷新从 RSS 获取的文章数量 (0 为不限制)</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>保存数量上限</Text>
+              <TextInput
+                style={styles.input}
+                value={String(retentionLimit)}
+                onChangeText={(text) => {
+                  const value = parseInt(text, 10);
+                  if (!isNaN(value) && value >= 0) {
+                    setRetentionLimit(value);
+                  } else if (text === '') {
+                    setRetentionLimit(0);
+                  }
+                }}
+                placeholder="例如: 100"
+                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.contentTypeHint}>每个源最多保存的文章数量 (0 为不限制，收藏不受影响)</Text>
             </View>
 
             <View style={styles.inputGroup}>

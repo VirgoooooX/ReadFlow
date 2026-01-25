@@ -2,10 +2,15 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '6.5.3',
-  buildNumber: 60503,
-  updateTime: '2026-01-18',
+  version: '6.5.5',
+  buildNumber: 60505,
+  updateTime: '2026-01-20',
   changelog: [
+    '实现文章自动标记和多媒体优化功能',
+    '添加自动标记已读功能的分层处理，区分UI更新和持久化操作',
+    '实现CloudSyncService的状态同步调度机制，防止重复请求',
+    '为ArticleService添加批量静默标记方法和源统计更新调度',
+    '优化视频和iframe的多媒体展示，添加封面图和点击播放功能',
     '实现强制刷新功能并更新版本号至6.5.2',
     '更新tsconfig配置并修复Prisma导入路径',
     '实现服务端游标同步机制并优化性能',
@@ -15,7 +20,7 @@ export const APP_VERSION = {
     '更新服务端版本信息展示',
     '添加构建脚本支持版本管理和变更日志',
     '改进云同步服务游标处理逻辑',
-
+    '添加文章URL唯一索引并优化同步性能',
   ],
 };
 

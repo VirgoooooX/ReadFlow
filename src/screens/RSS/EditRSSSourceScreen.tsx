@@ -35,7 +35,8 @@ interface FormData {
   category: string;
   contentType: 'text' | 'image_text';
   sourceMode: 'direct' | 'proxy';
-  maxArticles: number; // 新增
+  fetchLimit: number;
+  retentionLimit: number;
   isActive: boolean;
 }
 
@@ -43,7 +44,8 @@ interface FormErrors {
   name?: string;
   url?: string;
   category?: string;
-  maxArticles?: string; // 新增
+  fetchLimit?: string;
+  retentionLimit?: string;
 }
 
 const EditRSSSourceScreen: React.FC = () => {
@@ -64,7 +66,8 @@ const EditRSSSourceScreen: React.FC = () => {
     category: '技术',
     contentType: 'image_text',
     sourceMode: 'direct',
-    maxArticles: 20, // 默认 20
+    fetchLimit: 50,
+    retentionLimit: 100,
     isActive: true,
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -95,7 +98,8 @@ const EditRSSSourceScreen: React.FC = () => {
         category: source.category || '技术',
         contentType: source.contentType || 'image_text',
         sourceMode: source.sourceMode || 'direct',
-        maxArticles: source.maxArticles || 20,
+        fetchLimit: source.fetchLimit ?? 50,
+        retentionLimit: source.retentionLimit ?? 100,
         isActive: source.isActive,
       });
     } catch (error) {
@@ -202,7 +206,8 @@ const EditRSSSourceScreen: React.FC = () => {
         category: formData.category,
         contentType: formData.contentType,
         sourceMode: formData.sourceMode,
-        maxArticles: formData.maxArticles,
+        fetchLimit: formData.fetchLimit,
+        retentionLimit: formData.retentionLimit,
         isActive: formData.isActive,
       };
 
@@ -404,27 +409,49 @@ const EditRSSSourceScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* 文章数量限制 */}
+            {/* 刷新与保留限制 */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>文章数量限制</Text>
+              <Text style={styles.label}>刷新获取数量</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  value={String(formData.maxArticles || 0)}
+                  value={String(formData.fetchLimit ?? 0)}
                   onChangeText={(text) => {
                     const value = parseInt(text, 10);
                     if (!isNaN(value) && value >= 0) {
-                      updateFormData('maxArticles', value);
+                      updateFormData('fetchLimit', value);
                     } else if (text === '') {
-                       updateFormData('maxArticles', 0);
+                      updateFormData('fetchLimit', 0);
                     }
                   }}
-                  placeholder="例如: 20"
+                  placeholder="例如: 50"
                   placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
                   keyboardType="number-pad"
                 />
               </View>
-              <Text style={styles.proxyHint}>每次抓取保留的最新文章数量 (0为不限制，建议 20-50 篇)</Text>
+              <Text style={styles.proxyHint}>每次刷新从 RSS 获取的文章数量 (0 为不限制)</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>保存数量上限</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={String(formData.retentionLimit ?? 0)}
+                  onChangeText={(text) => {
+                    const value = parseInt(text, 10);
+                    if (!isNaN(value) && value >= 0) {
+                      updateFormData('retentionLimit', value);
+                    } else if (text === '') {
+                      updateFormData('retentionLimit', 0);
+                    }
+                  }}
+                  placeholder="例如: 100"
+                  placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+                  keyboardType="number-pad"
+                />
+              </View>
+              <Text style={styles.proxyHint}>每个源最多保存的文章数量 (0 为不限制，收藏文章不受影响)</Text>
             </View>
 
             <View style={styles.inputGroup}>

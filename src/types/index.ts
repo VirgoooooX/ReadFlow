@@ -52,7 +52,9 @@ export interface RSSSource {
   // 🌐 图标相关字段
   iconUrl?: string;              // RSS源图标URL（本地缓存或网络URL）
   
-  maxArticles?: number;          // 最大文章保留数量
+  fetchLimit?: number;           // 每次刷新获取的文章数量
+  retentionLimit?: number;       // 每个源保存的文章总数上限
+  maxArticles?: number;          // 兼容旧字段
 }
 
 // 📁 RSS分组类型

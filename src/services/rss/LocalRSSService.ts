@@ -410,11 +410,11 @@ export class LocalRSSService {
       const rss = await parseEnhancedRSS(xmlText);
       
       // 根据设置截断文章列表
-      const maxArticles = source.maxArticles || 20; // 默认 20 篇
-      const itemsCount = maxArticles > 0 ? Math.min(rss.items.length, maxArticles) : rss.items.length;
+      const fetchLimit = source.fetchLimit ?? 50; // 默认 50 篇
+      const itemsCount = fetchLimit > 0 ? Math.min(rss.items.length, fetchLimit) : rss.items.length;
       
-      if (maxArticles > 0 && rss.items.length > maxArticles) {
-        logger.info(`[RSS] 限制文章数量: ${rss.items.length} -> ${maxArticles}`);
+      if (fetchLimit > 0 && rss.items.length > fetchLimit) {
+        logger.info(`[RSS] 限制获取文章数量: ${rss.items.length} -> ${fetchLimit}`);
       }
       
       // 快速解析基本信息，找分界点
@@ -933,13 +933,13 @@ export class LocalRSSService {
     try {
       try {
         const sourceConfig = await this.databaseService.executeQuery(
-          'SELECT max_articles as maxArticles FROM rss_sources WHERE id = ?',
+          'SELECT fetch_limit, retention_limit FROM rss_sources WHERE id = ?',
           [sourceId]
         );
-        const maxArticlesRaw = sourceConfig[0]?.maxArticles;
-        const maxArticles = typeof maxArticlesRaw === 'number' ? maxArticlesRaw : parseInt(String(maxArticlesRaw ?? '0'), 10);
+        const retentionLimitRaw = sourceConfig[0]?.retention_limit;
+        const retentionLimit = typeof retentionLimitRaw === 'number' ? retentionLimitRaw : parseInt(String(retentionLimitRaw ?? '100'), 10);
 
-        if (Number.isFinite(maxArticles) && maxArticles > 0) {
+        if (Number.isFinite(retentionLimit) && retentionLimit > 0) {
           const favCountResult = await this.databaseService.executeQuery(
             'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_favorite = 1',
             [sourceId]
@@ -947,7 +947,7 @@ export class LocalRSSService {
           const favCount = typeof favCountResult[0]?.count === 'number'
             ? favCountResult[0]?.count
             : parseInt(String(favCountResult[0]?.count ?? '0'), 10);
-          const keepNonFavorite = Math.max(0, maxArticles - (Number.isFinite(favCount) ? favCount : 0));
+          const keepNonFavorite = Math.max(0, retentionLimit - (Number.isFinite(favCount) ? favCount : 0));
 
           await this.databaseService.executeStatement(
             `DELETE FROM articles 
@@ -961,7 +961,7 @@ export class LocalRSSService {
           );
         }
       } catch (e) {
-        logger.warn('[updateSourceStats] Failed to enforce max_articles:', e);
+        logger.warn('[updateSourceStats] Failed to enforce retention_limit:', e);
       }
 
       const articleCountResult = await this.databaseService.executeQuery(

@@ -143,6 +143,8 @@ export class DatabaseService {
         { name: 'group_id', sql: 'ALTER TABLE rss_sources ADD COLUMN group_id INTEGER' },
         { name: 'group_sort_order', sql: 'ALTER TABLE rss_sources ADD COLUMN group_sort_order INTEGER DEFAULT 0' },
         { name: 'max_articles', sql: 'ALTER TABLE rss_sources ADD COLUMN max_articles INTEGER DEFAULT 20' },
+        { name: 'fetch_limit', sql: 'ALTER TABLE rss_sources ADD COLUMN fetch_limit INTEGER DEFAULT 50' },
+        { name: 'retention_limit', sql: 'ALTER TABLE rss_sources ADD COLUMN retention_limit INTEGER DEFAULT 100' },
         { name: 'latest_published_at', sql: 'ALTER TABLE rss_sources ADD COLUMN latest_published_at TEXT' },
       ];
 
@@ -153,6 +155,16 @@ export class DatabaseService {
             console.log(`Adding ${column.name} column to rss_sources table...`);
             await this.db.execAsync(column.sql);
             console.log(`✅ ${column.name} column added successfully`);
+
+            // 如果是新增 fetch_limit 或 retention_limit，尝试从旧的 max_articles 迁移数据
+            if (column.name === 'fetch_limit' || column.name === 'retention_limit') {
+              console.log(`Migrating data for ${column.name}...`);
+              await this.db.execAsync(`
+                UPDATE rss_sources 
+                SET ${column.name} = max_articles 
+                WHERE ${column.name} IS NULL AND max_articles IS NOT NULL
+              `);
+            }
           } catch (error) {
             console.warn(`⚠️ Could not add ${column.name} column:`, error);
           }

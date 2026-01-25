@@ -630,13 +630,13 @@ export class CloudSyncService implements IRSSProvider {
     try {
       try {
         const sourceConfig = await this.databaseService.executeQuery(
-          'SELECT max_articles as maxArticles FROM rss_sources WHERE id = ?',
+          'SELECT fetch_limit, retention_limit FROM rss_sources WHERE id = ?',
           [sourceId]
         );
-        const maxArticlesRaw = sourceConfig[0]?.maxArticles;
-        const maxArticles = typeof maxArticlesRaw === 'number' ? maxArticlesRaw : parseInt(String(maxArticlesRaw ?? '0'), 10);
+        const retentionLimitRaw = sourceConfig[0]?.retention_limit;
+        const retentionLimit = typeof retentionLimitRaw === 'number' ? retentionLimitRaw : parseInt(String(retentionLimitRaw ?? '100'), 10);
 
-        if (Number.isFinite(maxArticles) && maxArticles > 0) {
+        if (Number.isFinite(retentionLimit) && retentionLimit > 0) {
           const favCountResult = await this.databaseService.executeQuery(
             'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_favorite = 1',
             [sourceId]
@@ -644,7 +644,7 @@ export class CloudSyncService implements IRSSProvider {
           const favCount = typeof favCountResult[0]?.count === 'number'
             ? favCountResult[0]?.count
             : parseInt(String(favCountResult[0]?.count ?? '0'), 10);
-          const keepNonFavorite = Math.max(0, maxArticles - (Number.isFinite(favCount) ? favCount : 0));
+          const keepNonFavorite = Math.max(0, retentionLimit - (Number.isFinite(favCount) ? favCount : 0));
 
           await this.databaseService.executeStatement(
             `DELETE FROM articles 
@@ -658,7 +658,7 @@ export class CloudSyncService implements IRSSProvider {
           );
         }
       } catch (e) {
-        logger.warn('[CloudSync] Failed to enforce max_articles:', e);
+        logger.warn('[CloudSync] Failed to enforce retention_limit:', e);
       }
 
       const articleCountResult = await this.databaseService.executeQuery(

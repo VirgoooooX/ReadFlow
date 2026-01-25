@@ -2,7 +2,9 @@
 .DS_Store
 Thumbs.db
 *.log
-
+.trae
+.shared
+.idea
 # IDE & Editors
 .vscode/
 .idea/
@@ -83,3 +85,4 @@ readflow-server/src/test-proxy.ts
 readflow-server/src/test-xml.ts
 readflow-server/src/verify.ts
 server-go/main.exe
+.trae

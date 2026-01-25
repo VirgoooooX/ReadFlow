@@ -38,7 +38,9 @@ export class RSSService {
     title?: string, 
     contentType: 'text' | 'image_text' = 'image_text',
     category: string = '技术',
-    sourceMode: 'direct' | 'proxy' = 'direct'
+    sourceMode: 'direct' | 'proxy' = 'direct',
+    fetchLimit: number = 50,
+    retentionLimit: number = 100
   ): Promise<RSSSource> {
     try {
       // 🔥 清理 URL：去除空格和末尾多余斜杠
@@ -78,12 +80,13 @@ export class RSSService {
         errorCount: 0,
         description: feedInfo.description,
         groupId: null, // 新源默认未分组
-        maxArticles: 20, // 默认限制 20 篇
+        fetchLimit,
+        retentionLimit,
       };
 
       const result = await this.databaseService.executeInsert(
-        `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated, max_articles) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated, fetch_limit, retention_limit) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rssSource.url,
           rssSource.name,
@@ -93,7 +96,8 @@ export class RSSService {
           rssSource.sourceMode,
           rssSource.isActive ? 1 : 0,
           rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
-          rssSource.maxArticles,
+          rssSource.fetchLimit,
+          rssSource.retentionLimit,
         ]
       );
 
@@ -237,9 +241,13 @@ export class RSSService {
         setClause.push('source_mode = ?');
         values.push(updates.sourceMode);
       }
-      if (updates.maxArticles !== undefined) {
-        setClause.push('max_articles = ?');
-        values.push(updates.maxArticles);
+      if (updates.fetchLimit !== undefined) {
+        setClause.push('fetch_limit = ?');
+        values.push(updates.fetchLimit);
+      }
+      if (updates.retentionLimit !== undefined) {
+        setClause.push('retention_limit = ?');
+        values.push(updates.retentionLimit);
       }
       
       if (setClause.length === 0) {
@@ -762,7 +770,8 @@ export class RSSService {
         contentType: row.content_type,
         sourceMode: row.source_mode,
         isActive: Boolean(row.is_active),
-        maxArticles: row.max_articles,
+        fetchLimit: row.fetch_limit,
+        retentionLimit: row.retention_limit,
         groupName: row.group_name,
         sortOrder: row.sort_order,
         updateFrequency: row.update_frequency,
@@ -803,12 +812,14 @@ export class RSSService {
           await this.databaseService.executeStatement(
             `UPDATE rss_sources SET 
               title = ?, description = ?, category = ?, content_type = ?, 
-              source_mode = ?, is_active = ?, max_articles = ?, 
+              source_mode = ?, is_active = ?, fetch_limit = ?, retention_limit = ?, 
               group_id = ?, sort_order = ?, update_frequency = ?
              WHERE id = ?`,
             [
               source.name, source.description, source.category, source.contentType,
-              source.sourceMode, source.isActive ? 1 : 0, source.maxArticles,
+              source.sourceMode, source.isActive ? 1 : 0, 
+              source.fetchLimit ?? source.maxArticles ?? 50, 
+              source.retentionLimit ?? source.maxArticles ?? 100,
               groupId, source.sortOrder, source.updateFrequency,
               id
             ]
@@ -817,12 +828,14 @@ export class RSSService {
           // Insert
           await this.databaseService.executeStatement(
             `INSERT INTO rss_sources 
-              (url, title, description, category, content_type, source_mode, is_active, max_articles, group_id, sort_order, update_frequency, last_updated)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (url, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency, last_updated)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               source.url, source.name, source.description, source.category, 
               source.contentType, source.sourceMode, source.isActive ? 1 : 0, 
-              source.maxArticles, groupId, source.sortOrder, source.updateFrequency,
+              source.fetchLimit ?? source.maxArticles ?? 50, 
+              source.retentionLimit ?? source.maxArticles ?? 100,
+              groupId, source.sortOrder, source.updateFrequency,
               new Date().toISOString()
             ]
           );
@@ -881,7 +894,9 @@ export class RSSService {
       // 📦 分组字段
       groupId: row.group_id || null,
       groupSortOrder: row.group_sort_order || 0,
-      maxArticles: row.max_articles || 20,
+      fetchLimit: row.fetch_limit ?? 50,
+      retentionLimit: row.retention_limit ?? 100,
+      maxArticles: row.max_articles,
     };
   }
 }
