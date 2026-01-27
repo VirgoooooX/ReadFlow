@@ -7,8 +7,7 @@ import { logger } from '../utils/Logger';
 import fetch from 'node-fetch'; // For warm-up requests
 import cronParser from 'cron-parser';
 import pLimit from 'p-limit';
-import { Writable } from 'stream';
-import { pipeline } from 'stream/promises';
+import { finished } from 'stream/promises';
 
 const router = express.Router();
 
@@ -22,11 +21,6 @@ const warmUpQueueLimit = pLimit(3);
 let warmUpQueueTail: Promise<void> = Promise.resolve();
 const warmUpRecent = new Map<string, number>();
 const WARMUP_RECENT_TTL_MS = 30 * 60_000;
-const devNull = new Writable({
-  write(_chunk, _encoding, callback) {
-    callback();
-  },
-});
 
 function redactForLog(input: any, depth: number = 0): any {
   if (depth > 8) return '[Truncated]';
@@ -181,7 +175,8 @@ async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = '
           try {
             const resp = await fetch(u, { signal: controller.signal } as any);
             if (resp?.body) {
-              await pipeline(resp.body as any, devNull);
+              (resp.body as any).resume?.();
+              await finished(resp.body as any);
             }
           } catch {
           } finally {

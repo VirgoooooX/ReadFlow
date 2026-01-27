@@ -13,7 +13,17 @@ export class ImageProxyController {
    * GET /api/image?url=...&w=...&q=...
    */
   static async proxyImage(req: Request, res: Response) {
-    const imageUrl = req.query.url as string;
+    let imageUrl = String(req.query.url || '').trim();
+    imageUrl = imageUrl.replace(/`/g, '').trim();
+    while (
+      (imageUrl.startsWith('"') && imageUrl.endsWith('"')) ||
+      (imageUrl.startsWith("'") && imageUrl.endsWith("'"))
+    ) {
+      imageUrl = imageUrl.slice(1, -1).trim();
+    }
+    while (imageUrl.endsWith(']') || imageUrl.endsWith(')') || imageUrl.endsWith('>')) {
+      imageUrl = imageUrl.slice(0, -1).trim();
+    }
     const width = req.query.w ? parseInt(req.query.w as string) : null;
     const raw = req.query.raw === '1' || req.query.raw === 'true' || req.query.mode === 'raw';
     
