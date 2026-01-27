@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import rssRoutes from './routes/rss';
 import vocabRoutes from './routes/vocabulary';
 import imageRoutes from './routes/image';
@@ -15,6 +16,23 @@ import { storageService } from './services/StorageService';
 
 // Set timezone to Asia/Shanghai (UTC+8)
 process.env.TZ = 'Asia/Shanghai';
+
+{
+  const cacheMemoryMbRaw = process.env.SHARP_CACHE_MEMORY_MB;
+  const cacheMemoryMb = Number.isFinite(cacheMemoryMbRaw as any)
+    ? Number(cacheMemoryMbRaw)
+    : parseInt(String(cacheMemoryMbRaw || ''), 10);
+  const effectiveCacheMemoryMb = Number.isFinite(cacheMemoryMb) ? Math.max(0, cacheMemoryMb) : 64;
+
+  const concurrencyRaw = process.env.SHARP_CONCURRENCY;
+  const concurrency = Number.isFinite(concurrencyRaw as any)
+    ? Number(concurrencyRaw)
+    : parseInt(String(concurrencyRaw || ''), 10);
+  const effectiveConcurrency = Number.isFinite(concurrency) ? Math.max(1, concurrency) : 2;
+
+  sharp.cache({ memory: effectiveCacheMemoryMb, files: 0, items: 200 });
+  sharp.concurrency(effectiveConcurrency);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -210,7 +228,11 @@ async function start(): Promise<void> {
       try {
         const result = await storageService.cleanupArticles();
         lastCleanupAt = Date.now();
-        logger.system(`Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount}`);
+        const imageResult = await storageService.cleanupImageCache();
+        const imageMb = Math.round(imageResult.remainingBytes / 1024 / 1024);
+        logger.system(
+          `Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount} deletedImageByAge=${imageResult.deletedByAge} deletedImageByCap=${imageResult.deletedByCap} imageCacheFiles=${imageResult.remainingFiles} imageCacheSize=${imageMb}MB`
+        );
       } catch (e) {
         logger.error('Cleanup failed', e);
       } finally {
@@ -235,7 +257,11 @@ start().catch(error => {
 async function logServerStatus() {
   try {
     const mem = process.memoryUsage();
-    const memUsage = Math.round(mem.rss / 1024 / 1024);
+    const rssMb = Math.round(mem.rss / 1024 / 1024);
+    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
+    const heapTotalMb = Math.round(mem.heapTotal / 1024 / 1024);
+    const externalMb = Math.round(mem.external / 1024 / 1024);
+    const arrayBuffersMb = Math.round(mem.arrayBuffers / 1024 / 1024);
     const uptime = Math.floor(process.uptime());
     const uptimeH = Math.floor(uptime / 3600);
     const uptimeM = Math.floor((uptime % 3600) / 60);
@@ -243,7 +269,9 @@ async function logServerStatus() {
     const users = (await storageService.getUsers()).length;
     const feeds = (await storageService.getFeedsLight()).length;
     
-    logger.system(`Status Update | Memory: ${memUsage}MB | Uptime: ${uptimeH}h ${uptimeM}m | Users: ${users} | Feeds: ${feeds}`);
+    logger.system(
+      `Status Update | Memory: rss=${rssMb}MB heap=${heapUsedMb}/${heapTotalMb}MB ext=${externalMb}MB ab=${arrayBuffersMb}MB | Uptime: ${uptimeH}h ${uptimeM}m | Users: ${users} | Feeds: ${feeds}`
+    );
   } catch (e) {
     logger.error('Failed to log status', e);
   }

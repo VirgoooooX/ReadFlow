@@ -35,6 +35,36 @@ export class ImageProxyController {
         );
 
     try {
+      const controller = new AbortController();
+      let response: any | null = null;
+      let transformer: any | null = null;
+      let cacheHitStream: fs.ReadStream | null = null;
+      let finished = false;
+
+      const cleanup = () => {
+        if (finished) return;
+        finished = true;
+        try {
+          controller.abort();
+        } catch {
+        }
+        try {
+          (response as any)?.body?.destroy?.();
+        } catch {
+        }
+        try {
+          transformer?.destroy?.();
+        } catch {
+        }
+        try {
+          cacheHitStream?.destroy?.();
+        } catch {
+        }
+      };
+
+      res.on('close', cleanup);
+      res.on('error', cleanup);
+
       // 1. 检查缓存
       if (cacheFile && fs.existsSync(cacheFile)) {
         // 检查文件是否完整（简单检查大小）
@@ -49,6 +79,10 @@ export class ImageProxyController {
           if (width && width > 0) res.setHeader('X-ReadFlow-Image-Width', String(width));
           res.setHeader('X-ReadFlow-Image-Mode', 'webp');
           const stream = fs.createReadStream(cacheFile);
+          cacheHitStream = stream;
+          stream.on('error', () => {
+            if (!res.headersSent) res.status(500).send('Image cache read failed');
+          });
           stream.pipe(res);
           return;
         }
@@ -103,13 +137,12 @@ export class ImageProxyController {
       };
 
       const referers = getReferers(imageUrl);
-      let response: any | null = null;
       let lastStatus: number | null = null;
       let lastReferer = '';
 
       for (const referer of referers.length > 0 ? referers : ['']) {
         lastReferer = referer;
-        response = await fetch(imageUrl, { headers: buildHeaders(referer) });
+        response = await fetch(imageUrl, { headers: buildHeaders(referer), signal: controller.signal } as any);
         if (response.ok) break;
         lastStatus = response.status;
         if (response.status !== 403 && response.status !== 401) break;
@@ -122,7 +155,7 @@ export class ImageProxyController {
       if (response && !response.ok && (lastStatus === 403 || lastStatus === 401)) {
         lastReferer = 'https://images.weserv.nl/';
         const fallbackUrl = `https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`;
-        response = await fetch(fallbackUrl, { headers: buildHeaders(lastReferer) });
+        response = await fetch(fallbackUrl, { headers: buildHeaders(lastReferer), signal: controller.signal } as any);
       }
 
       if (!response.ok) {
@@ -156,7 +189,7 @@ export class ImageProxyController {
       res.setHeader('X-ReadFlow-Image-Source-ContentLength', response.headers?.get?.('content-length') || '');
 
       // 4. 图片处理管道
-      let transformer = sharp();
+      transformer = sharp();
 
       // 调整尺寸 (如果指定)
       if (width && width > 0) {
@@ -192,7 +225,7 @@ export class ImageProxyController {
       response.body.pipe(transformer);
       
       // 分支 1: 写入缓存 (异步)
-      transformer.clone().toFile(cacheFile!).catch(err => {
+      transformer.clone().toFile(cacheFile!).catch((err: any) => {
         logger.error(`Failed to write cache file ${cacheFile}:`, err);
         // 尝试删除可能损坏的文件
         if (cacheFile && fs.existsSync(cacheFile)) fs.unlinkSync(cacheFile);

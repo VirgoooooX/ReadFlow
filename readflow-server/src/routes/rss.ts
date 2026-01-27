@@ -6,6 +6,9 @@ import { getProxyUrl, needsProxy, proxyImages } from '../utils/RSSUtils';
 import { logger } from '../utils/Logger';
 import fetch from 'node-fetch'; // For warm-up requests
 import cronParser from 'cron-parser';
+import pLimit from 'p-limit';
+import { Writable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 const router = express.Router();
 
@@ -14,6 +17,16 @@ let refreshRunning = false;
 const refreshingFeedIds = new Set<string>();
 const syncModeCounters = { serverCursor: 0, legacy: 0 };
 let lastSyncModeLogAt = 0;
+
+const warmUpQueueLimit = pLimit(3);
+let warmUpQueueTail: Promise<void> = Promise.resolve();
+const warmUpRecent = new Map<string, number>();
+const WARMUP_RECENT_TTL_MS = 30 * 60_000;
+const devNull = new Writable({
+  write(_chunk, _encoding, callback) {
+    callback();
+  },
+});
 
 function redactForLog(input: any, depth: number = 0): any {
   if (depth > 8) return '[Truncated]';
@@ -89,6 +102,13 @@ async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = '
   if (!articles || articles.length === 0) return;
   
   const settings = storageService.getSettings();
+  const envEnabled = process.env.IMAGE_WARMUP_ENABLED;
+  const enabled =
+    envEnabled === undefined
+      ? settings.imageWarmupEnabled !== false
+      : envEnabled === '1' || envEnabled.toLowerCase() === 'true';
+  if (!enabled) return;
+
   const imageCompression = true; // Always warm up compressed version
   const imageQuality = settings.imageQuality ?? 80;
 
@@ -135,22 +155,44 @@ async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = '
     }
   }
 
-  // Execute in background without awaiting
-  (async () => {
-    for (let i = 0; i < chunkParams.length; i += 3) {
-      const chunk = chunkParams.slice(i, i + 3);
-      await Promise.all(chunk.map(async (u: string) => {
-        try {
-          // Add raw=1 if using weserv, but here we call our own /api/image
-          // The getProxyUrl already constructs correct URL with q=...
-          await fetch(u, { timeout: 10000 });
-        } catch (e) {
-          // Ignore errors during warm up
+  const now = Date.now();
+  const toWarm: string[] = [];
+  for (const u of chunkParams) {
+    const last = warmUpRecent.get(u);
+    if (last && now - last < WARMUP_RECENT_TTL_MS) continue;
+    warmUpRecent.set(u, now);
+    toWarm.push(u);
+  }
+
+  if (toWarm.length === 0) return;
+
+  warmUpQueueTail = warmUpQueueTail
+    .then(async () => {
+      if (warmUpRecent.size > 5000) {
+        const pruneBefore = Date.now() - WARMUP_RECENT_TTL_MS;
+        for (const [k, v] of warmUpRecent.entries()) {
+          if (v < pruneBefore) warmUpRecent.delete(k);
         }
-      }));
-    }
-    logger.info(`[Pre-warm] Completed for ${chunkParams.length} images`);
-  })();
+      }
+      const tasks = toWarm.map(u =>
+        warmUpQueueLimit(async () => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10_000);
+          try {
+            const resp = await fetch(u, { signal: controller.signal } as any);
+            if (resp?.body) {
+              await pipeline(resp.body as any, devNull);
+            }
+          } catch {
+          } finally {
+            clearTimeout(timer);
+          }
+        })
+      );
+      await Promise.all(tasks);
+      logger.info(`[Pre-warm] Completed for ${toWarm.length} images`);
+    })
+    .catch(() => {});
 }
 
 async function refreshAllFeedsOnce() {
@@ -248,10 +290,64 @@ async function refreshAllFeedsOnce() {
 
 export function startRssAutoRefresh() {
   if (refreshTimer) return;
-  refreshAllFeedsOnce().catch(() => {});
-  refreshTimer = setInterval(() => {
-    refreshAllFeedsOnce().catch(() => {});
-  }, 60_000);
+  const scheduleNext = async () => {
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+
+    let delayMs = 60_000;
+    try {
+      const feeds = await storageService.getFeedsLight();
+      const settings = storageService.getSettings();
+      const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
+      const globalCron = settings.rssDefaultRefreshCron ? String(settings.rssDefaultRefreshCron).trim() : undefined;
+      const now = Date.now();
+
+      let nextAt = now + delayMs;
+      for (const feed of feeds) {
+        if (!feed?.url) continue;
+
+        let cronExpr = feed.refreshCron;
+        if (cronExpr) cronExpr = String(cronExpr).trim();
+        if (!cronExpr) cronExpr = globalCron;
+
+        if (cronExpr) {
+          try {
+            const base = feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : new Date(0);
+            const interval = cronParser.parseExpression(cronExpr, { currentDate: base });
+            const next = interval.next().toDate().getTime();
+            nextAt = Math.min(nextAt, next);
+            continue;
+          } catch {
+            cronExpr = undefined;
+          }
+        }
+
+        const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
+        if (intervalSeconds <= 0) continue;
+        const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
+        const candidate = last ? last + intervalSeconds * 1000 : now;
+        nextAt = Math.min(nextAt, candidate);
+      }
+
+      delayMs = Math.max(0, nextAt - now);
+      if (!Number.isFinite(delayMs)) delayMs = 60_000;
+      delayMs = Math.min(delayMs, 60 * 60 * 1000);
+    } catch {
+      delayMs = 60_000;
+    }
+
+    refreshTimer = setTimeout(() => {
+      refreshAllFeedsOnce()
+        .catch(() => {})
+        .finally(() => {
+          scheduleNext().catch(() => {});
+        });
+    }, delayMs);
+  };
+
+  scheduleNext().catch(() => {});
 }
 
 // GET /api/rss?url=...

@@ -11,6 +11,7 @@ function parseArgs(argv) {
     dryRun: false,
     doLogin: false,
     bumpVersion: true,
+    version: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -29,6 +30,13 @@ function parseArgs(argv) {
     }
     if (a === '--no-bump') {
       out.bumpVersion = false;
+      continue;
+    }
+    if (a === '--version' || a === '-v') {
+      const v = argv[i + 1];
+      if (!v) throw new Error('Missing value for --version');
+      out.version = String(v).trim();
+      i += 1;
       continue;
     }
     if (a === '--repository' || a === '-r') {
@@ -101,7 +109,8 @@ function isValidDockerTag(tag) {
 }
 
 function parseSemver(version) {
-  const v = String(version || '').trim();
+  const v0 = String(version || '').trim();
+  const v = v0.startsWith('v') ? v0.slice(1) : v0;
   const m = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(v);
   if (!m) return null;
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) };
@@ -111,6 +120,12 @@ function bumpPatch(version) {
   const parsed = parseSemver(version);
   if (!parsed) return '0.0.1';
   return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
+}
+
+function normalizeVersion(version) {
+  const parsed = parseSemver(version);
+  if (!parsed) return null;
+  return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
 }
 
 function writeJson(filePath, value) {
@@ -128,7 +143,8 @@ function main() {
         '  -n, --dry-run               Skip docker build/login/push (still bumps version/changelog)',
         '      --login                 Login to DockerHub using env vars',
         '      --no-login              Skip docker login (default)',
-        '      --no-bump               Do not bump package.json version',
+        '      --no-bump               Do not write version/changelog back to package.json',
+        '  -v, --version <x.y.z>       Use specified version tag (default: bump patch)',
         '  -r, --repository <repo>     Docker repository (default: virgoooox/readflowserver)',
         '  -c, --changelog-count <n>   Commit subjects count for changelog (default: 20)',
         '  -h, --help                  Show help',
@@ -164,7 +180,12 @@ function main() {
     : [];
   const changelogJson = JSON.stringify(changelogLines);
 
-  const nextVersion = args.bumpVersion ? bumpPatch(baseVersion) : baseVersion;
+  const manualVersion = args.version ? normalizeVersion(args.version) : null;
+  if (args.version && !manualVersion) {
+    throw new Error(`Invalid --version: ${args.version} (expected x.y.z)`);
+  }
+
+  const nextVersion = manualVersion || (args.bumpVersion ? bumpPatch(baseVersion) : baseVersion);
   if (!isValidDockerTag(nextVersion)) throw new Error(`Invalid docker tag: ${nextVersion}`);
 
   if (args.bumpVersion) {

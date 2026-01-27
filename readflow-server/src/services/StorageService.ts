@@ -15,6 +15,10 @@ const prisma = new PrismaClient({
 
 export interface ServerSettings {
   imageQuality: number;
+  imageWarmupEnabled?: boolean;
+  imageCacheMaxAgeDays?: number;
+  imageCacheMaxFiles?: number;
+  imageCacheMaxBytes?: number;
   adminPassword?: string;
   rssDefaultRefreshIntervalSeconds?: number;
   rssDefaultRefreshCron?: string;
@@ -95,6 +99,10 @@ export class StorageService {
 
     this.settings = {
       imageQuality: 80,
+      imageWarmupEnabled: true,
+      imageCacheMaxAgeDays: 30,
+      imageCacheMaxFiles: 50_000,
+      imageCacheMaxBytes: 2_000_000_000,
       rssDefaultRefreshIntervalSeconds: 900,
       rssDefaultRefreshCron: undefined,
       rssMaxItemsPerFetch: 20,
@@ -234,6 +242,24 @@ export class StorageService {
       (out as any)[key] = next;
     };
 
+    const setBool = (key: keyof ServerSettings, v: any) => {
+      if (v === undefined || v === null) return;
+      if (typeof v === 'boolean') {
+        (out as any)[key] = v;
+        return;
+      }
+      if (typeof v === 'number') {
+        (out as any)[key] = v !== 0;
+        return;
+      }
+      const s = String(v).trim().toLowerCase();
+      if (s === '1' || s === 'true') {
+        (out as any)[key] = true;
+      } else if (s === '0' || s === 'false') {
+        (out as any)[key] = false;
+      }
+    };
+
     const setStr = (key: keyof ServerSettings, v: any) => {
       if (v === undefined || v === null) return;
       const s = String(v);
@@ -256,6 +282,10 @@ export class StorageService {
     };
 
     setNum('imageQuality', input.imageQuality, 1, 100);
+    setBool('imageWarmupEnabled', input.imageWarmupEnabled);
+    setNum('imageCacheMaxAgeDays', input.imageCacheMaxAgeDays, 0, 3650);
+    setNum('imageCacheMaxFiles', input.imageCacheMaxFiles, 0, 5_000_000);
+    setNum('imageCacheMaxBytes', input.imageCacheMaxBytes, 0, 50_000_000_000);
     setNum(
       'rssDefaultRefreshIntervalSeconds',
       input.rssDefaultRefreshIntervalSeconds ?? input.rssRefreshIntervalSeconds,
@@ -1099,6 +1129,103 @@ export class StorageService {
       logger.error('Failed to get image cache size:', err);
       return 0;
     }
+  }
+
+  public async cleanupImageCache(): Promise<{
+    deletedByAge: number;
+    deletedByCap: number;
+    remainingFiles: number;
+    remainingBytes: number;
+  }> {
+    const settings = this.getSettings();
+    const maxAgeDays = settings.imageCacheMaxAgeDays ?? 0;
+    const maxFiles = settings.imageCacheMaxFiles ?? 0;
+    const maxBytes = settings.imageCacheMaxBytes ?? 0;
+
+    if (maxAgeDays <= 0 && maxFiles <= 0 && maxBytes <= 0) {
+      const remainingBytes = this.getImageCacheTotalSize();
+      let remainingFiles = 0;
+      try {
+        remainingFiles = fs.existsSync(this.cacheDir) ? fs.readdirSync(this.cacheDir).length : 0;
+      } catch {
+        remainingFiles = 0;
+      }
+      return { deletedByAge: 0, deletedByCap: 0, remainingFiles, remainingBytes };
+    }
+
+    if (!fs.existsSync(this.cacheDir)) {
+      return { deletedByAge: 0, deletedByCap: 0, remainingFiles: 0, remainingBytes: 0 };
+    }
+
+    const now = Date.now();
+    const cutoffMs = maxAgeDays > 0 ? now - maxAgeDays * 24 * 60 * 60 * 1000 : 0;
+
+    let deletedByAge = 0;
+    let deletedByCap = 0;
+
+    type CacheFile = { full: string; size: number; mtimeMs: number };
+    let entries: CacheFile[] = [];
+
+    try {
+      const names = await fs.promises.readdir(this.cacheDir);
+      const stats = await Promise.all(
+        names.map(async name => {
+          const full = path.join(this.cacheDir, name);
+          try {
+            const st = await fs.promises.stat(full);
+            if (!st.isFile()) return null;
+            return { full, size: st.size, mtimeMs: st.mtimeMs } satisfies CacheFile;
+          } catch {
+            return null;
+          }
+        })
+      );
+      entries = stats.filter(Boolean) as CacheFile[];
+    } catch (err) {
+      logger.error('Failed to read image cache directory:', err);
+      return { deletedByAge: 0, deletedByCap: 0, remainingFiles: 0, remainingBytes: 0 };
+    }
+
+    if (maxAgeDays > 0) {
+      const toDelete = entries.filter(e => e.mtimeMs < cutoffMs);
+      if (toDelete.length > 0) {
+        await Promise.all(
+          toDelete.map(async e => {
+            try {
+              await fs.promises.unlink(e.full);
+              deletedByAge += 1;
+            } catch {
+            }
+          })
+        );
+        entries = entries.filter(e => e.mtimeMs >= cutoffMs);
+      }
+    }
+
+    entries.sort((a, b) => a.mtimeMs - b.mtimeMs);
+    let totalBytes = entries.reduce((sum, e) => sum + e.size, 0);
+
+    const enforceFiles = maxFiles > 0;
+    const enforceBytes = maxBytes > 0;
+    while (
+      entries.length > 0 &&
+      ((enforceFiles && entries.length > maxFiles) || (enforceBytes && totalBytes > maxBytes))
+    ) {
+      const victim = entries.shift()!;
+      try {
+        await fs.promises.unlink(victim.full);
+        deletedByCap += 1;
+        totalBytes -= victim.size;
+      } catch {
+      }
+    }
+
+    return {
+      deletedByAge,
+      deletedByCap,
+      remainingFiles: entries.length,
+      remainingBytes: Math.max(0, totalBytes),
+    };
   }
 
   public async pruneArticles(days: number): Promise<number> {
