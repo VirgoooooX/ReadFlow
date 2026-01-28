@@ -18,9 +18,56 @@ const syncModeCounters = { serverCursor: 0, legacy: 0 };
 let lastSyncModeLogAt = 0;
 
 const warmUpQueueLimit = pLimit(3);
-let warmUpQueueTail: Promise<void> = Promise.resolve();
 const warmUpRecent = new Map<string, number>();
 const WARMUP_RECENT_TTL_MS = 30 * 60_000;
+const warmUpPending = new Set<string>();
+let warmUpWorkerRunning = false;
+const WARMUP_PENDING_MAX = 2000;
+let warmUpDropped = 0;
+
+async function runWarmUpWorker() {
+  if (warmUpWorkerRunning) return;
+  warmUpWorkerRunning = true;
+  try {
+    let processed = 0;
+    while (warmUpPending.size > 0) {
+      const batch: string[] = [];
+      for (const u of warmUpPending) {
+        batch.push(u);
+        if (batch.length >= 50) break;
+      }
+      for (const u of batch) warmUpPending.delete(u);
+
+      const tasks = batch.map(u =>
+        warmUpQueueLimit(async () => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10_000);
+          try {
+            const resp = await fetch(u, { signal: controller.signal } as any);
+            if (resp?.body) {
+              (resp.body as any).resume?.();
+              await finished(resp.body as any);
+            }
+          } catch {
+          } finally {
+            clearTimeout(timer);
+          }
+        })
+      );
+      await Promise.all(tasks);
+      processed += batch.length;
+    }
+    if (processed > 0) {
+      logger.info(`[Pre-warm] Completed for ${processed} images`);
+    }
+    if (warmUpDropped > 0) {
+      logger.warn(`[Pre-warm] Dropped ${warmUpDropped} images due to backlog cap`);
+      warmUpDropped = 0;
+    }
+  } finally {
+    warmUpWorkerRunning = false;
+  }
+}
 
 function redactForLog(input: any, depth: number = 0): any {
   if (depth > 8) return '[Truncated]';
@@ -160,34 +207,22 @@ async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = '
 
   if (toWarm.length === 0) return;
 
-  warmUpQueueTail = warmUpQueueTail
-    .then(async () => {
-      if (warmUpRecent.size > 5000) {
-        const pruneBefore = Date.now() - WARMUP_RECENT_TTL_MS;
-        for (const [k, v] of warmUpRecent.entries()) {
-          if (v < pruneBefore) warmUpRecent.delete(k);
-        }
-      }
-      const tasks = toWarm.map(u =>
-        warmUpQueueLimit(async () => {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 10_000);
-          try {
-            const resp = await fetch(u, { signal: controller.signal } as any);
-            if (resp?.body) {
-              (resp.body as any).resume?.();
-              await finished(resp.body as any);
-            }
-          } catch {
-          } finally {
-            clearTimeout(timer);
-          }
-        })
-      );
-      await Promise.all(tasks);
-      logger.info(`[Pre-warm] Completed for ${toWarm.length} images`);
-    })
-    .catch(() => {});
+  if (warmUpRecent.size > 5000) {
+    const pruneBefore = Date.now() - WARMUP_RECENT_TTL_MS;
+    for (const [k, v] of warmUpRecent.entries()) {
+      if (v < pruneBefore) warmUpRecent.delete(k);
+    }
+  }
+
+  for (const u of toWarm) {
+    if (warmUpPending.has(u)) continue;
+    if (warmUpPending.size >= WARMUP_PENDING_MAX) {
+      warmUpDropped += 1;
+      continue;
+    }
+    warmUpPending.add(u);
+  }
+  void runWarmUpWorker();
 }
 
 async function refreshAllFeedsOnce() {
