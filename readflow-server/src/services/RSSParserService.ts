@@ -31,12 +31,17 @@ export class RSSParserService {
   private static readonly FULLTEXT_COOLDOWN_403_MAX_MS = 30 * 60_000;
   private static readonly FULLTEXT_TIMEOUT_BACKOFF_BASE_MS = 2000;
   private static readonly FULLTEXT_TIMEOUT_BACKOFF_MAX_MS = 60_000;
+  private static readonly FULLTEXT_DOMAIN_STATE_MAX = 5000;
+  private static readonly FULLTEXT_DOMAIN_STATE_TTL_MS = 6 * 60 * 60_000;
+  private static readonly FULLTEXT_DOMAIN_STATE_PRUNE_INTERVAL_MS = 5 * 60_000;
+  private static fulltextDomainLastPruneAt = 0;
 
   private static readonly fulltextDomainStates = new Map<string, {
     tail: Promise<void>;
     nextAllowedAt: number;
     cooldownUntil: number;
     timeoutStrikes: number;
+    lastSeenAt: number;
   }>();
 
   private constructor() {}
@@ -440,17 +445,45 @@ export class RSSParserService {
 
   private getOrCreateFulltextDomainState(hostname: string) {
     const key = hostname || 'unknown';
+    const now = Date.now();
+    this.pruneFulltextDomainStatesIfNeeded(now);
     const existing = RSSParserService.fulltextDomainStates.get(key);
-    if (existing) return existing;
+    if (existing) {
+      existing.lastSeenAt = now;
+      RSSParserService.fulltextDomainStates.delete(key);
+      RSSParserService.fulltextDomainStates.set(key, existing);
+      return existing;
+    }
 
     const created = {
       tail: Promise.resolve(),
       nextAllowedAt: 0,
       cooldownUntil: 0,
       timeoutStrikes: 0,
+      lastSeenAt: now,
     };
     RSSParserService.fulltextDomainStates.set(key, created);
     return created;
+  }
+
+  private pruneFulltextDomainStatesIfNeeded(now: number) {
+    if (now - RSSParserService.fulltextDomainLastPruneAt < RSSParserService.FULLTEXT_DOMAIN_STATE_PRUNE_INTERVAL_MS) {
+      return;
+    }
+    RSSParserService.fulltextDomainLastPruneAt = now;
+
+    const expireBefore = now - RSSParserService.FULLTEXT_DOMAIN_STATE_TTL_MS;
+    for (const [k, v] of RSSParserService.fulltextDomainStates.entries()) {
+      if (v.lastSeenAt < expireBefore) {
+        RSSParserService.fulltextDomainStates.delete(k);
+      }
+    }
+
+    while (RSSParserService.fulltextDomainStates.size > RSSParserService.FULLTEXT_DOMAIN_STATE_MAX) {
+      const firstKey = RSSParserService.fulltextDomainStates.keys().next().value as string | undefined;
+      if (!firstKey) break;
+      RSSParserService.fulltextDomainStates.delete(firstKey);
+    }
   }
 
   private static async sleep(ms: number): Promise<void> {

@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -42,6 +42,8 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "fix: 清理图片代理URL中的额外字符并优化预热流处理",
+    "feat: 升级应用版本至6.6.0并优化服务端图片缓存",
     "feat(同步): 实现强制刷新功能并更新版本号至6.5.2",
     "fix(tsconfig): 更新tsconfig配置并修复Prisma导入路径",
     "feat(同步): 实现服务端游标同步机制并优化性能",
@@ -59,8 +61,6 @@
     "feat: 优化图片代理策略并修复懒加载图片问题",
     "fix(StorageService): 修正文章字数统计和阅读时间的映射",
     "feat: 实现词汇表功能并优化图片代理策略",
-    "feat: 增强图片代理功能并添加同步设置",
-    "feat(注册流程): 实现注册后自动登录功能",
-    "refactor: 重命名项目从 TechFlow 到 ReadFlow 并重构服务端架构"
+    "feat: 增强图片代理功能并添加同步设置"
   ]
 }

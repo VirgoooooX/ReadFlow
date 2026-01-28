@@ -62,17 +62,27 @@ export async function fetchWithRetry(
   };
 
   for (let i = 0; i <= retries; i++) {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let abortListener: (() => void) | undefined;
     try {
-      // 创建超时 Promise
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), timeout);
-      });
+      const controller = new AbortController();
+      const parentSignal = (finalOptions as any).signal as AbortSignal | undefined;
+      const requestSignal = parentSignal ? controller.signal : controller.signal;
 
-      // 创建 fetch Promise
-      const fetchPromise = fetch(url, finalOptions);
+      if (parentSignal) {
+        if (parentSignal.aborted) {
+          controller.abort((parentSignal as any).reason);
+        } else {
+          abortListener = () => controller.abort((parentSignal as any).reason);
+          parentSignal.addEventListener('abort', abortListener);
+        }
+      }
 
-      // 使用 Promise.race 实现超时控制
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      if (timeout > 0 && Number.isFinite(timeout)) {
+        timeoutId = setTimeout(() => controller.abort(new Error('Request timeout')), timeout);
+      }
+
+      const response = await fetch(url, { ...finalOptions, signal: requestSignal } as any);
       return response;
     } catch (error) {
       if (i === retries) {
@@ -81,6 +91,15 @@ export async function fetchWithRetry(
       
       // 指数退避等待后重试
       await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, i)));
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      const parentSignal = (finalOptions as any).signal as AbortSignal | undefined;
+      if (parentSignal && abortListener) {
+        try {
+          parentSignal.removeEventListener('abort', abortListener);
+        } catch {
+        }
+      }
     }
   }
   
