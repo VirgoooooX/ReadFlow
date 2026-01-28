@@ -4,6 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+function sleepSync(ms) {
+  const t = Number(ms);
+  if (!Number.isFinite(t) || t <= 0) return;
+  const ia = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(ia, 0, 0, t);
+}
+
 function parseArgs(argv) {
   const out = {
     repository: 'virgoooox/readflowserver',
@@ -77,6 +84,75 @@ function run(cmd, args, options = {}) {
   if (typeof res.status === 'number' && res.status !== 0) {
     throw new Error(`Command failed: ${cmd} ${args.join(' ')}`);
   }
+}
+
+function isRetryableDockerPushOutput(text) {
+  const s = String(text || '').toLowerCase();
+  if (!s) return false;
+  return (
+    s.includes('dial tcp') ||
+    s.includes('connectex') ||
+    s.includes('tls handshake timeout') ||
+    s.includes('i/o timeout') ||
+    s.includes('timeout') ||
+    s.includes('connection reset') ||
+    s.includes('connection refused') ||
+    s.includes('eof') ||
+    s.includes('no such host') ||
+    s.includes('temporary failure') ||
+    s.includes('too many requests') ||
+    s.includes('429') ||
+    s.includes('service unavailable') ||
+    s.includes('502') ||
+    s.includes('503') ||
+    s.includes('504')
+  );
+}
+
+function runDockerPushWithRetry(imageRef, options = {}) {
+  const maxAttemptsRaw = process.env.DOCKER_PUSH_RETRIES;
+  const baseDelayMsRaw = process.env.DOCKER_PUSH_RETRY_BASE_MS;
+  const maxAttempts = Math.max(1, parseInt(String(maxAttemptsRaw || '5'), 10) || 5);
+  const baseDelayMs = Math.max(250, parseInt(String(baseDelayMsRaw || '2000'), 10) || 2000);
+
+  let lastOut = '';
+  let lastErr = '';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = spawnSync('docker', ['push', imageRef], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: options.cwd,
+      env: options.env,
+      encoding: 'utf8',
+      shell: false,
+    });
+
+    const stdout = res.stdout || '';
+    const stderr = res.stderr || '';
+    if (stdout) process.stdout.write(stdout);
+    if (stderr) process.stderr.write(stderr);
+    lastOut = stdout;
+    lastErr = stderr;
+
+    if (typeof res.status === 'number' && res.status === 0) return;
+
+    const combined = `${stdout}\n${stderr}`;
+    const retryable = isRetryableDockerPushOutput(combined);
+    const isLast = attempt >= maxAttempts;
+    if (!retryable || isLast) {
+      const extraHint = combined.toLowerCase().includes('docker desktop has no https proxy')
+        ? '\nHint: Docker Desktop 当前未配置 HTTPS 代理，且网络需要代理时会 push 失败。请在 Docker Desktop 的 Proxy 设置里配置 HTTPS_PROXY。\n'
+        : '';
+      throw new Error(`Command failed: docker push ${imageRef}${extraHint}`);
+    }
+
+    const jitter = 0.85 + Math.random() * 0.3;
+    const delayMs = Math.min(60_000, Math.round(baseDelayMs * Math.pow(2, attempt - 1) * jitter));
+    process.stdout.write(`\nRetry docker push (${attempt}/${maxAttempts}) failed, wait ${delayMs}ms then retry...\n`);
+    sleepSync(delayMs);
+  }
+
+  throw new Error(`Command failed: docker push ${imageRef}\n${String(lastOut).slice(-2000)}\n${String(lastErr).slice(-2000)}`);
 }
 
 function capture(cmd, args, options = {}) {
@@ -246,8 +322,8 @@ function main() {
     process.stdout.write('Skip docker login (use existing local docker credentials). Use --login to force.\n');
   }
   run('docker', buildCmd);
-  run('docker', ['push', tagVersion]);
-  run('docker', ['push', tagLatest]);
+  runDockerPushWithRetry(tagVersion, { cwd: serverDir, env: process.env });
+  runDockerPushWithRetry(tagLatest, { cwd: serverDir, env: process.env });
 
   process.stdout.write(`Done: pushed ${tagLatest} and ${tagVersion}\n`);
 }

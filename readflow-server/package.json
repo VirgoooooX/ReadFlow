@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -42,6 +42,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "fix(server): 重构图片预热队列为工作线程模式以提升性能",
     "fix: 改进fetch重试逻辑的超时与信号处理",
     "fix: 清理图片代理URL中的额外字符并优化预热流处理",
     "feat: 升级应用版本至6.6.0并优化服务端图片缓存",
@@ -60,7 +61,6 @@
     "feat: 添加RSS源停用检查并更新版本至6.2.0",
     "feat: 优化云同步配置指纹检测及文章清理功能",
     "feat: 优化图片代理策略并修复懒加载图片问题",
-    "fix(StorageService): 修正文章字数统计和阅读时间的映射",
-    "feat: 实现词汇表功能并优化图片代理策略"
+    "fix(StorageService): 修正文章字数统计和阅读时间的映射"
   ]
 }
