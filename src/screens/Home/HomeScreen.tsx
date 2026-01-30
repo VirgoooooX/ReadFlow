@@ -71,7 +71,7 @@ const nowMs = () => {
 };
 
 // 【优化】提取单独的 ArticleItem 组件，性能更好且代码更清晰
-const ArticleItem = memo(({ item, onPress, styles, isDark, theme, proxyServerUrl }: any) => {
+const ArticleItem = memo(({ item, onPress, styles, theme, proxyServerUrl }: any) => {
   // 格式化日期，看起来更友好
   const dateStr = useMemo(() => {
     const date = new Date(item.publishedAt);
@@ -158,7 +158,6 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   isRefreshing,
   onRefresh,
   onArticlePress,
-  isDark,
   theme,
   isActive,
   isNeighbor,
@@ -174,7 +173,6 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   isRefreshing: boolean;
   onRefresh: () => void;
   onArticlePress: (id: number) => void;
-  isDark: boolean;
   theme: any;
   isActive: boolean;
   isNeighbor: boolean;
@@ -185,7 +183,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   autoMarkReadOnScroll?: boolean;
   onMarkRead: (ids: number[]) => void;
 }, ref: React.Ref<any>) {
-  const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const flatListRef = useRef<any>(null);
   const ITEM_HEIGHT = 110;
 
@@ -346,8 +344,8 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
           refreshing={isRefreshing}
           onRefresh={onRefresh}
           title={sourceName === '全部' ? '下拉刷新' : `刷新 ${sourceName}`}
-          titleColor={theme?.colors?.outline}
-          tintColor={theme?.colors?.primary}
+          titleColor={theme.colors.outline}
+          tintColor={theme.colors.primary}
         />
       }
       onEndReached={isActive && hasMore && !isLoadingMore ? onLoadMore : null}
@@ -355,7 +353,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       ListFooterComponent={() => // 【新增】列表底部加载指示器
         isLoadingMore ? (
           <View style={{ padding: 20, alignItems: 'center' }}>
-            <ActivityIndicator size="small" color={theme?.colors?.primary} />
+            <ActivityIndicator size="small" color={theme.colors.primary} />
           </View>
         ) : null
       }
@@ -364,7 +362,6 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
           item={item}
           onPress={onArticlePress}
           styles={styles}
-          isDark={isDark}
           theme={theme}
           proxyServerUrl={proxyServerUrl}
         />
@@ -372,7 +369,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
       ListEmptyComponent={() => (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
-            <MaterialIcons name="inbox" size={64} color={theme?.colors?.outlineVariant} />
+            <MaterialIcons name="inbox" size={64} color={theme.colors.outlineVariant} />
           </View>
           <Text style={styles.emptyText}>
             {sourceName === '全部' ? '暂无文章' : `${sourceName} 暂无文章`}
@@ -387,7 +384,7 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
 }));
 
 const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { rssSources, syncAllSources, syncSource } = useRSSSource();
   const { settings: readingSettings } = useReadingSettings();
   const { settings } = useReadingSettings();
@@ -425,7 +422,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const loadRequestSeqRef = useRef(0);
   const latestLoadRequestRef = useRef<Map<string, number>>(new Map());
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   const routes = useMemo(() => {
     let baseRoutes: Array<{ key: string; title: string; unreadCount?: number }> = [{ key: 'all', title: '全部' }];
@@ -1093,7 +1090,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
                 : undefined
             });
           }}
-          isDark={isDark}
           theme={theme}
           isActive={isActive}
           isNeighbor={isNeighbor}
@@ -1129,7 +1125,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       </View>
     );
-  }, [routes, loadedTabs, isRefreshing, index, handleRefresh, isDark, theme, navigation, screenWidth, tabDataMap, handleLoadMore, getTabData, settings]);
+  }, [routes, loadedTabs, isRefreshing, index, handleRefresh, theme, navigation, screenWidth, tabDataMap, handleLoadMore, getTabData, settings]);
 
   const handleMarkAllRead = useCallback(async () => {
     Alert.alert(
@@ -1185,7 +1181,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       ]
     );
-  }, [routes, index]); // loadArticles removed from deps as it's no longer used here
+  }, [routes, index, showOnlyUnread]); // Added showOnlyUnread to deps
 
   const toggleShowOnlyUnread = useCallback(() => {
     setShowOnlyUnread(prev => !prev);
@@ -1223,15 +1219,15 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               marginRight: 10,
               // 描边风格
               borderWidth: 0,
-              borderColor: showOnlyUnread ? (isDark ? theme.colors.primary : '#FFFFFF') : (isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'),
-              backgroundColor: showOnlyUnread ? (isDark ? theme.colors.primary : '#FFFFFF') : 'transparent',
+              borderColor: showOnlyUnread ? (theme.isDark ? theme.colors.primary : '#FFFFFF') : (theme.isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)'),
+              backgroundColor: showOnlyUnread ? (theme.isDark ? theme.colors.primary : '#FFFFFF') : 'transparent',
             }}
             hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
           >
             <MaterialIcons
               name={showOnlyUnread ? "filter-list" : "filter-list-off"}
               size={18}
-              color={showOnlyUnread ? (isDark ? theme.colors.onPrimary : theme.colors.primary) : (isDark ? theme.colors.onSurfaceVariant : '#FFFFFF')}
+              color={showOnlyUnread ? (theme.isDark ? theme.colors.onPrimary : theme.colors.primary) : (theme.isDark ? theme.colors.onSurfaceVariant : '#FFFFFF')}
             />
           </TouchableOpacity>
 
@@ -1245,7 +1241,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
               borderRadius: 10,
               // 描边风格
               borderWidth: 0,
-              borderColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)',
+              borderColor: theme.isDark ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.8)',
               backgroundColor: 'transparent',
             }}
             hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
@@ -1253,7 +1249,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             <MaterialIcons
               name="done-all"
               size={18}
-              color={isDark ? theme.colors.onSurface : '#FFFFFF'}
+              color={theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary}
             />
           </TouchableOpacity>
         </View>
@@ -1284,16 +1280,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 // 【样式重构】
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
       // 移除 paddingHorizontal 和高度限制，让 TabBar 撑开
     },
     menuButton: {
@@ -1312,11 +1308,11 @@ const createStyles = (isDark: boolean, theme: any) =>
     menuContainer: {
       width: 160,
       borderRadius: 8,
-      backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
-      elevation: 5,
-      shadowColor: '#000',
+      backgroundColor: theme.colors.surface,
+      elevation: theme.isDark ? 6 : 5,
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
+      shadowOpacity: theme.isDark ? 0.3 : 0.25,
       shadowRadius: 3.84,
       paddingVertical: 4,
     },
@@ -1331,12 +1327,12 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     menuDivider: {
       height: StyleSheet.hairlineWidth,
-      backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+      backgroundColor: theme.colors.outlineVariant,
       marginHorizontal: 12,
     },
     lazyPlaceholder: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     articleListContainer: {
       paddingHorizontal: 12,
@@ -1345,25 +1341,25 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     // 文章卡片样式优化
     articleItem: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
+      backgroundColor: theme.colors.surface,
       borderRadius: 16,
       padding: 12,
       marginBottom: 10, // 卡片间距
       flexDirection: 'row',
       // 阴影效果 (iOS)
-      shadowColor: '#000',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.4 : 0.05,
+      shadowOpacity: theme.isDark ? 0.3 : 0.05,
       shadowRadius: 8,
       // 阴影效果 (Android)
-      elevation: isDark ? 2 : 2,
+      elevation: theme.isDark ? 3 : 2,
       // 深色模式下加可见边框
-      borderWidth: 1,
-      borderColor: isDark ? (theme?.colors?.outlineVariant || '#374151') : 'transparent',
+      borderWidth: theme.isDark ? 1 : 0,
+      borderColor: theme.isDark ? theme.colors.outlineVariant : 'transparent',
     },
     // 未读文章背景稍微亮一点/不同一点 (可选)
     articleItemUnread: {
-      backgroundColor: theme?.colors?.surfaceContainerLow || (isDark ? '#36343B' : '#FEF7FF'),
+      backgroundColor: theme.colors.surfaceContainerLow,
     },
     articleContent: {
       flex: 1,
@@ -1381,7 +1377,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      backgroundColor: theme.colors.primary,
       marginTop: 6, // 视觉上与第一行文字居中
       marginRight: 4,
     },
@@ -1389,7 +1385,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       flex: 1,
       ...typography.bodyLarge,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       opacity: 0.6, // 已读文章稍微淡一点
     },
     articleTitleUnread: {
@@ -1398,7 +1394,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     articleSubtitle: {
       ...typography.bodyMedium,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 10,
     },
     // 底部元信息行
@@ -1410,37 +1406,37 @@ const createStyles = (isDark: boolean, theme: any) =>
     sourceTag: {
       ...typography.bodySmall,
       fontWeight: '500',
-      color: theme?.colors?.primary || '#3B82F6',
+      color: theme.colors.primary,
       maxWidth: 100,
     },
     metaDivider: {
       ...typography.bodySmall,
-      color: theme?.colors?.outline || '#999',
+      color: theme.colors.outline,
       marginHorizontal: 6,
     },
     metaText: {
       ...typography.bodySmall,
-      color: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.outline,
     },
     // 图片容器
     imageShadowWrapper: {
       width: 80,
       height: 80,
       borderRadius: 12,
-      backgroundColor: isDark ? 'transparent' : theme?.colors?.surface, // 必须有背景色阴影才会生效
+      backgroundColor: theme.isDark ? 'transparent' : theme.colors.surface, // 必须有背景色阴影才会生效
       // iOS 阴影
-      shadowColor: isDark ? '#000000' : (theme?.colors?.primary || '#000000'),
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.6 : 0.25,
+      shadowOpacity: theme.isDark ? 0.5 : 0.2,
       shadowRadius: 8,
       // Android 阴影
-      elevation: 6,
+      elevation: theme.isDark ? 8 : 6,
     },
     imageContainer: {
       width: '100%',
       height: '100%',
       borderRadius: 12,
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#36343B' : '#F2F0F4'),
+      backgroundColor: theme.colors.surfaceVariant,
       overflow: 'hidden',
     },
     articleImage: {
@@ -1458,26 +1454,26 @@ const createStyles = (isDark: boolean, theme: any) =>
       width: 120,
       height: 120,
       borderRadius: 60,
-      backgroundColor: theme?.colors?.surfaceContainerHighest || (isDark ? '#36343B' : '#F2F0F4'),
+      backgroundColor: theme.colors.surfaceContainerHighest,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: 24,
     },
     emptyText: {
       ...typography.bodyLarge,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 24,
     },
     refreshButton: {
       paddingHorizontal: 24,
       paddingVertical: 10,
       borderRadius: 20,
-      backgroundColor: theme?.colors?.primaryContainer,
+      backgroundColor: theme.colors.primaryContainer,
     },
     refreshButtonText: {
       ...typography.labelMedium,
       fontWeight: '600',
-      color: theme?.colors?.onPrimaryContainer,
+      color: theme.colors.onPrimaryContainer,
     },
   });
 

@@ -1,8 +1,8 @@
 import { useColorScheme } from 'react-native';
-import { lightColors, darkColors, getColorTokens, semanticColors, type ColorTokens, type CustomColorConfig, type ThemePreset, themePresets, themePresetDescriptions, themePresetTags } from './colors';
+import { lightColors, darkColors, getColorTokens, getSemanticColorTokens, semanticColors, type ColorTokens, type CustomColorConfig, type ThemePreset, type SemanticColorTokens, themePresets, themePresetDescriptions, themePresetTags } from './colors';
 import { typography, readingTypography, adjustTypography, type TypographyTokens } from './typography';
 import { spacing, componentSpacing, layoutSpacing, borderRadius, elevation, sizes, zIndex } from './spacing';
-import { withAlpha, getContrastColor } from '../utils/colorUtils';
+import { getContrastColor, isContrastSafe, getContrastRatio, withAlpha } from '../utils/colorUtils';
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { themeStorageService, type ThemeSettings } from '../services/ThemeStorageService';
 import cacheEventEmitter from '../services/CacheEventEmitter';
@@ -10,6 +10,7 @@ import cacheEventEmitter from '../services/CacheEventEmitter';
 // 主题接口定义
 export interface Theme {
   colors: ColorTokens;
+  semantic: SemanticColorTokens;
   typography: TypographyTokens;
   spacing: typeof spacing;
   componentSpacing: typeof componentSpacing;
@@ -21,10 +22,32 @@ export interface Theme {
   isDark: boolean;
 }
 
+let lastValidatedThemeKey: string | null = null;
+
+function validateTheme(theme: Theme) {
+  const key = `${theme.isDark}-${theme.colors.primary}-${theme.colors.background}-${theme.colors.surface}`;
+  if (lastValidatedThemeKey === key) return;
+  lastValidatedThemeKey = key;
+
+  const pairs: Array<[string, string, string]> = [
+    ['background/onBackground', theme.colors.background, theme.colors.onBackground],
+    ['surface/onSurface', theme.colors.surface, theme.colors.onSurface],
+    ['primary/onPrimary', theme.colors.primary, theme.colors.onPrimary],
+    ['primaryContainer/onPrimaryContainer', theme.colors.primaryContainer, theme.colors.onPrimaryContainer],
+  ];
+
+  for (const [name, bg, fg] of pairs) {
+    if (!isContrastSafe(bg, fg, 4.5)) {
+      console.warn(`⚠️ Theme contrast low: ${name} ratio=${getContrastRatio(bg, fg).toFixed(2)} bg=${bg} fg=${fg}`);
+    }
+  }
+}
+
 // 创建主题对象
 export const createTheme = (isDark: boolean, customConfig?: CustomColorConfig): Theme => {
-  return {
+  const theme: Theme = {
     colors: getColorTokens(isDark, customConfig),
+    semantic: getSemanticColorTokens(isDark),
     typography,
     spacing,
     componentSpacing,
@@ -35,6 +58,8 @@ export const createTheme = (isDark: boolean, customConfig?: CustomColorConfig): 
     zIndex,
     isDark,
   };
+  if (__DEV__) validateTheme(theme);
+  return theme;
 };
 
 // 根据预设创建主题
@@ -46,13 +71,6 @@ export const createThemeFromPreset = (isDark: boolean, preset: ThemePreset): The
 // 预定义主题
 export const lightTheme = createTheme(false);
 export const darkTheme = createTheme(true);
-
-// 主题钩子 (简单版本，仅读)
-export const useTheme = (): Theme => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  return useMemo(() => createTheme(isDark), [isDark]);
-};
 
 // --- 完整主题上下文 ---
 
@@ -71,6 +89,13 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const useTheme = (): Theme => {
+  const colorScheme = useColorScheme();
+  const fallbackIsDark = colorScheme === 'dark';
+  const context = useContext(ThemeContext);
+  return useMemo(() => context?.theme ?? createTheme(fallbackIsDark), [context?.theme, fallbackIsDark]);
+};
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -244,8 +269,10 @@ export {
   lightColors,
   darkColors,
   getColorTokens,
+  getSemanticColorTokens,
   semanticColors,
   type ColorTokens,
+  type SemanticColorTokens,
   type CustomColorConfig,
   type ThemePreset,
   themePresets,

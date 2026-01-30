@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, TouchableOpacity } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,7 +20,6 @@ import {
   Image,
   StyleSheet,
   Dimensions,
-  StatusBar,
 } from 'react-native';
 
 // 导入屏幕组件（暂时使用占位符）
@@ -81,31 +80,6 @@ const VocabularyStack = createNativeStackNavigator<VocabularyStackParamList>();
 const RSSStack = createNativeStackNavigator<RSSStackParamList>();
 const UserStack = createNativeStackNavigator<UserStackParamList>();
 
-// 主题配置
-const lightTheme = {
-  dark: false,
-  colors: {
-    primary: '#6750A4',
-    background: '#FFFBFE',
-    card: '#FFFBFE',
-    text: '#1C1B1F',
-    border: '#79747E',
-    notification: '#B3261E',
-  },
-};
-
-const darkTheme = {
-  dark: true,
-  colors: {
-    primary: '#60A5FA',          // OLED 优化：亮蓝色主色
-    background: '#0C0F14',       // OLED 优化：纯黑背景
-    card: '#1F2937',             // OLED 优化：深灰卡片
-    text: '#F9FAFB',             // OLED 优化：高对比度白色文字
-    border: '#374151',           // OLED 优化：深灰边框
-    notification: '#F87171',     // OLED 优化：亮红色通知
-  },
-};
-
 // 认证堆栈导航
 function AuthStackNavigator() {
   return (
@@ -137,7 +111,7 @@ function HomeStackNavigator() {
     <HomeStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
-        ...getCommonScreenOptions(theme, isDark),
+        ...getCommonScreenOptions(theme),
       }}
     >
       <HomeStack.Screen
@@ -174,7 +148,7 @@ function VocabularyStackNavigator() {
     <VocabularyStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
-        ...getCommonScreenOptions(theme, isDark),
+        ...getCommonScreenOptions(theme),
       }}
     >
       <VocabularyStack.Screen
@@ -255,7 +229,7 @@ function RSSStackNavigator() {
     <RSSStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
-        ...getCommonScreenOptions(theme, isDark),
+        ...getCommonScreenOptions(theme),
       }}
     >
       <RSSStack.Screen
@@ -364,7 +338,7 @@ function UserStackNavigator() {
     <UserStack.Navigator
       screenOptions={{
         headerShown: false, // 隐藏原生导航栏
-        ...getCommonScreenOptions(theme, isDark),
+        ...getCommonScreenOptions(theme),
       }}
     >
       <UserStack.Screen
@@ -741,7 +715,7 @@ function RootNavigator() {
     <RootStack.Navigator
       screenOptions={{
         headerShown: false,
-        ...getCommonScreenOptions(theme, isDark),
+        ...getCommonScreenOptions(theme),
       }}
     >
       <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
@@ -756,7 +730,7 @@ function RootNavigator() {
         options={({ navigation, route }) => {
           const isNextArticle = (route as any).params?.isNextArticle || false;
           return {
-            ...getCommonScreenOptions(theme, theme.isDark),
+            ...getCommonScreenOptions(theme),
             headerShown: true,
             title: '文章详情',
             // 翻页用 fade，不影响返回动画
@@ -773,7 +747,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: '单词详情',
-          ...getCommonScreenOptions(theme, theme.isDark),
+          ...getCommonScreenOptions(theme),
         })}
       />
       <RootStack.Screen
@@ -782,7 +756,7 @@ function RootNavigator() {
         options={({ navigation }) => ({
           headerShown: true,
           title: 'RSS源详情',
-          ...getCommonScreenOptions(theme, theme.isDark),
+          ...getCommonScreenOptions(theme),
         })}
       />
       <RootStack.Screen
@@ -791,7 +765,7 @@ function RootNavigator() {
         options={{
           headerShown: true,
           title: '添加RSS源',
-          ...getCommonScreenOptions(theme, theme.isDark),
+          ...getCommonScreenOptions(theme),
         }}
       />
     </RootStack.Navigator>
@@ -800,8 +774,28 @@ function RootNavigator() {
 
 // 主应用导航器
 export default function AppNavigator() {
+  const { theme } = useThemeContext();
+  const navigationTheme = React.useMemo(
+    () => {
+      const baseTheme = theme.isDark ? DarkTheme : DefaultTheme;
+      return {
+        ...baseTheme,
+        dark: theme.isDark,
+        colors: {
+          ...baseTheme.colors,
+          primary: theme.colors.primary,
+          background: theme.colors.background,
+          card: theme.colors.surface,
+          text: theme.colors.onSurface,
+          border: theme.colors.outlineVariant || theme.colors.outline,
+          notification: theme.colors.error,
+        },
+      };
+    },
+    [theme]
+  );
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       <RootNavigator />
     </NavigationContainer>
   );

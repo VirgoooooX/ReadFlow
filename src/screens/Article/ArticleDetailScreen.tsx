@@ -64,13 +64,12 @@ const formatDateForMeta = (date: Date | string): string => {
 const BottomProgressBar: React.FC<{
   progress: number;
   color: string;
-  isDark: boolean;
   showNextHint: boolean;
   hasNextArticle: boolean;
   isLastArticle: boolean;
   noUnreadArticle: boolean;
   theme: any;
-}> = ({ progress, color, isDark, showNextHint, hasNextArticle, isLastArticle, noUnreadArticle, theme }) => {
+}> = ({ progress, color, showNextHint, hasNextArticle, isLastArticle, noUnreadArticle, theme }) => {
   // 动画值
   const progressAnim = useRef(new Animated.Value(0)).current;
   const hintTranslateY = useRef(new Animated.Value(50)).current;  // 提示框位移：0 = 显示位置, 50 = 隐藏在底部
@@ -175,21 +174,21 @@ const BottomProgressBar: React.FC<{
 
   // 提示框背景色：灰色表示无交互，高亮主色表示有交互
   const pillBackgroundColor = isGray
-    ? (isDark ? 'rgba(50,50,50,0.95)' : 'rgba(240,240,240,0.95)')
-    : (theme?.colors?.primary || color);
+    ? hexToRgba(theme.colors.surfaceContainerHighest, 0.95)
+    : theme.colors.primary;
 
   const pillTextColor = isGray
-    ? (isDark ? '#AAA' : '#666')
-    : '#FFF';
+    ? theme.colors.onSurfaceVariant
+    : theme.colors.onPrimary;
 
   // Hex 转 RGBA 工具函数
-  const hexToRgba = (hex: string, alpha: number) => {
+  function hexToRgba(hex: string, alpha: number) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (result) {
       return `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`;
     }
     return hex;
-  };
+  }
 
   // 生成渐变色（从底部到顶部渐变透明）
   const getGradientColors = () => {
@@ -201,9 +200,9 @@ const BottomProgressBar: React.FC<{
       ];
     }
     return [
-      'rgba(103, 80, 164, 0.9)',
-      'rgba(103, 80, 164, 0.4)',
-      'rgba(103, 80, 164, 0)',
+      hexToRgba(theme.colors.primary, 0.9),
+      hexToRgba(theme.colors.primary, 0.4),
+      hexToRgba(theme.colors.primary, 0),
     ];
   };
 
@@ -261,13 +260,13 @@ const BottomProgressBar: React.FC<{
           paddingHorizontal: 20,
           borderRadius: 30,
           // 优质阴影
-          shadowColor: '#000',
+          shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
           shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.2,
+          shadowOpacity: theme.isDark ? 0.3 : 0.2,
           shadowRadius: 8,
           elevation: 6,
           borderWidth: isGray ? 1 : 0,
-          borderColor: 'rgba(0,0,0,0.05)',
+          borderColor: theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
         }}>
           {!isGray && (
             <Animated.View style={{
@@ -348,13 +347,13 @@ const ArticleBodyLinesSkeleton: React.FC<{
 
 const ArticleHeaderSkeletonOverlay: React.FC<{
   article: Article;
-  isDark: boolean;
+  theme: any;
   readingSettings: any | null;
-}> = ({ article, isDark, readingSettings }) => {
-  const bg = isDark ? '#1C1B1F' : '#FFFFFF';
+}> = ({ article, theme, readingSettings }) => {
+  const bg = theme.colors.background;
   const baseFontSize = Number(readingSettings?.fontSize) > 0 ? Number(readingSettings.fontSize) : 16;
   const baseLineHeightMultiplier = Number(readingSettings?.lineHeight) > 0 ? Number(readingSettings.lineHeight) : 1.8;
-  const lineBase = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const lineBase = theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
   const titleLineHeight = baseFontSize * 1.4 * 1.25;
   const subtitleLineHeight = baseFontSize * 1.2 * 1.5;
@@ -392,7 +391,7 @@ const ArticleHeaderSkeletonOverlay: React.FC<{
           <View style={{ width: 150, height: metaBarH, borderRadius: 8, backgroundColor: lineBase, marginRight: 12, marginBottom: 8 }} />
           <View style={{ width: 100, height: metaBarH, borderRadius: 8, backgroundColor: lineBase, marginRight: 12, marginBottom: 8 }} />
         </View>
-        <ArticleBodyLinesSkeleton isDark={isDark} baseFontSize={baseFontSize} lineHeightMultiplier={baseLineHeightMultiplier} />
+        <ArticleBodyLinesSkeleton isDark={theme.isDark} baseFontSize={baseFontSize} lineHeightMultiplier={baseLineHeightMultiplier} />
       </View>
     </View>
   );
@@ -402,7 +401,7 @@ const ArticleDetailScreen: React.FC = () => {
   const route = useRoute<ArticleDetailRouteProp>();
   const navigation = useNavigation();
   const { articleId, articleIds, currentIndex, article: passedArticle, perf } = route.params as any;
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const {
     settings: readingSettings,
     loading: settingsLoading, // Restore destructured variable name
@@ -478,7 +477,7 @@ const ArticleDetailScreen: React.FC = () => {
     }
   }, [hasNextArticle, showLastArticleHint, noUnreadArticle]);
 
-  const styles = createStyles(isDark, theme, readingSettings);
+  const styles = createStyles(theme, readingSettings);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -1138,12 +1137,11 @@ const ArticleDetailScreen: React.FC = () => {
     logger.info(`[ArticleDetail] 最终传递的 imageUrl = ${finalImageUrl}`);
 
     const html = generateArticleHtml({
+      theme,
       content: article.content,
       fontSize: readingSettings.fontSize || 16,
       lineHeight: readingSettings.lineHeight || 1.8,
       fontFamily: getFontStackForWebView(readingSettings.fontFamily || 'system'),
-      isDark,
-      primaryColor: theme?.colors?.primary || '#3B82F6',
       title: article.title,
       titleCn: article.titleCn,
       sourceName: article.sourceName,
@@ -1167,7 +1165,7 @@ const ArticleDetailScreen: React.FC = () => {
       }`
     );
     return html;
-  }, [article, readingSettings, isDark, theme?.colors?.primary, initialScrollY, proxyServerUrl]);
+  }, [article, readingSettings, theme, initialScrollY, proxyServerUrl]);
 
   const webViewSource = useMemo(() => ({ html: htmlContent }), [htmlContent]);
 
@@ -1178,7 +1176,7 @@ const ArticleDetailScreen: React.FC = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator
           size="large"
-          color={theme?.colors?.primary || '#3B82F6'}
+          color={theme.colors.primary}
         />
       </View>
     );
@@ -1187,7 +1185,7 @@ const ArticleDetailScreen: React.FC = () => {
   if (!article) {
     return (
       <View style={styles.errorContainer}>
-        <MaterialIcons name="error" size={48} color={theme?.colors?.error || '#B3261E'} />
+        <MaterialIcons name="error" size={48} color={theme.colors.error} />
       </View>
     );
   }
@@ -1197,12 +1195,11 @@ const ArticleDetailScreen: React.FC = () => {
       {/* 自定义顶部导航栏 - 为了支持 height: 35 必须使用自定义 View */}
       {/* 【修复】深色模式使用 surface 色，浅色模式使用 primary 色（与 CustomHeader 保持一致） */}
       <View style={[styles.customHeader, {
-        paddingTop: insets.top,
+        paddingTop: insets.top - 3, // 👈 整体上移 3 像素，同步 CustomHeader
+        paddingBottom: 3,           // 👈 补偿间距
         height: 35 + insets.top,
-        backgroundColor: isDark
-          ? (theme?.colors?.surface || '#1F2937')   // 深色模式：使用 surface 色
-          : (theme?.colors?.primary || '#6750A4'),  // 浅色模式：使用 primary 色
-        shadowColor: '#000',
+        backgroundColor: theme.isDark ? theme.colors.surface : theme.colors.primary,
+        shadowColor: theme.colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 2,
@@ -1216,7 +1213,7 @@ const ArticleDetailScreen: React.FC = () => {
           <MaterialIcons
             name="arrow-back"
             size={24}
-            color={isDark ? (theme?.colors?.onSurface || '#F9FAFB') : (theme?.colors?.onPrimary || '#FFFFFF')}
+            color={theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary}
           />
         </TouchableOpacity>
 
@@ -1235,7 +1232,7 @@ const ArticleDetailScreen: React.FC = () => {
               })
             }
           ]}>
-            <Text style={[styles.headerTitle, { color: isDark ? (theme?.colors?.onSurface || '#F9FAFB') : (theme?.colors?.onPrimary || '#FFFFFF') }]} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary }]} numberOfLines={1}>
               文章详情
             </Text>
           </Animated.View>
@@ -1249,7 +1246,7 @@ const ArticleDetailScreen: React.FC = () => {
               opacity: titleFadeAnim // 直接使用 0->1 的动画值
             }
           ]}>
-            <Text style={[styles.headerTitle, { color: isDark ? (theme?.colors?.onSurface || '#F9FAFB') : (theme?.colors?.onPrimary || '#FFFFFF') }]} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary }]} numberOfLines={1}>
               {article?.title || ''}
             </Text>
           </Animated.View>
@@ -1306,7 +1303,7 @@ const ArticleDetailScreen: React.FC = () => {
               }}
               renderLoading={() => (
                 <View style={styles.webViewLoading}>
-                  <ActivityIndicator size="small" color={theme?.colors?.primary} />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 </View>
               )}
               {...(Platform.OS === 'android' && {
@@ -1334,7 +1331,7 @@ const ArticleDetailScreen: React.FC = () => {
           >
             <ArticleHeaderSkeletonOverlay
               article={article}
-              isDark={isDark}
+              theme={theme}
               readingSettings={readingSettings}
             />
           </Animated.View>
@@ -1373,8 +1370,7 @@ const ArticleDetailScreen: React.FC = () => {
       {/* 【修改】底部进度条 - 带联动动画 */}
       <BottomProgressBar
         progress={readingProgress}
-        color={theme?.colors?.primary || '#3B82F6'}
-        isDark={isDark}
+        color={theme.colors.primary}
         showNextHint={showNextHint}
         hasNextArticle={hasNextArticle || false}
         isLastArticle={showLastArticleHint}
@@ -1385,23 +1381,23 @@ const ArticleDetailScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
+const createStyles = (theme: any, readingSettings?: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     errorContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     webView: {
       flex: 1,
@@ -1409,7 +1405,7 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
     },
     readerContainer: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     webViewLoading: {
       position: 'absolute',
@@ -1441,9 +1437,9 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
       position: 'relative', // 相对定位，作为绝对定位子元素的锚点
     },
     headerTitle: {
-      fontSize: 17,      // 调小一点 (原为18)
-      fontWeight: '900', // 严格同步 CustomHeader 字重 (Extra Bold)
-      color: theme?.colors?.onPrimary || '#FFFFFF', // 确保白色文字
+      fontSize: 19,      // 👈 同步 CustomHeader 字号
+      fontWeight: Platform.OS === 'ios' ? '900' : 'bold', // 👈 同步 CustomHeader 字重策略
+      color: theme.colors.onPrimary,
     },
     headerRight: {
       width: 48,

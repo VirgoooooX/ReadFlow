@@ -24,8 +24,8 @@ interface Props {
 }
 
 export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   const serverId = route?.params?.serverId;
   const isEditing = !!serverId;
@@ -155,7 +155,7 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={theme?.colors?.primary || '#3B82F6'} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -170,7 +170,7 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
             <TextInput
               style={styles.input}
               placeholder="如：家里代理、公司代理"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={name}
               onChangeText={setName}
               autoCapitalize="none"
@@ -193,7 +193,7 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
                 testResult === 'fail' && styles.inputError,
               ]}
               placeholder="如 https://proxy.yourdomain.com"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={serverUrl}
               onChangeText={(text) => {
                 setServerUrl(text);
@@ -207,7 +207,7 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
               <MaterialIcons 
                 name="check-circle" 
                 size={24} 
-                color="#10B981" 
+                color={theme.colors.primary} 
                 style={styles.inputIcon}
               />
             )}
@@ -215,7 +215,7 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
               <MaterialIcons 
                 name="error" 
                 size={24} 
-                color="#EF4444" 
+                color={theme.colors.error} 
                 style={styles.inputIcon}
               />
             )}
@@ -229,7 +229,7 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
             <TextInput
               style={styles.input}
               placeholder="如果服务器配置了 Token，请在此输入"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={token}
               onChangeText={setToken}
               autoCapitalize="none"
@@ -283,10 +283,10 @@ export const AddEditProxyServerScreen: React.FC<Props> = ({ route, navigation })
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
   },
   centerContent: {
     justifyContent: 'center',
@@ -301,7 +301,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
 sectionTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 10,
       marginTop: -5,  // 👈 增加与上方容器的距离
       textTransform: 'uppercase',
@@ -311,20 +311,20 @@ sectionTitle: {
     position: 'relative',
   },
   input: {
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#1E1E1E' : '#FFFFFF'),
+    backgroundColor: theme.colors.surfaceVariant,
     borderWidth: 2,
-    borderColor: theme?.colors?.outline || (isDark ? '#333' : '#E0E0E0'),
+    borderColor: theme.colors.outline,
     borderRadius: 12,
     padding: 16,
     paddingRight: 48,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
   },
   inputSuccess: {
-    borderColor: '#10B981',
+    borderColor: theme.semantic.success,
   },
   inputError: {
-    borderColor: '#EF4444',
+    borderColor: theme.semantic.error,
   },
   inputIcon: {
     position: 'absolute',
@@ -333,7 +333,7 @@ sectionTitle: {
   },
   helpText: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 8,
   },
   button: {
@@ -346,16 +346,16 @@ sectionTitle: {
     marginBottom: 12,
   },
   buttonPrimary: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
   },
   buttonTest: {
-    backgroundColor: theme?.colors?.secondary || '#8B5CF6',
+    backgroundColor: theme.colors.secondary,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

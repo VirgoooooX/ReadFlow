@@ -156,7 +156,7 @@ const FilterRuleEditorScreen: React.FC = () => {
     setSelectedSources(newSet);
   };
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -207,7 +207,7 @@ const FilterRuleEditorScreen: React.FC = () => {
             <MaterialIcons 
               name="block" 
               size={18} 
-              color={mode === 'exclude' ? '#FFF' : theme.colors.onSurfaceVariant} 
+              color={mode === 'exclude' ? theme.colors.onError : theme.colors.onSurfaceVariant} 
             />
             <Text style={[styles.segmentText, mode === 'exclude' && styles.segmentTextActive]}>
               屏蔽 (黑名单)
@@ -221,7 +221,7 @@ const FilterRuleEditorScreen: React.FC = () => {
             <MaterialIcons 
               name="check-circle" 
               size={18} 
-              color={mode === 'include' ? '#FFF' : theme.colors.onSurfaceVariant} 
+              color={mode === 'include' ? theme.colors.onPrimary : theme.colors.onSurfaceVariant} 
             />
             <Text style={[styles.segmentText, mode === 'include' && styles.segmentTextActive]}>
               保留 (白名单)
@@ -247,7 +247,7 @@ const FilterRuleEditorScreen: React.FC = () => {
             <MaterialIcons 
               name="public" 
               size={18} 
-              color={scope === 'global' ? '#FFF' : theme.colors.onSurfaceVariant} 
+              color={scope === 'global' ? theme.colors.onSecondary : theme.colors.onSurfaceVariant} 
             />
             <Text style={[styles.segmentText, scope === 'global' && styles.segmentTextActive]}>
               全局 (所有源)
@@ -261,7 +261,7 @@ const FilterRuleEditorScreen: React.FC = () => {
             <MaterialIcons 
               name="radio-button-checked" 
               size={18} 
-              color={scope === 'specific' ? '#FFF' : theme.colors.onSurfaceVariant} 
+              color={scope === 'specific' ? theme.colors.onSecondary : theme.colors.onSurfaceVariant} 
             />
             <Text style={[styles.segmentText, scope === 'specific' && styles.segmentTextActive]}>
               指定源
@@ -330,7 +330,7 @@ const FilterRuleEditorScreen: React.FC = () => {
         disabled={loading}
         activeOpacity={0.8}
       >
-        <MaterialIcons name="save" size={20} color="#FFF" />
+        <MaterialIcons name="save" size={20} color={theme.colors.onPrimary} />
         <Text style={styles.saveButtonText}>
           {editingRuleId ? '保存更改' : '创建规则'}
         </Text>
@@ -341,7 +341,7 @@ const FilterRuleEditorScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -369,9 +369,9 @@ const createStyles = (isDark: boolean, theme: any) =>
       padding: 16,
       marginHorizontal: 16,
       marginBottom: 16,
-      shadowColor: '#000',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0 : 0.05,
+      shadowOpacity: theme.isDark ? 0.3 : 0.05,
       shadowRadius: 2,
       elevation: 1,
     },
@@ -437,7 +437,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       color: theme.colors.onSurfaceVariant,
     },
     segmentTextActive: {
-      color: '#FFF',
+      color: theme.isDark ? theme.colors.onSurface : '#FFFFFF',
     },
     sourceList: {
       marginTop: 12,
@@ -516,7 +516,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       opacity: 0.5,
     },
     saveButtonText: {
-      color: '#FFF',
+      color: theme.colors.onPrimary,
       fontSize: 16,
       fontWeight: 'bold',
     },

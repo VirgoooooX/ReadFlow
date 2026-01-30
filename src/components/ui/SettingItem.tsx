@@ -39,8 +39,8 @@ export const SettingItem: React.FC<SettingItemProps> = ({
   isDestructive = false,
   disabled = false,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <>
@@ -58,8 +58,8 @@ export const SettingItem: React.FC<SettingItemProps> = ({
                 size={20}
                 color={
                   isDestructive
-                    ? theme?.colors?.error || '#EF4444'
-                    : color || theme?.colors?.onSurfaceVariant || '#666'
+                    ? theme.colors.error
+                    : color || theme.colors.onSurfaceVariant
                 }
               />
             </View>
@@ -67,7 +67,7 @@ export const SettingItem: React.FC<SettingItemProps> = ({
           <Text
             style={[
               styles.menuText,
-              isDestructive && { color: theme?.colors?.error || '#EF4444' },
+              isDestructive && { color: theme.colors.error },
             ]}
           >
             {label}
@@ -81,7 +81,7 @@ export const SettingItem: React.FC<SettingItemProps> = ({
             <MaterialIcons
               name="chevron-right"
               size={20}
-              color={theme?.colors?.outline || '#999'}
+              color={theme.colors.outline}
             />
           )}
         </View>
@@ -119,8 +119,8 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
   unit = '',
   isLast = false,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <>
@@ -132,7 +132,7 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
                 <MaterialIcons
                   name={icon}
                   size={20}
-                  color={theme?.colors?.primary || '#3B82F6'}
+                  color={theme.colors.primary}
                 />
               </View>
             )}
@@ -150,9 +150,9 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
             value={value}
             onValueChange={onValueChange}
             onSlidingComplete={onSlidingComplete}
-            minimumTrackTintColor={theme?.colors?.primary || '#6750A4'}
-            maximumTrackTintColor={theme?.colors?.outline || (isDark ? '#938F99' : '#79747E')}
-            thumbTintColor={theme?.colors?.primary || '#6750A4'}
+            minimumTrackTintColor={theme.colors.primary}
+            maximumTrackTintColor={theme.colors.outline}
+            thumbTintColor={theme.colors.primary}
           />
           <Text style={styles.sliderLabel}>{max}{unit}</Text>
         </View>
@@ -171,8 +171,8 @@ interface SettingGroupProps {
  * 设置选项分组容器 (卡片外观)
  */
 export const SettingGroup: React.FC<SettingGroupProps> = ({ children, style }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return <View style={[styles.menuGroupCard, style]}>{children}</View>;
 };
@@ -191,8 +191,8 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   children,
   containerStyle,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <View style={[styles.menuGroupContainer, containerStyle]}>
@@ -202,21 +202,21 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     menuGroupContainer: {
       marginBottom: 20,
     },
     menuGroupCard: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
+      backgroundColor: theme.colors.surface,
       borderRadius: 12,
       overflow: 'hidden',
       // 深色模式下添加细边框增强视觉分离
-      borderWidth: isDark ? 1 : 0,
-      borderColor: isDark ? (theme?.colors?.outlineVariant || '#374151') : 'transparent',
-      shadowColor: '#000',
+      borderWidth: theme.isDark ? 1 : 0,
+      borderColor: theme.isDark ? theme.colors.outlineVariant : 'transparent',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
+      shadowOpacity: theme.isDark ? 0.3 : 0.08,
       shadowRadius: 8,
       elevation: 3,
     },
@@ -230,7 +230,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     menuDivider: {
       height: StyleSheet.hairlineWidth,
-      backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+      backgroundColor: theme.colors.outlineVariant,
       marginHorizontal: 14,
     },
     menuLeft: {
@@ -248,7 +248,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     menuText: {
       ...typography.bodyLarge,
       fontWeight: '500',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
     },
     menuRight: {
       flexDirection: 'row',
@@ -257,12 +257,12 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     menuValueText: {
       ...typography.bodySmall,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       fontWeight: '500',
     },
     sectionTitle: {
       ...typography.titleMedium,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 10,
       marginTop: -5,
       textTransform: 'uppercase',
@@ -291,7 +291,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     sliderLabel: {
       fontSize: 10,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       minWidth: 24,
       textAlign: 'center',
     },

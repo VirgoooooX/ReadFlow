@@ -27,8 +27,8 @@ function normalizeServerUrl(input: string): string {
 }
 
 export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   const settingsService = SettingsService.getInstance();
   const [config, setConfig] = useState<CloudConfig | null>(null);
@@ -342,7 +342,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                     <CleanText style={styles.cardTitle}>{activeProxyServer.name}</CleanText>
                     <CleanText style={styles.cardSubtitle}>{activeProxyServer.serverUrl}</CleanText>
                 </View>
-                <Icon name="check-circle" size={20} color="#10B981" />
+                <Icon name="check-circle" size={20} color={theme.semantic.success} />
             </View>
             <View style={styles.optionDivider} />
             <TouchableOpacity 
@@ -375,7 +375,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
         <View style={styles.card}>
             {isConnected ? (
             <View style={styles.cardInternalRow}>
-                <Icon name="cloud-done" size={24} color="#10B981" />
+                <Icon name="cloud-done" size={24} color={theme.semantic.success} />
                 <View style={styles.cardInfo}>
                     <CleanText style={styles.cardTitle}>已连接到服务器</CleanText>
                     <CleanText style={styles.cardSubtitle}>{config?.serverUrl}</CleanText>
@@ -388,7 +388,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
             <>
                 <View style={styles.inputContainer}>
                     <View style={styles.inputHeader}>
-                        <Icon name="link" size={24} color={theme?.colors?.primary} />
+                        <Icon name="link" size={24} color={theme.colors.primary} />
                         <CleanText style={styles.inputLabel}>服务器地址</CleanText>
                     </View>
                     <TextInput
@@ -396,7 +396,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                         value={cloudServerUrl}
                         onChangeText={setCloudServerUrl}
                         placeholder="http://your-server.com"
-                        placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                        placeholderTextColor={theme.colors.onSurfaceVariant}
                         autoCapitalize="none"
                         autoCorrect={false}
                     />
@@ -405,7 +405,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                 
                 <View style={styles.inputContainer}>
                     <View style={styles.inputHeader}>
-                        <Icon name="vpn-key" size={24} color={theme?.colors?.primary} />
+                        <Icon name="vpn-key" size={24} color={theme.colors.primary} />
                         <CleanText style={styles.inputLabel}>访问码 (可选)</CleanText>
                     </View>
                     <TextInput
@@ -413,7 +413,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                         value={cloudAccessKey}
                         onChangeText={setCloudAccessKey}
                         placeholder="Server Access Key"
-                        placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                        placeholderTextColor={theme.colors.onSurfaceVariant}
                         autoCapitalize="none"
                         autoCorrect={false}
                         secureTextEntry
@@ -422,7 +422,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity 
-                    style={[styles.actionButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: styles.optionDivider.backgroundColor }]}
+                    style={[styles.actionButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.outlineVariant }]}
                     onPress={handleTestCloudConnection}
                     disabled={testingConnection || !cloudServerUrl.trim()}
                 >
@@ -449,7 +449,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                         <Icon name="account-circle" size={36} color={theme.colors.primary} />
                         <View style={styles.cardInfo}>
                             <CleanText style={styles.cardTitle}>{config?.auth?.user?.email}</CleanText>
-                            <CleanText style={{fontSize: 12, color: '#10B981'}}>已登录</CleanText>
+                            <CleanText style={{fontSize: 12, color: theme.semantic.success}}>已登录</CleanText>
                         </View>
                         <TouchableOpacity onPress={handleLogoutCloud} style={styles.logoutButton}>
                             <Icon name="logout" size={20} color={theme.colors.onSurfaceVariant} />
@@ -484,8 +484,8 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                         value={syncSettings.imageCompression ?? false}
                         onValueChange={(val: boolean) => saveSyncSettings({ imageCompression: val })}
                         disabled={syncing}
-                        trackColor={{ false: isDark ? '#4a4a4a' : '#e0e0e0', true: theme.colors.primaryContainer }}
-                        thumbColor={syncSettings.imageCompression ?? false ? theme.colors.primary : '#f4f3f4'}
+                        trackColor={{ false: theme.colors.surfaceVariant, true: theme.colors.primary }}
+                        thumbColor={syncSettings.imageCompression ?? false ? theme.colors.onPrimary : theme.colors.outline}
                     />
                 </View>
                 <View style={styles.optionDivider} />
@@ -545,7 +545,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -568,12 +568,12 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     // New Card Styles
     card: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      backgroundColor: theme.colors.surface,
       borderRadius: 12,
       overflow: 'hidden',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
+      shadowOpacity: 0.08,
       shadowRadius: 8,
       elevation: 3,
       marginBottom: 0, // Controlled by section
@@ -588,7 +588,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     optionDivider: {
       height: StyleSheet.hairlineWidth,
-      backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+      backgroundColor: theme.colors.outlineVariant,
       marginHorizontal: 14,
     },
     optionLeft: {
@@ -597,7 +597,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       flex: 1,
     },
     selectedOption: {
-      backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
+      backgroundColor: theme.colors.primaryContainer,
     },
     optionTextContainer: {
         marginLeft: 12,
@@ -607,23 +607,23 @@ const createStyles = (isDark: boolean, theme: any) =>
     optionTitle: {
       fontSize: 15,
       fontWeight: '500',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
       marginBottom: 2,
     },
     optionDesc: {
         fontSize: 12,
-        color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+        color: theme.colors.onSurfaceVariant,
         lineHeight: 16,
     },
     selectedText: {
-      color: theme?.colors?.primary || '#6750A4',
+      color: theme.colors.primary,
       fontWeight: '600',
     },
     // Input Styles
     inputContainer: {
       padding: 14,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+      borderBottomColor: theme.colors.outlineVariant,
     },
     inputHeader: {
       flexDirection: 'row',
@@ -633,21 +633,21 @@ const createStyles = (isDark: boolean, theme: any) =>
     inputLabel: {
       fontSize: 15,
       fontWeight: '500',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
       marginLeft: 12,
       flex: 1,
     },
     textInput: {
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#F0F0F0'),
+      backgroundColor: theme.colors.surfaceVariant,
       borderRadius: 8,
       padding: 12,
       fontSize: 15,
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
       marginBottom: 8,
     },
     inputHint: {
       fontSize: 13,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
     },
     // Button Styles
     actionButton: {
@@ -661,10 +661,10 @@ const createStyles = (isDark: boolean, theme: any) =>
       fontSize: 15,
       fontWeight: '500',
       marginLeft: 8,
-      color: theme?.colors?.primary || '#6750A4',
+      color: theme.colors.primary,
     },
     primaryButton: {
-      backgroundColor: theme?.colors?.primary || '#6750A4',
+      backgroundColor: theme.colors.primary,
       borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
@@ -672,7 +672,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginTop: 8,
     },
     primaryButtonText: {
-        color: '#FFFFFF',
+        color: theme.colors.onPrimary,
         fontWeight: '600',
         fontSize: 15,
     },
@@ -689,12 +689,12 @@ const createStyles = (isDark: boolean, theme: any) =>
     cardTitle: {
       fontSize: 15,
       fontWeight: '600',
-      color: theme?.colors?.onSurface,
+      color: theme.colors.onSurface,
       marginBottom: 2,
     },
     cardSubtitle: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant,
+      color: theme.colors.onSurfaceVariant,
     },
     emptyStateContainer: {
       alignItems: 'center',

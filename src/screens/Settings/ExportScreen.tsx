@@ -12,7 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 
 const ExportScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const [includeReadHistory, setIncludeReadHistory] = useState(true);
   const [includeFavorites, setIncludeFavorites] = useState(true);
   const [includeSettings, setIncludeSettings] = useState(true);
@@ -20,7 +20,7 @@ const ExportScreen: React.FC = () => {
   const [includeCategories, setIncludeCategories] = useState(true);
   const [exportFormat, setExportFormat] = useState('JSON');
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   const formatOptions = ['JSON', 'CSV', 'XML'];
 
@@ -50,7 +50,7 @@ const ExportScreen: React.FC = () => {
   ) => (
     <View style={styles.switchItem}>
       <View style={styles.switchLeft}>
-        <MaterialIcons name={icon as any} size={24} color={theme?.colors?.primary} />
+        <MaterialIcons name={icon as any} size={24} color={theme.colors.primary} />
         <View style={styles.switchContent}>
           <Text style={styles.switchTitle}>{title}</Text>
           <Text style={styles.switchDescription}>{description}</Text>
@@ -60,10 +60,10 @@ const ExportScreen: React.FC = () => {
         value={value}
         onValueChange={onValueChange}
         trackColor={{
-          false: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
-          true: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
+          false: theme.colors.outline,
+          true: theme.colors.primaryContainer,
         }}
-        thumbColor={value ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant}
+        thumbColor={value ? theme.colors.primary : theme.colors.onSurfaceVariant}
       />
     </View>
   );
@@ -81,7 +81,7 @@ const ExportScreen: React.FC = () => {
         <MaterialIcons 
           name={format === 'JSON' ? 'code' : format === 'CSV' ? 'table-chart' : 'description'} 
           size={24} 
-          color={exportFormat === format ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant} 
+          color={exportFormat === format ? theme.colors.primary : theme.colors.onSurfaceVariant} 
         />
         <View style={styles.formatContent}>
           <Text style={[
@@ -98,7 +98,7 @@ const ExportScreen: React.FC = () => {
         </View>
       </View>
       {exportFormat === format && (
-        <MaterialIcons name="check" size={20} color={theme?.colors?.primary} />
+        <MaterialIcons name="check" size={20} color={theme.colors.primary} />
       )}
     </TouchableOpacity>
   );
@@ -108,12 +108,12 @@ const ExportScreen: React.FC = () => {
       style={styles.exportButton}
       onPress={() => handleExport(format)}
     >
-      <MaterialIcons name={icon as any} size={24} color={theme?.colors?.primary} />
+      <MaterialIcons name={icon as any} size={24} color={theme.colors.primary} />
       <View style={styles.exportContent}>
         <Text style={styles.exportTitle}>导出为 {format}</Text>
         <Text style={styles.exportDescription}>{description}</Text>
       </View>
-      <MaterialIcons name="download" size={20} color={theme?.colors?.onSurfaceVariant} />
+      <MaterialIcons name="download" size={20} color={theme.colors.onSurfaceVariant} />
     </TouchableOpacity>
   );
 
@@ -184,7 +184,7 @@ const ExportScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>导出说明</Text>
           <View style={styles.infoCard}>
-            <MaterialIcons name="info" size={24} color={theme?.colors?.primary} />
+            <MaterialIcons name="info" size={24} color={theme.colors.primary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoTitle}>注意事项</Text>
               <Text style={styles.infoText}>
@@ -201,10 +201,10 @@ const ExportScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 16,
@@ -215,11 +215,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onBackground,
     marginBottom: 12,
   },
   card: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -242,12 +242,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   switchTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   switchDescription: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   formatItem: {
     flexDirection: 'row',
@@ -257,7 +257,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingHorizontal: 16,
   },
   selectedFormat: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
+    backgroundColor: theme.colors.primaryContainer,
   },
   formatLeft: {
     flexDirection: 'row',
@@ -271,15 +271,15 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   formatTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   selectedFormatText: {
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
   },
   formatDescription: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   exportButton: {
     flexDirection: 'row',
@@ -294,15 +294,15 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   exportTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   exportDescription: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   infoCard: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -315,12 +315,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },
 });

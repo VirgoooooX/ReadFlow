@@ -17,6 +17,7 @@ import { VocabularyEntry, WordDefinition } from '../../types';
 import type { VocabularyStackParamList } from '../../navigation/types';
 import { stripHtmlTags } from '../../utils/stringUtils';
 import * as StyleUtils from '../../utils/styleUtils';
+import { withAlpha } from '../../utils/colorUtils';
 
 type VocabularyDetailRouteProp = RouteProp<VocabularyStackParamList, 'VocabularyDetail'>;
 
@@ -24,13 +25,13 @@ const VocabularyDetailScreen: React.FC = () => {
   const route = useRoute<VocabularyDetailRouteProp>();
   const navigation = useNavigation();
   const { entryId } = route.params;
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   
   const [loading, setLoading] = useState(true);
   const [entry, setEntry] = useState<VocabularyEntry | null>(null);
   const [speaking, setSpeaking] = useState(false);
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   useEffect(() => {
     loadWordDetail();
@@ -118,15 +119,15 @@ const VocabularyDetailScreen: React.FC = () => {
 
   // 获取掌握程度标签
   const getMasteryInfo = (level: number) => {
-    if (level >= 5) return { text: '已掌握', color: '#22C55E', bg: '#E8F5E8' };
-    if (level >= 2) return { text: '学习中', color: '#F59E0B', bg: '#FFF3E0' };
-    return { text: '新单词', color: '#3B82F6', bg: '#E3F2FD' };
+    if (level >= 5) return { text: '已掌握', color: theme.semantic.success, bg: withAlpha(theme.semantic.success, 0.12) };
+    if (level >= 2) return { text: '学习中', color: theme.semantic.warning, bg: withAlpha(theme.semantic.warning, 0.12) };
+    return { text: '新单词', color: theme.semantic.info, bg: withAlpha(theme.semantic.info, 0.12) };
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme?.colors?.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>加载中...</Text>
       </View>
     );
@@ -135,7 +136,7 @@ const VocabularyDetailScreen: React.FC = () => {
   if (!entry) {
     return (
       <View style={styles.errorContainer}>
-        <MaterialIcons name="error-outline" size={48} color={theme?.colors?.error} />
+        <MaterialIcons name="error-outline" size={48} color={theme.colors.error} />
         <Text style={styles.errorText}>单词不存在</Text>
       </View>
     );
@@ -161,7 +162,7 @@ const VocabularyDetailScreen: React.FC = () => {
               <MaterialIcons 
                 name={speaking ? "volume-up" : "volume-up"} 
                 size={28} 
-                color={speaking ? '#FFFFFF' : (theme?.colors?.primary || '#3B82F6')} 
+                color={speaking ? theme.colors.onPrimary : theme.colors.primary} 
               />
             </TouchableOpacity>
           </View>
@@ -213,7 +214,7 @@ const VocabularyDetailScreen: React.FC = () => {
                 )}
                 {def.example && (
                   <View style={styles.exampleContainer}>
-                    <MaterialIcons name="format-quote" size={16} color={theme?.colors?.primary} />
+                    <MaterialIcons name="format-quote" size={16} color={theme.colors.primary} />
                     <Text style={styles.exampleText}>{def.example}</Text>
                   </View>
                 )}
@@ -270,7 +271,7 @@ const VocabularyDetailScreen: React.FC = () => {
 
         {/* 删除按钮 */}
         <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <MaterialIcons name="delete-outline" size={20} color="#FFFFFF" />
+          <MaterialIcons name="delete-outline" size={20} color={theme.colors.onError} />
           <Text style={styles.deleteButtonText}>从单词本中删除</Text>
         </TouchableOpacity>
       </View>
@@ -278,11 +279,11 @@ const VocabularyDetailScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme.colors.background,
     },
     content: {
       padding: 16,
@@ -295,7 +296,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     loadingText: {
       marginTop: 12,
       fontSize: 16,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
     },
     errorContainer: {
       flex: 1,
@@ -305,7 +306,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     errorText: {
       marginTop: 12,
       fontSize: 16,
-      color: theme?.colors?.error || '#B3261E',
+      color: theme.colors.error,
     },
     // 单词头部
     wordHeader: {
@@ -320,33 +321,33 @@ const createStyles = (isDark: boolean, theme: any) =>
     wordText: {
       fontSize: 32,
       fontWeight: 'bold',
-      color: theme?.colors?.primary || '#3B82F6',
+      color: theme.colors.primary,
     },
     speakButton: {
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F3F3F3'),
+      backgroundColor: theme.colors.surfaceContainer,
       justifyContent: 'center',
       alignItems: 'center',
     },
     speakButtonActive: {
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      backgroundColor: theme.colors.primary,
     },
     phoneticText: {
       fontSize: 18,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
     },
     wordFormText: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
     },
     // 统计卡片
     statsCard: {
       flexDirection: 'row' as any,
-      ...StyleUtils.createCardStyle(isDark, theme),
+      ...StyleUtils.createCardStyle(theme),
       borderRadius: 12,
       marginBottom: 20,
     },
@@ -365,13 +366,13 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     statLabel: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
     },
     statValue: {
       fontSize: 18,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
     },
     // 释义部分
     section: {
@@ -380,18 +381,18 @@ const createStyles = (isDark: boolean, theme: any) =>
     sectionTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       marginBottom: 12,
     },
     definitionItem: {
-      ...StyleUtils.createCardStyle(isDark, theme),
+      ...StyleUtils.createCardStyle(theme),
       borderRadius: 12,
       padding: 16,
       marginBottom: 10,
     },
     posTag: {
       alignSelf: 'flex-start',
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      backgroundColor: theme.colors.primary,
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 6,
@@ -400,17 +401,17 @@ const createStyles = (isDark: boolean, theme: any) =>
     posText: {
       fontSize: 11,
       fontWeight: '600',
-      color: '#FFFFFF',
+      color: theme.colors.onPrimary,
     },
     translationText: {
       fontSize: 16,
       fontWeight: '500',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       marginBottom: 6,
     },
     definitionText: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      color: theme.colors.onSurfaceVariant,
       lineHeight: 20,
       marginBottom: 6,
     },
@@ -420,41 +421,41 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginTop: 8,
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'),
+      borderTopColor: theme.colors.outlineVariant,
     },
     exampleText: {
       flex: 1,
       fontSize: 13,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
       marginLeft: 6,
       lineHeight: 18,
     },
     // 上下文
     contextCard: {
-      ...StyleUtils.createCardStyle(isDark, theme),
+      ...StyleUtils.createCardStyle(theme),
       borderRadius: 12,
       padding: 16,
     },
     contextText: {
       fontSize: 14,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       lineHeight: 22,
     },
     sourceText: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      color: theme.colors.onSurfaceVariant,
     },
     timeText: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
     },
     // 删除按钮
     deleteButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme?.colors?.error || '#B3261E',
+      backgroundColor: theme.colors.error,
       borderRadius: 24,
       paddingVertical: 12,
       paddingHorizontal: 24,
@@ -465,7 +466,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginLeft: 8,
       fontSize: 16,
       fontWeight: '600',
-      color: '#FFFFFF',
+      color: theme.colors.onError,
     },
   });
 

@@ -24,7 +24,7 @@ import { Switch } from 'react-native';
 type NavigationProp = NativeStackNavigationProp<any, 'AddRSSSource'>;
 
 const AddRSSSourceScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
   const { refreshRSSSources } = useRSSSource();
   const { groups, addSourceToGroup } = useRSSGroup();
@@ -140,7 +140,7 @@ const AddRSSSourceScreen: React.FC = () => {
     { name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/', contentType: 'image_text' as const },
   ];
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   return (
     <KeyboardAvoidingView 
@@ -154,7 +154,7 @@ const AddRSSSourceScreen: React.FC = () => {
             <MaterialIcons 
               name="rss-feed" 
               size={32} 
-              color={theme?.colors?.primary || '#3B82F6'} 
+              color={theme.colors.primary} 
             />
             <Text style={styles.title}>添加RSS源</Text>
             <Text style={styles.subtitle}>添加您喜欢的RSS订阅源</Text>
@@ -170,7 +170,7 @@ const AddRSSSourceScreen: React.FC = () => {
                   value={url}
                   onChangeText={setUrl}
                   placeholder="https://example.com/feed.xml"
-                  placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="url"
@@ -178,7 +178,7 @@ const AddRSSSourceScreen: React.FC = () => {
                 {isValidating && (
                   <ActivityIndicator 
                     size="small" 
-                    color={theme?.colors?.primary || '#3B82F6'} 
+                    color={theme.colors.primary} 
                     style={styles.validatingIcon}
                   />
                 )}
@@ -192,7 +192,7 @@ const AddRSSSourceScreen: React.FC = () => {
                 value={name}
                 onChangeText={setName}
                 placeholder="为RSS源起个名字"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
               />
             </View>
 
@@ -233,8 +233,8 @@ const AddRSSSourceScreen: React.FC = () => {
                     name="image" 
                     size={20} 
                     color={contentType === 'image_text' 
-                      ? (theme?.colors?.onPrimary || '#FFFFFF')
-                      : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant
                     } 
                   />
                   <Text style={[
@@ -256,8 +256,8 @@ const AddRSSSourceScreen: React.FC = () => {
                     name="text-fields" 
                     size={20} 
                     color={contentType === 'text' 
-                      ? (theme?.colors?.onPrimary || '#FFFFFF')
-                      : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant
                     } 
                   />
                   <Text style={[
@@ -326,7 +326,7 @@ const AddRSSSourceScreen: React.FC = () => {
                     <MaterialIcons 
                       name="cloud" 
                       size={20} 
-                      color={useProxy ? (theme?.colors?.primary || '#3B82F6') : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))} 
+                      color={useProxy ? theme.colors.primary : theme.colors.onSurfaceVariant} 
                     />
                     <Text style={styles.proxyTitle}>通过代理获取</Text>
                   </View>
@@ -338,12 +338,12 @@ const AddRSSSourceScreen: React.FC = () => {
                   value={useProxy}
                   onValueChange={setUseProxy}
                   trackColor={{ 
-                    false: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
-                    true: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF')
+                    false: theme.colors.surfaceVariant,
+                    true: theme.colors.primaryContainer
                   }}
                   thumbColor={useProxy 
-                    ? (theme?.colors?.primary || '#3B82F6') 
-                    : (theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'))
+                    ? theme.colors.primary 
+                    : theme.colors.outline
                   }
                 />
               </View>
@@ -364,7 +364,7 @@ const AddRSSSourceScreen: React.FC = () => {
                   }
                 }}
                 placeholder="例如: 50"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 keyboardType="number-pad"
               />
               <Text style={styles.contentTypeHint}>每次刷新从 RSS 获取的文章数量 (0 为不限制)</Text>
@@ -384,7 +384,7 @@ const AddRSSSourceScreen: React.FC = () => {
                   }
                 }}
                 placeholder="例如: 100"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 keyboardType="number-pad"
               />
               <Text style={styles.contentTypeHint}>每个源最多保存的文章数量 (0 为不限制，收藏不受影响)</Text>
@@ -397,7 +397,7 @@ const AddRSSSourceScreen: React.FC = () => {
                 value={description}
                 onChangeText={setDescription}
                 placeholder="简单描述这个RSS源的内容"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
@@ -420,7 +420,7 @@ const AddRSSSourceScreen: React.FC = () => {
                     <MaterialIcons 
                       name="rss-feed" 
                       size={20} 
-                      color={theme?.colors?.primary || '#3B82F6'} 
+                      color={theme.colors.primary} 
                     />
                   </View>
                   <View style={styles.quickSourceContent}>
@@ -430,7 +430,7 @@ const AddRSSSourceScreen: React.FC = () => {
                   <MaterialIcons 
                     name="add" 
                     size={20} 
-                    color={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')} 
+                    color={theme.colors.onSurfaceVariant} 
                   />
                 </TouchableOpacity>
               ))}
@@ -458,10 +458,10 @@ const AddRSSSourceScreen: React.FC = () => {
           disabled={!url.trim() || isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator size="small" color={theme?.colors?.onPrimary || '#FFFFFF'} />
+            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
           ) : (
             <>
-              <MaterialIcons name="add" size={20} color={theme?.colors?.onPrimary || '#FFFFFF'} />
+              <MaterialIcons name="add" size={20} color={theme.colors.onPrimary} />
               <Text style={styles.addButtonText}>添加RSS源</Text>
             </>
           )}
@@ -471,10 +471,10 @@ const AddRSSSourceScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#FFFFFF'),
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -489,12 +489,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginTop: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 4,
   },
   form: {
@@ -506,19 +506,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   inputContainer: {
     position: 'relative',
   },
   input: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     minHeight: 48,
   },
   textArea: {
@@ -534,21 +534,21 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 4,
   },
   categoryChip: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
   },
   categoryChipSelected: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
   },
   categoryChipText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   categoryChipTextSelected: {
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
     fontWeight: '500',
   },
   contentTypeContainer: {
@@ -557,7 +557,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 4,
   },
   contentTypeOption: {
-    ...StyleUtils.createCardStyle(isDark, theme),
+    ...StyleUtils.createCardStyle(theme),
     flex: 1,
     flexDirection: 'row' as any,
     alignItems: 'center' as any,
@@ -568,19 +568,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     gap: 8,
   },
   contentTypeOptionSelected: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
   },
   contentTypeText: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   contentTypeTextSelected: {
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   contentTypeHint: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 8,
     lineHeight: 16,
   },
@@ -588,7 +588,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...StyleUtils.createCardStyle(isDark, theme),
+    ...StyleUtils.createCardStyle(theme),
     borderRadius: 12,
     padding: 16,
   },
@@ -604,11 +604,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   proxyTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   proxyHint: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 4,
     lineHeight: 16,
   },
@@ -618,12 +618,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 16,
   },
   quickSourcesList: {
@@ -632,7 +632,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   quickSourceItem: {
     flexDirection: 'row' as any,
     alignItems: 'center' as any,
-    ...StyleUtils.createCardStyle(isDark, theme),
+    ...StyleUtils.createCardStyle(theme),
     borderRadius: 12,
     padding: 12,
   },
@@ -640,7 +640,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF'),
+    backgroundColor: theme.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -651,20 +651,20 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   quickSourceName: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   quickSourceUrl: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 2,
   },
   bottomActions: {
     flexDirection: 'row',
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#FFFFFF'),
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
-    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+    borderTopColor: theme.colors.outlineVariant,
     gap: 12,
   },
   cancelButton: {
@@ -673,12 +673,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   addButton: {
     flex: 2,
@@ -687,17 +687,17 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 24,
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
     gap: 8,
   },
   addButtonDisabled: {
-    backgroundColor: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    backgroundColor: theme.colors.surfaceVariant,
     opacity: 0.5,
   },
   addButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
 });
 

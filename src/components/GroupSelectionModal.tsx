@@ -9,14 +9,13 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RSSGroup } from '../types';
+import { useThemeContext } from '../theme';
 
 interface GroupSelectionModalProps {
   visible: boolean;
   groups: RSSGroup[];
   onClose: () => void;
   onSelect: (groupId: number | null) => void;
-  theme?: any;
-  isDark?: boolean;
 }
 
 const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
@@ -24,10 +23,9 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
   groups,
   onClose,
   onSelect,
-  theme,
-  isDark = false,
 }) => {
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <Modal
@@ -45,7 +43,7 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.title}>选择目标分组</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <MaterialIcons name="close" size={24} color={theme?.colors?.onSurface} />
+              <MaterialIcons name="close" size={24} color={theme.colors.onSurface} />
             </TouchableOpacity>
           </View>
 
@@ -55,8 +53,8 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
               style={styles.item}
               onPress={() => onSelect(null)}
             >
-              <View style={[styles.iconBox, { backgroundColor: theme?.colors?.surfaceVariant }]}>
-                <MaterialIcons name="folder-open" size={24} color={theme?.colors?.onSurfaceVariant} />
+              <View style={[styles.iconBox, { backgroundColor: theme.colors.surfaceVariant }]}>
+                <MaterialIcons name="folder-open" size={24} color={theme.colors.onSurfaceVariant} />
               </View>
               <Text style={styles.itemText}>默认</Text>
             </TouchableOpacity>
@@ -68,8 +66,8 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
                 style={styles.item}
                 onPress={() => onSelect(group.id)}
               >
-                <View style={[styles.iconBox, { backgroundColor: group.color || theme?.colors?.primary }]}>
-                  <MaterialIcons name="folder" size={24} color="#FFFFFF" />
+                <View style={[styles.iconBox, { backgroundColor: group.color || theme.colors.primary }]}>
+                  <MaterialIcons name="folder" size={24} color={theme.colors.onPrimary} />
                 </View>
                 <Text style={styles.itemText}>{group.name}</Text>
                 <Text style={styles.countText}>{group.sourceCount || 0} 个源</Text>
@@ -82,7 +80,7 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
@@ -91,11 +89,11 @@ const createStyles = (isDark: boolean, theme: any) =>
       padding: 20,
     },
     modalContainer: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme.colors.surface,
       borderRadius: 16,
       maxHeight: '70%',
       elevation: 5,
-      shadowColor: '#000',
+      shadowColor: theme.colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 3.84,
@@ -106,12 +104,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       alignItems: 'center',
       padding: 16,
       borderBottomWidth: 1,
-      borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'),
+      borderBottomColor: theme.colors.outlineVariant,
     },
     title: {
       fontSize: 18,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
     },
     list: {
       padding: 8,
@@ -133,11 +131,11 @@ const createStyles = (isDark: boolean, theme: any) =>
     itemText: {
       flex: 1,
       fontSize: 16,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
     },
     countText: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+      color: theme.colors.onSurfaceVariant,
     },
   });
 

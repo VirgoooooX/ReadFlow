@@ -229,7 +229,7 @@ const FilterManagementScreen: React.FC = () => {
     );
   };
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   if (loading) {
     return (
@@ -278,13 +278,13 @@ const FilterManagementScreen: React.FC = () => {
         onPress={handleCreate}
         activeOpacity={0.9}
       >
-        <MaterialIcons name="add" size={28} color="#FFF" />
+        <MaterialIcons name="add" size={28} color={theme.colors.onPrimary} />
       </TouchableOpacity>
     </View>
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -339,9 +339,9 @@ const createStyles = (isDark: boolean, theme: any) =>
       borderRadius: 16,
       padding: 16,
       marginBottom: 12,
-      shadowColor: '#000',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0 : 0.05,
+      shadowOpacity: theme.isDark ? 0.3 : 0.05,
       shadowRadius: 2,
       elevation: 1,
     },
@@ -428,7 +428,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       borderRadius: 28,
       justifyContent: 'center',
       alignItems: 'center',
-      shadowColor: '#000',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 8,

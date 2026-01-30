@@ -10,13 +10,12 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useThemeContext } from '../theme';
 
 interface CreateGroupModalProps {
   visible: boolean;
   onClose: () => void;
   onCreate: (name: string, color?: string) => void;
-  theme?: any;
-  isDark?: boolean;
 }
 
 const PRESET_COLORS = [
@@ -38,9 +37,9 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   visible,
   onClose,
   onCreate,
-  theme,
-  isDark = false,
 }) => {
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
 
@@ -70,47 +69,19 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           onPress={onClose}
         />
         
-        <View
-          style={[
-            styles.modal,
-            {
-              backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.title,
-              { color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F') },
-            ]}
-          >
-            创建分组
-          </Text>
+        <View style={styles.modal}>
+          <Text style={styles.title}>创建分组</Text>
 
           <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-                color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-                borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
-              },
-            ]}
+            style={styles.input}
             placeholder="分组名称"
-            placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
             value={name}
             onChangeText={setName}
             autoFocus
           />
 
-          <Text
-            style={[
-              styles.label,
-              { color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F') },
-            ]}
-          >
-            选择颜色
-          </Text>
+          <Text style={styles.label}>选择颜色</Text>
 
           <View style={styles.colorGrid}>
             {PRESET_COLORS.map((color) => (
@@ -124,7 +95,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 onPress={() => setSelectedColor(color)}
               >
                 {selectedColor === color && (
-                  <MaterialIcons name="check" size={20} color="#FFFFFF" />
+                  <MaterialIcons name="check" size={20} color={theme.colors.onPrimary} />
                 )}
               </TouchableOpacity>
             ))}
@@ -132,20 +103,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
 
           <View style={styles.actions}>
             <TouchableOpacity
-              style={[
-                styles.button,
-                {
-                  backgroundColor: 'transparent',
-                },
-              ]}
+              style={[styles.button, { backgroundColor: 'transparent' }]}
               onPress={onClose}
             >
-              <Text
-                style={[
-                  styles.buttonText,
-                  { color: theme?.colors?.primary || '#6750A4' },
-                ]}
-              >
+              <Text style={[styles.buttonText, { color: theme.colors.primary }]}>
                 取消
               </Text>
             </TouchableOpacity>
@@ -153,20 +114,13 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             <TouchableOpacity
               style={[
                 styles.button,
-                {
-                  backgroundColor: theme?.colors?.primary || '#6750A4',
-                },
+                { backgroundColor: theme.colors.primary },
                 !name.trim() && styles.buttonDisabled,
               ]}
               onPress={handleCreate}
               disabled={!name.trim()}
             >
-              <Text
-                style={[
-                  styles.buttonText,
-                  { color: theme?.colors?.onPrimary || '#FFFFFF' },
-                ]}
-              >
+              <Text style={[styles.buttonText, { color: theme.colors.onPrimary }]}>
                 创建
               </Text>
             </TouchableOpacity>
@@ -177,7 +131,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'center',
@@ -192,11 +146,13 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 24,
     padding: 24,
+    backgroundColor: theme.colors.surface,
   },
   title: {
     fontSize: 22,
     fontWeight: '600',
     marginBottom: 20,
+    color: theme.colors.onSurface,
   },
   input: {
     height: 48,
@@ -205,10 +161,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     marginBottom: 20,
+    backgroundColor: theme.colors.surfaceContainer,
+    color: theme.colors.onSurface,
+    borderColor: theme.colors.outline,
   },
   label: {
     fontSize: 14,
     marginBottom: 12,
+    color: theme.colors.onSurfaceVariant,
   },
   colorGrid: {
     flexDirection: 'row',
@@ -225,7 +185,7 @@ const styles = StyleSheet.create({
   },
   colorButtonSelected: {
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: theme.colors.onPrimary,
   },
   actions: {
     flexDirection: 'row',

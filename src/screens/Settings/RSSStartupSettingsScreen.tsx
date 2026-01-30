@@ -16,9 +16,9 @@ import { typography } from '../../theme/typography';
 import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
 
 const RSSStartupSettingsScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { rssSources, startupSettings, updateStartupSettings } = useRSSSource();
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   // 本地状态，用于快速响应 UI
   const [enabled, setEnabled] = useState(false);
@@ -121,8 +121,8 @@ const RSSStartupSettingsScreen: React.FC = () => {
               <Switch
                 value={enabled}
                 onValueChange={handleToggleEnable}
-                trackColor={{ false: '#767577', true: theme.colors.primary }}
-                thumbColor={enabled ? '#fff' : '#f4f3f4'}
+                trackColor={{ false: theme.colors.surfaceVariant, true: theme.colors.primary }}
+                thumbColor={enabled ? theme.colors.onPrimary : theme.colors.outline}
               />
             }
           />
@@ -175,11 +175,11 @@ const RSSStartupSettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background || (isDark ? '#121212' : '#F5F5F5'),
+      backgroundColor: theme.colors.background,
     },
     headerSection: {
       padding: 16,
@@ -199,7 +199,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       backgroundColor: theme.colors.surface,
       borderRadius: 24,
       elevation: 4,
-      shadowColor: '#000',
+      shadowColor: theme.colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,

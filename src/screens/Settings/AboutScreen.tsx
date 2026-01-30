@@ -15,8 +15,8 @@ import {
 } from '../../components/ui';
 
 const AboutScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -24,7 +24,7 @@ const AboutScreen: React.FC = () => {
         {/* 应用头部 */}
         <View style={styles.headerSection}>
           <View style={styles.appIcon}>
-            <MaterialIcons name="menu-book" size={48} color="#FFFFFF" />
+            <MaterialIcons name="menu-book" size={48} color={theme.colors.onPrimary} />
           </View>
           <Text style={styles.appName}>{APP_INFO.name}</Text>
           <Text style={styles.appDesc}>{APP_INFO.description}</Text>
@@ -72,19 +72,19 @@ const AboutScreen: React.FC = () => {
             icon="public"
             label="官方网站"
             onPress={() => Linking.openURL('https://github.com/readflow')}
-            color="#3B82F6"
+            color={theme.semantic.info}
           />
           <SettingItem
             icon="security"
             label="隐私政策"
             onPress={() => {}}
-            color="#10B981"
+            color={theme.semantic.success}
           />
           <SettingItem
             icon="description"
             label="用户协议"
             onPress={() => {}}
-            color="#F59E0B"
+            color={theme.semantic.warning}
             isLast
           />
         </SettingSection>
@@ -96,10 +96,10 @@ const AboutScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 16,
   },
   content: {
@@ -115,12 +115,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 18,
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -129,16 +129,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   appName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme?.colors?.onBackground || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onBackground,
     marginBottom: 6,
   },
   appDesc: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 14,
   },
   versionBadge: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
+    backgroundColor: theme.colors.primaryContainer,
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 14,
@@ -146,7 +146,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   versionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme?.colors?.primary || '#3B82F6',
+    color: theme.colors.primary,
   },
 });
 

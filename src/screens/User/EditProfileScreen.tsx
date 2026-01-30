@@ -37,10 +37,10 @@ interface UserProfile {
 }
 
 const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { state, updateProfile } = useUser();
   const { user } = state;
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
   
   // 使用用户上下文数据
   const [profile, setProfile] = useState<UserProfile>({
@@ -242,7 +242,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons 
                 name="person" 
                 size={48} 
-                color={theme?.colors?.onPrimary || '#FFFFFF'} 
+                color={theme.colors.onPrimary} 
               />
             </View>
           )}
@@ -250,7 +250,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons 
               name="camera-alt" 
               size={16} 
-              color={theme?.colors?.onPrimary || '#FFFFFF'} 
+              color={theme.colors.onPrimary} 
             />
           </View>
         </TouchableOpacity>
@@ -266,13 +266,13 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons 
               name="person" 
               size={20} 
-              color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              color={theme.colors.onSurfaceVariant} 
               style={styles.inputIcon}
             />
             <TextInput
               style={styles.textInput}
               placeholder="请输入用户名"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={profile.name}
               onChangeText={(text) => updateLocalProfile('name', text)}
               maxLength={20}
@@ -288,13 +288,13 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons 
               name="email" 
               size={20} 
-              color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              color={theme.colors.onSurfaceVariant} 
               style={styles.inputIcon}
             />
             <TextInput
               style={styles.textInput}
               placeholder="请输入邮箱地址"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={profile.email}
               onChangeText={(text) => updateLocalProfile('email', text)}
               keyboardType="email-address"
@@ -311,13 +311,13 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons 
               name="phone" 
               size={20} 
-              color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              color={theme.colors.onSurfaceVariant} 
               style={styles.inputIcon}
             />
             <TextInput
               style={styles.textInput}
               placeholder="请输入手机号码"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={profile.phone}
               onChangeText={(text) => updateLocalProfile('phone', text)}
               keyboardType="phone-pad"
@@ -334,13 +334,13 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons 
               name="location-on" 
               size={20} 
-              color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              color={theme.colors.onSurfaceVariant} 
               style={styles.inputIcon}
             />
             <TextInput
               style={styles.textInput}
               placeholder="请输入所在地"
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={profile.location}
               onChangeText={(text) => updateLocalProfile('location', text)}
               maxLength={50}
@@ -355,7 +355,7 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
             <TextInput
               style={[styles.textInput, styles.bioInput]}
               placeholder="介绍一下自己吧..."
-              placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+              placeholderTextColor={theme.colors.onSurfaceVariant}
               value={profile.bio}
               onChangeText={(text) => updateLocalProfile('bio', text)}
               multiline
@@ -387,15 +387,15 @@ const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme.colors.background,
   },
   avatarSection: {
     alignItems: 'center',
     paddingVertical: 32,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
   },
   avatarContainer: {
     position: 'relative',
@@ -410,7 +410,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -421,15 +421,15 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme?.colors?.secondary || '#625B71',
+    backgroundColor: theme.colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    borderColor: theme.colors.surface,
   },
   avatarHint: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   formContainer: {
     padding: 20,
@@ -440,16 +440,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+    borderColor: theme.colors.outline,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -458,7 +458,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     minHeight: 100,
   },
   inputError: {
-    borderColor: theme?.colors?.error || '#BA1A1A',
+    borderColor: theme.colors.error,
   },
   inputIcon: {
     marginRight: 12,
@@ -466,7 +466,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   bioInput: {
     minHeight: 80,
@@ -479,19 +479,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    color: theme?.colors?.error || '#BA1A1A',
+    color: theme.colors.error,
     flex: 1,
   },
   characterCount: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   buttonContainer: {
     padding: 20,
     paddingBottom: 40,
   },
   saveButton: {
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -502,7 +502,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
 });
 

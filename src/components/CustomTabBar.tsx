@@ -41,6 +41,7 @@ const TabItem = React.memo(({
     scrollX,
     screenWidth,
     inactiveColor,
+    activeColor,
     errorColor
 }: {
     item: Tab;
@@ -50,6 +51,7 @@ const TabItem = React.memo(({
     scrollX: SharedValue<number>;
     screenWidth: number;
     inactiveColor: string;
+    activeColor: string;
     errorColor: string;
 }) => {
     // 文字颜色动画样式 - O(1) 复杂度优化
@@ -61,7 +63,7 @@ const TabItem = React.memo(({
             color: interpolateColor(
                 currentProgress,
                 [index - 1, index, index + 1],
-                [inactiveColor, '#FFFFFF', inactiveColor]
+                [inactiveColor, activeColor, inactiveColor]
             )
         };
     });
@@ -102,7 +104,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     activeIndex,
     onTabPress,
 }) => {
-    const { theme, isDark } = useThemeContext();
+    const { theme } = useThemeContext();
     const scrollViewRef = useAnimatedRef<Animated.ScrollView>();
 
     // 🚀 核心优化：将布局数据存入 SharedValue，避免 worklet 跨桥
@@ -116,7 +118,8 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     const layoutCache = useRef<TabMeasurement[]>(tabs.map(() => ({ x: 0, width: 0 })));
     const layoutCount = useRef(0);
 
-    const inactiveColor = isDark ? '#9CA3AF' : '#64748B';  // Gray-400 for better dark mode visibility
+    const inactiveColor = theme.colors.onSurfaceVariant;
+    const activeColor = theme.colors.onPrimary;
     const pillBackgroundColor = theme.colors.primary;
 
     // 处理标签布局测量 - 收集完毕后一次性写入 SharedValue
@@ -205,7 +208,10 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     );
     return (
         <View
-            style={[styles.container, { backgroundColor: theme.colors.background }]}
+            style={[
+                styles.container,
+                { backgroundColor: theme.colors.background, shadowColor: theme.colors.shadow }
+            ]}
             onLayout={handleContainerLayout}
         >
             <Animated.ScrollView
@@ -235,6 +241,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
                         scrollX={scrollX}
                         screenWidth={screenWidth}
                         inactiveColor={inactiveColor}
+                        activeColor={activeColor}
                         errorColor={theme.colors.error}
                     />
                 ))}
@@ -248,7 +255,6 @@ const styles = StyleSheet.create({
         width: '100%', // 确保占满全宽
         height: 40, // 减小高度 (48 -> 40)
         // 添加阴影
-        shadowColor: '#000',
         shadowOffset: {
             width: 0,
             height: 1, // 减小阴影偏移

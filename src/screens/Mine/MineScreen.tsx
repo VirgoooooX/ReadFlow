@@ -24,11 +24,11 @@ import type { UserStackParamList } from '../../navigation/types';
 type MineScreenNavigationProp = NativeStackNavigationProp<UserStackParamList>;
 
 const MineScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const navigation = useNavigation<MineScreenNavigationProp>();
   const { state, logout } = useUser();
   const { user } = state;
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   // 状态管理
   const [proxyStatus, setProxyStatus] = useState<{ enabled: boolean; connected: boolean }>({
@@ -76,7 +76,7 @@ const MineScreen: React.FC = () => {
               <Image source={{ uri: user.avatar }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <MaterialIcons name="person" size={40} color="#FFF" />
+                <MaterialIcons name="person" size={40} color={theme.colors.onPrimary} />
               </View>
             )}
           </TouchableOpacity>
@@ -95,7 +95,7 @@ const MineScreen: React.FC = () => {
             style={styles.iconButton}
             onPress={() => navigation.navigate('EditProfile')}
           >
-            <MaterialIcons name="edit" size={20} color={theme?.colors?.onSurfaceVariant || '#666'} />
+            <MaterialIcons name="edit" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -108,19 +108,19 @@ const MineScreen: React.FC = () => {
           icon="chrome-reader-mode"
           label="阅读偏好"
           onPress={() => navigation.navigate('ReadingSettings')}
-          color={theme?.colors?.primary || '#3B82F6'}
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="folder"
           label="分组管理"
           onPress={() => navigation.navigate('GroupManagement')}
-          color="#8B5CF6"
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="filter-list"
           label="过滤规则"
           onPress={() => navigation.navigate('FilterManagement')}
-          color="#F59E0B"
+          color={theme.colors.primary}
           isLast
         />
       </SettingSection>
@@ -131,13 +131,13 @@ const MineScreen: React.FC = () => {
           icon="psychology"
           label="AI 助手配置"
           onPress={() => navigation.navigate('LLMSettings')}
-          color="#8B5CF6"
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="autorenew"
           label="启动自动刷新"
           onPress={() => navigation.navigate('RSSStartupSettings')}
-          color="#10B981"
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="cloud"
@@ -146,14 +146,14 @@ const MineScreen: React.FC = () => {
             console.log('Navigating to CloudSettings');
             navigation.navigate('CloudSettings');
           }}
-          color="#3B82F6"
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="palette"
           label="主题设置"
           onPress={() => navigation.navigate('ThemeSettings')}
-          color="#EC4899"
-          valueText={isDark ? '深色' : '浅色'}
+          color={theme.colors.primary}
+          valueText={theme.isDark ? '深色' : '浅色'}
           isLast
         />
       </SettingSection>
@@ -164,13 +164,13 @@ const MineScreen: React.FC = () => {
           icon="storage"
           label="存储空间管理"
           onPress={() => navigation.navigate('StorageManagement')}
-          color="#64748B"
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="info"
           label="关于应用"
           onPress={() => navigation.navigate('About')}
-          color="#64748B"
+          color={theme.colors.primary}
         />
         <SettingItem
           icon="logout"
@@ -187,11 +187,11 @@ const MineScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+      backgroundColor: theme.colors.background,
       paddingHorizontal: 16,
     },
 
@@ -210,13 +210,13 @@ const createStyles = (isDark: boolean, theme: any) =>
       height: 90,
       borderRadius: 30,
       borderWidth: 2,
-      borderColor: theme?.colors?.surface || '#FFF',
+      borderColor: theme.colors.outlineVariant,
     },
     avatarPlaceholder: {
       width: 64,
       height: 64,
       borderRadius: 32,
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      backgroundColor: theme.colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -227,17 +227,17 @@ const createStyles = (isDark: boolean, theme: any) =>
     userName: {
       fontSize: 25,
       fontWeight: '700',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
       marginBottom: 10,
     },
     userEmail: {
       ...typography.bodySmall,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 6,
     },
     iconButton: {
       padding: 8,
-      backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#1E1E1E' : '#FFFFFF'),
+      backgroundColor: theme.colors.surfaceVariant,
       borderRadius: 20,
     },
   });

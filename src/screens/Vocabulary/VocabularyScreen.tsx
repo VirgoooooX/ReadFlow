@@ -19,27 +19,28 @@ import { vocabularyService } from '../../services/VocabularyService';
 import { typography } from '../../theme/typography';
 import { VocabularyEntry } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
-import * as StyleUtils from '../../utils/styleUtils';
+import { withAlpha } from '../../utils/colorUtils';
 
 type Props = VocabularyStackScreenProps<'VocabularyMain'>;
 
 // 顶部 Tab 组件
-const SegmentedTab = ({ tabs, activeTab, onTabPress, theme, isDark }: any) => {
+const SegmentedTab = ({ tabs, activeTab, onTabPress, theme }: any) => {
+  const s = styles(theme);
   return (
-    <View style={styles(isDark, theme).tabContainer}>
+    <View style={s.tabContainer}>
       {tabs.map((tab: any) => {
         const isActive = activeTab === tab.key;
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[styles(isDark, theme).tabItem, isActive && styles(isDark, theme).tabItemActive]}
+            style={[s.tabItem, isActive && s.tabItemActive]}
             onPress={() => onTabPress(tab.key)}
             activeOpacity={0.7}
           >
-            <Text style={[styles(isDark, theme).tabText, isActive && styles(isDark, theme).tabTextActive]}>
+            <Text style={[s.tabText, isActive && s.tabTextActive]}>
               {tab.label}
             </Text>
-            {isActive && <View style={styles(isDark, theme).tabIndicator} />}
+            {isActive && <View style={s.tabIndicator} />}
           </TouchableOpacity>
         );
       })}
@@ -48,8 +49,9 @@ const SegmentedTab = ({ tabs, activeTab, onTabPress, theme, isDark }: any) => {
 };
 
 // 单词卡片组件
-const WordCard = ({ item, theme, isDark, onPress, onSpeak }: any) => {
-  const mastery = getMasteryLabel(item.masteryLevel || item.mastery_level || 0);
+const WordCard = ({ item, theme, onPress, onSpeak }: any) => {
+  const s = styles(theme);
+  const mastery = getMasteryLabel(theme, item.masteryLevel || item.mastery_level || 0);
   const translation = typeof item.definition === 'object' 
     ? item.definition?.definitions?.[0]?.translation 
     : item.translation;
@@ -59,39 +61,39 @@ const WordCard = ({ item, theme, isDark, onPress, onSpeak }: any) => {
 
   return (
     <TouchableOpacity 
-      style={styles(isDark, theme).wordCard} 
+      style={s.wordCard} 
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles(isDark, theme).wordCardHeader}>
-        <View style={styles(isDark, theme).wordMain}>
-          <Text style={styles(isDark, theme).wordText}>{item.word}</Text>
-          {phonetic && <Text style={styles(isDark, theme).phoneticText}>/{phonetic}/</Text>}
+      <View style={s.wordCardHeader}>
+        <View style={s.wordMain}>
+          <Text style={s.wordText}>{item.word}</Text>
+          {phonetic && <Text style={s.phoneticText}>/{phonetic}/</Text>}
         </View>
         
         {/* 发音按钮 */}
         <TouchableOpacity 
-          style={styles(isDark, theme).speakBtn}
+          style={s.speakBtn}
           onPress={(e) => {
             e.stopPropagation();
             onSpeak(item.word);
           }}
         >
-          <MaterialIcons name="volume-up" size={20} color={theme?.colors?.primary} />
+          <MaterialIcons name="volume-up" size={20} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles(isDark, theme).divider} />
+      <View style={s.divider} />
 
-      <View style={styles(isDark, theme).wordCardBody}>
-        <Text style={styles(isDark, theme).meaningText} numberOfLines={2}>
+      <View style={s.wordCardBody}>
+        <Text style={s.meaningText} numberOfLines={2}>
           {translation || '暂无释义'}
         </Text>
         
         {/* 状态徽章 (放在右下角) */}
-        <View style={[styles(isDark, theme).statusBadge, { backgroundColor: mastery.color + '15' }]}>
-          <View style={[styles(isDark, theme).statusDot, { backgroundColor: mastery.color }]} />
-          <Text style={[styles(isDark, theme).statusText, { color: mastery.color }]}>{mastery.text}</Text>
+        <View style={[s.statusBadge, { backgroundColor: withAlpha(mastery.color, 0.09) }]}>
+          <View style={[s.statusDot, { backgroundColor: mastery.color }]} />
+          <Text style={[s.statusText, { color: mastery.color }]}>{mastery.text}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -99,21 +101,21 @@ const WordCard = ({ item, theme, isDark, onPress, onSpeak }: any) => {
 };
 
 // 辅助函数：获取掌握程度样式
-const getMasteryLabel = (level: number) => {
-  if (level >= 5) return { text: '已掌握', color: '#4CAF50' }; // Green
-  if (level >= 2) return { text: '学习中', color: '#FF9800' }; // Orange
-  return { text: '新单词', color: '#2196F3' }; // Blue
+const getMasteryLabel = (theme: any, level: number) => {
+  if (level >= 5) return { text: '已掌握', color: theme.semantic.success };
+  if (level >= 2) return { text: '学习中', color: theme.semantic.warning };
+  return { text: '新单词', color: theme.semantic.info };
 };
 
 const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'vocabulary' | 'dictionary' | 'translation'>('vocabulary');
   const [stats, setStats] = useState({ vocabulary: 0, dictionary: 0, translation: 0, needReview: 0 });
   const [listData, setListData] = useState<any[]>([]);
 
   // 样式对象
-  const currentStyles = styles(isDark, theme);
+  const currentStyles = styles(theme);
 
   useFocusEffect(
     useCallback(() => {
@@ -179,7 +181,6 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
         <WordCard 
           item={item} 
           theme={theme} 
-          isDark={isDark} 
           onPress={() => navigation.navigate('VocabularyDetail', { entryId: item.id })}
           onSpeak={handleSpeak}
         />
@@ -239,14 +240,14 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
           >
             <View style={currentStyles.reviewBannerLeft}>
               <View style={currentStyles.reviewIconBg}>
-                <MaterialIcons name="school" size={20} color="#FFF" />
+                <MaterialIcons name="school" size={20} color={theme.colors.onPrimary} />
               </View>
               <View>
                 <Text style={currentStyles.reviewTitle}>开始今日复习</Text>
                 <Text style={currentStyles.reviewSubtitle}>{stats.needReview} 个单词需要巩固</Text>
               </View>
             </View>
-            <MaterialIcons name="arrow-forward" size={20} color={theme?.colors?.primary} />
+            <MaterialIcons name="arrow-forward" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
         )}
 
@@ -260,14 +261,13 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
           activeTab={activeTab}
           onTabPress={setActiveTab}
           theme={theme}
-          isDark={isDark}
         />
       </View>
 
       {/* 列表内容（考虑顶栏高度） */}
       {loading ? (
         <View style={currentStyles.centerContainer}>
-          <ActivityIndicator size="large" color={theme?.colors?.primary} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -278,7 +278,7 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={currentStyles.emptyContainer}>
-              <MaterialIcons name="inbox" size={48} color={theme?.colors?.outline} />
+              <MaterialIcons name="inbox" size={48} color={theme.colors.outline} />
               <Text style={currentStyles.emptyText}>暂无记录</Text>
             </View>
           }
@@ -289,10 +289,10 @@ const VocabularyScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 // 样式定义
-const styles = (isDark: boolean, theme: any) => StyleSheet.create({
+const styles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#F9F9F9'),
+    backgroundColor: theme.colors.background,
   },
   centerContainer: {
     flex: 1,
@@ -302,9 +302,9 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
 
   // --- 固定顶栏 ---
   fixedTopBar: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#F0F0F0'),
+    borderBottomColor: theme.colors.outlineVariant,
   },
   
   // --- Header (在固定顶栏内) ---
@@ -323,20 +323,20 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   statValue: {
     ...typography.titleLarge,
     fontWeight: '800' as any,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', // 数字用等宽字体更有质感
     lineHeight: 28,
   },
   statTitle: {
     ...typography.bodySmall,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 4,
     fontWeight: '500' as any,
   },
   statDivider: {
     width: 1,
     height: 20,
-    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E0E0E0'),
+    backgroundColor: theme.colors.outlineVariant,
     opacity: 0.5,
   },
 
@@ -345,7 +345,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row' as any,
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: (theme?.colors?.primary || '#6750A4') + '15',
+    backgroundColor: withAlpha(theme.colors.primary, 0.09),
     marginHorizontal: 12,
     marginVertical: 8,
     marginBottom: 8, // 与分割线紧贴
@@ -360,7 +360,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -368,11 +368,11 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   reviewTitle: {
     ...typography.titleMedium,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || '#333',
+    color: theme.colors.onSurface,
   },
   reviewSubtitle: {
     ...typography.bodyMedium,
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     marginTop: 2,
   },
 
@@ -384,7 +384,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#F0F0F0'),
+    borderTopColor: theme.colors.outlineVariant,
   },
   tabItem: {
     marginHorizontal: 20,
@@ -399,11 +399,11 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   tabText: {
     ...typography.bodyMedium,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     fontWeight: '500' as any,
   },
   tabTextActive: {
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '600' as any,
     ...typography.bodyMedium,
   },
@@ -413,7 +413,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 1.5,
   },
 
@@ -425,18 +425,18 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   
   // --- Word Card (Flashcard Style) ---
   wordCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     marginBottom: 10,
     padding: 12,
     // Card Shadow
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.05,
+    shadowOpacity: theme.isDark ? 0.3 : 0.05,
     shadowRadius: 8,
-    elevation: isDark ? 0 : 2,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.1)',
+    elevation: theme.isDark ? 3 : 2,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.colors.outlineVariant : 'transparent',
   },
   wordCardHeader: {
     flexDirection: 'row',
@@ -450,13 +450,13 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   wordText: {
     fontSize: 16,
     fontWeight: '700',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 1,
     letterSpacing: 0.5,
   },
   phoneticText: {
     ...typography.labelSmall,
-    color: theme?.colors?.secondary || '#666',
+    color: theme.colors.secondary,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontStyle: 'italic',
   },
@@ -464,13 +464,13 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: (theme?.colors?.primary || '#6750A4') + '10', // Very light bg
+    backgroundColor: withAlpha(theme.colors.primary, 0.06),
     justifyContent: 'center',
     alignItems: 'center',
   },
   divider: {
     height: 1,
-    backgroundColor: theme?.colors?.outlineVariant || '#F0F0F0',
+    backgroundColor: theme.colors.outlineVariant,
     opacity: 0.5,
     marginBottom: 12,
   },
@@ -482,7 +482,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   meaningText: {
     flex: 1,
     ...typography.bodyMedium,
-    color: theme?.colors?.onSurfaceVariant || '#666',
+    color: theme.colors.onSurfaceVariant,
     lineHeight: 22,
     marginRight: 10,
   },
@@ -506,12 +506,12 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
 
   // --- Simple Card (History) ---
   simpleCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: theme?.colors?.outlineVariant || '#F5F5F5',
+    borderBottomColor: theme.colors.outlineVariant,
   },
   simpleCardRow: {
     flexDirection: 'row',
@@ -522,37 +522,37 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   simpleWord: {
     ...typography.bodyLarge,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || '#333',
+    color: theme.colors.onSurface,
   },
   simpleTime: {
     ...typography.bodySmall,
-    color: theme?.colors?.outline || '#AAA',
+    color: theme.colors.outline,
   },
   simpleMeaning: {
     ...typography.bodySmall,
-    color: theme?.colors?.onSurfaceVariant || '#666',
+    color: theme.colors.onSurfaceVariant,
   },
 
   // --- Trans Card ---
   transCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
   },
   transOriginal: {
     ...typography.bodyMedium,
-    color: theme?.colors?.onSurface || '#333',
+    color: theme.colors.onSurface,
     lineHeight: 22,
   },
   transDivider: {
     height: 1,
-    backgroundColor: theme?.colors?.outlineVariant || '#F0F0F0',
+    backgroundColor: theme.colors.outlineVariant,
     marginVertical: 8,
   },
   transResult: {
     ...typography.bodyMedium,
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     lineHeight: 22,
     fontWeight: '500',
   },
@@ -566,7 +566,7 @@ const styles = (isDark: boolean, theme: any) => StyleSheet.create({
   emptyText: {
     marginTop: 16,
     ...typography.bodyMedium,
-    color: theme?.colors?.outline || '#999',
+    color: theme.colors.outline,
   },
 });
 

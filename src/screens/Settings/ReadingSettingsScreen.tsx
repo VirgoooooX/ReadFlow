@@ -23,9 +23,9 @@ import {
 import { typography } from '../../theme/typography';
 
 const ReadingSettingsScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { settings, updateSetting, loading } = useReadingSettings();
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   // 本地状态用于实时预览
   const [fontSize, setFontSize] = useState(16);
@@ -180,7 +180,7 @@ const ReadingSettingsScreen: React.FC = () => {
                   )}
                 </View>
                 {fontFamily === font.key && (
-                  <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />
+                  <MaterialIcons name="check" size={24} color={theme.colors.primary} />
                 )}
               </TouchableOpacity>
             ))}
@@ -193,7 +193,7 @@ const ReadingSettingsScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={theme?.colors?.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>加载设置中...</Text>
       </View>
     );
@@ -211,14 +211,14 @@ const ReadingSettingsScreen: React.FC = () => {
         <SettingItem
           icon="tab"
           label="显示“全部”标签"
-          color="#8B5CF6"
+          color={theme.colors.primary}
           rightElement={
             <View style={{ height: 32, justifyContent: 'center' }}>
               <Switch
                 value={showAllTab}
                 onValueChange={handleShowAllTabChange}
-                trackColor={{ false: theme?.colors?.surfaceVariant, true: theme?.colors?.primary }}
-                thumbColor={showAllTab ? theme?.colors?.onPrimary : theme?.colors?.outline}
+                trackColor={{ false: theme.colors.surfaceVariant, true: theme.colors.primary }}
+                thumbColor={showAllTab ? theme.colors.onPrimary : theme.colors.outline}
                 style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }} 
               />
             </View>
@@ -227,14 +227,14 @@ const ReadingSettingsScreen: React.FC = () => {
         <SettingItem
           icon="playlist-add-check"
           label="滚动自动标记已读"
-          color="#10B981"
+          color={theme.colors.primary}
           rightElement={
             <View style={{ height: 32, justifyContent: 'center' }}>
               <Switch
                 value={autoMarkReadOnScroll}
                 onValueChange={handleAutoMarkReadOnScrollChange}
-                trackColor={{ false: theme?.colors?.surfaceVariant, true: theme?.colors?.primary }}
-                thumbColor={autoMarkReadOnScroll ? theme?.colors?.onPrimary : theme?.colors?.outline}
+                trackColor={{ false: theme.colors.surfaceVariant, true: theme.colors.primary }}
+                thumbColor={autoMarkReadOnScroll ? theme.colors.onPrimary : theme.colors.outline}
                 style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
               />
             </View>
@@ -248,7 +248,7 @@ const ReadingSettingsScreen: React.FC = () => {
         <SettingItem
           icon="font-download"
           label="字体类型"
-          color={theme?.colors?.primary}
+          color={theme.colors.primary}
           valueText={currentFont?.name || '系统默认'}
           onPress={() => setShowFontDropdown(true)}
         />
@@ -309,16 +309,16 @@ const ReadingSettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 16,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
   },
 
   // Hint Box
@@ -328,7 +328,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   hintText: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     lineHeight: 16,
   },
 
@@ -340,14 +340,14 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingHorizontal: 20,
   },
   dropdownMenu: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: isDark ? 0.5 : 0.15,
+    shadowOpacity: theme.isDark ? 0.3 : 0.15,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 5,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -356,10 +356,10 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    borderBottomColor: theme.colors.outlineVariant,
   },
   dropdownItemSelected: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
+    backgroundColor: theme.colors.primaryContainer,
   },
   dropdownItemContent: {
     flex: 1,
@@ -367,19 +367,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   dropdownItemLabel: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   dropdownItemLabelSelected: {
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   dropdownItemDescription: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
   },
   dropdownItemDescriptionSelected: {
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
   },
 });
 

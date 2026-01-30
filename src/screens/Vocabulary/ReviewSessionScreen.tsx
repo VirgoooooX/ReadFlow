@@ -13,9 +13,9 @@ import { vocabularyService } from '../../services/VocabularyService';
 import { VocabularyEntry } from '../../types';
 import { useNavigation } from '@react-navigation/native';
 import { stripHtmlTags } from '../../utils/stringUtils';
-import * as StyleUtils from '../../utils/styleUtils';
+import { getContrastColor } from '../../utils/colorUtils';
 const ReviewSessionScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [words, setWords] = useState<VocabularyEntry[]>([]);
@@ -23,7 +23,7 @@ const ReviewSessionScreen: React.FC = () => {
   const [showDefinition, setShowDefinition] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   useEffect(() => {
     loadReviewWords();
@@ -92,7 +92,7 @@ const ReviewSessionScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme?.colors?.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>加载中...</Text>
       </View>
     );
@@ -164,7 +164,7 @@ const ReviewSessionScreen: React.FC = () => {
               style={styles.showButton}
               onPress={() => setShowDefinition(true)}
             >
-              <MaterialIcons name="visibility" size={24} color={theme?.colors?.primary} />
+              <MaterialIcons name="visibility" size={24} color={theme.colors.primary} />
               <Text style={styles.showButtonText}>显示释义</Text>
             </TouchableOpacity>
           )}
@@ -178,7 +178,7 @@ const ReviewSessionScreen: React.FC = () => {
             style={[styles.actionButton, styles.dontKnowButton]}
             onPress={handleDontKnow}
           >
-            <MaterialIcons name="close" size={28} color="#FFFFFF" />
+            <MaterialIcons name="close" size={28} color={theme.colors.onError} />
             <Text style={styles.actionButtonText}>不认识</Text>
           </TouchableOpacity>
 
@@ -186,7 +186,7 @@ const ReviewSessionScreen: React.FC = () => {
             style={[styles.actionButton, styles.knowButton]}
             onPress={handleKnow}
           >
-            <MaterialIcons name="check" size={28} color="#FFFFFF" />
+            <MaterialIcons name="check" size={28} color={getContrastColor(theme.semantic.success)} />
             <Text style={styles.actionButtonText}>认识</Text>
           </TouchableOpacity>
         </View>
@@ -195,10 +195,10 @@ const ReviewSessionScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -208,7 +208,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   emptyContainer: {
     flex: 1,
@@ -217,7 +217,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   progressContainer: {
     padding: 20,
@@ -225,19 +225,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
+    backgroundColor: theme.colors.surfaceVariant,
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
     borderRadius: 4,
   },
   progressText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
   },
   cardContainer: {
@@ -248,7 +248,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   card: {
     width: '100%',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 16,
     padding: 32,
     minHeight: 300,
@@ -257,43 +257,43 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   wordText: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     textAlign: 'center',
     marginBottom: 24,
   },
   contextContainer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
+    backgroundColor: theme.colors.surfaceVariant,
     borderRadius: 12,
   },
   contextLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 8,
   },
   contextText: {
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     lineHeight: 24,
   },
   definitionContainer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF'),
+    backgroundColor: theme.colors.primaryContainer,
     borderRadius: 12,
   },
   definitionLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme?.colors?.onPrimaryContainer || (isDark ? '#CCE7FF' : '#004A77'),
+    color: theme.colors.onPrimaryContainer,
     marginBottom: 8,
   },
   definitionText: {
     fontSize: 18,
     fontWeight: '500',
-    color: theme?.colors?.onPrimaryContainer || (isDark ? '#CCE7FF' : '#004A77'),
+    color: theme.colors.onPrimaryContainer,
     lineHeight: 26,
   },
   showButton: {
@@ -302,13 +302,13 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E6E0E9'),
+    backgroundColor: theme.colors.surfaceVariant,
     borderRadius: 12,
   },
   showButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.primary || '#3B82F6',
+    color: theme.colors.primary,
     marginLeft: 8,
   },
   actionsContainer: {
@@ -326,15 +326,15 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     gap: 8,
   },
   dontKnowButton: {
-    backgroundColor: theme?.colors?.error || '#B3261E',
+    backgroundColor: theme.colors.error,
   },
   knowButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: theme.semantic.success,
   },
   actionButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
 });
 

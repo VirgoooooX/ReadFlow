@@ -19,7 +19,7 @@ import { RSSGroup } from '../../types';
 import CreateGroupModal from '../../components/CreateGroupModal';
 
 const GroupManagementScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const navigation = useNavigation();
   const { groups, createGroup, updateGroup, deleteGroup, refreshGroups } = useRSSGroup();
   const { rssSources } = useRSSSource();
@@ -94,7 +94,7 @@ const GroupManagementScreen: React.FC = () => {
     );
   };
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   // 计算默认分组统计
   const uncategorizedSources = rssSources.filter(s => !s.groupId);
@@ -111,8 +111,8 @@ const GroupManagementScreen: React.FC = () => {
       <View style={styles.menuItem}>
         <View style={styles.menuLeft}>
           {/* 分组颜色图标 */}
-          <View style={[styles.menuIconBox, { backgroundColor: group.color || theme?.colors?.primary }]}>
-            <MaterialIcons name="folder" size={20} color="#FFFFFF" />
+          <View style={[styles.menuIconBox, { backgroundColor: group.color || theme.colors.primary }]}>
+            <MaterialIcons name="folder" size={20} color={theme.colors.onPrimary} />
           </View>
           
           <View style={styles.groupInfo}>
@@ -134,7 +134,7 @@ const GroupManagementScreen: React.FC = () => {
             <MaterialIcons
               name="edit"
               size={18}
-              color={theme?.colors?.onSurfaceVariant || '#666'}
+              color={theme.colors.onSurfaceVariant}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -145,7 +145,7 @@ const GroupManagementScreen: React.FC = () => {
             <MaterialIcons
               name="delete"
               size={18}
-              color={theme?.colors?.error || '#EF4444'}
+              color={theme.colors.error}
             />
           </TouchableOpacity>
         </View>
@@ -166,7 +166,7 @@ const GroupManagementScreen: React.FC = () => {
                 <MaterialIcons
                   name="folder-open"
                   size={48}
-                  color={theme?.colors?.onSurfaceVariant || '#999'}
+                  color={theme.colors.onSurfaceVariant}
                 />
                 <Text style={styles.emptyText}>暂无自定义分组</Text>
                 <Text style={styles.emptyHint}>点击下方按钮创建您的第一个分组</Text>
@@ -186,8 +186,8 @@ const GroupManagementScreen: React.FC = () => {
             {/* 默认分组 */}
             <View style={styles.menuItem}>
               <View style={styles.menuLeft}>
-                <View style={[styles.menuIconBox, { backgroundColor: theme?.colors?.surfaceVariant }]}>
-                  <MaterialIcons name="folder-open" size={20} color={theme?.colors?.onSurfaceVariant} />
+                <View style={[styles.menuIconBox, { backgroundColor: theme.colors.surfaceVariant }]}>
+                  <MaterialIcons name="folder-open" size={20} color={theme.colors.onSurfaceVariant} />
                 </View>
                 
                 <View style={styles.groupInfo}>
@@ -201,7 +201,7 @@ const GroupManagementScreen: React.FC = () => {
               </View>
 
               <View style={styles.menuRight}>
-                 <Text style={[styles.statText, { fontSize: 12, color: theme?.colors?.outline, marginRight: 8 }]}>系统默认</Text>
+                 <Text style={[styles.statText, { fontSize: 12, color: theme.colors.outline, marginRight: 8 }]}>系统默认</Text>
               </View>
             </View>
           </View>
@@ -212,15 +212,15 @@ const GroupManagementScreen: React.FC = () => {
           <SectionTitle title="使用提示" />
           <View style={styles.tipsCard}>
             <View style={styles.tipItem}>
-              <MaterialIcons name="edit" size={16} color={theme?.colors?.onSurfaceVariant || '#666'} />
+              <MaterialIcons name="edit" size={16} color={theme.colors.onSurfaceVariant} />
               <Text style={styles.tipText}>点击编辑按钮可修改分组名称和颜色</Text>
             </View>
             <View style={styles.tipItem}>
-              <MaterialIcons name="delete" size={16} color={theme?.colors?.onSurfaceVariant || '#666'} />
+              <MaterialIcons name="delete" size={16} color={theme.colors.onSurfaceVariant} />
               <Text style={styles.tipText}>删除分组时可选择是否同时删除源</Text>
             </View>
             <View style={styles.tipItem}>
-              <MaterialIcons name="add" size={16} color={theme?.colors?.onSurfaceVariant || '#666'} />
+              <MaterialIcons name="add" size={16} color={theme.colors.onSurfaceVariant} />
               <Text style={styles.tipText}>在添加RSS源时可选择所属分组</Text>
             </View>
           </View>
@@ -240,7 +240,7 @@ const GroupManagementScreen: React.FC = () => {
           <MaterialIcons
             name="add"
             size={24}
-            color={theme?.colors?.onPrimary || '#FFFFFF'}
+            color={theme.colors.onPrimary}
           />
           <Text style={styles.createButtonText}>创建新分组</Text>
         </TouchableOpacity>
@@ -251,8 +251,6 @@ const GroupManagementScreen: React.FC = () => {
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateGroup}
-        theme={theme}
-        isDark={isDark}
       />
 
       {/* 编辑分组弹窗 */}
@@ -265,8 +263,6 @@ const GroupManagementScreen: React.FC = () => {
             setEditingGroup(null);
           }}
           onUpdate={handleUpdateGroup}
-          theme={theme}
-          isDark={isDark}
         />
       )}
     </View>
@@ -279,8 +275,6 @@ interface EditGroupModalProps {
   group: RSSGroup;
   onClose: () => void;
   onUpdate: (name: string, color?: string) => void;
-  theme?: any;
-  isDark?: boolean;
 }
 
 const PRESET_COLORS = [
@@ -303,9 +297,9 @@ const EditGroupModal: React.FC<EditGroupModalProps> = ({
   group,
   onClose,
   onUpdate,
-  theme,
-  isDark = false,
 }) => {
+  const { theme } = useThemeContext();
+  const styles = createEditModalStyles(theme);
   const [name, setName] = useState(group.name);
   const [selectedColor, setSelectedColor] = useState(group.color || PRESET_COLORS[0]);
 
@@ -324,105 +318,65 @@ const EditGroupModal: React.FC<EditGroupModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={editModalStyles.overlay}>
+      <View style={styles.overlay}>
         <TouchableOpacity
-          style={editModalStyles.backdrop}
+          style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
         />
         
-        <View
-          style={[
-            editModalStyles.modal,
-            {
-              backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
-            },
-          ]}
-        >
-          <Text
-            style={[
-              editModalStyles.title,
-              { color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F') },
-            ]}
-          >
-            编辑分组
-          </Text>
+        <View style={styles.modal}>
+          <Text style={styles.title}>编辑分组</Text>
 
           <TextInput
-            style={[
-              editModalStyles.input,
-              {
-                backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
-                color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
-                borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
-              },
-            ]}
+            style={styles.input}
             placeholder="分组名称"
-            placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
             value={name}
             onChangeText={setName}
             autoFocus
           />
 
-          <Text
-            style={[
-              editModalStyles.label,
-              { color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F') },
-            ]}
-          >
-            选择颜色
-          </Text>
+          <Text style={styles.label}>选择颜色</Text>
 
-          <View style={editModalStyles.colorGrid}>
+          <View style={styles.colorGrid}>
             {PRESET_COLORS.map((color) => (
               <TouchableOpacity
                 key={color}
                 style={[
-                  editModalStyles.colorButton,
+                  styles.colorButton,
                   { backgroundColor: color },
-                  selectedColor === color && editModalStyles.colorButtonSelected,
+                  selectedColor === color && styles.colorButtonSelected,
                 ]}
                 onPress={() => setSelectedColor(color)}
               >
                 {selectedColor === color && (
-                  <MaterialIcons name="check" size={20} color="#FFFFFF" />
+                  <MaterialIcons name="check" size={20} color={theme.colors.onPrimary} />
                 )}
               </TouchableOpacity>
             ))}
           </View>
 
-          <View style={editModalStyles.actions}>
+          <View style={styles.actions}>
             <TouchableOpacity
-              style={editModalStyles.button}
+              style={styles.button}
               onPress={onClose}
             >
-              <Text
-                style={[
-                  editModalStyles.buttonText,
-                  { color: theme?.colors?.primary || '#6750A4' },
-                ]}
-              >
+              <Text style={[styles.buttonText, { color: theme.colors.primary }]}>
                 取消
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
-                editModalStyles.button,
-                {
-                  backgroundColor: theme?.colors?.primary || '#6750A4',
-                },
-                !name.trim() && editModalStyles.buttonDisabled,
+                styles.button,
+                { backgroundColor: theme.colors.primary },
+                !name.trim() && styles.buttonDisabled,
               ]}
               onPress={handleUpdate}
               disabled={!name.trim()}
             >
-              <Text
-                style={[
-                  editModalStyles.buttonText,
-                  { color: theme?.colors?.onPrimary || '#FFFFFF' },
-                ]}
-              >
+              <Text style={[styles.buttonText, { color: theme.colors.onPrimary }]}>
                 保存
               </Text>
             </TouchableOpacity>
@@ -433,7 +387,7 @@ const EditGroupModal: React.FC<EditGroupModalProps> = ({
   );
 };
 
-const editModalStyles = StyleSheet.create({
+const createEditModalStyles = (theme: any) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'center',
@@ -448,11 +402,13 @@ const editModalStyles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 24,
     padding: 24,
+    backgroundColor: theme.colors.surface,
   },
   title: {
     fontSize: 22,
     fontWeight: '600',
     marginBottom: 20,
+    color: theme.colors.onSurface,
   },
   input: {
     height: 48,
@@ -461,10 +417,14 @@ const editModalStyles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     marginBottom: 20,
+    backgroundColor: theme.colors.surfaceContainer,
+    color: theme.colors.onSurface,
+    borderColor: theme.colors.outline,
   },
   label: {
     fontSize: 14,
     marginBottom: 12,
+    color: theme.colors.onSurfaceVariant,
   },
   colorGrid: {
     flexDirection: 'row',
@@ -481,7 +441,7 @@ const editModalStyles = StyleSheet.create({
   },
   colorButtonSelected: {
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: theme.colors.onPrimary,
   },
   actions: {
     flexDirection: 'row',
@@ -504,10 +464,10 @@ const editModalStyles = StyleSheet.create({
   },
 });
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -520,12 +480,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 12,
   },
   menuGroupCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOpacity: theme.isDark ? 0.3 : 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -538,7 +498,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   menuDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    backgroundColor: theme.colors.outlineVariant,
     marginHorizontal: 14,
   },
   menuLeft: {
@@ -560,7 +520,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   menuText: {
     ...typography.bodyLarge,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   groupStats: {
@@ -569,11 +529,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   statText: {
     ...typography.bodySmall,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
   },
   statDivider: {
     ...typography.bodySmall,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginHorizontal: 6,
   },
   menuRight: {
@@ -588,7 +548,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     ...typography.titleMedium,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 10,
     marginTop: -5,
     textTransform: 'uppercase',
@@ -604,24 +564,24 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   emptyText: {
     ...typography.titleMedium,
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginTop: 16,
     marginBottom: 4,
   },
   emptyHint: {
     ...typography.bodySmall,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
   },
 
   // 提示卡片
   tipsCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOpacity: theme.isDark ? 0.3 : 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -632,7 +592,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   tipText: {
     ...typography.bodySmall,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginLeft: 8,
     flex: 1,
   },
@@ -641,17 +601,17 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   bottomActions: {
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 24,
     paddingVertical: 14,
     gap: 8,
-    shadowColor: theme?.colors?.primary || '#6750A4',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -660,7 +620,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   createButtonText: {
     ...typography.labelLarge,
     fontWeight: '600',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
 });
 

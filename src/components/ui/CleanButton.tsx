@@ -76,16 +76,17 @@ const createCleanButtonStyles = (theme: Theme) => {
     // 变体样式
     filled: {
       backgroundColor: theme.colors.primary,
-      elevation: 1,
-      shadowColor: theme.colors.shadow,
+      elevation: theme.isDark ? 2 : 1,
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.2,
-      shadowRadius: 2,
+      shadowOpacity: theme.isDark ? 0.3 : 0.2,
+      shadowRadius: theme.isDark ? 4 : 2,
     },
     
     outlined: {
       backgroundColor: 'transparent',
-      
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
     },
     
     text: {
