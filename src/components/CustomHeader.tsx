@@ -40,7 +40,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   titleMarginTop = 12, // 默认为0，按需设置
 }) => {
   const navigation = useNavigation();
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const insets = useSafeAreaInsets();
 
   // 计算实际的header高度（包含状态栏）
@@ -57,14 +57,10 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 
   // 确保使用主题色，如果传入了 backgroundColor 则优先使用
   // 深色模式下使用 surface 色替代亮色 primary，避免突兀
-  const headerBackgroundColor = backgroundColor || (isDark
-    ? theme?.colors?.surface || '#1F2937'  // 深色模式：使用 surface 色
-    : theme?.colors?.primary);              // 浅色模式：使用 primary 色
+  const headerBackgroundColor = backgroundColor || (theme.isDark ? theme.colors.surface : theme.colors.primary);
 
   // 深色模式下文字用 onSurface，浅色模式下用 onPrimary
-  const headerTextColor = textColor || (isDark
-    ? theme?.colors?.onSurface || '#F9FAFB'
-    : theme?.colors?.onPrimary || '#FFFFFF');
+  const headerTextColor = textColor || (theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary);
 
   // 动态计算文字样式
   const getTitleStyle = (): any => {
@@ -131,22 +127,8 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     return baseStyle;
   };
 
-  // 判断状态栏内容颜色：导航栏背景是 primary 色，所以根据 onPrimary 判断
-  // 如果 onPrimary 是浅色（如白色），则状态栏内容用 light-content
-  // 如果 onPrimary 是深色（如黑色），则状态栏内容用 dark-content
-  const isLightContent = headerTextColor.toLowerCase() === '#ffffff' ||
-    headerTextColor.toLowerCase() === '#fff' ||
-    headerTextColor.startsWith('#f') ||
-    headerTextColor.startsWith('#e') ||
-    headerTextColor.startsWith('#d');
-
   return (
     <>
-      <StatusBar
-        barStyle={isLightContent ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent={true}
-      />
       <View style={[styles.container, {
         backgroundColor: headerBackgroundColor,
         height: totalHeaderHeight,

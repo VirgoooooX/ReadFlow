@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  StatusBar,
-  useColorScheme,
   View,
   ActivityIndicator,
   Text,
@@ -11,7 +9,6 @@ import {
   AppState,  // 添加 AppState监听应用生命周期
 } from 'react-native';
 import { Provider } from 'react-redux';
-import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { Asset } from 'expo-asset';
@@ -39,8 +36,6 @@ import { configSyncService } from './src/services/ConfigSyncService';
 SplashScreen.preventAutoHideAsync();
 
 function App(): React.JSX.Element {
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
   const [appIsReady, setAppIsReady] = useState(false);
 
   // 1. 保底机制：无论发生什么，5秒后必须尝试关闭启动页
@@ -157,11 +152,6 @@ function App(): React.JSX.Element {
                 <RSSGroupProvider>
                   <ReadingSettingsProvider>
                     <View style={styles.container}>
-                      <StatusBar
-                        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                        backgroundColor="transparent"
-                        translucent
-                      />
                       <AppNavigator />
                     </View>
                   </ReadingSettingsProvider>

@@ -52,8 +52,8 @@ const CustomColorScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
 
   // 状态管理
-  const [primaryColor, setPrimaryColor] = useState(customConfig?.primary || theme?.colors?.primary || '#3B82F6');
-  const [secondaryColor, setSecondaryColor] = useState(customConfig?.secondary || theme?.colors?.secondary || '#64748B');
+  const [primaryColor, setPrimaryColor] = useState(customConfig?.primary || theme.colors.primary);
+  const [secondaryColor, setSecondaryColor] = useState(customConfig?.secondary || theme.colors.secondary);
   const [customPrimaryInput, setCustomPrimaryInput] = useState('');
   const [customSecondaryInput, setCustomSecondaryInput] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -167,7 +167,7 @@ const CustomColorScreen: React.FC = () => {
           <TextInput
             style={styles.customInput}
             placeholder="#RRGGBB"
-            placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+            placeholderTextColor={theme.colors.onSurfaceVariant}
             value={customInput}
             onChangeText={setCustomInput}
             maxLength={7}
@@ -238,14 +238,14 @@ const CustomColorScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-            <MaterialIcons name="restore" size={20} color={theme?.colors?.onSurfaceVariant} />
+            <MaterialIcons name="restore" size={20} color={theme.colors.onSurfaceVariant} />
             <Text style={styles.resetButtonText}>重置为默认</Text>
           </TouchableOpacity>
         </View>
 
         {/* 提示信息 */}
         <View style={styles.tipSection}>
-          <MaterialIcons name="info" size={18} color={theme?.colors?.primary} />
+          <MaterialIcons name="info" size={18} color={theme.colors.primary} />
           <Text style={styles.tipText}>
             主色用于按钮、链接等主要元素；次色用于辅助元素和图标。Material Design 3 会根据你选择的颜色自动生成完整的配色方案。
           </Text>
@@ -258,7 +258,7 @@ const CustomColorScreen: React.FC = () => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 16,
@@ -266,7 +266,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
 
   // 预览卡片
   previewCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
@@ -274,7 +274,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   previewTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginBottom: 16,
   },
   previewContent: {
@@ -333,7 +333,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
   },
   currentColorPreview: {
     paddingHorizontal: 12,
@@ -351,7 +351,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     padding: 12,
     borderRadius: 12,
   },
@@ -365,7 +365,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     borderColor: 'transparent',
   },
   colorItemSelected: {
-    borderColor: theme?.colors?.onSurface || '#FFFFFF',
+    borderColor: theme.colors.onSurface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -376,13 +376,13 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   // 自定义输入
   customInputContainer: {
     marginTop: 12,
-    backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     padding: 12,
     borderRadius: 12,
   },
   customInputLabel: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 8,
   },
   customInputRow: {
@@ -391,16 +391,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   customInput: {
     flex: 1,
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#374151' : '#F3F4F6'),
+    backgroundColor: theme.colors.surfaceVariant,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     fontFamily: 'monospace',
   },
   customInputButton: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
     width: 44,
     borderRadius: 8,
     justifyContent: 'center',
@@ -431,11 +431,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#1F2937' : '#F3F4F6'),
+    backgroundColor: theme.colors.surfaceVariant,
     gap: 8,
   },
   resetButtonText: {
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -443,7 +443,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   // 提示
   tipSection: {
     flexDirection: 'row',
-    backgroundColor: `${theme?.colors?.primary || '#3B82F6'}15`,
+    backgroundColor: `${theme.colors.primary}15`,
     padding: 12,
     borderRadius: 12,
     gap: 8,
@@ -452,7 +452,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },
 });

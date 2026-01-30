@@ -598,7 +598,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 4,
   },
   contentTypeOption: {
-    ...StyleUtils.createCardStyle(isDark, theme),
+    ...StyleUtils.createCardStyle(theme),
     flex: 1,
     flexDirection: 'row' as any,
     alignItems: 'center' as any,
@@ -629,7 +629,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...StyleUtils.createCardStyle(isDark, theme),
+    ...StyleUtils.createCardStyle(theme),
     borderRadius: 12,
     padding: 16,
   },
@@ -667,7 +667,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center' as any,
     justifyContent: 'center' as any,
-    ...StyleUtils.createCardStyle(isDark, theme),
+    ...StyleUtils.createCardStyle(theme),
     borderRadius: 24,
   },
   cancelButtonText: {

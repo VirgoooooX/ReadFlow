@@ -1,5 +1,16 @@
 import { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { StyleProp, ViewStyle } from 'react-native';
+import type { Theme } from '../theme';
+
+const getStatusBarStyle = (hexColor: string): 'light' | 'dark' => {
+  const hex = hexColor.replace('#', '');
+  const normalized = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex;
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 0.5 ? 'light' : 'dark';
+};
 
 /**
  * 获取通用的屏幕配置选项
@@ -7,20 +18,16 @@ import { StyleProp, ViewStyle } from 'react-native';
  * 确保所有页面的转场动画效果和背景颜色一致
  */
 export const getCommonScreenOptions = (
-  theme: any,
-  isDark: boolean
+  theme: Theme
 ): NativeStackNavigationOptions & { cardStyle?: StyleProp<ViewStyle> } => {
-  const backgroundColor = theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE');
+  const backgroundColor = theme.colors.background;
 
   // 【关键修复】导航栏背景色：深色模式用 surface，浅色模式用 primary
-  const headerBackgroundColor = isDark
-    ? (theme?.colors?.surface || '#1F2937')   // 深色模式：surface
-    : (theme?.colors?.primary || '#6750A4');  // 浅色模式：primary
+  const headerBackgroundColor = theme.isDark ? theme.colors.surface : theme.colors.primary;
 
   // 【关键修复】导航栏文字色：深色模式用 onSurface，浅色模式用 onPrimary
-  const headerTextColor = isDark
-    ? (theme?.colors?.onSurface || '#F9FAFB')  // 深色模式：onSurface (白色)
-    : (theme?.colors?.onPrimary || '#FFFFFF'); // 浅色模式：onPrimary (通常是白色)
+  const headerTextColor = theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary;
+  const statusBarStyle = getStatusBarStyle(headerTextColor);
 
   return {
     // 1. 核心动画：平移效果，从右侧滑入
@@ -49,6 +56,7 @@ export const getCommonScreenOptions = (
       backgroundColor: headerBackgroundColor,
     },
     headerTintColor: headerTextColor,
+    statusBarStyle,
 
     // 8. 其他头部配置
     headerTitleStyle: {

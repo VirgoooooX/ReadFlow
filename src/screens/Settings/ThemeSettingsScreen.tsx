@@ -11,7 +11,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeContext } from '../../theme';
+import { useThemeContext, type ThemePreset } from '../../theme';
 import { THEME_PRESETS } from '../../theme/presets';
 import type { UserStackParamList } from '../../navigation';
 
@@ -33,7 +33,7 @@ const ModeSelector = ({ mode, currentMode, onChange, theme, isDark }: any) => {
     <TouchableOpacity
       style={[
         { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 12, gap: 8 },
-        { backgroundColor: isSelected ? (theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF')) : (isDark ? '#3D3D3D' : '#F5F5F5') }
+        { backgroundColor: isSelected ? theme.colors.primaryContainer : theme.colors.surfaceVariant }
       ]}
       onPress={() => onChange(mode)}
       activeOpacity={0.7}
@@ -41,12 +41,12 @@ const ModeSelector = ({ mode, currentMode, onChange, theme, isDark }: any) => {
       <MaterialIcons 
         name={icons[mode]} 
         size={24} 
-        color={isSelected ? (theme?.colors?.primary || '#6750A4') : (theme?.colors?.onSurfaceVariant || '#999')} 
+        color={isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant} 
       />
       <Text style={{
         fontSize: 13,
         fontWeight: '600',
-        color: isSelected ? (theme?.colors?.primary || '#6750A4') : (theme?.colors?.onSurface || '#000')
+        color: isSelected ? theme.colors.primary : theme.colors.onSurface
       }}>
         {labels[mode]}
       </Text>
@@ -70,7 +70,7 @@ const ThemeCard = ({ preset, isSelected, onPress, theme }: any) => (
       justifyContent: 'center', 
       alignItems: 'center', 
       borderWidth: 2, 
-      borderColor: isSelected ? (theme?.colors?.primary || '#6750A4') : 'transparent'
+      borderColor: isSelected ? theme.colors.primary : 'transparent'
     }}>
       <View style={{ width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', backgroundColor: preset.colors.primary }}>
         <View style={{ position: 'absolute', right: 0, bottom: 0, width: '50%', height: '100%', backgroundColor: preset.colors.secondary }} />
@@ -79,7 +79,7 @@ const ThemeCard = ({ preset, isSelected, onPress, theme }: any) => (
     <Text 
       style={{
         fontSize: 12,
-        color: isSelected ? (theme?.colors?.primary || '#6750A4') : (theme?.colors?.onSurfaceVariant || '#999'),
+        color: isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant,
         textAlign: 'center',
         fontWeight: isSelected ? '600' : '500',
       }} 
@@ -109,8 +109,8 @@ const ThemeSettingsScreen: React.FC = () => {
     await setThemeMode(mode);
   };
 
-  const handlePresetChange = async (presetId: string) => {
-    await setThemePreset(presetId as any);
+  const handlePresetChange = async (presetId: ThemePreset) => {
+    await setThemePreset(presetId);
   };
 
   const handleCustomTheme = () => {
@@ -159,7 +159,7 @@ const ThemeSettingsScreen: React.FC = () => {
                   key={preset.id}
                   preset={preset}
                   isSelected={currentPreset === preset.id}
-                  onPress={() => handlePresetChange(preset.id)}
+                  onPress={() => handlePresetChange(preset.id as ThemePreset)}
                   theme={theme}
                 />
               ))}
@@ -201,7 +201,7 @@ const ThemeSettingsScreen: React.FC = () => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F7FA'),
+    backgroundColor: theme.colors.background,
     paddingHorizontal: CONTAINER_PADDING,
   },
   content: {
@@ -215,13 +215,13 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     marginBottom: 8,
     marginLeft: 4,
     opacity: 0.9,
   },
   menuGroupCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -250,7 +250,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   menuText: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
   },
   menuLeft: {
     flexDirection: 'row',
@@ -259,7 +259,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   menuDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    backgroundColor: theme.colors.outlineVariant,
     marginLeft: 60,
   },
 

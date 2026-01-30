@@ -346,7 +346,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     // 统计卡片
     statsCard: {
       flexDirection: 'row' as any,
-      ...StyleUtils.createCardStyle(isDark, theme),
+      ...StyleUtils.createCardStyle(theme),
       borderRadius: 12,
       marginBottom: 20,
     },
@@ -384,7 +384,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginBottom: 12,
     },
     definitionItem: {
-      ...StyleUtils.createCardStyle(isDark, theme),
+      ...StyleUtils.createCardStyle(theme),
       borderRadius: 12,
       padding: 16,
       marginBottom: 10,
@@ -432,7 +432,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     // 上下文
     contextCard: {
-      ...StyleUtils.createCardStyle(isDark, theme),
+      ...StyleUtils.createCardStyle(theme),
       borderRadius: 12,
       padding: 16,
     },

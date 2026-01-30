@@ -96,7 +96,8 @@ const createButtonStyles = (theme: Theme) => {
     
     outlined: {
       backgroundColor: 'transparent',
-      
+      borderWidth: 1,
+      borderColor: theme.colors.outline,
     },
     
     text: {

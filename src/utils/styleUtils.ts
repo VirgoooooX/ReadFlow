@@ -5,6 +5,7 @@
  */
 
 import { Theme } from '../theme';
+import { withAlpha } from './colorUtils';
 
 /**
  * 生成卡片样式（HomeScreen 风格）
@@ -12,37 +13,37 @@ import { Theme } from '../theme';
  * - 深色模式: elevation 0，有边框
  * - 浅色模式: elevation 2，无边框
  */
-export const createCardStyle = (isDark: boolean, theme: any) => ({
-  backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
+export const createCardStyle = (theme: Theme) => ({
+  backgroundColor: theme.colors.surface,
   borderRadius: 16,
   padding: 16,
   marginBottom: 10,
   // 阴影效果 (iOS)
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: isDark ? 0.4 : 0.05,
+  shadowOpacity: theme.isDark ? 0.4 : 0.05,
   shadowRadius: 8,
   // 阴影效果 (Android)
-  elevation: isDark ? 2 : 2,
+  elevation: 2,
   // 深色模式下加边框
   borderWidth: 1,
-  borderColor: isDark ? (theme?.colors?.outlineVariant || '#374151') : 'transparent',
+  borderColor: theme.isDark ? theme.colors.outlineVariant : 'transparent',
 });
 
 /**
  * 生成列表项样式
  * 支持未读状态、选中状态等变体
  */
-export const createListItemStyle = (isDark: boolean, theme: any, variant: 'default' | 'unread' | 'highlight' = 'default') => {
-  const baseStyle = createCardStyle(isDark, theme);
+export const createListItemStyle = (theme: Theme, variant: 'default' | 'unread' | 'highlight' = 'default') => {
+  const baseStyle = createCardStyle(theme);
 
   const variants = {
     default: {},
     unread: {
-      backgroundColor: theme?.colors?.surfaceContainerLow || (isDark ? '#36343B' : '#FEF7FF'),
+      backgroundColor: theme.colors.surfaceContainerLow,
     },
     highlight: {
-      backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#2563EB' : '#DBEAFE'),
+      backgroundColor: theme.colors.primaryContainer,
     },
   };
 
@@ -55,50 +56,50 @@ export const createListItemStyle = (isDark: boolean, theme: any, variant: 'defau
 /**
  * 生成标题样式（用于列表项、卡片等）
  */
-export const createTitleStyle = (isDark: boolean, theme: any, isUnread: boolean = false) => ({
+export const createTitleStyle = (theme: Theme, isUnread: boolean = false) => ({
   fontSize: 16,
   fontWeight: isUnread ? '700' : '600',
   lineHeight: 22,
-  color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+  color: theme.colors.onSurface,
   opacity: isUnread ? 1 : 0.9,
 });
 
 /**
  * 生成副标题样式
  */
-export const createSubtitleStyle = (isDark: boolean, theme: any) => ({
+export const createSubtitleStyle = (theme: Theme) => ({
   fontSize: 14,
   lineHeight: 20,
-  color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+  color: theme.colors.onSurfaceVariant,
   marginBottom: 10,
 });
 
 /**
  * 生成元信息样式（日期、标签等）
  */
-export const createMetaTextStyle = (isDark: boolean, theme: any) => ({
+export const createMetaTextStyle = (theme: Theme) => ({
   fontSize: 12,
-  color: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+  color: theme.colors.outline,
 });
 
 /**
  * 生成按钮样式
  */
-export const createButtonStyle = (isDark: boolean, theme: any, variant: 'primary' | 'secondary' | 'tertiary' = 'primary') => {
+export const createButtonStyle = (theme: Theme, variant: 'primary' | 'secondary' | 'tertiary' = 'primary') => {
   const variants = {
     primary: {
-      backgroundColor: theme?.colors?.primary || '#3B82F6',
+      backgroundColor: theme.colors.primary,
       paddingHorizontal: 24,
       paddingVertical: 12,
       borderRadius: 20,
     },
     secondary: {
-      backgroundColor: theme?.colors?.secondaryContainer || (isDark ? '#334155' : '#F1F5F9'),
+      backgroundColor: theme.colors.secondaryContainer,
       paddingHorizontal: 24,
       paddingVertical: 12,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: theme?.colors?.outline || (isDark ? '#64748B' : '#94A3B8'),
+      borderColor: theme.colors.outline,
     },
     tertiary: {
       backgroundColor: 'transparent',
@@ -106,7 +107,7 @@ export const createButtonStyle = (isDark: boolean, theme: any, variant: 'primary
       paddingVertical: 12,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: theme?.colors?.primary || '#3B82F6',
+      borderColor: theme.colors.primary,
     },
   };
 
@@ -116,20 +117,20 @@ export const createButtonStyle = (isDark: boolean, theme: any, variant: 'primary
 /**
  * 生成按钮文字样式
  */
-export const createButtonTextStyle = (isDark: boolean, theme: any, variant: 'primary' | 'secondary' | 'tertiary' = 'primary') => {
+export const createButtonTextStyle = (theme: Theme, variant: 'primary' | 'secondary' | 'tertiary' = 'primary') => {
   const variants = {
     primary: {
-      color: theme?.colors?.onPrimary || '#FFFFFF',
+      color: theme.colors.onPrimary,
       fontSize: 14,
       fontWeight: '600',
     },
     secondary: {
-      color: theme?.colors?.onSecondaryContainer || (isDark ? '#E2E8F0' : '#0F172A'),
+      color: theme.colors.onSecondaryContainer,
       fontSize: 14,
       fontWeight: '600',
     },
     tertiary: {
-      color: theme?.colors?.primary || '#3B82F6',
+      color: theme.colors.primary,
       fontSize: 14,
       fontWeight: '600',
     },
@@ -141,7 +142,7 @@ export const createButtonTextStyle = (isDark: boolean, theme: any, variant: 'pri
 /**
  * 生成空状态样式
  */
-export const createEmptyStateStyle = (isDark: boolean, theme: any) => ({
+export const createEmptyStateStyle = (theme: Theme) => ({
   container: {
     flex: 1,
     justifyContent: 'center' as any,
@@ -152,35 +153,35 @@ export const createEmptyStateStyle = (isDark: boolean, theme: any) => ({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: theme?.colors?.surfaceContainerHighest || (isDark ? '#36343B' : '#F2F0F4'),
+    backgroundColor: theme.colors.surfaceContainerHighest,
     justifyContent: 'center' as any,
     alignItems: 'center' as any,
     marginBottom: 24,
   },
   text: {
     fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 24,
   },
   button: {
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: theme?.colors?.primaryContainer,
+    backgroundColor: theme.colors.primaryContainer,
   },
   buttonText: {
     fontSize: 14,
     fontWeight: '600' as any,
-    color: theme?.colors?.onPrimaryContainer,
+    color: theme.colors.onPrimaryContainer,
   },
 });
 
 /**
  * 生成统计卡片样式
  */
-export const createStatCardStyle = (isDark: boolean, theme: any) => ({
+export const createStatCardStyle = (theme: Theme) => ({
   card: {
-    ...createCardStyle(isDark, theme),
+    ...createCardStyle(theme),
     marginHorizontal: 8,
     marginBottom: 16,
     paddingVertical: 20,
@@ -189,12 +190,12 @@ export const createStatCardStyle = (isDark: boolean, theme: any) => ({
   number: {
     fontSize: 24,
     fontWeight: '700',
-    color: theme?.colors?.primary || '#3B82F6',
+    color: theme.colors.primary,
     marginBottom: 8,
   },
   label: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
+    color: theme.colors.onSurfaceVariant,
     textAlign: 'center' as any,
   },
 });
@@ -202,20 +203,20 @@ export const createStatCardStyle = (isDark: boolean, theme: any) => ({
 /**
  * 生成分割线样式
  */
-export const createDividerStyle = (isDark: boolean, theme: any) => ({
+export const createDividerStyle = (theme: Theme) => ({
   height: 1,
-  backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'),
+  backgroundColor: theme.colors.outlineVariant,
   marginVertical: 16,
 });
 
 /**
  * 生成未读点样式
  */
-export const createUnreadDotStyle = (theme: any) => ({
+export const createUnreadDotStyle = (theme: Theme) => ({
   width: 8,
   height: 8,
   borderRadius: 4,
-  backgroundColor: theme?.colors?.primary || '#3B82F6',
+  backgroundColor: theme.colors.primary,
   marginTop: 6,
   marginRight: 8,
 });
@@ -223,34 +224,34 @@ export const createUnreadDotStyle = (theme: any) => ({
 /**
  * 生成徽章样式
  */
-export const createBadgeStyle = (isDark: boolean, theme: any, variant: 'primary' | 'secondary' | 'success' | 'error' | 'warning' = 'primary') => {
+export const createBadgeStyle = (theme: Theme, variant: 'primary' | 'secondary' | 'success' | 'error' | 'warning' = 'primary') => {
   const variants = {
     primary: {
-      backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#2563EB' : '#DBEAFE'),
+      backgroundColor: theme.colors.primaryContainer,
       paddingHorizontal: 12,
       paddingVertical: 4,
       borderRadius: 12,
     },
     secondary: {
-      backgroundColor: theme?.colors?.secondaryContainer || (isDark ? '#334155' : '#F1F5F9'),
+      backgroundColor: theme.colors.secondaryContainer,
       paddingHorizontal: 12,
       paddingVertical: 4,
       borderRadius: 12,
     },
     success: {
-      backgroundColor: '#D4EDDA',
+      backgroundColor: withAlpha(theme.semantic.success, theme.isDark ? 0.22 : 0.16),
       paddingHorizontal: 12,
       paddingVertical: 4,
       borderRadius: 12,
     },
     error: {
-      backgroundColor: theme?.colors?.errorContainer || '#FEE2E2',
+      backgroundColor: theme.colors.errorContainer,
       paddingHorizontal: 12,
       paddingVertical: 4,
       borderRadius: 12,
     },
     warning: {
-      backgroundColor: '#FFF3CD',
+      backgroundColor: withAlpha(theme.semantic.warning, theme.isDark ? 0.22 : 0.16),
       paddingHorizontal: 12,
       paddingVertical: 4,
       borderRadius: 12,
@@ -263,30 +264,30 @@ export const createBadgeStyle = (isDark: boolean, theme: any, variant: 'primary'
 /**
  * 生成徽章文字样式
  */
-export const createBadgeTextStyle = (isDark: boolean, theme: any, variant: 'primary' | 'secondary' | 'success' | 'error' | 'warning' = 'primary') => {
+export const createBadgeTextStyle = (theme: Theme, variant: 'primary' | 'secondary' | 'success' | 'error' | 'warning' = 'primary') => {
   const variants = {
     primary: {
-      color: theme?.colors?.onPrimaryContainer || '#1E3A8A',
+      color: theme.colors.onPrimaryContainer,
       fontSize: 12,
       fontWeight: '500' as any,
     },
     secondary: {
-      color: theme?.colors?.onSecondaryContainer || (isDark ? '#E2E8F0' : '#0F172A'),
+      color: theme.colors.onSecondaryContainer,
       fontSize: 12,
       fontWeight: '500' as any,
     },
     success: {
-      color: '#155724',
+      color: theme.semantic.success,
       fontSize: 12,
       fontWeight: '500' as any,
     },
     error: {
-      color: theme?.colors?.onErrorContainer || '#991B1B',
+      color: theme.colors.onErrorContainer,
       fontSize: 12,
       fontWeight: '500' as any,
     },
     warning: {
-      color: '#856404',
+      color: theme.semantic.warning,
       fontSize: 12,
       fontWeight: '500' as any,
     },

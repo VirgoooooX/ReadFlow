@@ -321,6 +321,18 @@ export const semanticColors = {
   },
 };
 
+export interface SemanticColorTokens {
+  success: string;
+  warning: string;
+  info: string;
+}
+
+export const getSemanticColorTokens = (isDark: boolean): SemanticColorTokens => ({
+  success: isDark ? semanticColors.success.dark : semanticColors.success.light,
+  warning: isDark ? semanticColors.warning.dark : semanticColors.warning.light,
+  info: isDark ? semanticColors.info.dark : semanticColors.info.light,
+});
+
 // --- 【优化】应用自定义颜色配置 ---
 
 const applyCustomColors = (

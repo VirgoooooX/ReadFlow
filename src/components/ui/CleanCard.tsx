@@ -55,7 +55,8 @@ const createCleanCardStyles = (theme: Theme) => {
     
     outlined: {
       backgroundColor: theme.colors.surface,
-      
+      borderWidth: 1,
+      borderColor: theme.colors.outlineVariant,
     },
     
     // 可点击状态
