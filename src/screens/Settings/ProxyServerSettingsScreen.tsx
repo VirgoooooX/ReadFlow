@@ -20,8 +20,8 @@ interface Props {
 }
 
 export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   const [config, setConfig] = useState<ProxyServersConfig>({ servers: [], activeServerId: null });
   const [isLoading, setIsLoading] = useState(true);
@@ -163,7 +163,7 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons 
                 name={isActive ? 'check-circle' : 'radio-button-unchecked'} 
                 size={24} 
-                color={isActive ? '#10B981' : (theme?.colors?.onSurfaceVariant || '#999')} 
+                color={isActive ? theme.colors.primary : theme.colors.onSurfaceVariant} 
               />
               <Text style={[styles.serverName, isActive && styles.serverNameActive]}>
                 {server.name}
@@ -182,11 +182,11 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
                 <MaterialIcons 
                   name={server.lastTestResult === 'success' ? 'check-circle' : 'error'} 
                   size={14} 
-                  color={server.lastTestResult === 'success' ? '#10B981' : '#EF4444'} 
+                  color={server.lastTestResult === 'success' ? theme.colors.primary : theme.colors.error} 
                 />
                 <Text style={[
                   styles.testResultText,
-                  { color: server.lastTestResult === 'success' ? '#10B981' : '#EF4444' }
+                  { color: server.lastTestResult === 'success' ? theme.colors.primary : theme.colors.error }
                 ]}>
                   {server.lastTestResult === 'success' ? '连接正常' : '连接失败'}
                 </Text>
@@ -207,22 +207,22 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
             disabled={isTesting}
           >
             {isTesting ? (
-              <ActivityIndicator size="small" color={theme?.colors?.primary || '#3B82F6'} />
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
-              <MaterialIcons name="wifi-tethering" size={20} color={theme?.colors?.primary || '#3B82F6'} />
+              <MaterialIcons name="wifi-tethering" size={20} color={theme.colors.primary} />
             )}
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => handleEditServer(server.id)}
           >
-            <MaterialIcons name="edit" size={20} color={theme?.colors?.onSurfaceVariant || '#666'} />
+            <MaterialIcons name="edit" size={20} color={theme.colors.onSurfaceVariant} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => handleDeleteServer(server)}
           >
-            <MaterialIcons name="delete" size={20} color="#EF4444" />
+            <MaterialIcons name="delete" size={20} color={theme.colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -247,7 +247,7 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={theme?.colors?.primary || '#3B82F6'} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -266,14 +266,14 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>代理服务器列表</Text>
             <TouchableOpacity style={styles.addButton} onPress={handleAddServer}>
-              <MaterialIcons name="add" size={20} color="#fff" />
+              <MaterialIcons name="add" size={20} color={theme.colors.onPrimary} />
               <Text style={styles.addButtonText}>添加</Text>
             </TouchableOpacity>
           </View>
           
           {config.servers.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="cloud-off" size={48} color={theme?.colors?.onSurfaceVariant || '#999'} />
+              <MaterialIcons name="cloud-off" size={48} color={theme.colors.onSurfaceVariant} />
               <Text style={styles.emptyTitle}>暂无代理服务器</Text>
               <Text style={styles.emptySubtitle}>点击「添加」按钮添加代理服务器</Text>
             </View>
@@ -289,7 +289,7 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>当前状态</Text>
             <View style={styles.statusCard}>
-              <MaterialIcons name="cloud-done" size={24} color="#10B981" />
+              <MaterialIcons name="cloud-done" size={24} color={theme.semantic.success} />
               <View style={styles.statusInfo}>
                 <Text style={styles.statusTitle}>代理已启用</Text>
                 <Text style={styles.statusSubtitle}>
@@ -311,25 +311,25 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>使用说明</Text>
           <View style={styles.infoBox}>
             <View style={styles.infoItem}>
-              <MaterialIcons name="cloud" size={20} color={theme?.colors?.primary || '#3B82F6'} />
+              <MaterialIcons name="cloud" size={20} color={theme.colors.primary} />
               <Text style={styles.infoText}>
                 代理服务器用于获取被墙的国外 RSS 源
               </Text>
             </View>
             <View style={styles.infoItem}>
-              <MaterialIcons name="swap-horiz" size={20} color={theme?.colors?.primary || '#3B82F6'} />
+              <MaterialIcons name="swap-horiz" size={20} color={theme.colors.primary} />
               <Text style={styles.infoText}>
                 支持添加多个服务器，点击即可快速切换
               </Text>
             </View>
             <View style={styles.infoItem}>
-              <MaterialIcons name="image" size={20} color={theme?.colors?.primary || '#3B82F6'} />
+              <MaterialIcons name="image" size={20} color={theme.colors.primary} />
               <Text style={styles.infoText}>
                 自动代理加载被墙的图片（如 Twitter、Instagram）
               </Text>
             </View>
             <View style={styles.infoItem}>
-              <MaterialIcons name="security" size={20} color={theme?.colors?.primary || '#3B82F6'} />
+              <MaterialIcons name="security" size={20} color={theme.colors.primary} />
               <Text style={styles.infoText}>
                 Token 保护公网服务器安全，防止被滥用
               </Text>
@@ -341,10 +341,10 @@ export const ProxyServerSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 16,
   },
   centerContent: {
@@ -369,21 +369,21 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontWeight: '600',
     marginTop: -5,
     marginBottom: 10,    
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     gap: 4,
   },
   addButtonText: {
-    color: '#fff',
+    color: theme.colors.onPrimary,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -391,20 +391,20 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     gap: 12,
   },
   serverCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     padding: 10,
     borderWidth: 2,
     borderColor: 'transparent',
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
   serverCardActive: {
-    borderColor: '#10B981',
+    borderColor: theme.semantic.success,
   },
   serverMain: {
     flex: 1,
@@ -420,26 +420,26 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   serverName: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     flex: 1,
   },
   serverNameActive: {
-    color: '#10B981',
+    color: theme.semantic.success,
   },
   activeTag: {
-    backgroundColor: '#10B981',
+    backgroundColor: theme.semantic.success,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   activeTagText: {
-    color: '#fff',
+    color: theme.colors.onPrimary,
     fontSize: 11,
     fontWeight: '500',
   },
   serverUrl: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginLeft: 32,
   },
   testResultRow: {
@@ -454,7 +454,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   testTimeText: {
     fontSize: 11,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginLeft: 8,
   },
   serverActions: {
@@ -464,12 +464,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    borderTopColor: theme.colors.outlineVariant,
   },
   actionButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
   },
   emptyState: {
     alignItems: 'center',
@@ -479,23 +479,23 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
   },
   statusCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     padding: 10,
     borderRadius: 12,
     gap: 12,
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -505,33 +505,33 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   statusTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#10B981',
+    color: theme.semantic.success,
   },
   statusSubtitle: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 2,
   },
   disableButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#EF4444',
+    backgroundColor: theme.semantic.error,
   },
   disableButtonText: {
-    color: '#fff',
+    color: theme.colors.onError,
     fontSize: 13,
     fontWeight: '500',
   },
   infoBox: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     padding: 10,
     borderRadius: 12,
     gap: 14,
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -543,7 +543,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },
 });

@@ -45,7 +45,7 @@ interface LLMProfile {
 }
 
 const LLMSettingsScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const navigation = useNavigation<NavigationProp>();
 
   // LLM设置状态 - 基于数据库字段简化设计
@@ -478,15 +478,15 @@ const LLMSettingsScreen: React.FC = () => {
             >
               <View style={styles.optionLeft}>
                 {value && ['openai', 'anthropic', 'google', 'local', 'custom'].includes(value) ? (
-                  <BrandIcon brand={value} size={24} color={theme?.colors?.primary} />
+                  <BrandIcon brand={value} size={24} color={theme.colors.primary} />
                 ) : (
-                  <MaterialIcons name={iconName as any} size={24} color={theme?.colors?.primary} />
+                  <MaterialIcons name={iconName as any} size={24} color={theme.colors.primary} />
                 )}
                 <Text style={[styles.optionText, isSelected && styles.selectedText]}>
                   {label || value}
                 </Text>
               </View>
-              {isSelected && <MaterialIcons name="check" size={24} color={theme?.colors?.primary} />}
+              {isSelected && <MaterialIcons name="check" size={24} color={theme.colors.primary} />}
             </TouchableOpacity>
             {!isLast && <View style={styles.optionDivider} />}
           </React.Fragment>
@@ -513,7 +513,7 @@ const LLMSettingsScreen: React.FC = () => {
           onPress={() => setExpandedSelector(expanded ? null : selectorKey)}
         >
           <View style={styles.optionLeft}>
-            <MaterialIcons name={icon as any} size={24} color={theme?.colors?.primary} />
+            <MaterialIcons name={icon as any} size={24} color={theme.colors.primary} />
             <Text style={styles.optionText}>{title}</Text>
           </View>
           <View style={styles.optionRight}>
@@ -523,7 +523,7 @@ const LLMSettingsScreen: React.FC = () => {
             <MaterialIcons
               name={expanded ? 'expand-less' : 'chevron-right'}
               size={24}
-              color={theme?.colors?.onSurfaceVariant}
+              color={theme.colors.onSurfaceVariant}
             />
           </View>
         </TouchableOpacity>
@@ -542,28 +542,27 @@ const LLMSettingsScreen: React.FC = () => {
     value: boolean,
     onValueChange: (value: boolean) => void,
     icon: string
-  ) => (
-    <View style={styles.switchItem}>
-      <View style={styles.switchLeft}>
-        <MaterialIcons name={icon as any} size={24} color={theme?.colors?.primary} />
-        <View style={styles.switchContent}>
-          <Text style={styles.switchTitle}>{title}</Text>
-          <Text style={styles.switchDescription}>{description}</Text>
+  ) => {
+    return (
+      <View style={styles.optionItem}>
+        <View style={styles.optionLeft}>
+          <Text style={styles.optionTitle}>{title}</Text>
+          {description ? <Text style={styles.optionDesc}>{description}</Text> : null}
         </View>
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{
+            false: theme.colors.outline,
+            true: theme.colors.primaryContainer,
+          }}
+          thumbColor={value ? theme.colors.primary : theme.colors.outline}
+        />
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{
-          false: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
-          true: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
-        }}
-        thumbColor={value ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant}
-      />
-    </View>
-  );
+    );
+  };
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
   const profileOptions = profiles.map(p => ({
     label: p.name || p.id,
     value: p.id,
@@ -586,7 +585,7 @@ const LLMSettingsScreen: React.FC = () => {
             <View style={styles.optionDivider} />
             <View style={styles.optionItem}>
               <View style={styles.optionLeft}>
-                <MaterialIcons name="analytics" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="analytics" size={24} color={theme.colors.primary} />
                 <Text style={styles.optionText}>本月请求</Text>
               </View>
               <Text style={styles.statValueText}>{usageStats.monthly}次</Text>
@@ -594,7 +593,7 @@ const LLMSettingsScreen: React.FC = () => {
             <View style={styles.optionDivider} />
             <View style={styles.optionItem}>
               <View style={styles.optionLeft}>
-                <MaterialIcons name="account-balance" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="account-balance" size={24} color={theme.colors.primary} />
                 <Text style={styles.optionText}>总请求数</Text>
               </View>
               <Text style={styles.statValueText}>{usageStats.total}次</Text>
@@ -652,7 +651,7 @@ const LLMSettingsScreen: React.FC = () => {
             <View style={styles.optionDivider} />
             <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
               <View style={styles.inputHeader}>
-                <MaterialIcons name="badge" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="badge" size={24} color={theme.colors.primary} />
                 <Text style={styles.inputLabel}>档案名称</Text>
               </View>
               <TextInput
@@ -660,7 +659,7 @@ const LLMSettingsScreen: React.FC = () => {
                 value={profileName}
                 onChangeText={setProfileName}
                 placeholder="例如：查词-便宜模型"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 autoCapitalize="none"
                 autoCorrect={false}
               />
@@ -668,22 +667,22 @@ const LLMSettingsScreen: React.FC = () => {
             <View style={styles.optionDivider} />
             <TouchableOpacity style={styles.optionItem} onPress={handleCreateProfile}>
               <View style={styles.optionLeft}>
-                <MaterialIcons name="add" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="add" size={24} color={theme.colors.primary} />
                 <Text style={styles.optionText}>新建档案</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.optionDivider} />
             <TouchableOpacity style={styles.optionItem} onPress={handleDuplicateProfile}>
               <View style={styles.optionLeft}>
-                <MaterialIcons name="content-copy" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="content-copy" size={24} color={theme.colors.primary} />
                 <Text style={styles.optionText}>复制当前档案</Text>
               </View>
             </TouchableOpacity>
             <View style={styles.optionDivider} />
             <TouchableOpacity style={styles.optionItem} onPress={handleDeleteProfile}>
               <View style={styles.optionLeft}>
-                <MaterialIcons name="delete" size={24} color={theme?.colors?.error || '#B3261E'} />
-                <Text style={[styles.optionText, { color: theme?.colors?.error || '#B3261E' }]}>
+                <MaterialIcons name="delete" size={24} color={theme.colors.error} />
+                <Text style={[styles.optionText, { color: theme.colors.error }]}>
                   删除当前档案
                 </Text>
               </View>
@@ -721,7 +720,7 @@ const LLMSettingsScreen: React.FC = () => {
                 <View style={styles.optionDivider} />
                 <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
                   <View style={styles.inputHeader}>
-                    <MaterialIcons name="edit" size={24} color={theme?.colors?.primary} />
+                    <MaterialIcons name="edit" size={24} color={theme.colors.primary} />
                     <Text style={styles.inputLabel}>自定义模型</Text>
                   </View>
                   <TextInput
@@ -729,7 +728,7 @@ const LLMSettingsScreen: React.FC = () => {
                     value={customModelName}
                     onChangeText={setCustomModelName}
                     placeholder="例如: gpt-4, claude-3-opus, llama2 等"
-                    placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
@@ -746,7 +745,7 @@ const LLMSettingsScreen: React.FC = () => {
           <View style={styles.card}>
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <MaterialIcons name="key" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="key" size={24} color={theme.colors.primary} />
                 <Text style={styles.inputLabel}>API密钥</Text>
                 <TouchableOpacity
                   onPress={() => setShowApiKey(!showApiKey)}
@@ -755,7 +754,7 @@ const LLMSettingsScreen: React.FC = () => {
                   <MaterialIcons
                     name={showApiKey ? 'visibility-off' : 'visibility'}
                     size={20}
-                    color={theme?.colors?.onSurfaceVariant}
+                    color={theme.colors.onSurfaceVariant}
                   />
                 </TouchableOpacity>
               </View>
@@ -764,7 +763,7 @@ const LLMSettingsScreen: React.FC = () => {
                 value={apiKey}
                 onChangeText={handleApiKeyChange}
                 placeholder="请输入API密钥"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 secureTextEntry={!showApiKey}
               />
               <Text style={styles.inputHint}>状态: {apiKey ? '已配置' : '未配置'}</Text>
@@ -772,7 +771,7 @@ const LLMSettingsScreen: React.FC = () => {
             
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <MaterialIcons name="link" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="link" size={24} color={theme.colors.primary} />
                 <Text style={styles.inputLabel}>API地址</Text>
                 {provider !== 'custom' && (
                   <TouchableOpacity
@@ -782,7 +781,7 @@ const LLMSettingsScreen: React.FC = () => {
                     <MaterialIcons
                       name={showBaseUrl ? 'visibility-off' : 'visibility'}
                       size={20}
-                      color={theme?.colors?.onSurfaceVariant}
+                      color={theme.colors.onSurfaceVariant}
                     />
                   </TouchableOpacity>
                 )}
@@ -790,12 +789,12 @@ const LLMSettingsScreen: React.FC = () => {
               <TextInput
                 style={[
                   styles.textInput,
-                  provider !== 'custom' && { backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC') }
+                  provider !== 'custom' && { backgroundColor: theme.colors.surfaceVariant }
                 ]}
                 value={baseUrl}
                 onChangeText={handleBaseUrlChange}
                 placeholder={provider === 'custom' ? '请输入自定义API地址' : '自动配置的API地址'}
-                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 secureTextEntry={provider !== 'custom' && !showBaseUrl}
                 editable={provider === 'custom'}
               />
@@ -804,10 +803,8 @@ const LLMSettingsScreen: React.FC = () => {
                </Text>
              </View>
             
-
-            
             <TouchableOpacity style={styles.testButton} onPress={handleTestConnection}>
-              <MaterialIcons name="wifi" size={20} color={theme?.colors?.primary} />
+              <MaterialIcons name="wifi" size={20} color={theme.colors.primary} />
               <Text style={styles.testButtonText}>测试连接</Text>
             </TouchableOpacity>
           </View>
@@ -819,7 +816,7 @@ const LLMSettingsScreen: React.FC = () => {
           <View style={styles.card}>
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <MaterialIcons name="thermostat" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="thermostat" size={24} color={theme.colors.primary} />
                 <Text style={styles.inputLabel}>Temperature</Text>
               </View>
               <TextInput
@@ -843,7 +840,7 @@ const LLMSettingsScreen: React.FC = () => {
                   }
                 }}
                 placeholder="0.7"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 keyboardType="decimal-pad"
               />
               <Text style={styles.inputHint}>控制输出随机性，范围: 0-2，推荐: 0.7</Text>
@@ -851,7 +848,7 @@ const LLMSettingsScreen: React.FC = () => {
             
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <MaterialIcons name="memory" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="memory" size={24} color={theme.colors.primary} />
                 <Text style={styles.inputLabel}>最大Token数</Text>
               </View>
               <TextInput
@@ -859,7 +856,7 @@ const LLMSettingsScreen: React.FC = () => {
                 value={maxTokens.toString()}
                 onChangeText={handleMaxTokensChange}
                 placeholder="2048"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 keyboardType="numeric"
               />
               <Text style={styles.inputHint}>限制输出长度，推荐: 2048</Text>
@@ -867,7 +864,7 @@ const LLMSettingsScreen: React.FC = () => {
             
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <MaterialIcons name="tune" size={24} color={theme?.colors?.primary} />
+                <MaterialIcons name="tune" size={24} color={theme.colors.primary} />
                 <Text style={styles.inputLabel}>Top P</Text>
               </View>
               <TextInput
@@ -890,7 +887,7 @@ const LLMSettingsScreen: React.FC = () => {
                   }
                 }}
                 placeholder="1.0"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 keyboardType="decimal-pad"
               />
               <Text style={styles.inputHint}>核采样参数，范围: 0-1，推荐: 1.0</Text>
@@ -900,7 +897,7 @@ const LLMSettingsScreen: React.FC = () => {
         {/* 保存按钮 */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <MaterialIcons name="save" size={20} color="#FFFFFF" />
+            <MaterialIcons name="save" size={20} color={theme.colors.onPrimary} />
             <Text style={styles.saveButtonText}>保存配置</Text>
           </TouchableOpacity>
         </View>
@@ -909,10 +906,10 @@ const LLMSettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 16,
   },
   content: {
@@ -923,24 +920,24 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
-    marginBottom: 10,
-    marginTop: -5,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBottom: 12,
+    marginTop: 16,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 1,
   },
   card: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : theme.colors.shadow || '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: theme.isDark ? 0.3 : 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   optionItem: {
     flexDirection: 'row',
@@ -951,7 +948,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   optionDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    backgroundColor: theme.colors.outlineVariant,
     marginHorizontal: 14,
   },
   optionLeft: {
@@ -966,7 +963,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   optionValueText: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginRight: 8,
     flexShrink: 1,
     textAlign: 'right',
@@ -978,16 +975,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingLeft: 24,
   },
   selectedOption: {
-    backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
+    backgroundColor: theme.colors.primaryContainer,
   },
   optionText: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginLeft: 12,
   },
   selectedText: {
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
   switchItem: {
@@ -1009,17 +1006,27 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   switchTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
+    marginBottom: 2,
+  },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   switchDescription: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
+  },
+  optionDesc: {
+    fontSize: 13,
+    color: theme.colors.onSurfaceVariant,
   },
   inputContainer: {
     padding: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    borderBottomColor: theme.colors.outlineVariant,
   },
   inputContainerNoDivider: {
     borderBottomWidth: 0,
@@ -1032,7 +1039,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   inputLabel: {
     fontSize: 15,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginLeft: 12,
     flex: 1,
   },
@@ -1040,16 +1047,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     padding: 4,
   },
   textInput: {
-    backgroundColor: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#F0F0F0'),
+    backgroundColor: theme.colors.surfaceVariant,
     borderRadius: 8,
     padding: 12,
     fontSize: 15,
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   inputHint: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
   },
   testButton: {
     flexDirection: 'row',
@@ -1062,18 +1069,18 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     marginLeft: 8,
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
   },
   statsCard: {
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : theme.colors.shadow || '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: theme.isDark ? 0.3 : 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statItem: {
     flexDirection: 'row',
@@ -1081,7 +1088,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#3D3D3D' : '#E8E8E8'),
+    borderBottomColor: theme.colors.outlineVariant,
   },
   lastStatItem: {
     borderBottomWidth: 0,
@@ -1092,21 +1099,21 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   statLabel: {
     fontSize: 13,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 2,
   },
   statValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
   },
   statValueText: {
     fontSize: 15,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+    color: theme.colors.onSurface,
   },
   saveButton: {
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1114,16 +1121,16 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
     // 投影效果
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : theme.colors.shadow || '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: theme.isDark ? 0.4 : 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   saveButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
     marginLeft: 8,
   },
 });

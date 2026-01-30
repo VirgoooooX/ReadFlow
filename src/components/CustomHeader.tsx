@@ -42,10 +42,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   const navigation = useNavigation();
   const { theme } = useThemeContext();
   const insets = useSafeAreaInsets();
-
-  // 计算实际的header高度（包含状态栏）
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : insets.top;
-  const totalHeaderHeight = HEADER_HEIGHT + statusBarHeight;
+  const styles = createStyles(theme, insets, backgroundColor, textColor, titleHeight, titleLineHeight);
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -55,149 +52,94 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
     }
   };
 
-  // 确保使用主题色，如果传入了 backgroundColor 则优先使用
-  // 深色模式下使用 surface 色替代亮色 primary，避免突兀
-  const headerBackgroundColor = backgroundColor || (theme.isDark ? theme.colors.surface : theme.colors.primary);
-
-  // 深色模式下文字用 onSurface，浅色模式下用 onPrimary
-  const headerTextColor = textColor || (theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary);
-
-  // 动态计算文字样式
-  const getTitleStyle = (): any => {
-    const baseStyle: any = {
-      fontSize: 18,
-      fontWeight: '900' as const,
-      textAlign: 'center' as const,
-      color: headerTextColor,
-      marginTop: 5, // 文字下移 10px
-    };
-
-    // 添加自定义属性
-    if (titleHeight) {
-      baseStyle.height = titleHeight;
-    }
-    if (titleLineHeight) {
-      baseStyle.lineHeight = titleLineHeight;
-    }
-    // 注意：不再在这里设置marginTop，由容器的paddingTop来控制
-
-    // Android特有属性
-    if (Platform.OS === 'android') {
-      baseStyle.textAlignVertical = 'center';
-    }
-
-    return baseStyle;
-  };
-
-  // 动态计算容器样式
-  const getCenterSectionStyle = (): any => {
-    const baseStyle: any = {
-      flex: 1,
-      alignItems: 'center' as const,
-      paddingHorizontal: 16,
-      justifyContent: 'flex-start', // 改为顶部对齐
-      paddingTop: 0, // 文字紧贴顶部
-    };
-
-    return baseStyle;
-  };
-
-  // 动态计算左侧按钮容器样式
-  const getLeftSectionStyle = (): any => {
-    const baseStyle: any = {
-      width: 40,
-      alignItems: 'flex-start' as const,
-      justifyContent: 'flex-start', // 改为顶部对齐
-      paddingTop: 0, // 按钮紧贴顶部
-      marginTop: -2, // 与标题文字对齐
-    };
-
-    return baseStyle;
-  };
-
-  // 动态计算右侧组件容器样式
-  const getRightSectionStyle = (): any => {
-    const baseStyle: any = {
-      width: 40,
-      alignItems: 'flex-end' as const,
-      justifyContent: 'flex-start', // 改为顶部对齐
-      paddingTop: 0, // 按钮紧贴顶部
-    };
-
-    return baseStyle;
-  };
-
   return (
-    <>
-      <View style={[styles.container, {
-        backgroundColor: headerBackgroundColor,
-        height: totalHeaderHeight,
-        paddingTop: statusBarHeight,
-      }]}>
-        <View style={styles.content}>
-          {/* 左侧返回按钮 */}
-          <View style={getLeftSectionStyle()}>
-            {showBackButton && (
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBackPress}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons
-                  name="arrow-back"
-                  size={22}
-                  color={headerTextColor}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* 中间标题 */}
-          <View style={getCenterSectionStyle()}>
-            <Text
-              style={getTitleStyle()}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {title}
-            </Text>
-          </View>
-
-          {/* 右侧组件 */}
-          <View style={getRightSectionStyle()}>
-            {rightComponent}
-          </View>
-        </View>
+    <View style={styles.container}>
+      {/* 左侧区域：返回按钮 */}
+      <View style={styles.sideSection}>
+        {showBackButton && (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBackPress}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialIcons name="arrow-back-ios" size={20} color={styles.title.color} />
+          </TouchableOpacity>
+        )}
       </View>
-    </>
+
+      {/* 中间区域：标题 */}
+      <View style={styles.centerSection}>
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
+
+      {/* 右侧区域：操作按钮 */}
+      <View style={styles.sideSection}>
+        {rightComponent}
+      </View>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    paddingTop: Platform.OS === 'ios' ? 0 : 0, // 状态栏高度已由StatusBar处理
-    elevation: 4, // Android阴影
-    shadowColor: '#000', // iOS阴影
-    shadowOffset: {
-      width: 0,
-      height: 2,
+const createStyles = (
+  theme: any,
+  insets: any,
+  backgroundColor?: string,
+  textColor?: string,
+  titleHeight?: number,
+  titleLineHeight?: number
+) => {
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : insets.top;
+  
+  // 确保使用主题色，如果传入了 backgroundColor 则优先使用
+  const headerBackgroundColor = backgroundColor || (theme.isDark ? theme.colors.surface : theme.colors.primary);
+  const headerTextColor = textColor || (theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary);
+
+  return StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: headerBackgroundColor,
+      height: HEADER_HEIGHT + statusBarHeight,
+      paddingTop: statusBarHeight,
+      paddingHorizontal: 4,
+      elevation: 4,
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: theme.isDark ? 0.3 : 0.1,
+      shadowRadius: 2,
+      zIndex: 100,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    zIndex: 1000,
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'stretch', // 改为stretch，让子容器可以控制自己的对齐
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    flex: 1,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8, // 调整触摸区域
-  },
-});
+    sideSection: {
+      width: 56,
+      height: HEADER_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    centerSection: {
+      flex: 1,
+      height: HEADER_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+    },
+    backButton: {
+      padding: 8,
+      marginLeft: 4,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '900',
+      color: headerTextColor,
+      textAlign: 'center',
+      height: titleHeight,
+      lineHeight: titleLineHeight,
+      marginTop: 5,
+      ...(Platform.OS === 'android' ? { textAlignVertical: 'center' } : {}),
+    },
+  });
+};
 
 export default CustomHeader;

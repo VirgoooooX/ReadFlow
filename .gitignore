@@ -86,3 +86,4 @@ readflow-server/src/test-xml.ts
 readflow-server/src/verify.ts
 server-go/main.exe
 .trae
+ui_design_showcase.html

@@ -98,7 +98,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   }, [routes, rssSources]);
 
   const filteredSources = useMemo(() => getFilteredSources(activeIndex), [getFilteredSources, activeIndex]);
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   // 初始化
   useEffect(() => {
@@ -885,8 +885,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
         groups={groups}
         onClose={() => setShowMoveGroupModal(false)}
         onSelect={handleMoveToGroup}
-        theme={theme}
-        isDark={isDark}
       />
 
       {/* 动作菜单 ActionSheet */}
@@ -900,7 +898,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -1024,10 +1022,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
+    backgroundColor: theme.colors.surface,
     // 阴影
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0 : 0.05,
+    shadowOpacity: theme.isDark ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -1074,14 +1073,14 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
       borderWidth: 2, // 始终保留 2px 边框，但平时透明
       borderColor: 'transparent',
       // 阴影
-      shadowColor: '#000',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: isDark ? 0 : 0.05,
+    shadowOpacity: theme.isDark ? 0.3 : 0.05,
     shadowRadius: 2,
     elevation: 1,
   },
   cardSelected: {
-      backgroundColor: isDark ? theme.colors.surfaceContainerHigh : theme.colors.primaryContainer,
+      backgroundColor: theme.isDark ? theme.colors.surfaceContainerHigh : theme.colors.primaryContainer,
       borderColor: theme.colors.primary, // 选中时显示边框，但因为基准样式已有2px，所以不会撑开
     },
   cardInner: {
@@ -1207,7 +1206,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     bottom: 30,
     left: 40,
     right: 40,
-    backgroundColor: '#333',
+    backgroundColor: theme.isDark ? theme.colors.surfaceContainerHigh : '#333333',
     borderRadius: 28,
     flexDirection: 'row',
     justifyContent: 'space-evenly',
@@ -1225,7 +1224,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     paddingHorizontal: 12,
   },
   bottomActionText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontWeight: '600',
     marginLeft: 6,
   },

@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useThemeContext } from '../../theme';
+import type { Theme } from '../../theme';
 
 interface ColorPickerProps {
   initialColor?: string;
@@ -18,19 +19,14 @@ interface ColorPickerProps {
 }
 
 // 预设颜色 - 使用Material Design 3主题颜色
-const getPresetColors = (theme: any) => [
-  theme?.colors?.primary || '#3B82F6', // Primary
-  theme?.colors?.secondary || '#6B7280', // Secondary
-  theme?.colors?.tertiary || '#10B981', // Tertiary
-  theme?.colors?.error || '#EF4444', // Error
-  '#8B5CF6', // Purple
-  '#F97316', // Orange
-  '#F59E0B', // Yellow
-  '#EC4899', // Pink
-  '#14B8A6', // Teal
-  '#84CC16', // Lime
-  '#F472B6', // Rose
-  '#A78BFA', // Violet
+const getPresetColors = (theme: Theme) => [
+  theme.colors.primary,
+  theme.colors.secondary,
+  theme.colors.tertiary,
+  theme.colors.error,
+  theme.semantic.success,
+  theme.semantic.warning,
+  theme.semantic.info,
 ];
 
 // 颜色工具函数
@@ -60,12 +56,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   showPresets = true,
 }) => {
   const { theme } = useThemeContext();
-  const defaultColor = initialColor || theme?.colors?.primary || '#3B82F6';
+  const defaultColor = initialColor || theme.colors.primary;
   const [selectedColor, setSelectedColor] = useState(defaultColor);
   const [hexInput, setHexInput] = useState(defaultColor);
   const [rgbValues, setRgbValues] = useState(() => {
     const rgb = hexToRgb(defaultColor);
-    return rgb || { r: 59, g: 130, b: 246 };
+    return rgb || hexToRgb(theme.colors.primary) || { r: 0, g: 0, b: 0 };
   });
   
   const presetColors = getPresetColors(theme);
@@ -247,7 +243,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             style={styles.hexInput}
             value={hexInput}
             onChangeText={handleHexInputChange}
-            placeholder={theme?.colors?.primary || '#3B82F6'}
+            placeholder={theme.colors.primary}
             placeholderTextColor={theme.colors.onSurfaceVariant}
             autoCapitalize="characters"
             maxLength={7}

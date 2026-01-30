@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RSSGroup, VIRTUAL_GROUPS } from '../types';
+import { useThemeContext } from '../theme';
+import { withAlpha } from '../utils/colorUtils';
 
 interface GroupTabBarProps {
   groups: RSSGroup[];
@@ -15,8 +17,6 @@ interface GroupTabBarProps {
   onGroupChange: (groupId: number) => void;
   onCreateGroup: () => void;
   onManageGroups?: () => void;  // 进入管理页面
-  theme?: any;
-  isDark?: boolean;
 }
 
 const GroupTabBar: React.FC<GroupTabBarProps> = ({
@@ -25,9 +25,10 @@ const GroupTabBar: React.FC<GroupTabBarProps> = ({
   onGroupChange,
   onCreateGroup,
   onManageGroups,
-  theme,
-  isDark = false,
 }) => {
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
+
   // 构建完整的 Tab 列表（虚拟分组 + 实际分组）
   const allTabs = [
     { id: VIRTUAL_GROUPS.ALL.id, name: VIRTUAL_GROUPS.ALL.name, unreadCount: 0 },
@@ -51,23 +52,14 @@ const GroupTabBar: React.FC<GroupTabBarProps> = ({
               key={tab.id}
               style={[
                 styles.tab,
-                isActive && {
-                  ...styles.activeTab,
-                  backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
-                },
+                isActive && styles.activeTab,
               ]}
               onPress={() => onGroupChange(tab.id)}
             >
               <Text
                 style={[
                   styles.tabText,
-                  {
-                    color: theme?.colors?.onSurfaceVariant || (isDark ? '#CAC4D0' : '#49454F'),
-                  },
-                  isActive && {
-                    color: theme?.colors?.onPrimaryContainer || (isDark ? '#E8DEF8' : '#21005D'),
-                    fontWeight: '600',
-                  },
+                  isActive && styles.activeTabText,
                 ]}
               >
                 {tab.name}
@@ -78,12 +70,7 @@ const GroupTabBar: React.FC<GroupTabBarProps> = ({
                 <Text
                   style={[
                     styles.count,
-                    {
-                      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
-                    },
-                    isActive && {
-                      color: theme?.colors?.onPrimaryContainer || (isDark ? '#E8DEF8' : '#21005D'),
-                    },
+                    isActive && styles.activeCountText,
                   ]}
                 >
                   ({(tab as RSSGroup).sourceCount})
@@ -92,12 +79,7 @@ const GroupTabBar: React.FC<GroupTabBarProps> = ({
               
               {/* 未读红点 */}
               {hasUnread && (
-                <View
-                  style={[
-                    styles.badge,
-                    { backgroundColor: theme?.colors?.error || '#BA1A1A' },
-                  ]}
-                />
+                <View style={styles.badge} />
               )}
             </TouchableOpacity>
           );
@@ -105,36 +87,26 @@ const GroupTabBar: React.FC<GroupTabBarProps> = ({
 
         {/* 添加分组按钮 */}
         <TouchableOpacity
-          style={[
-            styles.addButton,
-            {
-              borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
-            },
-          ]}
+          style={styles.addButton}
           onPress={onCreateGroup}
         >
           <MaterialIcons
             name="add"
             size={20}
-            color={theme?.colors?.primary || '#6750A4'}
+            color={theme.colors.primary}
           />
         </TouchableOpacity>
 
         {/* 管理分组按钮 */}
         {onManageGroups && (
           <TouchableOpacity
-            style={[
-              styles.manageButton,
-              {
-                backgroundColor: theme?.colors?.secondaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
-              },
-            ]}
+            style={styles.manageButton}
             onPress={onManageGroups}
           >
             <MaterialIcons
               name="settings"
               size={18}
-              color={theme?.colors?.onSecondaryContainer || (isDark ? '#E8DEF8' : '#1D192B')}
+              color={theme.colors.onSecondaryContainer}
             />
           </TouchableOpacity>
         )}
@@ -143,11 +115,11 @@ const GroupTabBar: React.FC<GroupTabBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     height: 48,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+    borderBottomColor: withAlpha(theme.colors.outlineVariant, 0.4),
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -163,19 +135,29 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   activeTab: {
-    // backgroundColor 在组件中动态设置
+    backgroundColor: theme.colors.primaryContainer,
   },
   tabText: {
     fontSize: 14,
+    color: theme.colors.onSurfaceVariant,
+  },
+  activeTabText: {
+    color: theme.colors.onPrimaryContainer,
+    fontWeight: '600',
   },
   count: {
     fontSize: 12,
+    color: theme.colors.onSurfaceVariant,
+  },
+  activeCountText: {
+    color: theme.colors.onPrimaryContainer,
   },
   badge: {
     width: 6,
     height: 6,
     borderRadius: 3,
     marginLeft: 4,
+    backgroundColor: theme.colors.error,
   },
   addButton: {
     width: 36,
@@ -186,6 +168,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 4,
+    borderColor: theme.colors.outline,
   },
   manageButton: {
     width: 36,
@@ -193,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 4,
+    backgroundColor: theme.colors.secondaryContainer,
   },
 });
 

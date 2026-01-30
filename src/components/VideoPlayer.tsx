@@ -101,7 +101,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       />
       {isLoading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={theme?.colors?.primary} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       )}
     </View>

@@ -29,8 +29,8 @@ const WordDefinitionModal: React.FC<WordDefinitionModalProps> = ({
   onClose,
   onAddToVocabulary,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <Modal
@@ -45,7 +45,7 @@ const WordDefinitionModal: React.FC<WordDefinitionModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.headerTitle}>词典查询</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <MaterialIcons name="close" size={24} color={theme?.colors?.onSurface} />
+              <MaterialIcons name="close" size={24} color={theme.colors.onSurface} />
             </TouchableOpacity>
           </View>
 
@@ -53,7 +53,7 @@ const WordDefinitionModal: React.FC<WordDefinitionModalProps> = ({
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme?.colors?.primary} />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
                 <Text style={styles.loadingText}>查询中...</Text>
               </View>
             ) : definition ? (
@@ -116,7 +116,7 @@ const WordDefinitionModal: React.FC<WordDefinitionModalProps> = ({
               </>
             ) : (
               <View style={styles.errorContainer}>
-                <MaterialIcons name="error-outline" size={48} color={theme?.colors?.error} />
+                <MaterialIcons name="error-outline" size={48} color={theme.colors.error} />
                 <Text style={styles.errorText}>查询失败或未找到释义</Text>
               </View>
             )}
@@ -129,7 +129,7 @@ const WordDefinitionModal: React.FC<WordDefinitionModalProps> = ({
                 style={styles.addButton}
                 onPress={onAddToVocabulary}
               >
-                <MaterialIcons name="bookmark-add" size={20} color="#FFFFFF" />
+                <MaterialIcons name="bookmark-add" size={20} color={theme.colors.onPrimary} />
                 <Text style={styles.addButtonText}>添加到单词本</Text>
               </TouchableOpacity>
             </View>
@@ -140,7 +140,7 @@ const WordDefinitionModal: React.FC<WordDefinitionModalProps> = ({
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
@@ -148,7 +148,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       justifyContent: 'flex-end',
     },
     modalContainer: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme.colors.surface,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       maxHeight: '80%',
@@ -160,12 +160,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       paddingHorizontal: 20,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'),
+      borderBottomColor: theme.colors.outlineVariant,
     },
     headerTitle: {
       fontSize: 18,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
     },
     closeButton: {
       padding: 4,
@@ -181,7 +181,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     loadingText: {
       marginTop: 12,
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
     },
     wordHeader: {
       flexDirection: 'row',
@@ -191,16 +191,16 @@ const createStyles = (isDark: boolean, theme: any) =>
     word: {
       fontSize: 28,
       fontWeight: 'bold',
-      color: theme?.colors?.primary || '#6750A4',
+      color: theme.colors.primary,
     },
     wordForm: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       marginLeft: 8,
     },
     phonetic: {
       fontSize: 16,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 20,
     },
     section: {
@@ -209,42 +209,42 @@ const createStyles = (isDark: boolean, theme: any) =>
     sectionTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       marginBottom: 12,
     },
     definitionItem: {
       marginBottom: 16,
       paddingLeft: 12,
       borderLeftWidth: 3,
-      borderLeftColor: theme?.colors?.primary || '#6750A4',
+      borderLeftColor: theme.colors.primary,
     },
     partOfSpeech: {
       fontSize: 12,
       fontWeight: '600',
-      color: theme?.colors?.secondary || '#625B71',
+      color: theme.colors.secondary,
       marginBottom: 4,
     },
     translation: {
       fontSize: 16,
       fontWeight: '500',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       marginBottom: 4,
     },
     definition: {
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
       lineHeight: 20,
     },
     example: {
       fontSize: 13,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
       lineHeight: 18,
     },
     source: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
       marginTop: 8,
     },
@@ -256,18 +256,18 @@ const createStyles = (isDark: boolean, theme: any) =>
     errorText: {
       marginTop: 12,
       fontSize: 14,
-      color: theme?.colors?.error || '#B3261E',
+      color: theme.colors.error,
     },
     footer: {
       padding: 16,
       borderTopWidth: 1,
-      borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'),
+      borderTopColor: theme.colors.outlineVariant,
     },
     addButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme?.colors?.primary || '#6750A4',
+      backgroundColor: theme.colors.primary,
       borderRadius: 24,
       paddingVertical: 12,
       paddingHorizontal: 24,
@@ -276,7 +276,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginLeft: 8,
       fontSize: 16,
       fontWeight: '600',
-      color: '#FFFFFF',
+      color: theme.colors.onPrimary,
     },
   });
 

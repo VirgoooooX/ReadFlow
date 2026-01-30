@@ -48,8 +48,8 @@ const COLOR_PALETTES = {
 
 const CustomColorScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { theme, isDark, customConfig, setCustomColors, currentPreset } = useThemeContext();
-  const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
+  const { theme, customConfig, setCustomColors, currentPreset } = useThemeContext();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   // 状态管理
   const [primaryColor, setPrimaryColor] = useState(customConfig?.primary || theme.colors.primary);
@@ -154,7 +154,7 @@ const CustomColorScreen: React.FC = () => {
             onPress={() => onSelect(color)}
           >
             {selectedColor === color && (
-              <MaterialIcons name="check" size={20} color="#FFFFFF" />
+              <MaterialIcons name="check" size={20} color={theme.colors.onPrimary} />
             )}
           </TouchableOpacity>
         ))}
@@ -174,7 +174,7 @@ const CustomColorScreen: React.FC = () => {
             autoCapitalize="characters"
           />
           <TouchableOpacity style={styles.customInputButton} onPress={onCustomSubmit}>
-            <MaterialIcons name="check" size={20} color="#FFFFFF" />
+            <MaterialIcons name="check" size={20} color={theme.colors.onPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -255,7 +255,7 @@ const CustomColorScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

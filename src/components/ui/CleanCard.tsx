@@ -42,11 +42,11 @@ const createCleanCardStyles = (theme: Theme) => {
     // 变体样式
     elevated: {
       backgroundColor: theme.colors.surface,
-      elevation: 1,
-      shadowColor: theme.colors.shadow,
+      elevation: theme.isDark ? 2 : 1,
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
+      shadowOpacity: theme.isDark ? 0.3 : 0.05,
+      shadowRadius: theme.isDark ? 4 : 2,
     },
     
     filled: {

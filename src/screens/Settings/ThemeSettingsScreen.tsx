@@ -24,7 +24,7 @@ const CARD_PADDING = 12;
 const COLOR_ITEM_WIDTH = (SCREEN_WIDTH - (CONTAINER_PADDING * 2) - (CARD_PADDING * 2) - 30) / 4;
 
 // 模式选择器组件
-const ModeSelector = ({ mode, currentMode, onChange, theme, isDark }: any) => {
+const ModeSelector = ({ mode, currentMode, onChange, theme }: any) => {
   const isSelected = currentMode === mode;
   const labels: Record<string, string> = { light: '浅色', dark: '深色', system: '自动' };
   const icons: Record<string, any> = { light: 'light-mode', dark: 'dark-mode', system: 'settings-brightness' };
@@ -92,9 +92,9 @@ const ThemeCard = ({ preset, isSelected, onPress, theme }: any) => (
 
 const ThemeSettingsScreen: React.FC = () => {
   const navigation = useNavigation<ThemeSettingsNavigationProp>();
-  const { theme, isDark, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig } = useThemeContext();
+  const { theme, themeMode, setThemeMode, currentPreset, setThemePreset, customConfig } = useThemeContext();
   
-  const styles = useMemo(() => createStyles(isDark, theme), [isDark, theme]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const displayPresets = useMemo(() => [
     ...THEME_PRESETS,
@@ -142,9 +142,9 @@ const ThemeSettingsScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>外观模式</Text>
           <View style={[styles.menuGroupCard, { paddingHorizontal: CARD_PADDING, paddingVertical: 6 }]}>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <ModeSelector mode="light" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} isDark={isDark} />
-              <ModeSelector mode="dark" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} isDark={isDark} />
-              <ModeSelector mode="system" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} isDark={isDark} />
+              <ModeSelector mode="light" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} />
+              <ModeSelector mode="dark" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} />
+              <ModeSelector mode="system" currentMode={themeMode} onChange={handleThemeModeChange} theme={theme} />
             </View>
           </View>
         </View>
@@ -173,22 +173,22 @@ const ThemeSettingsScreen: React.FC = () => {
           <View style={styles.menuGroupCard}>
             <TouchableOpacity style={styles.menuItem} onPress={handleCustomTheme}>
               <View style={styles.menuLeft}>
-                <View style={[styles.menuIconBox, { backgroundColor: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF') }]}>
-                  <MaterialIcons name="palette" size={20} color={theme?.colors?.primary || '#6750A4'} />
+                <View style={[styles.menuIconBox, { backgroundColor: theme.colors.primaryContainer }]}>
+                  <MaterialIcons name="palette" size={20} color={theme.colors.primary} />
                 </View>
                 <Text style={styles.menuText}>编辑自定义颜色</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.outline || '#999'} />
+              <MaterialIcons name="chevron-right" size={20} color={theme.colors.outline} />
             </TouchableOpacity>
           
             <View style={styles.menuDivider} />
           
             <TouchableOpacity style={styles.menuItem} onPress={resetToDefault}>
               <View style={styles.menuLeft}>
-                <View style={[styles.menuIconBox, { backgroundColor: theme?.colors?.errorContainer || (isDark ? '#93000A' : '#F9DEDC') }]}>
-                  <MaterialIcons name="restore" size={20} color={theme?.colors?.error || '#B3261E'} />
+                <View style={[styles.menuIconBox, { backgroundColor: theme.colors.errorContainer }]}>
+                  <MaterialIcons name="restore" size={20} color={theme.colors.error} />
                 </View>
-                <Text style={[styles.menuText, { color: theme?.colors?.error || '#B3261E' }]}>恢复默认设置</Text>
+                <Text style={[styles.menuText, { color: theme.colors.error }]}>恢复默认设置</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -198,7 +198,7 @@ const ThemeSettingsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -223,9 +223,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   menuGroupCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: isDark ? 0.3 : 0.04,
+    shadowOpacity: theme.isDark ? 0.3 : 0.08,
     shadowRadius: 12,
     elevation: 2,
     overflow: 'hidden',

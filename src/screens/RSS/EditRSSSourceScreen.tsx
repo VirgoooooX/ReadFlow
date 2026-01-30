@@ -52,7 +52,7 @@ const EditRSSSourceScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<EditRSSSourceRouteProp>();
   const { sourceId } = route.params;
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { refreshRSSSources } = useRSSSource();
 
   const [loading, setLoading] = useState(true);
@@ -227,7 +227,7 @@ const EditRSSSourceScreen: React.FC = () => {
     }
   };
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   if (loading) {
     return (
@@ -236,8 +236,8 @@ const EditRSSSourceScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color={theme?.colors?.primary || '#6750A4'} />
-          <Text style={{ marginTop: 16, fontSize: 16, color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F') }}>\u52a0载\u4e2d...</Text>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ marginTop: 16, fontSize: 16, color: theme.colors.onSurface }}>\u52a0载\u4e2d...</Text>
         </View>
       </KeyboardAvoidingView>
     );
@@ -255,7 +255,7 @@ const EditRSSSourceScreen: React.FC = () => {
             <MaterialIcons
               name="rss-feed"
               size={32}
-              color={theme?.colors?.primary || '#3B82F6'}
+              color={theme.colors.primary}
             />
             <Text style={styles.title}>编辑RSS源</Text>
             <Text style={styles.subtitle}>修改RSS订阅源设置</Text>
@@ -271,7 +271,7 @@ const EditRSSSourceScreen: React.FC = () => {
                   value={formData.url}
                   onChangeText={(text) => updateFormData('url', text)}
                   placeholder="https://example.com/feed.xml"
-                  placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="url"
@@ -279,7 +279,7 @@ const EditRSSSourceScreen: React.FC = () => {
                 {validating && (
                   <ActivityIndicator
                     size="small"
-                    color={theme?.colors?.primary || '#3B82F6'}
+                    color={theme.colors.primary}
                     style={styles.validatingIcon}
                   />
                 )}
@@ -294,7 +294,7 @@ const EditRSSSourceScreen: React.FC = () => {
                 value={formData.name}
                 onChangeText={(text) => updateFormData('name', text)}
                 placeholder="为RSS源起个名字"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
               />
               {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
@@ -336,8 +336,8 @@ const EditRSSSourceScreen: React.FC = () => {
                     name="image"
                     size={20}
                     color={formData.contentType === 'image_text'
-                      ? (theme?.colors?.onPrimary || '#FFFFFF')
-                      : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant
                     }
                   />
                   <Text style={[
@@ -359,8 +359,8 @@ const EditRSSSourceScreen: React.FC = () => {
                     name="text-fields"
                     size={20}
                     color={formData.contentType === 'text'
-                      ? (theme?.colors?.onPrimary || '#FFFFFF')
-                      : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))
+                      ? theme.colors.onPrimary
+                      : theme.colors.onSurfaceVariant
                     }
                   />
                   <Text style={[
@@ -386,7 +386,7 @@ const EditRSSSourceScreen: React.FC = () => {
                     <MaterialIcons 
                       name="cloud" 
                       size={20} 
-                      color={formData.sourceMode === 'proxy' ? (theme?.colors?.primary || '#3B82F6') : (theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'))} 
+                      color={formData.sourceMode === 'proxy' ? theme.colors.primary : theme.colors.onSurfaceVariant} 
                     />
                     <Text style={styles.proxyTitle}>通过代理获取</Text>
                   </View>
@@ -398,12 +398,12 @@ const EditRSSSourceScreen: React.FC = () => {
                   value={formData.sourceMode === 'proxy'}
                   onValueChange={(value) => updateFormData('sourceMode', value ? 'proxy' : 'direct')}
                   trackColor={{ 
-                    false: theme?.colors?.surfaceVariant || (isDark ? '#49454F' : '#E7E0EC'),
-                    true: theme?.colors?.primaryContainer || (isDark ? '#004A77' : '#CCE7FF')
+                    false: theme.colors.surfaceVariant,
+                    true: theme.colors.primaryContainer
                   }}
                   thumbColor={formData.sourceMode === 'proxy' 
-                    ? (theme?.colors?.primary || '#3B82F6') 
-                    : (theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'))
+                    ? theme.colors.primary 
+                    : theme.colors.outline
                   }
                 />
               </View>
@@ -425,7 +425,7 @@ const EditRSSSourceScreen: React.FC = () => {
                     }
                   }}
                   placeholder="例如: 50"
-                  placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
                   keyboardType="number-pad"
                 />
               </View>
@@ -447,7 +447,7 @@ const EditRSSSourceScreen: React.FC = () => {
                     }
                   }}
                   placeholder="例如: 100"
-                  placeholderTextColor={theme?.colors?.onSurfaceVariant || '#999'}
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
                   keyboardType="number-pad"
                 />
               </View>
@@ -461,7 +461,7 @@ const EditRSSSourceScreen: React.FC = () => {
                 value={formData.description}
                 onChangeText={(text) => updateFormData('description', text)}
                 placeholder="简单描述这个RSS源的内容"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E')}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
@@ -490,10 +490,10 @@ const EditRSSSourceScreen: React.FC = () => {
           disabled={!formData.url.trim() || !formData.name.trim() || saving}
         >
           {saving ? (
-            <ActivityIndicator size="small" color={theme?.colors?.onPrimary || '#FFFFFF'} />
+            <ActivityIndicator size="small" color={theme.colors.onPrimary} />
           ) : (
             <>
-              <MaterialIcons name="save" size={20} color={theme?.colors?.onPrimary || '#FFFFFF'} />
+              <MaterialIcons name="save" size={20} color={theme.colors.onPrimary} />
               <Text style={styles.addButtonText}>保存更改</Text>
             </>
           )}
@@ -503,10 +503,10 @@ const EditRSSSourceScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#FFFFFF'),
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -521,12 +521,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginTop: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 4,
   },
   form: {
@@ -538,23 +538,23 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   inputContainer: {
     position: 'relative',
   },
   input: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     minHeight: 48,
   },
   inputError: {
-    borderColor: theme?.colors?.error || '#B3261E',
+    borderColor: theme.colors.error,
     borderWidth: 1,
   },
   textArea: {
@@ -568,28 +568,28 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    color: theme?.colors?.error || '#B3261E',
+    color: theme.colors.error,
     marginTop: 4,
   },
   categoryScroll: {
     marginTop: 4,
   },
   categoryChip: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
   },
   categoryChipSelected: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
   },
   categoryChipText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   categoryChipTextSelected: {
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
     fontWeight: '500',
   },
   contentTypeContainer: {
@@ -609,19 +609,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     gap: 8,
   },
   contentTypeOptionSelected: {
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
   },
   contentTypeText: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   contentTypeTextSelected: {
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   contentTypeHint: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 8,
     lineHeight: 16,
   },
@@ -645,11 +645,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   proxyTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   proxyHint: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 4,
     lineHeight: 16,
   },
@@ -657,9 +657,9 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#FFFFFF'),
+    backgroundColor: theme.colors.background,
     borderTopWidth: 1,
-    borderTopColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+    borderTopColor: theme.colors.outlineVariant,
     gap: 12,
   },
   cancelButton: {
@@ -673,7 +673,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   addButton: {
     flex: 2,
@@ -682,17 +682,17 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 24,
-    backgroundColor: theme?.colors?.primary || '#3B82F6',
+    backgroundColor: theme.colors.primary,
     gap: 8,
   },
   addButtonDisabled: {
-    backgroundColor: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    backgroundColor: theme.colors.surfaceVariant,
     opacity: 0.5,
   },
   addButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
 });
 

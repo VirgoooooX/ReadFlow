@@ -15,9 +15,9 @@ import { imageCacheService, DatabaseService } from '../../services';
 import cacheEventEmitter from '../../services/CacheEventEmitter';
 
 const StorageManagementScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const navigation = useNavigation();
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   const [imageCacheSize, setImageCacheSize] = useState<string>('计算中...');
   const [articleDataSize, setArticleDataSize] = useState<string>('计算中...');
@@ -139,15 +139,15 @@ const StorageManagementScreen: React.FC = () => {
   const StorageItem = ({ icon, label, size, onPress }: any) => (
     <TouchableOpacity style={styles.storageItem} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.storageItemLeft}>
-        <View style={[styles.storageIcon, { backgroundColor: `${theme?.colors?.primary || '#3B82F6'}15` }]}>
-          <MaterialIcons name={icon} size={24} color={theme?.colors?.primary || '#3B82F6'} />
+        <View style={[styles.storageIcon, { backgroundColor: `${theme.colors.primary}15` }]}>
+          <MaterialIcons name={icon} size={24} color={theme.colors.primary} />
         </View>
         <View>
           <Text style={styles.storageLabel}>{label}</Text>
           <Text style={styles.storageSize}>{size}</Text>
         </View>
       </View>
-      <MaterialIcons name="chevron-right" size={24} color={theme?.colors?.onSurfaceVariant || '#999'} />
+      <MaterialIcons name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
     </TouchableOpacity>
   );
 
@@ -157,7 +157,7 @@ const StorageManagementScreen: React.FC = () => {
         {/* 总览卡片 */}
         <View style={styles.overviewCard}>
           <View style={styles.overviewIconBox}>
-            <MaterialIcons name="storage" size={40} color={theme?.colors?.primary || '#3B82F6'} />
+            <MaterialIcons name="storage" size={40} color={theme.colors.primary} />
           </View>
           <View style={styles.overviewContent}>
             <Text style={styles.overviewTitle}>总存储占用</Text>
@@ -186,7 +186,7 @@ const StorageManagementScreen: React.FC = () => {
         {/* 说明 */}
         <View style={styles.infoSection}>
           <View style={styles.infoBox}>
-            <MaterialIcons name="info" size={20} color={theme?.colors?.primary || '#3B82F6'} />
+            <MaterialIcons name="info" size={20} color={theme.colors.primary} />
             <View style={styles.infoText}>
               <Text style={styles.infoTitle}>缓存说明</Text>
               <Text style={styles.infoDesc}>
@@ -205,12 +205,12 @@ const StorageManagementScreen: React.FC = () => {
           >
             {isClearing ? (
               <>
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={theme.colors.onPrimary} size="small" />
                 <Text style={styles.clearButtonText}>清除中...</Text>
               </>
             ) : (
               <>
-                <MaterialIcons name="delete-sweep" size={20} color="#fff" />
+                <MaterialIcons name="delete-sweep" size={20} color={theme.colors.onPrimary} />
                 <Text style={styles.clearButtonText}>清除所有数据</Text>
               </>
             )}
@@ -225,11 +225,11 @@ const StorageManagementScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#121212' : '#F5F5F5'),
+      backgroundColor: theme.colors.background,
       paddingHorizontal: 16,
     },
     content: {
@@ -241,14 +241,14 @@ const createStyles = (isDark: boolean, theme: any) =>
     overviewCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      backgroundColor: theme.colors.surface,
       padding: 16,
       borderRadius: 12,
       marginBottom: 20,
       // 投影效果
-      shadowColor: '#000',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
+      shadowOpacity: theme.isDark ? 0.3 : 0.08,
       shadowRadius: 8,
       elevation: 3,
     },
@@ -256,7 +256,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       width: 56,
       height: 56,
       borderRadius: 12,
-      backgroundColor: `${theme?.colors?.primary || '#3B82F6'}15`,
+      backgroundColor: `${theme.colors.primary}15`,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: 14,
@@ -266,13 +266,13 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     overviewTitle: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
     },
     overviewSize: {
       fontSize: 26,
       fontWeight: '700',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
     },
 
     // 分组
@@ -282,7 +282,7 @@ const createStyles = (isDark: boolean, theme: any) =>
   sectionTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       marginBottom: 10,
       marginTop: -5,  // 👈 增加与上方容器的距离
       textTransform: 'uppercase',
@@ -294,14 +294,14 @@ const createStyles = (isDark: boolean, theme: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      backgroundColor: theme.colors.surface,
       padding: 14,
       borderRadius: 12,
       marginBottom: 10,
       // 投影效果
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
+      shadowOpacity: theme.dark ? 0.3 : 0.08,
       shadowRadius: 8,
       elevation: 3,
     },
@@ -321,12 +321,12 @@ const createStyles = (isDark: boolean, theme: any) =>
     storageLabel: {
       fontSize: 15,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#FFFFFF' : '#000000'),
+      color: theme.colors.onSurface,
       marginBottom: 3,
     },
     storageSize: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
     },
 
     // 信息区
@@ -335,11 +335,11 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     infoBox: {
       flexDirection: 'row',
-      backgroundColor: `${theme?.colors?.primary || '#3B82F6'}08`,
+      backgroundColor: `${theme.colors.primary}08`,
       padding: 14,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: `${theme?.colors?.primary || '#3B82F6'}15`,
+      borderColor: `${theme.colors.primary}15`,
     },
     infoText: {
       flex: 1,
@@ -348,12 +348,12 @@ const createStyles = (isDark: boolean, theme: any) =>
     infoTitle: {
       fontSize: 13,
       fontWeight: '600',
-      color: theme?.colors?.primary || '#3B82F6',
+      color: theme.colors.primary,
       marginBottom: 4,
     },
     infoDesc: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       lineHeight: 18,
     },
 
@@ -365,7 +365,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#EF4444',
+      backgroundColor: theme.colors.error,
       padding: 14,
       borderRadius: 12,
       gap: 8,
@@ -380,13 +380,13 @@ const createStyles = (isDark: boolean, theme: any) =>
       opacity: 0.6,
     },
     clearButtonText: {
-      color: '#fff',
+      color: theme.colors.onPrimary,
       fontSize: 15,
       fontWeight: '600',
     },
     warningText: {
       fontSize: 12,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#B0B0B0' : '#666666'),
+      color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
       marginTop: 12,
     },

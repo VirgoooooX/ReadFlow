@@ -12,13 +12,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 
 const ImportScreen: React.FC = () => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const [mergeData, setMergeData] = useState(true);
   const [overwriteExisting, setOverwriteExisting] = useState(false);
   const [createBackup, setCreateBackup] = useState(true);
   const [validateData, setValidateData] = useState(true);
 
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   const handleImportFromFile = () => {
     Alert.alert(
@@ -63,7 +63,7 @@ const ImportScreen: React.FC = () => {
   ) => (
     <View style={styles.switchItem}>
       <View style={styles.switchLeft}>
-        <MaterialIcons name={icon as any} size={24} color={theme?.colors?.primary} />
+        <MaterialIcons name={icon as any} size={24} color={theme.colors.primary} />
         <View style={styles.switchContent}>
           <Text style={styles.switchTitle}>{title}</Text>
           <Text style={styles.switchDescription}>{description}</Text>
@@ -73,10 +73,10 @@ const ImportScreen: React.FC = () => {
         value={value}
         onValueChange={onValueChange}
         trackColor={{
-          false: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
-          true: theme?.colors?.primaryContainer || (isDark ? '#4F378B' : '#EADDFF'),
+          false: theme.colors.outline,
+          true: theme.colors.primaryContainer,
         }}
-        thumbColor={value ? theme?.colors?.primary : theme?.colors?.onSurfaceVariant}
+        thumbColor={value ? theme.colors.primary : theme.colors.onSurfaceVariant}
       />
     </View>
   );
@@ -93,14 +93,14 @@ const ImportScreen: React.FC = () => {
         <MaterialIcons 
           name={icon as any} 
           size={24} 
-          color={color || theme?.colors?.primary} 
+          color={color || theme.colors.primary} 
         />
         <View style={styles.importContent}>
           <Text style={styles.importTitle}>{title}</Text>
           <Text style={styles.importDescription}>{description}</Text>
         </View>
       </View>
-      <MaterialIcons name="chevron-right" size={20} color={theme?.colors?.onSurfaceVariant} />
+      <MaterialIcons name="chevron-right" size={20} color={theme.colors.onSurfaceVariant} />
     </TouchableOpacity>
   );
 
@@ -194,22 +194,22 @@ const ImportScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>支持的格式</Text>
           <View style={styles.formatGrid}>
             <View style={styles.formatItem}>
-              <MaterialIcons name="code" size={32} color={theme?.colors?.primary} />
+              <MaterialIcons name="code" size={32} color={theme.colors.primary} />
               <Text style={styles.formatName}>JSON</Text>
               <Text style={styles.formatDescription}>推荐格式</Text>
             </View>
             <View style={styles.formatItem}>
-              <MaterialIcons name="table-chart" size={32} color={theme?.colors?.primary} />
+              <MaterialIcons name="table-chart" size={32} color={theme.colors.primary} />
               <Text style={styles.formatName}>CSV</Text>
               <Text style={styles.formatDescription}>表格数据</Text>
             </View>
             <View style={styles.formatItem}>
-              <MaterialIcons name="description" size={32} color={theme?.colors?.primary} />
+              <MaterialIcons name="description" size={32} color={theme.colors.primary} />
               <Text style={styles.formatName}>XML</Text>
               <Text style={styles.formatDescription}>标记语言</Text>
             </View>
             <View style={styles.formatItem}>
-              <MaterialIcons name="archive" size={32} color={theme?.colors?.primary} />
+              <MaterialIcons name="archive" size={32} color={theme.colors.primary} />
               <Text style={styles.formatName}>ZIP</Text>
               <Text style={styles.formatDescription}>压缩包</Text>
             </View>
@@ -220,7 +220,7 @@ const ImportScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>导入说明</Text>
           <View style={styles.infoCard}>
-            <MaterialIcons name="info" size={24} color={theme?.colors?.primary} />
+            <MaterialIcons name="info" size={24} color={theme.colors.primary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoTitle}>注意事项</Text>
               <Text style={styles.infoText}>
@@ -238,10 +238,10 @@ const ImportScreen: React.FC = () => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme.colors.background,
   },
   content: {
     padding: 16,
@@ -252,11 +252,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme?.colors?.onBackground || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onBackground,
     marginBottom: 12,
   },
   card: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -279,12 +279,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   switchTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   switchDescription: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   importOption: {
     flexDirection: 'row',
@@ -305,12 +305,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   importTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 2,
   },
   importDescription: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   cloudContainer: {
     flexDirection: 'row',
@@ -319,7 +319,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   cloudService: {
     width: '48%',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -328,7 +328,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   cloudServiceName: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -339,7 +339,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   formatItem: {
     width: '48%',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -348,17 +348,17 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   formatName: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginTop: 8,
     marginBottom: 4,
   },
   formatDescription: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
   },
   infoCard: {
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -371,12 +371,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },
 });

@@ -30,9 +30,9 @@ interface LoginForm {
 }
 
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { login, state } = useUser();
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   const [form, setForm] = useState<LoginForm>({
     email: '',
@@ -107,7 +107,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons
               name="auto-stories"
               size={64}
-              color={theme?.colors?.primary || '#6750A4'}
+              color={theme.colors.primary}
             />
           </View>
           <Text style={styles.title}>ReadFlow</Text>
@@ -123,13 +123,13 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons
                 name="email"
                 size={20}
-                color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                color={theme.colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="请输入邮箱地址"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 value={form.email}
                 onChangeText={(text) => updateForm('email', text)}
                 keyboardType="email-address"
@@ -147,13 +147,13 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons
                 name="lock"
                 size={20}
-                color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                color={theme.colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="请输入密码"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 value={form.password}
                 onChangeText={(text) => updateForm('password', text)}
                 secureTextEntry={!showPassword}
@@ -167,7 +167,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 <MaterialIcons
                   name={showPassword ? 'visibility-off' : 'visibility'}
                   size={20}
-                  color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                  color={theme.colors.onSurfaceVariant}
                 />
               </TouchableOpacity>
             </View>
@@ -210,7 +210,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   serverSettingsContainer: {
     marginTop: 32,
     width: '100%',
@@ -223,19 +223,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   serverSettingsToggleText: {
     fontSize: 14,
-    color: theme?.colors?.primary,
+    color: theme.colors.primary,
     marginHorizontal: 8,
     fontWeight: '500',
   },
   serverSettingsContent: {
     marginTop: 12,
-    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F5F5F5',
+    backgroundColor: theme.colors.surfaceContainer,
     borderRadius: 12,
     padding: 16,
   },
   serverSettingsHint: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant,
+    color: theme.colors.onSurfaceVariant,
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -249,18 +249,18 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   serverInput: {
     height: 40,
-    backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0',
+    borderColor: theme.colors.outlineVariant,
     paddingHorizontal: 12,
     fontSize: 14,
-    color: theme?.colors?.onSurface,
+    color: theme.colors.onSurface,
   },
   testButton: {
     height: 40,
     paddingHorizontal: 16,
-    backgroundColor: theme?.colors?.primary,
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -269,13 +269,13 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     opacity: 0.6,
   },
   testButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.onPrimary,
     fontSize: 14,
     fontWeight: '600',
   },
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -290,7 +290,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     justifyContent: 'center' as any,
     alignItems: 'center',
     marginBottom: 16,
@@ -298,12 +298,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   formContainer: {
     width: '100%',
@@ -314,26 +314,26 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row' as any,
     alignItems: 'center',
-    backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme?.colors?.outline || (isDark ? '#49454F' : '#E6E0E9'),
+    borderColor: theme.colors.outline,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: '#000',
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: isDark ? 0.1 : 0.05,
+    shadowOpacity: theme.isDark ? 0.3 : 0.05,
     shadowRadius: 2,
-    elevation: isDark ? 0 : 1,
+    elevation: theme.isDark ? 2 : 1,
   },
   inputError: {
-    borderColor: theme?.colors?.error || '#BA1A1A',
+    borderColor: theme.colors.error,
   },
   inputIcon: {
     marginRight: 12,
@@ -341,14 +341,14 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   passwordToggle: {
     padding: 4,
   },
   errorText: {
     fontSize: 12,
-    color: theme?.colors?.error || '#BA1A1A',
+    color: theme.colors.error,
     marginTop: 4,
   },
   forgotPassword: {
@@ -357,20 +357,20 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center' as any,
     marginBottom: 24,
-    shadowColor: theme?.colors?.primary || '#6750A4',
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.15,
+    shadowOpacity: theme.isDark ? 0.3 : 0.15,
     shadowRadius: 4,
-    elevation: isDark ? 0 : 3,
+    elevation: theme.isDark ? 4 : 3,
   },
   loginButtonDisabled: {
     opacity: 0.6,
@@ -378,7 +378,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   loginButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   divider: {
     flexDirection: 'row',
@@ -388,11 +388,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+    backgroundColor: theme.colors.outline,
   },
   dividerText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginHorizontal: 16,
   },
   registerContainer: {
@@ -402,12 +402,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   registerText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginRight: 4,
   },
   registerLink: {
     fontSize: 14,
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
 });

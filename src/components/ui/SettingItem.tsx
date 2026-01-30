@@ -39,8 +39,8 @@ export const SettingItem: React.FC<SettingItemProps> = ({
   isDestructive = false,
   disabled = false,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <>
@@ -119,8 +119,8 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
   unit = '',
   isLast = false,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <>
@@ -171,8 +171,8 @@ interface SettingGroupProps {
  * 设置选项分组容器 (卡片外观)
  */
 export const SettingGroup: React.FC<SettingGroupProps> = ({ children, style }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return <View style={[styles.menuGroupCard, style]}>{children}</View>;
 };
@@ -191,8 +191,8 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   children,
   containerStyle,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <View style={[styles.menuGroupContainer, containerStyle]}>
@@ -202,7 +202,7 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     menuGroupContainer: {
       marginBottom: 20,
@@ -212,11 +212,11 @@ const createStyles = (isDark: boolean, theme: any) =>
       borderRadius: 12,
       overflow: 'hidden',
       // 深色模式下添加细边框增强视觉分离
-      borderWidth: isDark ? 1 : 0,
-      borderColor: isDark ? theme.colors.outlineVariant : 'transparent',
-      shadowColor: '#000',
+      borderWidth: theme.isDark ? 1 : 0,
+      borderColor: theme.isDark ? theme.colors.outlineVariant : 'transparent',
+      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.08,
+      shadowOpacity: theme.isDark ? 0.3 : 0.08,
       shadowRadius: 8,
       elevation: 3,
     },

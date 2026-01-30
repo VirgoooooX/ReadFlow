@@ -80,31 +80,6 @@ const VocabularyStack = createNativeStackNavigator<VocabularyStackParamList>();
 const RSSStack = createNativeStackNavigator<RSSStackParamList>();
 const UserStack = createNativeStackNavigator<UserStackParamList>();
 
-// 主题配置
-const lightTheme = {
-  dark: false,
-  colors: {
-    primary: '#6750A4',
-    background: '#FFFBFE',
-    card: '#FFFBFE',
-    text: '#1C1B1F',
-    border: '#79747E',
-    notification: '#B3261E',
-  },
-};
-
-const darkTheme = {
-  dark: true,
-  colors: {
-    primary: '#60A5FA',          // OLED 优化：亮蓝色主色
-    background: '#0C0F14',       // OLED 优化：纯黑背景
-    card: '#1F2937',             // OLED 优化：深灰卡片
-    text: '#F9FAFB',             // OLED 优化：高对比度白色文字
-    border: '#374151',           // OLED 优化：深灰边框
-    notification: '#F87171',     // OLED 优化：亮红色通知
-  },
-};
-
 // 认证堆栈导航
 function AuthStackNavigator() {
   return (

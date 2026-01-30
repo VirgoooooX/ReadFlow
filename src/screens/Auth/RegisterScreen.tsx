@@ -31,9 +31,9 @@ interface RegisterForm {
 }
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
-  const { theme, isDark } = useThemeContext();
+  const { theme } = useThemeContext();
   const { register, state } = useUser();
-  const styles = createStyles(isDark, theme);
+  const styles = createStyles(theme);
 
   const [form, setForm] = useState<RegisterForm>({
     username: '',
@@ -151,7 +151,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons
               name="auto-stories"
               size={64}
-              color={theme?.colors?.primary || '#6750A4'}
+              color={theme.colors.primary}
             />
           </View>
           <Text style={styles.title}>创建账户</Text>
@@ -167,13 +167,13 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons
                 name="person"
                 size={20}
-                color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                color={theme.colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="请输入用户名"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 value={form.username}
                 onChangeText={(text) => updateForm('username', text)}
                 autoCapitalize="none"
@@ -191,13 +191,13 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons
                 name="email"
                 size={20}
-                color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                color={theme.colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="请输入邮箱地址"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 value={form.email}
                 onChangeText={(text) => updateForm('email', text)}
                 keyboardType="email-address"
@@ -215,13 +215,13 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons
                 name="lock"
                 size={20}
-                color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                color={theme.colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="请输入密码"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 value={form.password}
                 onChangeText={(text) => updateForm('password', text)}
                 secureTextEntry={!showPassword}
@@ -235,7 +235,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 <MaterialIcons
                   name={showPassword ? 'visibility-off' : 'visibility'}
                   size={20}
-                  color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                  color={theme.colors.onSurfaceVariant}
                 />
               </TouchableOpacity>
             </View>
@@ -250,13 +250,13 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
               <MaterialIcons
                 name="lock"
                 size={20}
-                color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                color={theme.colors.onSurfaceVariant}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.textInput}
                 placeholder="请再次输入密码"
-                placeholderTextColor={theme?.colors?.onSurfaceVariant || '#79747E'}
+                placeholderTextColor={theme.colors.onSurfaceVariant}
                 value={form.confirmPassword}
                 onChangeText={(text) => updateForm('confirmPassword', text)}
                 secureTextEntry={!showConfirmPassword}
@@ -270,7 +270,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 <MaterialIcons
                   name={showConfirmPassword ? 'visibility-off' : 'visibility'}
                   size={20}
-                  color={theme?.colors?.onSurfaceVariant || '#79747E'}
+                  color={theme.colors.onSurfaceVariant}
                 />
               </TouchableOpacity>
             </View>
@@ -285,7 +285,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             <MaterialIcons
               name={agreedToTerms ? 'check-box' : 'check-box-outline-blank'}
               size={20}
-              color={theme?.colors?.primary || '#6750A4'}
+              color={theme.colors.primary}
             />
             <Text style={styles.termsText}>
               我已阅读并同意
@@ -302,7 +302,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             disabled={isLoading || authLoading}
           >
             {isLoading || authLoading ? (
-              <ActivityIndicator color={theme?.colors?.onPrimary || '#FFFFFF'} />
+              <ActivityIndicator color={theme.colors.onPrimary} />
             ) : (
               <Text style={styles.registerButtonText}>注册</Text>
             )}
@@ -328,10 +328,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -346,7 +346,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surfaceContainer,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -354,12 +354,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
   },
   formContainer: {
     width: '100%',
@@ -370,21 +370,26 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+    borderColor: theme.colors.outline,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: theme.isDark ? 0.3 : 0.05,
+    shadowRadius: 2,
+    elevation: theme.isDark ? 2 : 1,
   },
   inputError: {
-    borderColor: theme?.colors?.error || '#BA1A1A',
+    borderColor: theme.colors.error,
   },
   inputIcon: {
     marginRight: 12,
@@ -392,19 +397,19 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+    color: theme.colors.onSurface,
   },
   passwordToggle: {
     padding: 4,
   },
   errorText: {
     fontSize: 12,
-    color: theme?.colors?.error || '#BA1A1A',
+    color: theme.colors.error,
     marginTop: 4,
   },
   passwordHint: {
     fontSize: 12,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginTop: 4,
   },
   termsContainer: {
@@ -416,20 +421,25 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   termsText: {
     flex: 1,
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginLeft: 8,
     lineHeight: 20,
   },
   termsLink: {
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   registerButton: {
-    backgroundColor: theme?.colors?.primary || '#6750A4',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 24,
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: theme.isDark ? 0.3 : 0.15,
+    shadowRadius: 4,
+    elevation: theme.isDark ? 4 : 3,
   },
   registerButtonDisabled: {
     opacity: 0.6,
@@ -437,7 +447,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   registerButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme?.colors?.onPrimary || '#FFFFFF',
+    color: theme.colors.onPrimary,
   },
   divider: {
     flexDirection: 'row',
@@ -447,11 +457,11 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: theme?.colors?.outline || (isDark ? '#938F99' : '#79747E'),
+    backgroundColor: theme.colors.outline,
   },
   dividerText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginHorizontal: 16,
   },
   loginContainer: {
@@ -461,12 +471,12 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   loginText: {
     fontSize: 14,
-    color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+    color: theme.colors.onSurfaceVariant,
     marginRight: 4,
   },
   loginLink: {
     fontSize: 14,
-    color: theme?.colors?.primary || '#6750A4',
+    color: theme.colors.primary,
     fontWeight: '600',
   },
 });

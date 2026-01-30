@@ -26,8 +26,8 @@ const SentenceTranslationModal: React.FC<SentenceTranslationModalProps> = ({
   loading,
   onClose,
 }) => {
-  const { theme, isDark } = useThemeContext();
-  const styles = createStyles(isDark, theme);
+  const { theme } = useThemeContext();
+  const styles = createStyles(theme);
 
   return (
     <Modal
@@ -42,7 +42,7 @@ const SentenceTranslationModal: React.FC<SentenceTranslationModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.headerTitle}>句子翻译</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <MaterialIcons name="close" size={24} color={theme?.colors?.onSurface} />
+              <MaterialIcons name="close" size={24} color={theme.colors.onSurface} />
             </TouchableOpacity>
           </View>
 
@@ -54,7 +54,7 @@ const SentenceTranslationModal: React.FC<SentenceTranslationModalProps> = ({
                 <MaterialIcons 
                   name="translate" 
                   size={20} 
-                  color={theme?.colors?.primary} 
+                  color={theme.colors.primary} 
                 />
                 <Text style={styles.sectionTitle}>原文</Text>
               </View>
@@ -67,20 +67,20 @@ const SentenceTranslationModal: React.FC<SentenceTranslationModalProps> = ({
                 <MaterialIcons 
                   name="check-circle" 
                   size={20} 
-                  color={theme?.colors?.secondary} 
+                  color={theme.colors.secondary} 
                 />
                 <Text style={styles.sectionTitle}>译文</Text>
               </View>
               {loading ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={theme?.colors?.primary} />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                   <Text style={styles.loadingText}>翻译中...</Text>
                 </View>
               ) : translatedText ? (
                 <Text style={styles.translatedText}>{translatedText}</Text>
               ) : (
                 <View style={styles.errorContainer}>
-                  <MaterialIcons name="error-outline" size={32} color={theme?.colors?.error} />
+                  <MaterialIcons name="error-outline" size={32} color={theme.colors.error} />
                   <Text style={styles.errorText}>翻译失败</Text>
                 </View>
               )}
@@ -92,7 +92,7 @@ const SentenceTranslationModal: React.FC<SentenceTranslationModalProps> = ({
   );
 };
 
-const createStyles = (isDark: boolean, theme: any) =>
+const createStyles = (theme: any) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
@@ -100,7 +100,7 @@ const createStyles = (isDark: boolean, theme: any) =>
       justifyContent: 'flex-end',
     },
     modalContainer: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme.colors.surface,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       maxHeight: '60%',
@@ -112,12 +112,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       paddingHorizontal: 20,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: theme?.colors?.outlineVariant || (isDark ? '#49454F' : '#E6E0E9'),
+      borderBottomColor: theme.colors.outlineVariant,
     },
     headerTitle: {
       fontSize: 18,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
     },
     closeButton: {
       padding: 4,
@@ -136,26 +136,23 @@ const createStyles = (isDark: boolean, theme: any) =>
     sectionTitle: {
       fontSize: 14,
       fontWeight: '600',
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       marginLeft: 8,
     },
     originalText: {
       fontSize: 15,
       lineHeight: 22,
-      color: theme?.colors?.onSurface || (isDark ? '#E6E1E5' : '#1C1B1F'),
+      color: theme.colors.onSurface,
       padding: 12,
-      backgroundColor: theme?.colors?.surfaceContainer || (isDark ? '#2B2930' : '#F7F2FA'),
+      backgroundColor: theme.colors.surfaceContainer,
       borderRadius: 8,
     },
     translatedText: {
       fontSize: 16,
       lineHeight: 24,
-      color:
-        theme?.colors?.onSecondaryContainer ||
-        theme?.colors?.onSurface ||
-        (isDark ? '#E2E8F0' : '#0F172A'),
+      color: theme.colors.onSecondaryContainer,
       padding: 12,
-      backgroundColor: theme?.colors?.secondaryContainer || (isDark ? '#4A4458' : '#E8DEF8'),
+      backgroundColor: theme.colors.secondaryContainer,
       borderRadius: 8,
       fontWeight: '500',
     },
@@ -168,7 +165,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     loadingText: {
       marginLeft: 12,
       fontSize: 14,
-      color: theme?.colors?.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+      color: theme.colors.onSurfaceVariant,
     },
     errorContainer: {
       flexDirection: 'row',
@@ -179,7 +176,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     errorText: {
       marginLeft: 12,
       fontSize: 14,
-      color: theme?.colors?.error || '#B3261E',
+      color: theme.colors.error,
     },
   });
 

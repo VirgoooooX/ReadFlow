@@ -4,6 +4,7 @@
  */
 
 import { needsProxy, toProxyUrl } from './imageProxy';
+import type { Theme } from '../theme';
 
 /**
  * 替换 HTML 中需要代理的图片 URL (包括 src 和 srcset)
@@ -43,12 +44,11 @@ function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
 }
 
 export interface HtmlTemplateOptions {
+  theme: Theme;
   content: string;
   fontSize?: number;
   lineHeight?: number;
   fontFamily?: string;  // 新增：CSS font-family 字符串
-  isDark?: boolean;
-  primaryColor?: string;
   // 元数据字段
   title?: string;
   titleCn?: string;
@@ -68,12 +68,11 @@ export interface HtmlTemplateOptions {
 
 export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   const {
+    theme,
     content,
     fontSize = 17, // 稍微调大默认字号，適合英文阅读
     lineHeight = 1.6, // 1.6 是英文阅读的黄金行高
     fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', // 默认系统字体
-    isDark = false,
-    primaryColor = '#3B82F6',
     title = '',
     titleCn = '',
     sourceName = '',
@@ -88,21 +87,21 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     vocabularyWords = [],
     proxyServerUrl = ''  // 【新增】代理服务器地址
   } = options;
+  const isDark = theme.isDark;
 
-  // 主题色配置 - OLED 优化深色模式
   const colors = {
-    text: isDark ? '#F9FAFB' : '#202124', // 高对比度白色文字
-    secondaryText: isDark ? '#D1D5DB' : '#5F6368',
-    background: isDark ? '#0C0F14' : '#FFFFFF', // OLED 优化深黑背景
-    strong: isDark ? '#FFFFFF' : '#202124',
-    link: primaryColor,
-    blockquoteBg: isDark ? '#1F2937' : '#F1F3F4', // Slate-800
-    blockquoteBorder: primaryColor,
-    codeBg: isDark ? '#1F2937' : '#F5F5F5', // Slate-800
-    codeText: isDark ? '#F9FAFB' : '#1C1B1F',
-    tableBorder: isDark ? '#374151' : '#E0E0E0', // Slate-700
-    tableHeaderBg: isDark ? '#1F2937' : '#F8F9FA', // Slate-800
-    caption: isDark ? '#9CA3AF' : '#666666', // 更亮的说明文字
+    text: theme.colors.onBackground,
+    secondaryText: theme.colors.onSurfaceVariant,
+    background: theme.colors.background,
+    strong: theme.colors.onBackground,
+    link: theme.colors.primary,
+    blockquoteBg: theme.colors.surfaceContainerLow,
+    blockquoteBorder: theme.colors.primary,
+    codeBg: theme.colors.surfaceContainerHigh,
+    codeText: theme.colors.onSurface,
+    tableBorder: theme.colors.outlineVariant,
+    tableHeaderBg: theme.colors.surfaceContainerHigh,
+    caption: theme.colors.outline,
   };
 
   // 构建标题下方的图片说明 HTML
