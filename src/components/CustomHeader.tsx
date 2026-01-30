@@ -103,7 +103,8 @@ const createStyles = (
       justifyContent: 'space-between',
       backgroundColor: headerBackgroundColor,
       height: HEADER_HEIGHT + statusBarHeight,
-      paddingTop: statusBarHeight,
+      paddingTop: statusBarHeight - 3, // 整体上移 3 像素
+      paddingBottom: 3, // 补偿底部间距，保持总高度不变
       paddingHorizontal: 4,
       elevation: 4,
       shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
@@ -130,13 +131,12 @@ const createStyles = (
       marginLeft: 4,
     },
     title: {
-      fontSize: 18,
-      fontWeight: '900',
+      fontSize: 19, // 稍微加大字号，配合字重更显醒目
+      fontWeight: Platform.OS === 'ios' ? '900' : 'bold', // iOS 支持 900，Android 通常只支持 bold/700
       color: headerTextColor,
       textAlign: 'center',
       height: titleHeight,
       lineHeight: titleLineHeight,
-      marginTop: 5,
       ...(Platform.OS === 'android' ? { textAlignVertical: 'center' } : {}),
     },
   });

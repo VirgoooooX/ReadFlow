@@ -1195,7 +1195,8 @@ const ArticleDetailScreen: React.FC = () => {
       {/* 自定义顶部导航栏 - 为了支持 height: 35 必须使用自定义 View */}
       {/* 【修复】深色模式使用 surface 色，浅色模式使用 primary 色（与 CustomHeader 保持一致） */}
       <View style={[styles.customHeader, {
-        paddingTop: insets.top,
+        paddingTop: insets.top - 3, // 👈 整体上移 3 像素，同步 CustomHeader
+        paddingBottom: 3,           // 👈 补偿间距
         height: 35 + insets.top,
         backgroundColor: theme.isDark ? theme.colors.surface : theme.colors.primary,
         shadowColor: theme.colors.shadow,
@@ -1436,8 +1437,8 @@ const createStyles = (theme: any, readingSettings?: any) =>
       position: 'relative', // 相对定位，作为绝对定位子元素的锚点
     },
     headerTitle: {
-      fontSize: 17,      // 调小一点 (原为18)
-      fontWeight: '900', // 严格同步 CustomHeader 字重 (Extra Bold)
+      fontSize: 19,      // 👈 同步 CustomHeader 字号
+      fontWeight: Platform.OS === 'ios' ? '900' : 'bold', // 👈 同步 CustomHeader 字重策略
       color: theme.colors.onPrimary,
     },
     headerRight: {
