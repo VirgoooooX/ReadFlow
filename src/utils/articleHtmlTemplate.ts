@@ -10,7 +10,7 @@ import { needsProxy, toProxyUrl } from './imageProxy';
  */
 function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
   if (!html) return html;
-  
+
   // 1. 替换 src 属性
   let processedHtml = html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
     if (needsProxy(url, proxyServerUrl)) {
@@ -89,20 +89,20 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     proxyServerUrl = ''  // 【新增】代理服务器地址
   } = options;
 
-  // 主题色配置 - 优化了颜色方案
+  // 主题色配置 - OLED 优化深色模式
   const colors = {
-    text: isDark ? '#E6E1E5' : '#202124', // 使用稍微柔和一点的黑色
-    secondaryText: isDark ? '#CAC4D0' : '#5F6368',
-    background: isDark ? '#1C1B1F' : '#FFFFFF',
+    text: isDark ? '#F9FAFB' : '#202124', // 高对比度白色文字
+    secondaryText: isDark ? '#D1D5DB' : '#5F6368',
+    background: isDark ? '#0C0F14' : '#FFFFFF', // OLED 优化深黑背景
     strong: isDark ? '#FFFFFF' : '#202124',
     link: primaryColor,
-    blockquoteBg: isDark ? '#2B2930' : '#F1F3F4',
+    blockquoteBg: isDark ? '#1F2937' : '#F1F3F4', // Slate-800
     blockquoteBorder: primaryColor,
-    codeBg: isDark ? '#2B2930' : '#F5F5F5',
-    codeText: isDark ? '#E6E1E5' : '#1C1B1F',
-    tableBorder: isDark ? '#49454F' : '#E0E0E0',
-    tableHeaderBg: isDark ? '#2B2930' : '#F8F9FA',
-    caption: isDark ? '#999999' : '#666666', // 图片说明颜色
+    codeBg: isDark ? '#1F2937' : '#F5F5F5', // Slate-800
+    codeText: isDark ? '#F9FAFB' : '#1C1B1F',
+    tableBorder: isDark ? '#374151' : '#E0E0E0', // Slate-700
+    tableHeaderBg: isDark ? '#1F2937' : '#F8F9FA', // Slate-800
+    caption: isDark ? '#9CA3AF' : '#666666', // 更亮的说明文字
   };
 
   // 构建标题下方的图片说明 HTML
@@ -669,7 +669,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     .generated-video-card {
       display: flex;
       align-items: center;
-      background-color: ${isDark ? '#2B2930' : '#f0f0f0'};
+      background-color: ${isDark ? '#1F2937' : '#f0f0f0'};
       border-left: 5px solid #cc0000; /* BBC Red */
       padding: 12px;
       margin: 20px 0;
@@ -743,7 +743,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
 
   // 【关键】将数据直接序列化以便注入 JS，在页面初始化时使用
   // 【优化】初始 HTML 不包含生词数据，由 RN 在 WebView 加载完成后动态注入，避免重复刷新
-  const injectedWords = JSON.stringify([]); 
+  const injectedWords = JSON.stringify([]);
   const injectedScrollY = initialScrollY;
   const injectedArticleUrl = JSON.stringify(articleUrl);
 

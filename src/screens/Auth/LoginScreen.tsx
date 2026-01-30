@@ -38,7 +38,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     email: '',
     password: '',
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { isLoading: authLoading } = state;
@@ -46,19 +46,19 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginForm> = {};
-    
+
     if (!form.email.trim()) {
       newErrors.email = '请输入邮箱地址';
     } else if (!/\S+@\S+\.\S+/.test(form.email)) {
       newErrors.email = '请输入有效的邮箱地址';
     }
-    
+
     if (!form.password.trim()) {
       newErrors.password = '请输入密码';
     } else if (form.password.length < 6) {
       newErrors.password = '密码至少需要6位字符';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -67,7 +67,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     if (!validateForm()) return;
 
     const response = await login({ email: form.email, password: form.password });
-    
+
     if (!response.success) {
       Alert.alert('登录失败', response.message || '登录失败，请重试');
       return;
@@ -93,21 +93,21 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         {/* Logo和标题 */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <MaterialIcons 
-              name="auto-stories" 
-              size={64} 
-              color={theme?.colors?.primary || '#6750A4'} 
+            <MaterialIcons
+              name="auto-stories"
+              size={64}
+              color={theme?.colors?.primary || '#6750A4'}
             />
           </View>
           <Text style={styles.title}>ReadFlow</Text>
@@ -120,10 +120,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>邮箱地址</Text>
             <View style={[styles.inputWrapper, errors.email && styles.inputError]}>
-              <MaterialIcons 
-                name="email" 
-                size={20} 
-                color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              <MaterialIcons
+                name="email"
+                size={20}
+                color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -144,10 +144,10 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>密码</Text>
             <View style={[styles.inputWrapper, errors.password && styles.inputError]}>
-              <MaterialIcons 
-                name="lock" 
-                size={20} 
-                color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -160,14 +160,14 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.passwordToggle}
               >
-                <MaterialIcons 
-                  name={showPassword ? 'visibility-off' : 'visibility'} 
-                  size={20} 
-                  color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+                <MaterialIcons
+                  name={showPassword ? 'visibility-off' : 'visibility'}
+                  size={20}
+                  color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 />
               </TouchableOpacity>
             </View>
@@ -180,8 +180,8 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
 
           {/* 登录按钮 */}
-          <TouchableOpacity 
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
             onPress={handleLogin}
             disabled={isLoading || authLoading}
           >
@@ -275,7 +275,7 @@ const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
   },
   scrollContent: {
     flexGrow: 1,

@@ -34,14 +34,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { theme, isDark } = useThemeContext();
   const { register, state } = useUser();
   const styles = createStyles(isDark, theme);
-  
+
   const [form, setForm] = useState<RegisterForm>({
     username: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +52,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const validateForm = (): boolean => {
     const newErrors: Partial<RegisterForm> = {};
-    
+
     if (!form.username.trim()) {
       newErrors.username = '请输入用户名';
     } else if (form.username.length < 2) {
@@ -60,13 +60,13 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     } else if (form.username.length > 20) {
       newErrors.username = '用户名不能超过20个字符';
     }
-    
+
     if (!form.email.trim()) {
       newErrors.email = '请输入邮箱地址';
     } else if (!/\S+@\S+\.\S+/.test(form.email)) {
       newErrors.email = '请输入有效的邮箱地址';
     }
-    
+
     if (!form.password.trim()) {
       newErrors.password = '请输入密码';
     } else if (form.password.length < 6) {
@@ -74,20 +74,20 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(form.password)) {
       newErrors.password = '密码需要包含字母和数字';
     }
-    
+
     if (!form.confirmPassword.trim()) {
       newErrors.confirmPassword = '请确认密码';
     } else if (form.password !== form.confirmPassword) {
       newErrors.confirmPassword = '两次输入的密码不一致';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleRegister = async () => {
     if (!validateForm()) return;
-    
+
     if (!agreedToTerms) {
       Alert.alert('提示', '请先同意用户协议和隐私政策');
       return;
@@ -98,7 +98,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       email: form.email,
       password: form.password,
     });
-    
+
     if (response.success) {
       if (response.user && response.token) {
         Alert.alert('注册成功', '已自动登录', [
@@ -136,11 +136,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -148,10 +148,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         {/* Logo和标题 */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <MaterialIcons 
-              name="auto-stories" 
-              size={64} 
-              color={theme?.colors?.primary || '#6750A4'} 
+            <MaterialIcons
+              name="auto-stories"
+              size={64}
+              color={theme?.colors?.primary || '#6750A4'}
             />
           </View>
           <Text style={styles.title}>创建账户</Text>
@@ -164,10 +164,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>用户名</Text>
             <View style={[styles.inputWrapper, errors.username && styles.inputError]}>
-              <MaterialIcons 
-                name="person" 
-                size={20} 
-                color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              <MaterialIcons
+                name="person"
+                size={20}
+                color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -188,10 +188,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>邮箱地址</Text>
             <View style={[styles.inputWrapper, errors.email && styles.inputError]}>
-              <MaterialIcons 
-                name="email" 
-                size={20} 
-                color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              <MaterialIcons
+                name="email"
+                size={20}
+                color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -212,10 +212,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>密码</Text>
             <View style={[styles.inputWrapper, errors.password && styles.inputError]}>
-              <MaterialIcons 
-                name="lock" 
-                size={20} 
-                color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -228,14 +228,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.passwordToggle}
               >
-                <MaterialIcons 
-                  name={showPassword ? 'visibility-off' : 'visibility'} 
-                  size={20} 
-                  color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+                <MaterialIcons
+                  name={showPassword ? 'visibility-off' : 'visibility'}
+                  size={20}
+                  color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 />
               </TouchableOpacity>
             </View>
@@ -247,10 +247,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>确认密码</Text>
             <View style={[styles.inputWrapper, errors.confirmPassword && styles.inputError]}>
-              <MaterialIcons 
-                name="lock" 
-                size={20} 
-                color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+              <MaterialIcons
+                name="lock"
+                size={20}
+                color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -263,14 +263,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 style={styles.passwordToggle}
               >
-                <MaterialIcons 
-                  name={showConfirmPassword ? 'visibility-off' : 'visibility'} 
-                  size={20} 
-                  color={theme?.colors?.onSurfaceVariant || '#79747E'} 
+                <MaterialIcons
+                  name={showConfirmPassword ? 'visibility-off' : 'visibility'}
+                  size={20}
+                  color={theme?.colors?.onSurfaceVariant || '#79747E'}
                 />
               </TouchableOpacity>
             </View>
@@ -278,14 +278,14 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           {/* 用户协议 */}
-          <TouchableOpacity 
-            style={styles.termsContainer} 
+          <TouchableOpacity
+            style={styles.termsContainer}
             onPress={() => setAgreedToTerms(!agreedToTerms)}
           >
-            <MaterialIcons 
-              name={agreedToTerms ? 'check-box' : 'check-box-outline-blank'} 
-              size={20} 
-              color={theme?.colors?.primary || '#6750A4'} 
+            <MaterialIcons
+              name={agreedToTerms ? 'check-box' : 'check-box-outline-blank'}
+              size={20}
+              color={theme?.colors?.primary || '#6750A4'}
             />
             <Text style={styles.termsText}>
               我已阅读并同意
@@ -296,8 +296,8 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
 
           {/* 注册按钮 */}
-          <TouchableOpacity 
-            style={[styles.registerButton, isLoading && styles.registerButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.registerButton, isLoading && styles.registerButtonDisabled]}
             onPress={handleRegister}
             disabled={isLoading || authLoading}
           >
@@ -331,7 +331,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 const createStyles = (isDark: boolean, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+    backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
   },
   scrollContent: {
     flexGrow: 1,

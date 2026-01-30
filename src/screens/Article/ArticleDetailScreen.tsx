@@ -61,9 +61,9 @@ const formatDateForMeta = (date: Date | string): string => {
 };
 
 // 【优化】底部进度条组件 - 流体磁吸风格设计
-const BottomProgressBar: React.FC<{ 
-  progress: number; 
-  color: string; 
+const BottomProgressBar: React.FC<{
+  progress: number;
+  color: string;
   isDark: boolean;
   showNextHint: boolean;
   hasNextArticle: boolean;
@@ -77,7 +77,7 @@ const BottomProgressBar: React.FC<{
   const hintOpacity = useRef(new Animated.Value(0)).current;
   const arrowTranslateY = useRef(new Animated.Value(0)).current;  // 箭头呼吸动画
   const arrowAnimRef = useRef<any>(null);
-  
+
   // 进度条平滑动画
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -206,7 +206,7 @@ const BottomProgressBar: React.FC<{
       'rgba(103, 80, 164, 0)',
     ];
   };
-  
+
   return (
     <View pointerEvents="none" style={{
       position: 'absolute',
@@ -418,10 +418,10 @@ const ArticleDetailScreen: React.FC = () => {
   // 【优化】优先使用传递过来的 article 对象，实现秒开
   const passedArticleHydrated: Article | null = passedArticle
     ? {
-        ...passedArticle,
-        publishedAt: new Date(passedArticle.publishedAt),
-        readAt: passedArticle.readAt ? new Date(passedArticle.readAt) : undefined,
-      }
+      ...passedArticle,
+      publishedAt: new Date(passedArticle.publishedAt),
+      readAt: passedArticle.readAt ? new Date(passedArticle.readAt) : undefined,
+    }
     : null;
   const [article, setArticle] = useState<Article | null>(passedArticleHydrated);
   // 【优化】如果有传递的数据，就不显示全屏 Loading
@@ -453,7 +453,7 @@ const ArticleDetailScreen: React.FC = () => {
   const currentScrollYRef = useRef(0);
   // 记录是否需要保存（只有滚动过才保存）
   const hasScrolledRef = useRef(false);
-  
+
   // 【新增】阅读进度和底部状态
   const [readingProgress, setReadingProgress] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(false);
@@ -463,11 +463,11 @@ const ArticleDetailScreen: React.FC = () => {
   const lastInBlankAreaRef = useRef(false);
   const [nextUnreadIndex, setNextUnreadIndex] = useState<number | null>(null); // 【新增】下一篇未读文章索引
   const [nextUnreadArticleId, setNextUnreadArticleId] = useState<number | null>(null);
-  
+
   // 【新增】代理服务器地址，用于处理防盗链图片
   const [proxyServerUrl, setProxyServerUrl] = useState<string>('');
   const aliveRef = useRef(true);
-  
+
   // 【修改】检查是否有下一篇未读文章
   const hasNextArticle = nextUnreadIndex !== null || nextUnreadArticleId !== null;
 
@@ -512,8 +512,7 @@ const ArticleDetailScreen: React.FC = () => {
       const dtFromPress = perfPayload.tPressMs ? tMountMs - perfPayload.tPressMs : undefined;
       const dtFromNavigate = perfPayload.tNavigateMs ? tMountMs - perfPayload.tNavigateMs : undefined;
       logger.info(
-        `[Perf] [Detail] mount id=${perfPayload.id} dtFromPressMs=${
-          dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
+        `[Perf] [Detail] mount id=${perfPayload.id} dtFromPressMs=${dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
         } dtFromNavigateMs=${dtFromNavigate !== undefined ? Math.round(dtFromNavigate) : 'na'} articleId=${articleId}`
       );
     }
@@ -529,7 +528,7 @@ const ArticleDetailScreen: React.FC = () => {
         if (!passedArticle) {
           setLoading(true);
         }
-        
+
         // 【优化】不再强制重置 webViewReady，避免闪烁
         // setWebViewReady(false); 
 
@@ -829,14 +828,14 @@ const ArticleDetailScreen: React.FC = () => {
       setTimeout(() => setNoUnreadArticle(false), 2000);
       return;
     }
-    
+
     // 【优化】使用 Rigid（短促、清脆）震动，表示"操作成功"
     // 相比 Medium 更快、更干脆，体验更爽快
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
-    
+
     // 【新增】更新最后查看的文章ID，用于返回时滚动定位
     setLastViewedArticleId(nextArticleId);
-    
+
     // 使用 replace 替代当前页面，这样返回时直接回到列表
     (navigation as any).replace('ArticleDetail', {
       articleId: nextArticleId,
@@ -947,14 +946,14 @@ const ArticleDetailScreen: React.FC = () => {
     const thumbnailUrl = article.imageUrl;
     logger.info(`[shouldShowHeaderImage] 封面图片URL: ${thumbnailUrl}`);
     const normalizedThumbnail = normalizeForCompare(thumbnailUrl);
-    
+
     for (const imgTag of contentImages) {
       const srcMatch = imgTag.match(/src=["']([^"']*)["']/i);
       if (srcMatch && srcMatch[1]) {
         try {
           const contentImageUrl = safeDecode(srcMatch[1]);
           const thumbnailImageUrl = safeDecode(thumbnailUrl);
-          
+
           logger.info(`[shouldShowHeaderImage] 内容图片URL: ${contentImageUrl}`);
           logger.info(`[shouldShowHeaderImage] 解码后封面URL: ${thumbnailImageUrl}`);
 
@@ -1007,8 +1006,7 @@ const ArticleDetailScreen: React.FC = () => {
             const dtFromPress = perfRef.current?.tPressMs ? tNow - perfRef.current.tPressMs : undefined;
             const dtFromMount = tNow - mountMsRef.current;
             logger.info(
-              `[Perf] [Detail] webViewReady id=${perfRef.current.id} dtFromPressMs=${
-                dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
+              `[Perf] [Detail] webViewReady id=${perfRef.current.id} dtFromPressMs=${dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
               } dtFromMountMs=${dtFromMount !== undefined ? Math.round(dtFromMount) : 'na'}`
             );
           }
@@ -1051,7 +1049,7 @@ const ArticleDetailScreen: React.FC = () => {
           if (data.scrollY !== undefined) {
             currentScrollYRef.current = data.scrollY;
             hasScrolledRef.current = true;
-            
+
             const fadeStartY = 24;
             const fadeEndY = 140;
             const titleFade = clamp01((Number(data.scrollY) - fadeStartY) / (fadeEndY - fadeStartY));
@@ -1059,12 +1057,12 @@ const ArticleDetailScreen: React.FC = () => {
               titleFadeLastRef.current = titleFade;
               titleFadeAnim.setValue(titleFade);
             }
-            
+
             // 【新增】更新阅读进度
             if (data.progress !== undefined) {
               setReadingProgress(data.progress);
             }
-                        
+
             if (data.shouldShowHint !== undefined) {
               const inBlankArea = data.shouldShowHint;
               lastInBlankAreaRef.current = inBlankArea;
@@ -1078,7 +1076,7 @@ const ArticleDetailScreen: React.FC = () => {
             }
           }
           break;
-        
+
         // 【新增】处理底部上滑切换下一篇
         case 'swipeToNext':
           logger.info('[ArticleDetail] Swipe to next article triggered');
@@ -1094,10 +1092,8 @@ const ArticleDetailScreen: React.FC = () => {
         case 'perf':
           if (data.event) {
             logger.info(
-              `[Perf] [WebView] event=${data.event} id=${perfRef.current?.id || `a${articleId}`} durationMs=${
-                data.durationMs !== undefined ? Math.round(data.durationMs) : 'na'
-              } highlighted=${data.highlighted !== undefined ? data.highlighted : 'na'} initMs=${
-                data.initMs !== undefined ? Math.round(data.initMs) : 'na'
+              `[Perf] [WebView] event=${data.event} id=${perfRef.current?.id || `a${articleId}`} durationMs=${data.durationMs !== undefined ? Math.round(data.durationMs) : 'na'
+              } highlighted=${data.highlighted !== undefined ? data.highlighted : 'na'} initMs=${data.initMs !== undefined ? Math.round(data.initMs) : 'na'
               }`
             );
           }
@@ -1127,12 +1123,12 @@ const ArticleDetailScreen: React.FC = () => {
     logger.info('[ArticleDetail] Generating HTML, article exists:', !!article);
     logger.info('[ArticleDetail] article.content exists:', !!article?.content);
     logger.info('[ArticleDetail] readingSettings exists:', !!readingSettings);
-    
+
     if (!article?.content || !readingSettings) {
       logger.info('[ArticleDetail] ❌ HTML generation skipped - missing article.content or readingSettings');
       return '';
     }
-  
+
     // 【调试日志】空急论证 imageUrl
     const showHeaderImage = shouldShowHeaderImage();
     logger.info(`[ArticleDetail] article.imageUrl = ${article.imageUrl}`);
@@ -1164,11 +1160,10 @@ const ArticleDetailScreen: React.FC = () => {
       vocabularyWords: [],
       proxyServerUrl,
     });
-    
+
     logger.info('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);
     logger.info(
-      `[Perf] [Detail] generateHtmlDone id=${perfRef.current?.id || `a${articleId}`} ms=${Math.round(nowMs() - tStart)} htmlLen=${
-        html.length
+      `[Perf] [Detail] generateHtmlDone id=${perfRef.current?.id || `a${articleId}`} ms=${Math.round(nowMs() - tStart)} htmlLen=${html.length
       }`
     );
     return html;
@@ -1200,10 +1195,13 @@ const ArticleDetailScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* 自定义顶部导航栏 - 为了支持 height: 35 必须使用自定义 View */}
+      {/* 【修复】深色模式使用 surface 色，浅色模式使用 primary 色（与 CustomHeader 保持一致） */}
       <View style={[styles.customHeader, {
         paddingTop: insets.top,
-        height: 35 + insets.top, // 恢复正常高度计算，之前误写成 70 会导致过高
-        backgroundColor: theme?.colors?.primary || '#6750A4', // 同步 AppNavigator 的 Primary 背景色
+        height: 35 + insets.top,
+        backgroundColor: isDark
+          ? (theme?.colors?.surface || '#1F2937')   // 深色模式：使用 surface 色
+          : (theme?.colors?.primary || '#6750A4'),  // 浅色模式：使用 primary 色
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
@@ -1214,8 +1212,12 @@ const ArticleDetailScreen: React.FC = () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          {/* 使用 onPrimary (通常是白色) 以匹配 Primary 背景 */}
-          <MaterialIcons name="arrow-back" size={24} color={theme?.colors?.onPrimary || '#FFFFFF'} />
+          {/* 【修复】深色模式使用 onSurface，浅色模式使用 onPrimary */}
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={isDark ? (theme?.colors?.onSurface || '#F9FAFB') : (theme?.colors?.onPrimary || '#FFFFFF')}
+          />
         </TouchableOpacity>
 
         <View style={[styles.headerTitleContainer, { opacity: 1 }]}>
@@ -1233,7 +1235,7 @@ const ArticleDetailScreen: React.FC = () => {
               })
             }
           ]}>
-            <Text style={[styles.headerTitle, { color: theme?.colors?.onPrimary || '#FFFFFF' }]} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: isDark ? (theme?.colors?.onSurface || '#F9FAFB') : (theme?.colors?.onPrimary || '#FFFFFF') }]} numberOfLines={1}>
               文章详情
             </Text>
           </Animated.View>
@@ -1247,7 +1249,7 @@ const ArticleDetailScreen: React.FC = () => {
               opacity: titleFadeAnim // 直接使用 0->1 的动画值
             }
           ]}>
-            <Text style={[styles.headerTitle, { color: theme?.colors?.onPrimary || '#FFFFFF' }]} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: isDark ? (theme?.colors?.onSurface || '#F9FAFB') : (theme?.colors?.onPrimary || '#FFFFFF') }]} numberOfLines={1}>
               {article?.title || ''}
             </Text>
           </Animated.View>
@@ -1288,8 +1290,7 @@ const ArticleDetailScreen: React.FC = () => {
                   const dtFromPress = perfRef.current?.tPressMs ? tNow - perfRef.current.tPressMs : undefined;
                   const dtFromMount = mountMsRef.current ? tNow - mountMsRef.current : undefined;
                   logger.info(
-                    `[Perf] [Detail] webViewOnLoad id=${perfRef.current.id} dtFromPressMs=${
-                      dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
+                    `[Perf] [Detail] webViewOnLoad id=${perfRef.current.id} dtFromPressMs=${dtFromPress !== undefined ? Math.round(dtFromPress) : 'na'
                     } dtFromMountMs=${dtFromMount !== undefined ? Math.round(dtFromMount) : 'na'}`
                   );
                 }
@@ -1368,9 +1369,9 @@ const ArticleDetailScreen: React.FC = () => {
         swipeToCloseEnabled={true}
         doubleTapToZoomEnabled={true}
       />
-      
+
       {/* 【修改】底部进度条 - 带联动动画 */}
-      <BottomProgressBar 
+      <BottomProgressBar
         progress={readingProgress}
         color={theme?.colors?.primary || '#3B82F6'}
         isDark={isDark}
@@ -1388,19 +1389,19 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
     },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
     },
     errorContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
     },
     webView: {
       flex: 1,
@@ -1408,7 +1409,7 @@ const createStyles = (isDark: boolean, theme: any, readingSettings?: any) =>
     },
     readerContainer: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
     },
     webViewLoading: {
       position: 'absolute',

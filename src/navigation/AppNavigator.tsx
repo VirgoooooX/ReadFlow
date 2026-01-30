@@ -97,12 +97,12 @@ const lightTheme = {
 const darkTheme = {
   dark: true,
   colors: {
-    primary: '#D0BCFF',
-    background: '#1C1B1F',
-    card: '#1C1B1F',
-    text: '#E6E1E5',
-    border: '#938F99',
-    notification: '#F2B8B5',
+    primary: '#60A5FA',          // OLED 优化：亮蓝色主色
+    background: '#0C0F14',       // OLED 优化：纯黑背景
+    card: '#1F2937',             // OLED 优化：深灰卡片
+    text: '#F9FAFB',             // OLED 优化：高对比度白色文字
+    border: '#374151',           // OLED 优化：深灰边框
+    notification: '#F87171',     // OLED 优化：亮红色通知
   },
 };
 
@@ -272,10 +272,10 @@ function RSSStackNavigator() {
                 style={{ padding: 4, marginRight: 8 }}
                 activeOpacity={0.6}
               >
-                <MaterialIcons 
-                  name="add" 
-                  size={26} 
-                  color={isDark ? theme.colors.onSurface : theme.colors.onPrimary} 
+                <MaterialIcons
+                  name="add"
+                  size={26}
+                  color={isDark ? theme.colors.onSurface : theme.colors.onPrimary}
                 />
               </TouchableOpacity>
             }
@@ -338,8 +338,8 @@ function RSSStackNavigator() {
       </RSSStack.Screen>
       <RSSStack.Screen
         name="FilterRuleEditor"
-        options={({ route }: any) => ({ 
-          title: route?.params?.ruleId ? '编辑规则' : '新建规则' 
+        options={({ route }: any) => ({
+          title: route?.params?.ruleId ? '编辑规则' : '新建规则'
         })}
       >
         {(props: any) => (
@@ -460,8 +460,8 @@ function UserStackNavigator() {
       </UserStack.Screen>
       <UserStack.Screen
         name="AddEditProxyServer"
-        options={({ route }: any) => ({ 
-          title: route?.params?.serverId ? '编辑服务器' : '添加服务器' 
+        options={({ route }: any) => ({
+          title: route?.params?.serverId ? '编辑服务器' : '添加服务器'
         })}
       >
         {(props: any) => (
@@ -600,8 +600,8 @@ function UserStackNavigator() {
 
       <UserStack.Screen
         name="FilterRuleEditor"
-        options={({ route }: any) => ({ 
-          title: route?.params?.ruleId ? '编辑规则' : '新建规则' 
+        options={({ route }: any) => ({
+          title: route?.params?.ruleId ? '编辑规则' : '新建规则'
         })}
       >
         {(props: any) => (
@@ -661,10 +661,10 @@ function MainTabNavigator() {
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.onSurfaceVariant || (isDark ? '#938F99' : '#79747E'),
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant || (isDark ? '#9CA3AF' : '#79747E'),
         tabBarStyle: {
-          backgroundColor: theme.colors.surface || (isDark ? '#1C1B1F' : '#FFFBFE'),
-          borderTopColor: theme.colors.outlineVariant || (isDark ? '#49454F' : '#CAC4D0'),
+          backgroundColor: theme.colors.surface || (isDark ? '#0C0F14' : '#FFFBFE'),
+          borderTopColor: theme.colors.outlineVariant || (isDark ? '#374151' : '#CAC4D0'),
           borderTopWidth: 0.5,
           // 显式设置底部内边距，包含安全区域
           paddingBottom: getTabBarPaddingVertical() + bottomInset,
@@ -691,7 +691,7 @@ function MainTabNavigator() {
       <MainTab.Screen
         name="RSS"
         component={RSSStackNavigator}
-        options={{ 
+        options={{
           tabBarLabel: 'RSS',
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarBadgeStyle: {

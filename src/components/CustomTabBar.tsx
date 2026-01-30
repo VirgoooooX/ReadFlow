@@ -116,7 +116,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     const layoutCache = useRef<TabMeasurement[]>(tabs.map(() => ({ x: 0, width: 0 })));
     const layoutCount = useRef(0);
 
-    const inactiveColor = isDark ? '#938F99' : '#64748B';
+    const inactiveColor = isDark ? '#9CA3AF' : '#64748B';  // Gray-400 for better dark mode visibility
     const pillBackgroundColor = theme.colors.primary;
 
     // 处理标签布局测量 - 收集完毕后一次性写入 SharedValue

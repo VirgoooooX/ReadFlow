@@ -13,20 +13,20 @@ import { Theme } from '../theme';
  * - 浅色模式: elevation 2，无边框
  */
 export const createCardStyle = (isDark: boolean, theme: any) => ({
-  backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+  backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
   borderRadius: 16,
   padding: 16,
   marginBottom: 10,
   // 阴影效果 (iOS)
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: isDark ? 0.3 : 0.05,
+  shadowOpacity: isDark ? 0.4 : 0.05,
   shadowRadius: 8,
   // 阴影效果 (Android)
-  elevation: isDark ? 0 : 2,
+  elevation: isDark ? 2 : 2,
   // 深色模式下加边框
-  borderWidth: isDark ? 1 : 0,
-  borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.1)',
+  borderWidth: 1,
+  borderColor: isDark ? (theme?.colors?.outlineVariant || '#374151') : 'transparent',
 });
 
 /**
@@ -35,7 +35,7 @@ export const createCardStyle = (isDark: boolean, theme: any) => ({
  */
 export const createListItemStyle = (isDark: boolean, theme: any, variant: 'default' | 'unread' | 'highlight' = 'default') => {
   const baseStyle = createCardStyle(isDark, theme);
-  
+
   const variants = {
     default: {},
     unread: {

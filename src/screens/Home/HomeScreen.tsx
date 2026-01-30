@@ -1288,12 +1288,12 @@ const createStyles = (isDark: boolean, theme: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
     },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
       // 移除 paddingHorizontal 和高度限制，让 TabBar 撑开
     },
     menuButton: {
@@ -1312,7 +1312,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     menuContainer: {
       width: 160,
       borderRadius: 8,
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
       elevation: 5,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -1336,7 +1336,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     lazyPlaceholder: {
       flex: 1,
-      backgroundColor: theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE'),
+      backgroundColor: theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE'),
     },
     articleListContainer: {
       paddingHorizontal: 12,
@@ -1345,7 +1345,7 @@ const createStyles = (isDark: boolean, theme: any) =>
     },
     // 文章卡片样式优化
     articleItem: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
       borderRadius: 16,
       padding: 12,
       marginBottom: 10, // 卡片间距
@@ -1353,13 +1353,13 @@ const createStyles = (isDark: boolean, theme: any) =>
       // 阴影效果 (iOS)
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.05,
+      shadowOpacity: isDark ? 0.4 : 0.05,
       shadowRadius: 8,
       // 阴影效果 (Android)
-      elevation: isDark ? 0 : 2,
-      // 深色模式下加个边框增加辨识度
-      borderWidth: isDark ? 1 : 0,
-      borderColor: theme?.colors?.outlineVariant || 'rgba(255,255,255,0.1)',
+      elevation: isDark ? 2 : 2,
+      // 深色模式下加可见边框
+      borderWidth: 1,
+      borderColor: isDark ? (theme?.colors?.outlineVariant || '#374151') : 'transparent',
     },
     // 未读文章背景稍微亮一点/不同一点 (可选)
     articleItemUnread: {

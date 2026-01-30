@@ -10,9 +10,17 @@ export const getCommonScreenOptions = (
   theme: any,
   isDark: boolean
 ): NativeStackNavigationOptions & { cardStyle?: StyleProp<ViewStyle> } => {
-  const backgroundColor = theme?.colors?.background || (isDark ? '#1C1B1F' : '#FFFBFE');
-  const primaryColor = theme?.colors?.primary || '#6750A4';
-  const onPrimaryColor = theme?.colors?.onPrimary || '#FFFFFF';
+  const backgroundColor = theme?.colors?.background || (isDark ? '#0C0F14' : '#FFFBFE');
+
+  // 【关键修复】导航栏背景色：深色模式用 surface，浅色模式用 primary
+  const headerBackgroundColor = isDark
+    ? (theme?.colors?.surface || '#1F2937')   // 深色模式：surface
+    : (theme?.colors?.primary || '#6750A4');  // 浅色模式：primary
+
+  // 【关键修复】导航栏文字色：深色模式用 onSurface，浅色模式用 onPrimary
+  const headerTextColor = isDark
+    ? (theme?.colors?.onSurface || '#F9FAFB')  // 深色模式：onSurface (白色)
+    : (theme?.colors?.onPrimary || '#FFFFFF'); // 浅色模式：onPrimary (通常是白色)
 
   return {
     // 1. 核心动画：平移效果，从右侧滑入
@@ -36,11 +44,11 @@ export const getCommonScreenOptions = (
     // 6. 动画时长：200ms，与 Android 系统默认一致
     animationDuration: 200,
 
-    // 7. 头部样式统一：使用主题色作为背景
+    // 7. 头部样式统一：【修复】深色/浅色模式使用不同颜色
     headerStyle: {
-      backgroundColor: primaryColor,
+      backgroundColor: headerBackgroundColor,
     },
-    headerTintColor: onPrimaryColor,
+    headerTintColor: headerTextColor,
 
     // 8. 其他头部配置
     headerTitleStyle: {

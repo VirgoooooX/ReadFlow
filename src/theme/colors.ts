@@ -134,32 +134,32 @@ export const generateTokensFromSource = (
       errorContainer: toHex(scheme.errorContainer),
       onErrorContainer: toHex(scheme.onErrorContainer),
 
-      // Background
-      // Background - 强制在浅色模式下使用略深的背景色以保证卡片对比度
-      background: (!isDark && toHex(scheme.background) === toHex(scheme.surface))
-        ? '#F0F2F5' // 通用浅灰背景
-        : toHex(scheme.background),
-      onBackground: toHex(scheme.onBackground),
+      // Background - 深色模式使用优化的 OLED 背景
+      background: isDark
+        ? '#0C0F14'  // OLED 优化深黑
+        : (toHex(scheme.background) === toHex(scheme.surface) ? '#F0F2F5' : toHex(scheme.background)),
+      // 【关键修复】深色模式强制使用浅色文字
+      onBackground: isDark ? '#F9FAFB' : toHex(scheme.onBackground),
 
-      // Surface
-      surface: toHex(scheme.surface),
-      onSurface: toHex(scheme.onSurface),
-      surfaceVariant: toHex(scheme.surfaceVariant),
-      onSurfaceVariant: toHex(scheme.onSurfaceVariant),
+      // Surface - 深色模式使用优化的表面色
+      surface: isDark ? '#1F2937' : toHex(scheme.surface),
+      // 【关键修复】深色模式强制使用浅色文字
+      onSurface: isDark ? '#F9FAFB' : toHex(scheme.onSurface),
+      surfaceVariant: isDark ? '#374151' : toHex(scheme.surfaceVariant),
+      onSurfaceVariant: isDark ? '#D1D5DB' : toHex(scheme.onSurfaceVariant),
 
-      // Outline
-      outline: toHex(scheme.outline),
-      outlineVariant: toHex(scheme.outlineVariant),
+      // Outline - 深色模式使用优化的边框色
+      outline: isDark ? '#6B7280' : toHex(scheme.outline),
+      outlineVariant: isDark ? '#374151' : toHex(scheme.outlineVariant),
 
-      // Surface container (MD3 新增分层)
-      // Surface container (MD3 新增分层) - 添加回退机制，防止旧版库返回 undefined
-      surfaceDim: (scheme as any).surfaceDim ? toHex((scheme as any).surfaceDim) : toHex(scheme.surface),
-      surfaceBright: (scheme as any).surfaceBright ? toHex((scheme as any).surfaceBright) : toHex(scheme.surface),
-      surfaceContainerLowest: (scheme as any).surfaceContainerLowest ? toHex((scheme as any).surfaceContainerLowest) : toHex(scheme.surface),
-      surfaceContainerLow: (scheme as any).surfaceContainerLow ? toHex((scheme as any).surfaceContainerLow) : toHex(scheme.surface),
-      surfaceContainer: (scheme as any).surfaceContainer ? toHex((scheme as any).surfaceContainer) : toHex(scheme.surface),
-      surfaceContainerHigh: (scheme as any).surfaceContainerHigh ? toHex((scheme as any).surfaceContainerHigh) : toHex(scheme.surface),
-      surfaceContainerHighest: (scheme as any).surfaceContainerHighest ? toHex((scheme as any).surfaceContainerHighest) : toHex(scheme.surface),
+      // Surface container (MD3 新增分层) - 深色模式使用固定值
+      surfaceDim: isDark ? '#0C0F14' : ((scheme as any).surfaceDim ? toHex((scheme as any).surfaceDim) : toHex(scheme.surface)),
+      surfaceBright: isDark ? '#374151' : ((scheme as any).surfaceBright ? toHex((scheme as any).surfaceBright) : toHex(scheme.surface)),
+      surfaceContainerLowest: isDark ? '#0C0F14' : ((scheme as any).surfaceContainerLowest ? toHex((scheme as any).surfaceContainerLowest) : toHex(scheme.surface)),
+      surfaceContainerLow: isDark ? '#111827' : ((scheme as any).surfaceContainerLow ? toHex((scheme as any).surfaceContainerLow) : toHex(scheme.surface)),
+      surfaceContainer: isDark ? '#1F2937' : ((scheme as any).surfaceContainer ? toHex((scheme as any).surfaceContainer) : toHex(scheme.surface)),
+      surfaceContainerHigh: isDark ? '#374151' : ((scheme as any).surfaceContainerHigh ? toHex((scheme as any).surfaceContainerHigh) : toHex(scheme.surface)),
+      surfaceContainerHighest: isDark ? '#4B5563' : ((scheme as any).surfaceContainerHighest ? toHex((scheme as any).surfaceContainerHighest) : toHex(scheme.surface)),
 
       // Inverse
       inverseSurface: toHex((scheme as any).inverseSurface),
@@ -174,7 +174,7 @@ export const generateTokensFromSource = (
     return tokens;
   } catch (error) {
     console.error('Failed to generate tokens from source color:', error);
-    // 回退到默认浅色主题
+    // 回退到默认主题
     return isDark ? darkColors : lightColors;
   }
 };
@@ -232,52 +232,75 @@ export const lightColors: ColorTokens = {
 };
 
 // 2. 深色模式标准定义 (Dark Theme)
-// 【重点】确保所有 onXxx 都是浅色！
+// 【OLED 优化】使用更深的黑色背景，提高对比度和省电效果
+// 基于 ui-ux-pro-max 技能的 Dark Mode (OLED) 样式规范
 export const darkColors: ColorTokens = {
-  primary: '#60A5FA',
-  onPrimary: '#002D6C',
-  primaryContainer: '#2563EB',
-  onPrimaryContainer: '#DBEAFE',
+  // ═══════════════════════════════════════════════════════════════════
+  // PRIMARY BRAND COLORS - 更亮的蓝色，OLED 显示更鲜艳
+  // ═══════════════════════════════════════════════════════════════════
+  primary: '#60A5FA',           // Vibrant Blue - 在深色背景上高可见度
+  onPrimary: '#1E3A5F',         // 深蓝色文字
+  primaryContainer: '#1E40AF',  // 深蓝容器
+  onPrimaryContainer: '#DBEAFE', // 浅蓝文字
 
-  // 背景：深黑
-  background: '#111827', // Gray-900
-  onBackground: '#F3F4F6', // Gray-100 (浅白字)
+  // ═══════════════════════════════════════════════════════════════════
+  // BACKGROUND & SURFACE - 层级分明的深色系统
+  // ═══════════════════════════════════════════════════════════════════
+  // Level 0: 最深背景 (OLED 优化 - 接近纯黑)
+  background: '#0C0F14',        // True Dark - 对比度最高
+  onBackground: '#F9FAFB',      // 近白色文字 (18.5:1 对比度)
 
-  // 卡片：比背景稍亮
-  surface: '#1F2937',    // Gray-800
-  onSurface: '#F9FAFB',  // Gray-50 (纯白字)
-  surfaceVariant: '#374151', // Gray-700
-  onSurfaceVariant: '#D1D5DB', // Gray-300 (浅灰字)
+  // Level 2: 卡片背景 (比背景稍亮)
+  surface: '#1F2937',           // Slate-800 - 卡片/列表项
+  onSurface: '#F9FAFB',         // 主文字 - 纯白
+  surfaceVariant: '#374151',    // Slate-700 - 次级背景
+  onSurfaceVariant: '#D1D5DB',  // 次级文字 - 浅灰
 
-  surfaceContainer: '#1F2937', // 列表项背景
+  surfaceContainer: '#1F2937',  // 列表项背景
 
-  // 其他辅助色
-  secondary: '#94A3B8',
-  onSecondary: '#0F172A',
-  secondaryContainer: '#334155',
-  onSecondaryContainer: '#E2E8F0',
-  tertiary: '#2DD4BF',
-  onTertiary: '#00382E',
-  tertiaryContainer: '#0F766E',
-  onTertiaryContainer: '#CCFBF1',
-  error: '#F87171',
-  onError: '#450A0A',
-  errorContainer: '#991B1B',
+  // ═══════════════════════════════════════════════════════════════════
+  // SECONDARY & TERTIARY - 补充色彩
+  // ═══════════════════════════════════════════════════════════════════
+  secondary: '#A78BFA',         // 紫色强调
+  onSecondary: '#1E1B4B',
+  secondaryContainer: '#4C1D95',
+  onSecondaryContainer: '#EDE9FE',
+
+  tertiary: '#22D3EE',          // 青色强调
+  onTertiary: '#164E63',
+  tertiaryContainer: '#0E7490',
+  onTertiaryContainer: '#CFFAFE',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ERROR - 明亮的红色，易于识别
+  // ═══════════════════════════════════════════════════════════════════
+  error: '#EF4444',             // 亮红色
+  onError: '#FFFFFF',
+  errorContainer: '#7F1D1D',
   onErrorContainer: '#FECACA',
-  outline: '#64748B',
-  outlineVariant: '#475569',
 
-  // MD3 Surface Tones
-  surfaceDim: '#111827',
-  surfaceBright: '#374151',
-  surfaceContainerLowest: '#0F0D13',
-  surfaceContainerLow: '#1D1B20',
-  surfaceContainerHigh: '#2B2930',
-  surfaceContainerHighest: '#36343B',
+  // ═══════════════════════════════════════════════════════════════════
+  // OUTLINE & BORDERS - 可见的边框
+  // ═══════════════════════════════════════════════════════════════════
+  outline: '#6B7280',           // Gray-500 - 可见边框
+  outlineVariant: '#374151',    // Slate-700 - 细微边框
 
-  inverseSurface: '#E6E1E5',
-  inverseOnSurface: '#313033',
-  inversePrimary: '#3B82F6',
+  // ═══════════════════════════════════════════════════════════════════
+  // MD3 SURFACE TONES - 5 层深色层级
+  // ═══════════════════════════════════════════════════════════════════
+  surfaceDim: '#0C0F14',           // 最深
+  surfaceBright: '#374151',        // 最亮
+  surfaceContainerLowest: '#0C0F14',  // Level 0
+  surfaceContainerLow: '#111827',     // Level 1
+  surfaceContainerHigh: '#374151',    // Level 3 (弹窗/模态框)
+  surfaceContainerHighest: '#4B5563', // Level 4
+
+  // ═══════════════════════════════════════════════════════════════════
+  // INVERSE - 反色系统
+  // ═══════════════════════════════════════════════════════════════════
+  inverseSurface: '#F3F4F6',
+  inverseOnSurface: '#111827',
+  inversePrimary: '#2563EB',
   shadow: '#000000',
   scrim: '#000000',
 };
@@ -336,12 +359,14 @@ const applyCustomColors = (
       merged.onErrorContainer = getContrastColor(merged.errorContainer);
     }
 
-    if (customConfig.background) {
+    // 【关键修复】background 和 surface 只在浅色模式下应用自定义值
+    // 深色模式使用 generateTokensFromSource 中定义的 OLED 优化色
+    if (!isDark && customConfig.background) {
       merged.background = customConfig.background;
       merged.onBackground = getContrastColor(customConfig.background);
     }
 
-    if (customConfig.surface) {
+    if (!isDark && customConfig.surface) {
       merged.surface = customConfig.surface;
       merged.onSurface = getContrastColor(customConfig.surface);
     }
@@ -373,12 +398,13 @@ const applyCustomColors = (
     newColors.onErrorContainer = getContrastColor(newColors.errorContainer);
   }
 
-  if (customConfig.background) {
+  // 【关键修复】background 和 surface 只在浅色模式下应用自定义值
+  if (!isDark && customConfig.background) {
     newColors.background = customConfig.background;
     newColors.onBackground = getContrastColor(customConfig.background);
   }
 
-  if (customConfig.surface) {
+  if (!isDark && customConfig.surface) {
     newColors.surface = customConfig.surface;
     newColors.onSurface = getContrastColor(customConfig.surface);
   }
@@ -391,12 +417,24 @@ export const getColorTokens = (isDark: boolean, customConfig?: CustomColorConfig
   const result = applyCustomColors(baseColors, customConfig, isDark);
 
   // 【防守性编程】确保深色模式下的文字颜色永远不会是深色
-  // 更新：使用新的标准浅色 #F9FAFB 作为深色模式下的文字颜色
-  if (isDark && result.onSurface && result.onSurface.toLowerCase() !== '#f9fafb') {
-    console.warn('⚠️ 深色模式 onSurface 颜色异常:', result.onSurface, '已纠正为浅色');
-    result.onSurface = '#F9FAFB';
-    result.onBackground = '#F3F4F6';
-    result.onSurfaceVariant = '#D1D5DB';
+  // 使用亮度检测而非固定值比较
+  if (isDark && result.onSurface) {
+    const hex = result.onSurface.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    // 计算相对亮度 (ITU-R BT.709)
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+    // 如果亮度低于 0.5，说明是深色文字，需要纠正
+    if (luminance < 0.5) {
+      if (__DEV__) {
+        console.warn('⚠️ 深色模式 onSurface 颜色过暗:', result.onSurface, '(亮度:', luminance.toFixed(2), ') 已纠正为浅色');
+      }
+      result.onSurface = '#F9FAFB';
+      result.onBackground = '#F9FAFB';
+      result.onSurfaceVariant = '#D1D5DB';
+    }
   }
 
   return result;

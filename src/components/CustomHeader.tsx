@@ -57,10 +57,10 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 
   // 确保使用主题色，如果传入了 backgroundColor 则优先使用
   // 深色模式下使用 surface 色替代亮色 primary，避免突兀
-  const headerBackgroundColor = backgroundColor || (isDark 
+  const headerBackgroundColor = backgroundColor || (isDark
     ? theme?.colors?.surface || '#1F2937'  // 深色模式：使用 surface 色
     : theme?.colors?.primary);              // 浅色模式：使用 primary 色
-  
+
   // 深色模式下文字用 onSurface，浅色模式下用 onPrimary
   const headerTextColor = textColor || (isDark
     ? theme?.colors?.onSurface || '#F9FAFB'
@@ -134,11 +134,11 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   // 判断状态栏内容颜色：导航栏背景是 primary 色，所以根据 onPrimary 判断
   // 如果 onPrimary 是浅色（如白色），则状态栏内容用 light-content
   // 如果 onPrimary 是深色（如黑色），则状态栏内容用 dark-content
-  const isLightContent = headerTextColor.toLowerCase() === '#ffffff' || 
-                         headerTextColor.toLowerCase() === '#fff' ||
-                         headerTextColor.startsWith('#f') ||
-                         headerTextColor.startsWith('#e') ||
-                         headerTextColor.startsWith('#d');
+  const isLightContent = headerTextColor.toLowerCase() === '#ffffff' ||
+    headerTextColor.toLowerCase() === '#fff' ||
+    headerTextColor.startsWith('#f') ||
+    headerTextColor.startsWith('#e') ||
+    headerTextColor.startsWith('#d');
 
   return (
     <>

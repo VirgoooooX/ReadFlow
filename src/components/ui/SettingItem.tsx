@@ -141,8 +141,8 @@ export const SettingSliderItem: React.FC<SettingSliderItemProps> = ({
           <Text style={styles.menuValueText}>{value.toFixed(step < 1 ? 1 : 0)}{unit}</Text>
         </View>
         <View style={styles.sliderBody}>
-           <Text style={styles.sliderLabel}>{min}{unit}</Text>
-           <Slider
+          <Text style={styles.sliderLabel}>{min}{unit}</Text>
+          <Slider
             style={styles.slider}
             minimumValue={min}
             maximumValue={max}
@@ -208,9 +208,12 @@ const createStyles = (isDark: boolean, theme: any) =>
       marginBottom: 20,
     },
     menuGroupCard: {
-      backgroundColor: theme?.colors?.surface || (isDark ? '#2B2930' : '#FFFFFF'),
+      backgroundColor: theme?.colors?.surface || (isDark ? '#1F2937' : '#FFFFFF'),
       borderRadius: 12,
       overflow: 'hidden',
+      // 深色模式下添加细边框增强视觉分离
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? (theme?.colors?.outlineVariant || '#374151') : 'transparent',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: isDark ? 0.3 : 0.08,
