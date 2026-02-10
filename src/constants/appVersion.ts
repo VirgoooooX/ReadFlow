@@ -2,8 +2,8 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '7.0.0',
-  buildNumber: 70000,
+  version: '7.0.1',
+  buildNumber: 70001,
   updateTime: '2026-01-30',
   changelog: [
     '统一组件样式以使用主题对象并移除冗余参数',
