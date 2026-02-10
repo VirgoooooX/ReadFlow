@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -43,6 +43,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "feat: 添加发布脚本并改进日志系统",
     "chore: 更新版本号至1.1.3并添加Docker推送重试机制",
     "fix(server): 重构图片预热队列为工作线程模式以提升性能",
     "fix: 改进fetch重试逻辑的超时与信号处理",
@@ -61,7 +62,6 @@
     "perf(rss): 优化RSS相关性能并添加文档说明",
     "feat(LLM): 实现多档案管理和功能绑定功能",
     "feat: 添加RSS源停用检查并更新版本至6.2.0",
-    "feat: 优化云同步配置指纹检测及文章清理功能",
-    "feat: 优化图片代理策略并修复懒加载图片问题"
+    "feat: 优化云同步配置指纹检测及文章清理功能"
   ]
 }
