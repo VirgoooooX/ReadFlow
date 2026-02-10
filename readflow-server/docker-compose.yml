@@ -23,7 +23,7 @@ services:
       - SERVER_TOKEN=admin # (可选) 设置此Token后，客户端连接和注册时必须提供匹配的Token
       - ADMIN_PASSWORD=admin # 请在部署时修改此默认密码
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/readflow?schema=public
-      - IMAGE_WARMUP_ENABLED=${IMAGE_WARMUP_ENABLED:-1}
+      - IMAGE_WARMUP_ENABLED=${IMAGE_WARMUP_ENABLED:-0}
       - SHARP_CACHE_MEMORY_MB=${SHARP_CACHE_MEMORY_MB:-64}
       - SHARP_CONCURRENCY=${SHARP_CONCURRENCY:-2}
     depends_on:

@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.1.3",
+  "version": "1.2.1",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "db:up": "docker-compose up -d",
     "db:migrate": "npx prisma migrate dev",
     "db:import": "ts-node scripts/migrate-json-to-pg.ts",
+    "release": "node scripts/release.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -42,6 +43,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "chore: 更新版本号至1.1.3并添加Docker推送重试机制",
     "fix(server): 重构图片预热队列为工作线程模式以提升性能",
     "fix: 改进fetch重试逻辑的超时与信号处理",
     "fix: 清理图片代理URL中的额外字符并优化预热流处理",
@@ -60,7 +62,6 @@
     "feat(LLM): 实现多档案管理和功能绑定功能",
     "feat: 添加RSS源停用检查并更新版本至6.2.0",
     "feat: 优化云同步配置指纹检测及文章清理功能",
-    "feat: 优化图片代理策略并修复懒加载图片问题",
-    "fix(StorageService): 修正文章字数统计和阅读时间的映射"
+    "feat: 优化图片代理策略并修复懒加载图片问题"
   ]
 }
