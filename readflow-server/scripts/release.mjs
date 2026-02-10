@@ -96,7 +96,8 @@ async function main() {
   run('git', ['tag', appTag]);
   
   console.log('📤 Pushing to GitHub...');
-  run('git', ['push', 'origin', 'main']);
+  const currentBranch = capture('git', ['branch', '--show-current']).stdout || 'master';
+  run('git', ['push', 'origin', currentBranch]);
   run('git', ['push', 'origin', serverTag]);
   run('git', ['push', 'origin', appTag]);
 
