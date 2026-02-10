@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const os = require('os');
+const readline = require('readline');
 
 // 记录构建开始时间
 const buildStartTime = Date.now();
@@ -44,12 +45,26 @@ function showHelp() {
   --version <ver>     指定版本号 (例: 2.1.0)
   --changelog <msg>   指定更新日志 (可多个)
   --auto-generate     从 Git 提交日志自动生成 changelog
+  --release           仅更新版本并推送 app-<ver> 标签（触发云端构建）
   --fast              快速构建模式 (跳过缓存清除)
   --arch <arch>       只构建指定架构 (arm64/arm/x86/x86_64/all)
   --open              构建完成后打开 APK 所在目录
   --help              显示此帮助信息
 `);
   process.exit(0);
+}
+
+function ask(question) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
 }
 
 // 格式化文件大小
@@ -299,6 +314,7 @@ const versionIndex = args.indexOf('--version');
 const changelogIndex = args.indexOf('--changelog');
 const archIndex = args.indexOf('--arch');
 const autoGenerate = args.includes('--auto-generate');
+const releaseMode = args.includes('--release');
 const fastBuild = args.includes('--fast');
 const openAfterBuild = args.includes('--open');
 
@@ -335,12 +351,14 @@ function calculateVersionCode(versionString) {
   return Math.max(1, Math.floor(code));
 }
 
+;(async () => {
 try {
   const projectRoot = path.join(__dirname, '..');
 
   console.log('\n🚀 开始构建 ReadFlow APK...\n');
 
-  if (fastBuild) {
+  const shouldSkipCacheClean = fastBuild || releaseMode;
+  if (shouldSkipCacheClean) {
     console.log('⚡ 快速构建模式 - 跳过缓存清除');
   } else {
     cleanCaches(projectRoot);
@@ -465,6 +483,38 @@ export const APP_INFO = {
     console.log('    - appVersion.ts 内容无变化，跳过更新');
   }
 
+  if (releaseMode) {
+    console.log('\n📦 Staging version changes...');
+    execSync('git add app.json src/constants/appVersion.ts', {
+      stdio: 'inherit',
+      cwd: projectRoot,
+      env: commonEnv
+    });
+
+    console.log('\n--- STOP ---');
+    console.log('1. 请在 Trae/IDE 中使用 AI 生成提交信息并完成 Commit。');
+    console.log('2. Commit 完成后，回到这里按回车继续打 Tag 并 Push。');
+    await ask('Press Enter after you have committed the changes...');
+
+    const appTag = `app-${version}`;
+    console.log(`🏷️ Creating tag ${appTag}...`);
+    execSync(`git tag ${appTag}`, { stdio: 'inherit', cwd: projectRoot, env: commonEnv });
+
+    const currentBranch = execSync('git branch --show-current', {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+      env: commonEnv
+    }).toString().trim() || 'master';
+
+    console.log('📤 Pushing to GitHub...');
+    execSync(`git push origin ${currentBranch}`, { stdio: 'inherit', cwd: projectRoot, env: commonEnv });
+    execSync(`git push origin ${appTag}`, { stdio: 'inherit', cwd: projectRoot, env: commonEnv });
+
+    console.log('\n✅ Done!');
+    console.log(`- Android APK build triggered by tag: ${appTag}`);
+    process.exit(0);
+  }
+
   // 执行 expo prebuild
   console.log('\n🔨 执行 expo prebuild...');
   // 使用 CI=1 环境变量来确保非交互模式
@@ -527,3 +577,4 @@ export const APP_INFO = {
   console.error(`\n❌ 构建失败 (耗时 ${formatDuration(buildDuration)}):`, error.message);
   process.exit(1);
 }
+})();

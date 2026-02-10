@@ -88,22 +88,17 @@ async function main() {
   await ask('Press Enter after you have committed the changes...');
 
   // 5. 打 Tag 并 Push
-  console.log(`🏷️ Creating tags...`);
+  console.log(`🏷️ Creating tag ${nextVersion}...`);
   const serverTag = nextVersion;
-  const appTag = `app-${nextVersion}`;
-  
   run('git', ['tag', serverTag]);
-  run('git', ['tag', appTag]);
   
   console.log('📤 Pushing to GitHub...');
   const currentBranch = capture('git', ['branch', '--show-current']).stdout || 'master';
   run('git', ['push', 'origin', currentBranch]);
   run('git', ['push', 'origin', serverTag]);
-  run('git', ['push', 'origin', appTag]);
 
   console.log(`\n✅ Done!`);
   console.log(`- Docker image build triggered by tag: ${serverTag}`);
-  console.log(`- Android APK build triggered by tag: ${appTag}`);
 }
 
 main().catch(err => {
