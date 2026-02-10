@@ -30,6 +30,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Ensure Gradle wrapper executable
+        run: chmod +x android/gradlew
+
       - name: Install dependencies
         run: npm ci
 
