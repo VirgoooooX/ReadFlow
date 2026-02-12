@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -43,6 +43,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "chore: 更新服务器版本号至1.2.5并更新变更日志",
     "feat(图片代理): 增加图片转码开关配置",
     "feat(rss): 为RSS解析服务添加视频URL支持",
     "ci: 调整发布流程并分离服务器与安卓应用构建触发",
@@ -61,7 +62,6 @@
     "refactor(RSSUtils): 移除未使用的图片代理URL修复功能并改进懒加载属性匹配",
     "fix(rss): 修复图片代理URL处理逻辑",
     "feat: 升级应用版本至6.5.0并优化图片处理逻辑",
-    "feat(rss): 添加全文本抓取速率限制和特定网站内容提取",
-    "feat(RSS解析): 为RSS解析服务添加请求限流和特殊站点处理逻辑"
+    "feat(rss): 添加全文本抓取速率限制和特定网站内容提取"
   ]
 }
