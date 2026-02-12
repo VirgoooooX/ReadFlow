@@ -12,6 +12,7 @@ export interface Article {
   imageUrl?: string;
   imageCaption?: string;
   imageCredit?: string;
+  videoUrl?: string;
   tags: string[];
   category: string;
   wordCount: number;

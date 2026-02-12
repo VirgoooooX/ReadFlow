@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -43,6 +43,8 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "ci: 调整发布流程并分离服务器与安卓应用构建触发",
+    "chore: 更新应用和服务器版本号至7.0.2和1.2.3",
     "chore: 更新版本号至1.2.2并修改发布脚本",
     "feat: 添加发布脚本并改进日志系统",
     "chore: 更新版本号至1.1.3并添加Docker推送重试机制",
@@ -60,8 +62,6 @@
     "feat(rss): 添加全文本抓取速率限制和特定网站内容提取",
     "feat(RSS解析): 为RSS解析服务添加请求限流和特殊站点处理逻辑",
     "feat(rss): 添加基于cron表达式的定时刷新功能",
-    "perf(rss): 优化RSS相关性能并添加文档说明",
-    "feat(LLM): 实现多档案管理和功能绑定功能",
-    "feat: 添加RSS源停用检查并更新版本至6.2.0"
+    "perf(rss): 优化RSS相关性能并添加文档说明"
   ]
 }

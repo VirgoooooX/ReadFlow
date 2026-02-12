@@ -135,6 +135,37 @@ function applyProxyToArticle(
   return { ...article, content, imageUrl };
 }
 
+function isXchuxingVideoUrl(value: unknown): boolean {
+  if (!value || typeof value !== 'string') return false;
+  try {
+    const urlObj = new URL(value);
+    return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/video/');
+  } catch {
+    return false;
+  }
+}
+
+async function enrichBlocksWithVideoUrls(blocks: any[]) {
+  const limit = pLimit(3);
+  const tasks: Array<Promise<void>> = [];
+  for (const block of blocks) {
+    const upserts = Array.isArray(block?.upserts) ? block.upserts : [];
+    for (const a of upserts) {
+      if (!isXchuxingVideoUrl(a?.url)) continue;
+      if (typeof a?.videoUrl === 'string' && a.videoUrl.trim()) continue;
+      tasks.push(limit(async () => {
+        const videoUrl = await rssParserService.resolveVideoUrl(String(a.url));
+        if (videoUrl) {
+          a.videoUrl = videoUrl;
+        }
+      }));
+    }
+  }
+  if (tasks.length) {
+    await Promise.all(tasks);
+  }
+}
+
 /**
  * Pre-warm images for a list of articles (background task)
  * Extracts first 2 images from latest 5 articles and requests them from local proxy
@@ -506,6 +537,8 @@ router.get('/sync', async (req: Request, res: Response) => {
         upserts: b.upserts.map(a => applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
       }));
 
+      await enrichBlocksWithVideoUrls(mappedBlocks);
+
       return res.json({
         sourceUrl: url,
         mode,
@@ -554,6 +587,8 @@ router.get('/sync', async (req: Request, res: Response) => {
       createdAt: b.createdAt,
       upserts: b.upserts.map(a => applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
     }));
+
+    await enrichBlocksWithVideoUrls(mappedBlocks);
 
     res.json({
       sourceUrl: url,

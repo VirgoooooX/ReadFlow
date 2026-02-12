@@ -35,6 +35,7 @@ export class RSSParserService {
   private static readonly FULLTEXT_DOMAIN_STATE_TTL_MS = 6 * 60 * 60_000;
   private static readonly FULLTEXT_DOMAIN_STATE_PRUNE_INTERVAL_MS = 5 * 60_000;
   private static fulltextDomainLastPruneAt = 0;
+  private static readonly VIDEO_URL_CACHE_TTL_MS = 10 * 60_000;
 
   private static readonly fulltextDomainStates = new Map<string, {
     tail: Promise<void>;
@@ -43,6 +44,8 @@ export class RSSParserService {
     timeoutStrikes: number;
     lastSeenAt: number;
   }>();
+
+  private readonly videoUrlCache = new Map<string, { url: string; at: number }>();
 
   private constructor() {}
 
@@ -242,6 +245,16 @@ export class RSSParserService {
           readProgress: 0,
           tags: [],
         };
+
+        try {
+          const urlObj = new URL(itemLink);
+          if (this.isXchuxingVideoUrl(urlObj)) {
+            const videoUrl = await this.resolveVideoUrl(itemLink);
+            if (videoUrl) {
+              article.videoUrl = videoUrl;
+            }
+          }
+        } catch {}
         
         if (shouldExtractImages) {
           let imageUrl = null;
@@ -292,6 +305,13 @@ export class RSSParserService {
     contentType: 'text' | 'image_text' = 'image_text'
   ): Promise<string> {
     try {
+      try {
+        const urlObj = new URL(url);
+        if (this.isXchuxingVideoUrl(urlObj)) {
+          return preserveHtmlContent(rawContent, contentType);
+        }
+      } catch {}
+
       const shouldFetch = rawContent.length < 500 || 
                          rawContent.includes('阅读全文') || 
                          rawContent.includes('Read more') ||
@@ -309,6 +329,63 @@ export class RSSParserService {
     } catch (error) {
       logger.error('Content extraction failed:', error);
       return rawContent;
+    }
+  }
+
+  public async resolveVideoUrl(pageUrl: string): Promise<string | null> {
+    try {
+      const now = Date.now();
+      const cached = this.videoUrlCache.get(pageUrl);
+      if (cached && now - cached.at <= RSSParserService.VIDEO_URL_CACHE_TTL_MS) {
+        return cached.url;
+      }
+
+      const urlObj = new URL(pageUrl);
+      const hostname = urlObj.hostname;
+
+      const response = await this.withFulltextDomainLimit(hostname, async () => {
+        return fetchWithRetry(pageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'identity',
+            'Referer': urlObj.origin,
+          },
+          timeout: RSSParserService.FULLTEXT_TIMEOUT_MS,
+          retries: 0,
+        });
+      });
+
+      if (!response || !response.ok) return null;
+      const html = await response.text();
+      const { document } = parseHTML(html);
+
+      if (this.isXchuxingVideoUrl(urlObj)) {
+        const videoEl = (document as any).querySelector?.('#video');
+        const direct = videoEl?.getAttribute?.('data-src') || videoEl?.getAttribute?.('src');
+        const picked = typeof direct === 'string' ? direct.trim() : '';
+        if (picked && (picked.includes('.m3u8') || picked.includes('.mp4'))) {
+          this.videoUrlCache.set(pageUrl, { url: picked, at: now });
+          return picked;
+        }
+      }
+
+      const m3u8 = html.match(/https?:[^\"'\s>]+\.m3u8[^\"'\s>]*/i)?.[0];
+      if (m3u8) {
+        this.videoUrlCache.set(pageUrl, { url: m3u8, at: now });
+        return m3u8;
+      }
+
+      const mp4 = html.match(/https?:[^\"'\s>]+\.mp4[^\"'\s>]*/i)?.[0];
+      if (mp4) {
+        this.videoUrlCache.set(pageUrl, { url: mp4, at: now });
+        return mp4;
+      }
+
+      return null;
+    } catch {
+      return null;
     }
   }
 
@@ -353,6 +430,15 @@ export class RSSParserService {
           } catch (e) {}
         }
       });
+
+      if (this.isXchuxingVideoUrl(urlObj)) {
+        const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+        if (metaDesc && metaDesc.trim()) {
+          const escaped = this.escapeHtml(metaDesc.trim());
+          return `<article><p>${escaped}</p></article>`;
+        }
+        return null;
+      }
 
       if (this.isXchuxingArticleUrl(urlObj)) {
         const extracted = this.extractXchuxingArticleContent(document as unknown as Document);
@@ -500,6 +586,10 @@ export class RSSParserService {
 
   private isXchuxingArticleUrl(urlObj: URL): boolean {
     return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/article/');
+  }
+
+  private isXchuxingVideoUrl(urlObj: URL): boolean {
+    return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/video/');
   }
 
   private extractXchuxingArticleContent(document: Document): string | null {
