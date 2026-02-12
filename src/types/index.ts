@@ -15,6 +15,7 @@ export interface Article {
   imageUrl?: string;
   imageCaption?: string;   // 封面图片说明（来自 figcaption、alt 或 media:description）
   imageCredit?: string;    // 封面图片来源/版权（如 "Reuters"）
+  videoUrl?: string;
   tags: string[];
   category: string;
   wordCount: number;

@@ -306,8 +306,8 @@ export class ProxyRSSService {
         `INSERT INTO articles (
           title, url, content, summary, author, published_at, rss_source_id, 
           source_name, category, word_count, reading_time, difficulty, 
-          is_read, is_favorite, read_progress, tags, guid, image_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_read, is_favorite, read_progress, tags, guid, image_url, video_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           article.title,
           article.url,
@@ -327,6 +327,7 @@ export class ProxyRSSService {
           JSON.stringify(article.tags),
           article.url,
           article.imageUrl || null,
+          article.videoUrl || null,
         ]
       );
 

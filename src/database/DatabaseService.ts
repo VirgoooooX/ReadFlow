@@ -183,6 +183,7 @@ export class DatabaseService {
         { name: 'scroll_position', sql: 'ALTER TABLE articles ADD COLUMN scroll_position INTEGER DEFAULT 0' },
         { name: 'image_caption', sql: 'ALTER TABLE articles ADD COLUMN image_caption TEXT' },
         { name: 'image_credit', sql: 'ALTER TABLE articles ADD COLUMN image_credit TEXT' },
+        { name: 'video_url', sql: 'ALTER TABLE articles ADD COLUMN video_url TEXT' },
       ];
 
       for (const column of articleColumnsToAdd) {
@@ -288,6 +289,7 @@ export class DatabaseService {
         url TEXT NOT NULL,
         guid TEXT,
         image_url TEXT,
+        video_url TEXT,
         tags TEXT, -- JSON array
         category TEXT NOT NULL,
         word_count INTEGER NOT NULL,

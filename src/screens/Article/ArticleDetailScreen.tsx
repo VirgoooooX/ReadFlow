@@ -32,6 +32,7 @@ import { generateArticleHtml } from '../../utils/articleHtmlTemplate';
 import { getFontStackForWebView } from '../../theme/typography';
 import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
+import VideoPlayer from '../../components/VideoPlayer';
 import { setLastViewedArticleId } from '../Home/HomeScreen';
 import { toProxyUrl } from '../../utils/imageProxy';
 import { cloudConfigService } from '../../services/CloudConfigService';
@@ -1258,6 +1259,9 @@ const ArticleDetailScreen: React.FC = () => {
 
       {/* WebView 内容 */}
       <View style={styles.readerContainer}>
+        {typeof article.videoUrl === 'string' && article.videoUrl.trim().length > 0 && (
+          <VideoPlayer src={article.videoUrl.trim()} />
+        )}
         {!!htmlContent && (
           <Animated.View style={{ flex: 1, opacity: bodyFadeAnim }}>
             <WebView

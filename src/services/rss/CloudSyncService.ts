@@ -524,6 +524,7 @@ export class CloudSyncService implements IRSSProvider {
       sourceName: source.name,
       url: item.url || item.link,
       imageUrl: item.imageUrl || item.image_url,
+      videoUrl: item.videoUrl || item.video_url,
       author: item.author,
       tags: item.tags || [],
       category: item.category || source.category || 'Uncategorized',
@@ -573,6 +574,7 @@ export class CloudSyncService implements IRSSProvider {
     const toInsert = uniqueArticles.filter(a => a?.url && !existingUrls.has(a.url));
     const insertedArticles = toInsert;
     let insertedCount = 0;
+    let updatedCount = 0;
 
     const batchSize = 40;
     await this.databaseService.beginTransaction();
@@ -581,10 +583,10 @@ export class CloudSyncService implements IRSSProvider {
         const batch = toInsert.slice(i, i + batchSize);
         if (batch.length === 0) continue;
 
-        const valuesSql = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+        const valuesSql = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
         const sql = `INSERT OR IGNORE INTO articles (
           title, content, summary, published_at, rss_source_id, source_name,
-          url, image_url, author, category, word_count, reading_time, difficulty
+          url, image_url, video_url, author, category, word_count, reading_time, difficulty
         ) VALUES ${valuesSql}`;
 
         const params: any[] = [];
@@ -598,6 +600,7 @@ export class CloudSyncService implements IRSSProvider {
             article.sourceName,
             article.url,
             article.imageUrl,
+            article.videoUrl || null,
             article.author,
             article.category,
             article.wordCount,
@@ -609,6 +612,16 @@ export class CloudSyncService implements IRSSProvider {
         const result = await this.databaseService.executeInsert(sql, params);
         insertedCount += result.changes || 0;
       }
+
+      const toUpdateVideoUrl = uniqueArticles.filter(a => a?.url && typeof a.videoUrl === 'string' && a.videoUrl.trim().length > 0);
+      for (const article of toUpdateVideoUrl) {
+        const result = await this.databaseService.executeInsert(
+          'UPDATE articles SET video_url = ? WHERE url = ? AND (video_url IS NULL OR video_url = "")',
+          [article.videoUrl, article.url]
+        );
+        updatedCount += result.changes || 0;
+      }
+
       await this.databaseService.commitTransaction();
     } catch (e) {
       await this.databaseService.rollbackTransaction();
@@ -618,7 +631,7 @@ export class CloudSyncService implements IRSSProvider {
     return {
       insertedArticles,
       insertedCount,
-      updatedCount: 0,
+      updatedCount,
       upsertedCount: insertedCount,
     };
   }

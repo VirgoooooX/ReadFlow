@@ -890,8 +890,8 @@ export class LocalRSSService {
           title, url, content, summary, author, published_at, rss_source_id, 
           source_name, category, word_count, reading_time, difficulty, 
           is_read, is_favorite, read_progress, tags, guid, image_url,
-          image_caption, image_credit
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          image_caption, image_credit, video_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           article.title,
           article.url,
@@ -913,6 +913,7 @@ export class LocalRSSService {
           article.imageUrl || null,
           article.imageCaption || null,
           article.imageCredit || null,
+          article.videoUrl || null,
         ]
       );
 
