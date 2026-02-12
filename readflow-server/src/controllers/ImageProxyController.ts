@@ -25,9 +25,10 @@ export class ImageProxyController {
       imageUrl = imageUrl.slice(0, -1).trim();
     }
     const width = req.query.w ? parseInt(req.query.w as string) : null;
-    const raw = req.query.raw === '1' || req.query.raw === 'true' || req.query.mode === 'raw';
-    
     const settings = storageService.getSettings();
+    const transcodeEnabled = settings.imageTranscodeEnabled !== false;
+    const rawRequested = req.query.raw === '1' || req.query.raw === 'true' || req.query.mode === 'raw';
+    const raw = rawRequested || !transcodeEnabled;
     const requestedQRaw = req.query.q ? parseInt(req.query.q as string) : null;
     const requestedQ = Number.isFinite(requestedQRaw) ? requestedQRaw : null;
     const quality = requestedQ === 100 ? 100 : (settings.imageQuality || 80);

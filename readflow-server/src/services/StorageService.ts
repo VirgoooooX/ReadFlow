@@ -15,6 +15,7 @@ const prisma = new PrismaClient({
 
 export interface ServerSettings {
   imageQuality: number;
+  imageTranscodeEnabled?: boolean;
   imageWarmupEnabled?: boolean;
   imageCacheMaxAgeDays?: number;
   imageCacheMaxFiles?: number;
@@ -99,6 +100,7 @@ export class StorageService {
 
     this.settings = {
       imageQuality: 80,
+      imageTranscodeEnabled: true,
       imageWarmupEnabled: true,
       imageCacheMaxAgeDays: 30,
       imageCacheMaxFiles: 50_000,
@@ -282,6 +284,7 @@ export class StorageService {
     };
 
     setNum('imageQuality', input.imageQuality, 1, 100);
+    setBool('imageTranscodeEnabled', input.imageTranscodeEnabled);
     setBool('imageWarmupEnabled', input.imageWarmupEnabled);
     setNum('imageCacheMaxAgeDays', input.imageCacheMaxAgeDays, 0, 3650);
     setNum('imageCacheMaxFiles', input.imageCacheMaxFiles, 0, 5_000_000);
