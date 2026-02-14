@@ -35,7 +35,6 @@ export type RootStackParamList = {
   About: undefined;
   Export: undefined;
   Import: undefined;
-  DailyReportList: undefined;
 };
 
 // 主标签参数列表
@@ -107,6 +106,7 @@ export type UserStackParamList = {
   FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器
   DailyReportSettings: undefined;  // 日报设置
   DailyReportDetail: { reportId: number };
+  DailyReportList: undefined;
 };
 
 // 屏幕属性类型定义

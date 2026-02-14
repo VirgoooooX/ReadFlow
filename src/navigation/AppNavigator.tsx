@@ -593,6 +593,20 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
 
+      <UserStack.Screen
+        name="DailyReportList"
+        options={{ title: 'AI 日报历史' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="AI 日报历史"
+            showBackButton={true}
+          >
+            <DailyReportListScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
 
 
 
@@ -797,14 +811,6 @@ function RootNavigator() {
           </ScreenWithCustomHeader>
         )}
       </RootStack.Screen>
-      <RootStack.Screen
-        name="DailyReportList"
-        component={DailyReportListScreen}
-        options={{
-          headerShown: false,
-          ...getCommonScreenOptions(theme),
-        }}
-      />
     </RootStack.Navigator>
   );
 }
