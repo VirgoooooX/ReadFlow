@@ -29,7 +29,7 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             border: '#2a2a3e',
             divider: '#2a2a3e',
             codeBg: '#1e1e2e',
-            summaryBg: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+            summaryBg: '#1e2030', /* Slightly lighter/more visible block in dark mode */
             summaryBorder: `${primaryColor}40`,
             h2Accent: primaryColor,
             h3Accent: '#ff6b6b',
@@ -50,7 +50,7 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             border: '#e8e8f0',
             divider: '#e0e0e8',
             codeBg: '#f0f0f5',
-            summaryBg: 'linear-gradient(135deg, #f5f7ff 0%, #eef1ff 100%)',
+            summaryBg: '#eef2ff', /* Slightly darker/more visible blue-ish grey in light mode */
             summaryBorder: `${primaryColor}40`,
             h2Accent: primaryColor,
             h3Accent: '#e74c3c',
@@ -85,59 +85,106 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             -webkit-text-size-adjust: 100%;
         }
 
-        /* ─── H1 Title ─── */
+        /* ─── H1 Title (Daily Insights) ─── */
         h1 {
-            font-size: 26px;
-            font-weight: 900;
-            line-height: 1.3;
-            margin: 0 0 16px 0; /* Reduced from 24px */
-            letter-spacing: -0.5px;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.25;
+            margin: 0 0 24px 0;
+            letter-spacing: -0.8px;
             color: ${colors.text};
-            padding-bottom: 12px; /* Reduced from 16px */
-            border-bottom: 3px solid ${colors.primary};
+            padding-bottom: 12px;
+            position: relative;
+            /* Gradient Underline Effect */
+            background: linear-gradient(120deg, ${colors.primary} 0%, ${colors.primary}40 100%);
+            background-size: 100% 4px;
+            background-position: 0 100%;
+            background-repeat: no-repeat;
         }
 
-        /* ─── H2 Section Headers ─── */
+        /* ─── Lead Paragraph (Insight Text) ─── */
+        h1 + p {
+            font-size: 15px;
+            line-height: 1.6;
+            color: ${colors.text};
+            margin-bottom: 20px;
+            font-weight: 400;
+        }
+
+        /* Drop Cap for Lead Paragraph */
+        h1 + p::first-letter {
+            float: left;
+            font-size: 3.2em;
+            line-height: 0.8;
+            padding-top: 4px;
+            padding-right: 8px;
+            padding-left: 0;
+            color: ${colors.primary};
+            font-weight: 800;
+        }
+
+        /* ─── H2 Section Headers (Category) ─── */
         h2 {
             font-size: 20px;
             font-weight: 700;
-            margin: 24px 0 12px 0; /* Reduced from 32px 0 16px 0 */
-            padding: 10px 14px; /* Reduced from 12px 16px */
+            margin: 32px 0 16px 0;
+            padding: 10px 16px;
+            
+            /* Solid Strip Style */
             background: ${colors.summaryBg};
             border-left: 4px solid ${colors.h2Accent};
-            border-radius: 0 8px 8px 0;
+            border-radius: 0 8px 8px 0; /* "Tag" shape attached to left */
+            
             color: ${colors.text};
-            letter-spacing: 0.3px;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
         }
 
-        /* Special styling for summary section */
+        /* Special styling for summary section remains similar but updated */
         h2:first-of-type + p,
         h2:nth-of-type(1) + p {
             background: ${colors.summaryBg};
             border: 1px solid ${colors.summaryBorder};
-            border-radius: 12px;
-            padding: 14px 16px; /* Reduced padding */
-            margin: 6px 0 16px 0; /* Reduced margin */
-            font-size: 14.5px;
-            line-height: 1.8;
+            border-radius: 8px; /* Consistent radius */
+            padding: 16px 20px;
+            margin: 8px 0 24px 0;
+            font-size: 15px;
+            line-height: 1.7;
             color: ${colors.textSecondary};
+            font-style: italic; /* Editorial touch */
         }
 
-        /* ─── H3 Sub-headers ─── */
+        /* ─── H3 Sub-headers (Topic) ─── */
         h3 {
             font-size: 17px;
-            font-weight: 600;
-            margin: 16px 0 8px 0; /* Reduced from 24px 0 10px 0 */
-            padding-left: 12px;
-            border-left: 3px solid ${colors.h3Accent};
+            font-weight: 700;
+            margin: 28px 0 10px 0; /* Distinct separation */
+            padding: 0;
+            border: none;
             color: ${colors.text};
             line-height: 1.4;
+            display: flex;
+            align-items: center;
+            letter-spacing: -0.2px;
         }
 
-        /* H3 后面的正文缩进 */
+        /* Geometric Marker (Square) */
+        h3::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: ${colors.primary};
+            margin-right: 12px;
+            border-radius: 1px; /* Slightly rounded square */
+            transform: rotate(45deg); /* Diamond shape for dynamic look */
+        }
+
+        /* H3 后面的正文缩进 - Removed for cleaner look with new header style */
         h3 + p,
         h3 + p + p {
-            padding-left: 16px;
+            padding-left: 0;
         }
 
         /* ─── Paragraphs ─── */
@@ -173,13 +220,13 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
 
         ol > li {
             counter-increment: item;
-            margin: 6px 0; /* Reduced from 10px */
-            padding: 10px 12px 10px 44px; /* Reduced vertical padding */
+            margin: 2px 0; /* Minimal margin */
+            padding: 6px 12px 6px 44px; /* Tighter padding */
             position: relative;
             background: ${colors.surface};
             border: 1px solid ${colors.border};
-            border-radius: 10px;
-            line-height: 1.6;
+            border-radius: 8px; /* Slightly smaller radius */
+            line-height: 1.5;
             font-size: 14.5px;
             transition: background 0.2s;
         }
@@ -188,13 +235,13 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             content: counter(item);
             position: absolute;
             left: 12px;
-            top: 10px; /* Adjusted for smaller padding */
-            width: 24px;
-            height: 24px;
+            top: 6px; /* Adjusted for smaller padding */
+            width: 22px; /* Smaller circle */
+            height: 22px;
             background: ${colors.olNumberColor};
             color: #fff;
             border-radius: 50%;
-            font-size: 12px;
+            font-size: 11px; /* Smaller font */
             font-weight: 700;
             display: flex;
             align-items: center;
@@ -210,10 +257,10 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
         }
 
         ul > li {
-            margin: 4px 0; /* Reduced from 8px */
-            padding: 6px 14px 6px 24px; /* Reduced vertical padding */
+            margin: 0; /* Removed margin */
+            padding: 2px 14px 2px 24px; /* Minimal padding */
             position: relative;
-            line-height: 1.6;
+            line-height: 1.5; /* Slightly tighter line height */
             font-size: 14.5px;
             color: ${colors.text};
         }
@@ -222,11 +269,22 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             content: '';
             position: absolute;
             left: 8px; /* Adjusted position */
-            top: 15px; /* Adjusted position roughly center of line-height */
-            width: 6px;
-            height: 6px;
+            top: 11px; /* Adjusted for new line-height and padding */
+            width: 5px; /* Slightly smaller dot */
+            height: 5px;
             background: ${colors.primary};
             border-radius: 50%;
+        }
+
+        /* ─── Fix for loose lists (markdown with newlines between items) ─── */
+        li > p {
+            margin: 0;
+            display: inline; /* Force inline to avoid block spacing if possible */
+        }
+        
+        li > p + p {
+            margin-top: 4px; /* Spacing only between paragraphs inside same list item */
+            display: block;
         }
 
         /* ─── Horizontal Rule ─── */
@@ -339,6 +397,13 @@ const DailyReportDetailScreen: React.FC = () => {
             }
         };
         fetchReport();
+    }, [reportId]);
+
+    // Mark as read
+    useEffect(() => {
+        if (reportId) {
+            dailyReportApiService.markAsRead(reportId).catch(() => { });
+        }
     }, [reportId]);
 
     useEffect(() => {

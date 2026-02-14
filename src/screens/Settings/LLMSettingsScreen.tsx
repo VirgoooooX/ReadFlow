@@ -586,362 +586,364 @@ const LLMSettingsScreen: React.FC = () => {
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 200 }}
+        contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.content}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>概览</Text>
-            <View style={styles.card}>
-              {renderSwitchOption(
-                '启用LLM功能',
-                '开启或关闭AI功能',
-                isActive,
-                setIsActive,
-                'smart-toy'
-              )}
-              <View style={styles.optionDivider} />
-              <View style={styles.optionItem}>
-                <View style={styles.optionLeft}>
-                  <MaterialIcons name="analytics" size={24} color={theme.colors.primary} />
-                  <Text style={styles.optionText}>本月请求</Text>
-                </View>
-                <Text style={styles.statValueText}>{usageStats.monthly}次</Text>
-              </View>
-              <View style={styles.optionDivider} />
-              <View style={styles.optionItem}>
-                <View style={styles.optionLeft}>
-                  <MaterialIcons name="account-balance" size={24} color={theme.colors.primary} />
-                  <Text style={styles.optionText}>总请求数</Text>
-                </View>
-                <Text style={styles.statValueText}>{usageStats.total}次</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>功能绑定</Text>
-            <View style={styles.card}>
-              {renderSelectorRow(
-                'binding_translation',
-                '翻译',
-                'translate',
-                bindings.translation,
-                profileOptions,
-                (value) => handleBindingChange('translation', value),
-                'badge'
-              )}
-              <View style={styles.optionDivider} />
-              {renderSelectorRow(
-                'binding_dictionary',
-                '查词',
-                'menu-book',
-                bindings.dictionary,
-                profileOptions,
-                (value) => handleBindingChange('dictionary', value),
-                'badge'
-              )}
-              <View style={styles.optionDivider} />
-              {renderSelectorRow(
-                'binding_titleTranslation',
-                '标题翻译',
-                'title',
-                bindings.titleTranslation,
-                profileOptions,
-                (value) => handleBindingChange('titleTranslation', value),
-                'badge'
-              )}
-              <View style={styles.optionDivider} />
-              {renderSelectorRow(
-                'binding_dailyReport',
-                'AI日报',
-                'auto-awesome',
-                bindings.dailyReport,
-                profileOptions,
-                (value) => handleBindingChange('dailyReport', value),
-                'badge'
-              )}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>档案管理</Text>
-            <View style={styles.card}>
-              {renderSelectorRow(
-                'editing_profile',
-                '当前编辑档案',
-                'manage-accounts',
-                editingProfileId,
-                profileOptions,
-                (value) => handleEditingProfileChange(value),
-                'badge'
-              )}
-              <View style={styles.optionDivider} />
-              <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="badge" size={24} color={theme.colors.primary} />
-                  <Text style={styles.inputLabel}>档案名称</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={profileName}
-                  onChangeText={setProfileName}
-                  placeholder="例如：查词-便宜模型"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-              <View style={styles.optionDivider} />
-              <TouchableOpacity style={styles.optionItem} onPress={handleCreateProfile}>
-                <View style={styles.optionLeft}>
-                  <MaterialIcons name="add" size={24} color={theme.colors.primary} />
-                  <Text style={styles.optionText}>新建档案</Text>
-                </View>
-              </TouchableOpacity>
-              <View style={styles.optionDivider} />
-              <TouchableOpacity style={styles.optionItem} onPress={handleDuplicateProfile}>
-                <View style={styles.optionLeft}>
-                  <MaterialIcons name="content-copy" size={24} color={theme.colors.primary} />
-                  <Text style={styles.optionText}>复制当前档案</Text>
-                </View>
-              </TouchableOpacity>
-              <View style={styles.optionDivider} />
-              <TouchableOpacity style={styles.optionItem} onPress={handleDeleteProfile}>
-                <View style={styles.optionLeft}>
-                  <MaterialIcons name="delete" size={24} color={theme.colors.error} />
-                  <Text style={[styles.optionText, { color: theme.colors.error }]}>
-                    删除当前档案
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>档案配置</Text>
-            <View style={styles.card}>
-              {renderSelectorRow(
-                'provider',
-                'AI 提供商',
-                'hub',
-                provider,
-                providerOptions,
-                handleProviderChange
-              )}
-              {getCurrentProvider().models.length > 0 && (
-                <>
-                  <View style={styles.optionDivider} />
-                  {renderSelectorRow(
-                    'model',
-                    '模型',
-                    'psychology',
-                    model,
-                    getCurrentProvider().models,
-                    setModel,
-                    'psychology'
-                  )}
-                </>
-              )}
-              {(provider === 'custom' || getCurrentProvider().models.length === 0) && (
-                <>
-                  <View style={styles.optionDivider} />
-                  <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
-                    <View style={styles.inputHeader}>
-                      <MaterialIcons name="edit" size={24} color={theme.colors.primary} />
-                      <Text style={styles.inputLabel}>自定义模型</Text>
-                    </View>
-                    <TextInput
-                      style={styles.textInput}
-                      value={customModelName}
-                      onChangeText={setCustomModelName}
-                      placeholder="例如: gpt-4, claude-3-opus, llama2 等"
-                      placeholderTextColor={theme.colors.onSurfaceVariant}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    <Text style={styles.inputHint}>请输入具体的模型名称</Text>
+        <View style={styles.maxWidthContainer}>
+          <View style={styles.content}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>概览</Text>
+              <View style={styles.card}>
+                {renderSwitchOption(
+                  '启用LLM功能',
+                  '开启或关闭AI功能',
+                  isActive,
+                  setIsActive,
+                  'smart-toy'
+                )}
+                <View style={styles.optionDivider} />
+                <View style={styles.optionItem}>
+                  <View style={styles.optionLeft}>
+                    <MaterialIcons name="analytics" size={24} color={theme.colors.primary} />
+                    <Text style={styles.optionText}>本月请求</Text>
                   </View>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* API配置 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>API 配置</Text>
-            <View style={styles.card}>
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="key" size={24} color={theme.colors.primary} />
-                  <Text style={styles.inputLabel}>API密钥</Text>
-                  <TouchableOpacity
-                    onPress={() => setShowApiKey(!showApiKey)}
-                    style={styles.toggleButton}
-                  >
-                    <MaterialIcons
-                      name={showApiKey ? 'visibility-off' : 'visibility'}
-                      size={20}
-                      color={theme.colors.onSurfaceVariant}
-                    />
-                  </TouchableOpacity>
+                  <Text style={styles.statValueText}>{usageStats.monthly}次</Text>
                 </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={apiKey}
-                  onChangeText={handleApiKeyChange}
-                  placeholder="请输入API密钥"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  secureTextEntry={!showApiKey}
-                />
-                <Text style={styles.inputHint}>状态: {apiKey ? '已配置' : '未配置'}</Text>
+                <View style={styles.optionDivider} />
+                <View style={styles.optionItem}>
+                  <View style={styles.optionLeft}>
+                    <MaterialIcons name="account-balance" size={24} color={theme.colors.primary} />
+                    <Text style={styles.optionText}>总请求数</Text>
+                  </View>
+                  <Text style={styles.statValueText}>{usageStats.total}次</Text>
+                </View>
               </View>
+            </View>
 
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="link" size={24} color={theme.colors.primary} />
-                  <Text style={styles.inputLabel}>API地址</Text>
-                  {provider !== 'custom' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>功能绑定</Text>
+              <View style={styles.card}>
+                {renderSelectorRow(
+                  'binding_translation',
+                  '翻译',
+                  'translate',
+                  bindings.translation,
+                  profileOptions,
+                  (value) => handleBindingChange('translation', value),
+                  'badge'
+                )}
+                <View style={styles.optionDivider} />
+                {renderSelectorRow(
+                  'binding_dictionary',
+                  '查词',
+                  'menu-book',
+                  bindings.dictionary,
+                  profileOptions,
+                  (value) => handleBindingChange('dictionary', value),
+                  'badge'
+                )}
+                <View style={styles.optionDivider} />
+                {renderSelectorRow(
+                  'binding_titleTranslation',
+                  '标题翻译',
+                  'title',
+                  bindings.titleTranslation,
+                  profileOptions,
+                  (value) => handleBindingChange('titleTranslation', value),
+                  'badge'
+                )}
+                <View style={styles.optionDivider} />
+                {renderSelectorRow(
+                  'binding_dailyReport',
+                  'AI日报',
+                  'auto-awesome',
+                  bindings.dailyReport,
+                  profileOptions,
+                  (value) => handleBindingChange('dailyReport', value),
+                  'badge'
+                )}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>档案管理</Text>
+              <View style={styles.card}>
+                {renderSelectorRow(
+                  'editing_profile',
+                  '当前编辑档案',
+                  'manage-accounts',
+                  editingProfileId,
+                  profileOptions,
+                  (value) => handleEditingProfileChange(value),
+                  'badge'
+                )}
+                <View style={styles.optionDivider} />
+                <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="badge" size={24} color={theme.colors.primary} />
+                    <Text style={styles.inputLabel}>档案名称</Text>
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={profileName}
+                    onChangeText={setProfileName}
+                    placeholder="例如：查词-便宜模型"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+                <View style={styles.optionDivider} />
+                <TouchableOpacity style={styles.optionItem} onPress={handleCreateProfile}>
+                  <View style={styles.optionLeft}>
+                    <MaterialIcons name="add" size={24} color={theme.colors.primary} />
+                    <Text style={styles.optionText}>新建档案</Text>
+                  </View>
+                </TouchableOpacity>
+                <View style={styles.optionDivider} />
+                <TouchableOpacity style={styles.optionItem} onPress={handleDuplicateProfile}>
+                  <View style={styles.optionLeft}>
+                    <MaterialIcons name="content-copy" size={24} color={theme.colors.primary} />
+                    <Text style={styles.optionText}>复制当前档案</Text>
+                  </View>
+                </TouchableOpacity>
+                <View style={styles.optionDivider} />
+                <TouchableOpacity style={styles.optionItem} onPress={handleDeleteProfile}>
+                  <View style={styles.optionLeft}>
+                    <MaterialIcons name="delete" size={24} color={theme.colors.error} />
+                    <Text style={[styles.optionText, { color: theme.colors.error }]}>
+                      删除当前档案
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>档案配置</Text>
+              <View style={styles.card}>
+                {renderSelectorRow(
+                  'provider',
+                  'AI 提供商',
+                  'hub',
+                  provider,
+                  providerOptions,
+                  handleProviderChange
+                )}
+                {getCurrentProvider().models.length > 0 && (
+                  <>
+                    <View style={styles.optionDivider} />
+                    {renderSelectorRow(
+                      'model',
+                      '模型',
+                      'psychology',
+                      model,
+                      getCurrentProvider().models,
+                      setModel,
+                      'psychology'
+                    )}
+                  </>
+                )}
+                {(provider === 'custom' || getCurrentProvider().models.length === 0) && (
+                  <>
+                    <View style={styles.optionDivider} />
+                    <View style={[styles.inputContainer, styles.inputContainerNoDivider]}>
+                      <View style={styles.inputHeader}>
+                        <MaterialIcons name="edit" size={24} color={theme.colors.primary} />
+                        <Text style={styles.inputLabel}>自定义模型</Text>
+                      </View>
+                      <TextInput
+                        style={styles.textInput}
+                        value={customModelName}
+                        onChangeText={setCustomModelName}
+                        placeholder="例如: gpt-4, claude-3-opus, llama2 等"
+                        placeholderTextColor={theme.colors.onSurfaceVariant}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <Text style={styles.inputHint}>请输入具体的模型名称</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {/* API配置 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>API 配置</Text>
+              <View style={styles.card}>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="key" size={24} color={theme.colors.primary} />
+                    <Text style={styles.inputLabel}>API密钥</Text>
                     <TouchableOpacity
-                      onPress={() => setShowBaseUrl(!showBaseUrl)}
+                      onPress={() => setShowApiKey(!showApiKey)}
                       style={styles.toggleButton}
                     >
                       <MaterialIcons
-                        name={showBaseUrl ? 'visibility-off' : 'visibility'}
+                        name={showApiKey ? 'visibility-off' : 'visibility'}
                         size={20}
                         color={theme.colors.onSurfaceVariant}
                       />
                     </TouchableOpacity>
-                  )}
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={apiKey}
+                    onChangeText={handleApiKeyChange}
+                    placeholder="请输入API密钥"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    secureTextEntry={!showApiKey}
+                  />
+                  <Text style={styles.inputHint}>状态: {apiKey ? '已配置' : '未配置'}</Text>
                 </View>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    provider !== 'custom' && { backgroundColor: theme.colors.surfaceVariant }
-                  ]}
-                  value={baseUrl}
-                  onChangeText={handleBaseUrlChange}
-                  placeholder={provider === 'custom' ? '请输入自定义API地址' : '自动配置的API地址'}
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  secureTextEntry={provider !== 'custom' && !showBaseUrl}
-                  editable={provider === 'custom'}
-                />
-                <Text style={styles.inputHint}>
-                  {provider === 'custom' ? '请输入完整的API基础URL' : `当前提供商: ${getCurrentProvider().label}`}
-                </Text>
-              </View>
 
-              <TouchableOpacity style={styles.testButton} onPress={handleTestConnection}>
-                <MaterialIcons name="wifi" size={20} color={theme.colors.primary} />
-                <Text style={styles.testButtonText}>测试连接</Text>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="link" size={24} color={theme.colors.primary} />
+                    <Text style={styles.inputLabel}>API地址</Text>
+                    {provider !== 'custom' && (
+                      <TouchableOpacity
+                        onPress={() => setShowBaseUrl(!showBaseUrl)}
+                        style={styles.toggleButton}
+                      >
+                        <MaterialIcons
+                          name={showBaseUrl ? 'visibility-off' : 'visibility'}
+                          size={20}
+                          color={theme.colors.onSurfaceVariant}
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.textInput,
+                      provider !== 'custom' && { backgroundColor: theme.colors.surfaceVariant }
+                    ]}
+                    value={baseUrl}
+                    onChangeText={handleBaseUrlChange}
+                    placeholder={provider === 'custom' ? '请输入自定义API地址' : '自动配置的API地址'}
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    secureTextEntry={provider !== 'custom' && !showBaseUrl}
+                    editable={provider === 'custom'}
+                  />
+                  <Text style={styles.inputHint}>
+                    {provider === 'custom' ? '请输入完整的API基础URL' : `当前提供商: ${getCurrentProvider().label}`}
+                  </Text>
+                </View>
+
+                <TouchableOpacity style={styles.testButton} onPress={handleTestConnection}>
+                  <MaterialIcons name="wifi" size={20} color={theme.colors.primary} />
+                  <Text style={styles.testButtonText}>测试连接</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 模型参数 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>模型参数</Text>
+              <View style={styles.card}>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="thermostat" size={24} color={theme.colors.primary} />
+                    <Text style={styles.inputLabel}>Temperature</Text>
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={temperatureText}
+                    onChangeText={(text) => {
+                      setTemperatureText(text);
+                      const value = parseFloat(text);
+                      if (!isNaN(value) && value >= 0 && value <= 2) {
+                        setTemperature(value);
+                      }
+                    }}
+                    onBlur={() => {
+                      // 失去焦点时校验和格式化
+                      const value = parseFloat(temperatureText);
+                      if (isNaN(value) || value < 0 || value > 2) {
+                        setTemperatureText(temperature.toString());
+                      } else {
+                        setTemperature(value);
+                        setTemperatureText(value.toString());
+                      }
+                    }}
+                    placeholder="0.7"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={styles.inputHint}>控制输出随机性，范围: 0-2，推荐: 0.7</Text>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="memory" size={24} color={theme.colors.primary} />
+                    <Text style={styles.inputLabel}>最大Token数</Text>
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={maxTokensText}
+                    onChangeText={handleMaxTokensChange}
+                    onBlur={() => {
+                      const value = parseInt(maxTokensText);
+                      if (isNaN(value) || value <= 0) {
+                        setMaxTokensText(maxTokens.toString());
+                      } else {
+                        setMaxTokens(value);
+                        setMaxTokensText(value.toString());
+                      }
+                    }}
+                    placeholder="2048"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.inputHint}>限制输出长度，推荐: 2048</Text>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
+                    <MaterialIcons name="tune" size={24} color={theme.colors.primary} />
+                    <Text style={styles.inputLabel}>Top P</Text>
+                  </View>
+                  <TextInput
+                    style={styles.textInput}
+                    value={topPText}
+                    onChangeText={(text) => {
+                      setTopPText(text);
+                      const value = parseFloat(text);
+                      if (!isNaN(value) && value >= 0 && value <= 1) {
+                        setTopP(value);
+                      }
+                    }}
+                    onBlur={() => {
+                      const value = parseFloat(topPText);
+                      if (isNaN(value) || value < 0 || value > 1) {
+                        setTopPText(topP.toString());
+                      } else {
+                        setTopP(value);
+                        setTopPText(value.toString());
+                      }
+                    }}
+                    placeholder="1.0"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={styles.inputHint}>核采样参数，范围: 0-1，推荐: 1.0</Text>
+                </View>
+              </View>
+            </View>
+            {/* 保存按钮 */}
+            <View style={styles.section}>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                <MaterialIcons name="save" size={20} color={theme.colors.onPrimary} />
+                <Text style={styles.saveButtonText}>保存配置</Text>
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* 模型参数 */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>模型参数</Text>
-            <View style={styles.card}>
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="thermostat" size={24} color={theme.colors.primary} />
-                  <Text style={styles.inputLabel}>Temperature</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={temperatureText}
-                  onChangeText={(text) => {
-                    setTemperatureText(text);
-                    const value = parseFloat(text);
-                    if (!isNaN(value) && value >= 0 && value <= 2) {
-                      setTemperature(value);
-                    }
-                  }}
-                  onBlur={() => {
-                    // 失去焦点时校验和格式化
-                    const value = parseFloat(temperatureText);
-                    if (isNaN(value) || value < 0 || value > 2) {
-                      setTemperatureText(temperature.toString());
-                    } else {
-                      setTemperature(value);
-                      setTemperatureText(value.toString());
-                    }
-                  }}
-                  placeholder="0.7"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  keyboardType="decimal-pad"
-                />
-                <Text style={styles.inputHint}>控制输出随机性，范围: 0-2，推荐: 0.7</Text>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="memory" size={24} color={theme.colors.primary} />
-                  <Text style={styles.inputLabel}>最大Token数</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={maxTokensText}
-                  onChangeText={handleMaxTokensChange}
-                  onBlur={() => {
-                    const value = parseInt(maxTokensText);
-                    if (isNaN(value) || value <= 0) {
-                      setMaxTokensText(maxTokens.toString());
-                    } else {
-                      setMaxTokens(value);
-                      setMaxTokensText(value.toString());
-                    }
-                  }}
-                  placeholder="2048"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  keyboardType="numeric"
-                />
-                <Text style={styles.inputHint}>限制输出长度，推荐: 2048</Text>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <View style={styles.inputHeader}>
-                  <MaterialIcons name="tune" size={24} color={theme.colors.primary} />
-                  <Text style={styles.inputLabel}>Top P</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  value={topPText}
-                  onChangeText={(text) => {
-                    setTopPText(text);
-                    const value = parseFloat(text);
-                    if (!isNaN(value) && value >= 0 && value <= 1) {
-                      setTopP(value);
-                    }
-                  }}
-                  onBlur={() => {
-                    const value = parseFloat(topPText);
-                    if (isNaN(value) || value < 0 || value > 1) {
-                      setTopPText(topP.toString());
-                    } else {
-                      setTopP(value);
-                      setTopPText(value.toString());
-                    }
-                  }}
-                  placeholder="1.0"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  keyboardType="decimal-pad"
-                />
-                <Text style={styles.inputHint}>核采样参数，范围: 0-1，推荐: 1.0</Text>
-              </View>
-            </View>
-          </View>
-          {/* 保存按钮 */}
-          <View style={styles.section}>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <MaterialIcons name="save" size={20} color={theme.colors.onPrimary} />
-              <Text style={styles.saveButtonText}>保存配置</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView >
   );
 };
 
@@ -949,11 +951,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  maxWidthContainer: {
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     paddingHorizontal: 16,
   },
   content: {
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 200,
   },
   section: {
     marginBottom: 20,

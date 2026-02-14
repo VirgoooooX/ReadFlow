@@ -55,7 +55,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   return (
     <View style={styles.container}>
       {/* 左侧区域：返回按钮 */}
-      <View style={styles.sideSection}>
+      <View style={styles.leftSection}>
         {showBackButton && (
           <TouchableOpacity
             style={styles.backButton}
@@ -68,14 +68,14 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
       </View>
 
       {/* 中间区域：标题 */}
-      <View style={styles.centerSection}>
+      <View style={styles.centerSection} pointerEvents="box-none">
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
       </View>
 
       {/* 右侧区域：操作按钮 */}
-      <View style={styles.sideSection}>
+      <View style={styles.rightSection}>
         {rightComponent}
       </View>
     </View>
@@ -113,26 +113,37 @@ const createStyles = (
       shadowRadius: 2,
       zIndex: 100,
     },
-    sideSection: {
-      width: 56,
+    leftSection: {
+      width: 48, // 左侧固定宽度，确保返回按钮位置一致
+      height: HEADER_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    rightSection: {
+      minWidth: 48, // 右侧最小宽度，但允许自适应增长
       height: HEADER_HEIGHT,
       justifyContent: 'center',
       alignItems: 'center',
     },
     centerSection: {
-      flex: 1,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 3, // 补偿 container paddingBottom
       height: HEADER_HEIGHT,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 8,
+      zIndex: -1,
     },
     backButton: {
-      padding: 8,
-      marginLeft: 4,
+      width: 48,
+      height: HEADER_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     title: {
-      fontSize: 19, // 稍微加大字号，配合字重更显醒目
-      fontWeight: Platform.OS === 'ios' ? '900' : 'bold', // iOS 支持 900，Android 通常只支持 bold/700
+      fontSize: 19,
+      fontWeight: Platform.OS === 'ios' ? '900' : 'bold',
       color: headerTextColor,
       textAlign: 'center',
       height: titleHeight,

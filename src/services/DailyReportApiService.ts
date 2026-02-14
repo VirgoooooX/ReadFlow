@@ -8,6 +8,7 @@ export interface DailyReportSummary {
     articleCount: number;
     groupNames: any;
     generatedAt: string;
+    isRead?: boolean;
 }
 
 export interface DailyReportDetail extends DailyReportSummary {
@@ -95,6 +96,19 @@ class DailyReportApiService {
         } catch (error) {
             console.warn('[DailyReportApi] generateReport failed:', error);
             throw error;
+        }
+    }
+
+    async markAsRead(id: number): Promise<boolean> {
+        try {
+            const serverUrl = await this.getServerUrl();
+            const resp = await this.authenticatedFetch(`${serverUrl}/api/rss/daily-reports/${id}/read`, {
+                method: 'POST',
+            });
+            return resp.ok;
+        } catch (error) {
+            console.warn('[DailyReportApi] markAsRead failed:', error);
+            return false;
         }
     }
 }

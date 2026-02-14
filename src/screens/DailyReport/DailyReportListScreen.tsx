@@ -7,15 +7,17 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
+    Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { UserStackParamList } from '../../navigation/types';
+import type { RootStackParamList } from '../../navigation/types';
 import { dailyReportApiService, DailyReportSummary } from '../../services/DailyReportApiService';
+import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
 
-type NavigationProp = NativeStackNavigationProp<UserStackParamList, 'DailyReportList'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'DailyReportList'>;
 
 const DailyReportListScreen: React.FC = () => {
     const { theme } = useThemeContext();
@@ -26,12 +28,17 @@ const DailyReportListScreen: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+    const [generating, setGenerating] = useState(false);
 
     const fetchReports = useCallback(async (offset = 0, append = false) => {
         try {
             const data = await dailyReportApiService.getReports(10, offset);
             if (append) {
-                setReports(prev => [...prev, ...data]);
+                setReports(prev => {
+                    const existingIds = new Set(prev.map(r => r.id));
+                    const newUnique = data.filter(r => !existingIds.has(r.id));
+                    return [...prev, ...newUnique];
+                });
             } else {
                 setReports(data);
             }
@@ -57,6 +64,26 @@ const DailyReportListScreen: React.FC = () => {
         await fetchReports(reports.length, true);
         setLoadingMore(false);
     };
+
+    const handleGenerate = async () => {
+        if (generating) return;
+        setGenerating(true);
+        try {
+            const result = await dailyReportApiService.generateReport();
+            if (result) {
+                Alert.alert('生成成功', '日报已生成');
+                handleRefresh();
+            } else {
+                Alert.alert('生成失败', '暂无足够的新闻素材或未配置 AI');
+            }
+        } catch (error) {
+            Alert.alert('生成失败', (error as Error).message);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+
 
     const renderItem = ({ item }: { item: DailyReportSummary }) => {
         const time = new Date(item.generatedAt).toLocaleString('zh-CN', {
@@ -107,35 +134,49 @@ const DailyReportListScreen: React.FC = () => {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-            <FlatList
-                data={reports}
-                keyExtractor={item => String(item.id)}
-                renderItem={renderItem}
-                contentContainerStyle={styles.listContent}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary} />
-                }
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.3}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <MaterialIcons name="auto-awesome" size={48} color={theme.colors.onSurfaceVariant} />
-                        <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
-                            暂无日报
-                        </Text>
-                        <Text style={[styles.emptySubtext, { color: theme.colors.onSurfaceVariant }]}>
-                            日报将根据你的设置自动生成
-                        </Text>
-                    </View>
-                }
-                ListFooterComponent={
-                    loadingMore ? (
-                        <ActivityIndicator style={styles.footer} size="small" color={theme.colors.primary} />
-                    ) : null
-                }
-            />
-        </View>
+        <ScreenWithCustomHeader
+            title="AI 日报历史"
+            showBackButton={true}
+            rightComponent={
+                <TouchableOpacity onPress={handleGenerate} disabled={generating} style={{ padding: 4 }}>
+                    {generating ? (
+                        <ActivityIndicator size="small" color={theme.colors.primary} />
+                    ) : (
+                        <MaterialIcons name="auto-awesome" size={24} color={theme.colors.primary} />
+                    )}
+                </TouchableOpacity>
+            }
+        >
+            <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+                <FlatList
+                    data={reports}
+                    keyExtractor={item => String(item.id)}
+                    renderItem={renderItem}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary} />
+                    }
+                    onEndReached={handleLoadMore}
+                    onEndReachedThreshold={0.3}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <MaterialIcons name="auto-awesome" size={48} color={theme.colors.onSurfaceVariant} />
+                            <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
+                                暂无日报
+                            </Text>
+                            <Text style={[styles.emptySubtext, { color: theme.colors.onSurfaceVariant }]}>
+                                日报将根据你的设置自动生成
+                            </Text>
+                        </View>
+                    }
+                    ListFooterComponent={
+                        loadingMore ? (
+                            <ActivityIndicator style={styles.footer} size="small" color={theme.colors.primary} />
+                        ) : null
+                    }
+                />
+            </View>
+        </ScreenWithCustomHeader>
     );
 };
 

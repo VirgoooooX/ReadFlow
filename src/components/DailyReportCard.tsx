@@ -27,13 +27,15 @@ const DailyReportCard: React.FC<DailyReportCardProps> = ({ onPress }) => {
 
             const fetchLatestReport = async () => {
                 try {
-                    console.log('[DailyReportCard] Fetching latest report...');
+                    // 每次 focus 都强制刷新，确保已读状态同步
                     const latest = await dailyReportApiService.getLatestReport();
                     if (!cancelled) {
-                        console.log('[DailyReportCard] Got report:', latest ? `#${latest.id} "${latest.title}"` : 'null');
                         setReport(latest);
-                        // 有新日报时重置 dismissed 状态
-                        if (latest) {
+                        // 只有当 ID 变化时（新日报），才重置 dismissed
+                        // 如果只是状态变化（变为已读），则这里会被上面的 if (report.isRead) 拦截而不渲染
+                        if (latest && report && latest.id !== report.id) {
+                            setDismissed(false);
+                        } else if (latest && !report) {
                             setDismissed(false);
                         }
                     }
@@ -51,12 +53,13 @@ const DailyReportCard: React.FC<DailyReportCardProps> = ({ onPress }) => {
             return () => {
                 cancelled = true;
             };
-        }, [])
+        }, [report?.id]) // 添加依赖，确保逻辑正确
     );
 
-    // 没有日报数据 或 被关闭 → 不渲染
-    if (loading || !report || dismissed) {
-        return null;
+    // 没有日报数据 或 被关闭 或 已读 → 不渲染
+    // 逻辑修正：如果已读，则不显示在首页 (符合用户 "日报已读就不显示" 的要求)
+    if (loading || !report || dismissed || report.isRead) {
+        return null; // 这里之前的逻辑其实是对的，但可能 notify 没有触发重新渲染，或者 isRead 状态更新不及时
     }
 
     const previewLines = report.content

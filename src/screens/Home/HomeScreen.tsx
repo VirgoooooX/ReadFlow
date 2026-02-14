@@ -20,6 +20,7 @@ import { typography } from '../../theme/typography';
 import { useReadingSettings } from '../../contexts/ReadingSettingsContext';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { articleService, RSSService } from '../../services';
+import { dailyReportApiService } from '../../services/DailyReportApiService';
 import { SettingsService } from '../../services/SettingsService';
 import cacheEventEmitter from '../../services/CacheEventEmitter';
 import { logger } from '../../services/rss/RSSUtils';
@@ -410,6 +411,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
   const [proxyServerUrl, setProxyServerUrl] = useState<string>(''); // 🔥 新增
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   // 【重构】每个标签页独立管理文章数据和分页状态
   const [tabDataMap, setTabDataMap] = useState<Map<string, {
@@ -1197,6 +1199,30 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [showOnlyUnread]);
 
+  const handleGenerateReport = useCallback(async () => {
+    if (generatingReport) return;
+    setGeneratingReport(true);
+    try {
+      const result = await dailyReportApiService.generateReport();
+      if (result) {
+        Alert.alert(
+          '生成成功',
+          'AI 日报已生成，是否前往查看？',
+          [
+            { text: '稍后', style: 'cancel' },
+            { text: '前往', onPress: () => navigation.navigate('DailyReportList' as any) }
+          ]
+        );
+      } else {
+        Alert.alert('生成失败', '暂无足够的新闻素材或未配置 AI');
+      }
+    } catch (error) {
+      Alert.alert('生成失败', (error as Error).message);
+    } finally {
+      setGeneratingReport(false);
+    }
+  }, [generatingReport, navigation]);
+
   return (
     <ScreenWithCustomHeader
       title="文章"
@@ -1209,6 +1235,32 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           paddingRight: 12,
           marginTop: -1.5
         }}>
+          <TouchableOpacity
+            onPress={handleGenerateReport}
+            disabled={generatingReport}
+            style={{
+              width: 24,
+              height: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 10,
+              marginRight: 10,
+              borderWidth: 0,
+              backgroundColor: 'transparent',
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+          >
+            {generatingReport ? (
+              <ActivityIndicator size="small" color={theme.isDark ? theme.colors.primary : '#FFFFFF'} />
+            ) : (
+              <MaterialIcons
+                name="auto-awesome"
+                size={18}
+                color={theme.isDark ? theme.colors.onSurfaceVariant : '#FFFFFF'}
+              />
+            )}
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={toggleShowOnlyUnread}
             style={{
