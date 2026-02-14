@@ -1025,4 +1025,29 @@ router.post('/daily-reports/generate', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/rss/daily-reports/:id/read - Mark daily report as read
+router.post('/daily-reports/:id/read', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any)?.user?.id || '');
+    if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const reportId = parseInt(req.params.id);
+    if (isNaN(reportId)) {
+      return res.status(400).json({ error: 'Invalid report ID' });
+    }
+
+    const success = await dailyReportService.markAsRead(reportId, userId);
+    if (!success) {
+      return res.status(404).json({ ok: false, error: 'Report not found' });
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    logger.error('[DailyReport] Mark read failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 export default router;

@@ -212,6 +212,7 @@ model DailyReport {
   sourceUrls   Json     @db.JsonB     // 参与总结的文章 URL 列表
   articleCount Int                    // 总结的文章数量
   groupNames   Json     @db.JsonB     // 使用的分组名称
+  isRead       Boolean  @default(false) // 是否已读
   generatedAt  DateTime @default(now())
   createdAt    DateTime @default(now())
 

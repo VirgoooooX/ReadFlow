@@ -30,6 +30,7 @@ export interface ServerSettings {
   cleanupIntervalHours?: number;
   syncPageSizeDefault?: number;
   syncPageSizeMax?: number;
+  dailyReportSystemPrompt?: string;
 }
 
 // Retain legacy interfaces for compatibility
@@ -322,6 +323,7 @@ export class StorageService {
     setNum('cleanupIntervalHours', input.cleanupIntervalHours, 1, 168);
 
     setStr('adminPassword', input.adminPassword);
+    setOptionalStr('dailyReportSystemPrompt', input.dailyReportSystemPrompt);
     return out;
   }
 

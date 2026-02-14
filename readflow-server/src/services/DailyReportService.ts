@@ -1,6 +1,7 @@
 import { PrismaClient } from '.prisma/client';
 import fetch from 'node-fetch';
 import { logger } from '../utils/Logger';
+import { storageService } from './StorageService';
 
 const prisma = new PrismaClient({
     datasources: { db: { url: process.env.DATABASE_URL } },
@@ -274,41 +275,56 @@ export class DailyReportService {
      * Build the LLM prompt from articles
      */
     private buildPrompt(articles: ArticleForSummary[]): { systemPrompt: string; userPrompt: string } {
-        const systemPrompt = `你是一位资深科技资讯编辑。你的任务是将多篇新闻素材编纂成一份**深度、有洞察力且排版精美**的日报。
+        const settings = storageService.getSettings();
+        const defaultSystemPrompt = `你是一位资深科技资讯编辑。你的任务是将多篇新闻素材编纂成一份**深度、有洞察力且排版精美**的日报。
 
 ## 核心原则
+
 - **深度整合**：不要简单罗列新闻，而是要寻找新闻背后的关联，提炼出核心趋势。
+- **归纳整合**：不再逐条罗列新闻。你需要分析所有素材，将同一主题（如某公司发新模型、某领域新规）的多条新闻合并。
 - **全球视野**：关注全球科技、金融、地缘政治的互动。
 - **排版美观**：直接从H1标题开始输出，拒绝任何多余的开场白，合理使用 Emoji、加粗、列表等 Markdown 语法，提升阅读体验。
 
 ## 输出结构
 
 ### 1. 今日洞察（H1）
+
 \`# 💡 今日洞察\`
-用**一段话**（150-200字）概括今天最重要的宏观趋势。将科技进步、市场动态和地缘政治联系起来，给出你独到的见解。**不要**使用额外的子标题，重点信息要加粗显示。
+用**一段话**（100-150字）概括今天最重要的宏观趋势。将科技进步、市场动态和地缘政治联系起来，给出你独到的见解。**不要**使用额外的子标题，重点信息要加粗显示。
 
 ### 2. 分类新闻（H2）
+
 请将新闻分为以下几类（根据实际内容调整，可增减）：
+
 - \`## 🚀 科技前沿\`
 - \`## 💰 金融市场\`
 - \`## 🌏 全球动态\`
 - \`## 🗞️ 社会百态\`
 
-在每个分类下，使用**紧凑的**无序列表列出新闻，**每条新闻只占一行**：
-- **新闻标题**：核心内容概括（50-100字）。_(来源)_
+请根据新闻内容，在每个分类下提炼 3-5 个核心主题（例如 "AI模型与应用"、"硬件创新"、"投融资动态" 等，根据实际内容调整，可增减）
+
+- 每个主题下面用无序列表列出简短的每条相关新闻的总结，要尽量简练，简短，一句话即可
+- 每个条目之间不加空行
+- 在句末用括号标注来源，如 \`(cnBeta, AIBase)\`
+- 对关键实体（公司、产品、人名）进行**加粗**。
 
 ### 3. 资讯速览（H2）
+
 \`## ⚡ 资讯速览\`
 用简短的一句话概括其他值得关注的快讯（10-15条）。
+
 - **标题**：一句话内容。_(来源)_
 
 ## 格式要求
+
 - 严格遵守 H1 (#) 和 H2 (##) 标题层级。
 - **不要**在 H2 之间添加分割线（---）。
 - **不要**换行显示新闻内容，保持 '- **标题**：内容' 的单行格式。
 - 来源格式统一为 '_(来源名称)_'，例如 '_(cnBeta)_' 或 '_(BBC, 参考消息)_'。
 - 关键信息（如人名、公司名、数据）适当**加粗**。
-- 段落之间保留空行。`;
+- 段落之间保留空行，但**列表项之间不要留空行**（紧凑列表）。`;
+
+        const systemPrompt = settings.dailyReportSystemPrompt || defaultSystemPrompt;
 
         let userPrompt = `以下是今天的 ${articles.length} 篇新闻文章，请生成日报摘要：\n\n`;
 
@@ -420,6 +436,7 @@ export class DailyReportService {
                 articleCount: true,
                 groupNames: true,
                 generatedAt: true,
+                isRead: true,
             },
         });
 
@@ -430,6 +447,7 @@ export class DailyReportService {
             articleCount: r.articleCount,
             groupNames: r.groupNames,
             generatedAt: r.generatedAt.toISOString(),
+            isRead: r.isRead,
         }));
     }
 
@@ -452,6 +470,7 @@ export class DailyReportService {
             groupNames: report.groupNames,
             generatedAt: report.generatedAt.toISOString(),
             createdAt: report.createdAt.toISOString(),
+            isRead: report.isRead,
         };
     }
 
@@ -474,6 +493,7 @@ export class DailyReportService {
             articleCount: report.articleCount,
             groupNames: report.groupNames,
             generatedAt: report.generatedAt.toISOString(),
+            isRead: report.isRead,
         };
     }
 
@@ -519,6 +539,24 @@ export class DailyReportService {
         }
 
         logger.info('[DailyReport] Schedule check complete');
+    }
+
+    /**
+     * Mark a report as read
+     */
+    async markAsRead(reportId: number, userId: string): Promise<boolean> {
+        const report = await prismaAny.dailyReport.findFirst({
+            where: { id: reportId, userId },
+        });
+
+        if (!report) return false;
+
+        await prismaAny.dailyReport.update({
+            where: { id: reportId },
+            data: { isRead: true },
+        });
+
+        return true;
     }
 }
 
