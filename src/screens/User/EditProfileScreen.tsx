@@ -429,6 +429,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   avatarHint: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   formContainer: {
@@ -439,6 +441,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 8,
@@ -466,6 +470,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurface,
   },
   bioInput: {
@@ -479,11 +485,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.error,
     flex: 1,
   },
   characterCount: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   buttonContainer: {
@@ -501,6 +511,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onPrimary,
   },

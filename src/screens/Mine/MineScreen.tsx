@@ -11,9 +11,9 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useThemeContext } from '../../theme';
-import { 
-  SettingItem, 
-  SettingSection 
+import {
+  SettingItem,
+  SettingSection
 } from '../../components/ui';
 import { typography } from '../../theme/typography';
 import { useUser } from '../../contexts/UserContext';
@@ -134,6 +134,18 @@ const MineScreen: React.FC = () => {
           color={theme.colors.primary}
         />
         <SettingItem
+          icon="auto-awesome"
+          label="AI 日报设置"
+          onPress={() => navigation.navigate('DailyReportSettings')}
+          color={theme.colors.primary}
+        />
+        <SettingItem
+          icon="history"
+          label="AI 日报历史"
+          onPress={() => navigation.navigate('DailyReportList')}
+          color={theme.colors.primary}
+        />
+        <SettingItem
           icon="autorenew"
           label="启动自动刷新"
           onPress={() => navigation.navigate('RSSStartupSettings')}
@@ -226,6 +238,8 @@ const createStyles = (theme: any) =>
     },
     userName: {
       fontSize: 25,
+      lineHeight: 38,
+      includeFontPadding: false,
       fontWeight: '700',
       color: theme.colors.onSurface,
       marginBottom: 10,

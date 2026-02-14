@@ -353,12 +353,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   title: {
     fontSize: 28,
+    lineHeight: 36,
+    includeFontPadding: false,
     fontWeight: 'bold',
     color: theme.colors.onSurface,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   formContainer: {
@@ -369,6 +373,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 8,
@@ -397,6 +403,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurface,
   },
   passwordToggle: {
@@ -404,11 +412,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.error,
     marginTop: 4,
   },
   passwordHint: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 4,
   },
@@ -421,6 +433,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   termsText: {
     flex: 1,
     fontSize: 14,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginLeft: 8,
     lineHeight: 20,
@@ -446,6 +459,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   registerButtonText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onPrimary,
   },
@@ -461,6 +476,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   dividerText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginHorizontal: 16,
   },
@@ -471,11 +488,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   loginText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginRight: 4,
   },
   loginLink: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.primary,
     fontWeight: '600',
   },

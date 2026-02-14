@@ -102,18 +102,21 @@ export const typography: TypographyTokens = {
   // Display styles - 用于大标题和品牌展示
   displayLarge: {
     fontSize: 57,
+    includeFontPadding: false,
     lineHeight: 64,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.tight,
   },
   displayMedium: {
     fontSize: 45,
+    includeFontPadding: false,
     lineHeight: 52,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
   },
   displaySmall: {
     fontSize: 36,
+    includeFontPadding: false,
     lineHeight: 44,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
@@ -122,18 +125,21 @@ export const typography: TypographyTokens = {
   // Headline styles - 用于页面标题
   headlineLarge: {
     fontSize: 32,
+    includeFontPadding: false,
     lineHeight: 40,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
   },
   headlineMedium: {
     fontSize: 28,
+    includeFontPadding: false,
     lineHeight: 36,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
   },
   headlineSmall: {
     fontSize: 24,
+    includeFontPadding: false,
     lineHeight: 32,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
@@ -142,18 +148,21 @@ export const typography: TypographyTokens = {
   // Title styles - 用于组件标题
   titleLarge: {
     fontSize: 22,
+    includeFontPadding: false,
     lineHeight: 28,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
   },
   titleMedium: {
     fontSize: 16,
+    includeFontPadding: false,
     lineHeight: 24,
     fontWeight: fontWeights.medium,
     letterSpacing: letterSpacing.wide,
   },
   titleSmall: {
     fontSize: 14,
+    includeFontPadding: false,
     lineHeight: 20,
     fontWeight: fontWeights.medium,
     letterSpacing: letterSpacing.wide,
@@ -162,18 +171,21 @@ export const typography: TypographyTokens = {
   // Label styles - 用于按钮和标签
   labelLarge: {
     fontSize: 14,
+    includeFontPadding: false,
     lineHeight: 20,
     fontWeight: fontWeights.medium,
     letterSpacing: letterSpacing.wide,
   },
   labelMedium: {
     fontSize: 12,
+    includeFontPadding: false,
     lineHeight: 16,
     fontWeight: fontWeights.medium,
     letterSpacing: letterSpacing.wider,
   },
   labelSmall: {
     fontSize: 11,
+    includeFontPadding: false,
     lineHeight: 16,
     fontWeight: fontWeights.medium,
     letterSpacing: letterSpacing.wider,
@@ -182,18 +194,21 @@ export const typography: TypographyTokens = {
   // Body styles - 用于正文内容
   bodyLarge: {
     fontSize: 16,
+    includeFontPadding: false,
     lineHeight: 24,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.wider,
   },
   bodyMedium: {
     fontSize: 14,
+    includeFontPadding: false,
     lineHeight: 20,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.wide,
   },
   bodySmall: {
     fontSize: 12,
+    includeFontPadding: false,
     lineHeight: 16,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
@@ -205,6 +220,7 @@ export const readingTypography = {
   // 文章标题
   articleTitle: {
     fontSize: 24,
+    includeFontPadding: false,
     lineHeight: 32,
     fontWeight: fontWeights.bold,
     letterSpacing: letterSpacing.normal,
@@ -213,6 +229,7 @@ export const readingTypography = {
   // 文章副标题
   articleSubtitle: {
     fontSize: 18,
+    includeFontPadding: false,
     lineHeight: 26,
     fontWeight: fontWeights.medium,
     letterSpacing: letterSpacing.normal,
@@ -221,6 +238,7 @@ export const readingTypography = {
   // 文章正文
   articleBody: {
     fontSize: 16,
+    includeFontPadding: false,
     lineHeight: 26, // 1.625倍行高，适合长文阅读
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
@@ -229,6 +247,7 @@ export const readingTypography = {
   // 引用文本
   quote: {
     fontSize: 16,
+    includeFontPadding: false,
     lineHeight: 24,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
@@ -238,6 +257,7 @@ export const readingTypography = {
   // 代码文本
   code: {
     fontSize: 14,
+    includeFontPadding: false,
     lineHeight: 20,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,
@@ -247,6 +267,7 @@ export const readingTypography = {
   // 标注文本
   caption: {
     fontSize: 12,
+    includeFontPadding: false,
     lineHeight: 18,
     fontWeight: fontWeights.regular,
     letterSpacing: letterSpacing.normal,

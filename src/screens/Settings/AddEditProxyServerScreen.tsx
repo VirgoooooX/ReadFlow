@@ -300,6 +300,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
 sectionTitle: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurfaceVariant,
       marginBottom: 10,
@@ -318,6 +320,8 @@ sectionTitle: {
     padding: 16,
     paddingRight: 48,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurface,
   },
   inputSuccess: {
@@ -333,6 +337,8 @@ sectionTitle: {
   },
   helpText: {
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 8,
   },
@@ -357,6 +363,8 @@ sectionTitle: {
   buttonText: {
     color: theme.colors.onPrimary,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

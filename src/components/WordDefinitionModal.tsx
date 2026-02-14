@@ -164,6 +164,8 @@ const createStyles = (theme: any) =>
     },
     headerTitle: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
     },
@@ -181,6 +183,8 @@ const createStyles = (theme: any) =>
     loadingText: {
       marginTop: 12,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     wordHeader: {
@@ -190,16 +194,22 @@ const createStyles = (theme: any) =>
     },
     word: {
       fontSize: 28,
+      lineHeight: 36,
+      includeFontPadding: false,
       fontWeight: 'bold',
       color: theme.colors.primary,
     },
     wordForm: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginLeft: 8,
     },
     phonetic: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginBottom: 20,
     },
@@ -208,6 +218,8 @@ const createStyles = (theme: any) =>
     },
     sectionTitle: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 12,
@@ -220,30 +232,37 @@ const createStyles = (theme: any) =>
     },
     partOfSpeech: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.secondary,
       marginBottom: 4,
     },
     translation: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '500',
       color: theme.colors.onSurface,
       marginBottom: 4,
     },
     definition: {
       fontSize: 14,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
       lineHeight: 20,
     },
     example: {
       fontSize: 13,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
       lineHeight: 18,
     },
     source: {
       fontSize: 12,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
       marginTop: 8,
@@ -256,6 +275,8 @@ const createStyles = (theme: any) =>
     errorText: {
       marginTop: 12,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.error,
     },
     footer: {
@@ -275,6 +296,8 @@ const createStyles = (theme: any) =>
     addButtonText: {
       marginLeft: 8,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onPrimary,
     },

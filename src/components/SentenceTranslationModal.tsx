@@ -116,6 +116,8 @@ const createStyles = (theme: any) =>
     },
     headerTitle: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
     },
@@ -135,12 +137,14 @@ const createStyles = (theme: any) =>
     },
     sectionTitle: {
       fontSize: 14,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginLeft: 8,
     },
     originalText: {
       fontSize: 15,
+      includeFontPadding: false,
       lineHeight: 22,
       color: theme.colors.onSurface,
       padding: 12,
@@ -149,6 +153,7 @@ const createStyles = (theme: any) =>
     },
     translatedText: {
       fontSize: 16,
+      includeFontPadding: false,
       lineHeight: 24,
       color: theme.colors.onSecondaryContainer,
       padding: 12,
@@ -165,6 +170,8 @@ const createStyles = (theme: any) =>
     loadingText: {
       marginLeft: 12,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     errorContainer: {
@@ -176,6 +183,8 @@ const createStyles = (theme: any) =>
     errorText: {
       marginLeft: 12,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.error,
     },
   });

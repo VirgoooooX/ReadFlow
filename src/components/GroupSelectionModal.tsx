@@ -108,6 +108,8 @@ const createStyles = (theme: any) =>
     },
     title: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
     },
@@ -131,10 +133,14 @@ const createStyles = (theme: any) =>
     itemText: {
       flex: 1,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       color: theme.colors.onSurface,
     },
     countText: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
   });

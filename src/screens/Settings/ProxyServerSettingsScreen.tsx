@@ -366,6 +366,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     marginTop: -5,
     marginBottom: 10,    
@@ -385,6 +387,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   addButtonText: {
     color: theme.colors.onPrimary,
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '500',
   },
   serverList: {
@@ -419,6 +423,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   serverName: {
     fontSize: 15,
+    lineHeight: 22,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
     flex: 1,
@@ -435,10 +441,14 @@ const createStyles = (theme: any) => StyleSheet.create({
   activeTagText: {
     color: theme.colors.onPrimary,
     fontSize: 11,
+    lineHeight: 16,
+    includeFontPadding: false,
     fontWeight: '500',
   },
   serverUrl: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginLeft: 32,
   },
@@ -451,9 +461,13 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   testResultText: {
     fontSize: 11,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   testTimeText: {
     fontSize: 11,
+    lineHeight: 16,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginLeft: 8,
   },
@@ -478,11 +492,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 15,
+    lineHeight: 22,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
   },
   emptySubtitle: {
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   statusCard: {
@@ -504,11 +522,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   statusTitle: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.semantic.success,
   },
   statusSubtitle: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 2,
   },
@@ -521,6 +543,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   disableButtonText: {
     color: theme.colors.onError,
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '500',
   },
   infoBox: {
@@ -543,6 +567,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },

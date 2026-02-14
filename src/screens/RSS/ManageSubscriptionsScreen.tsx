@@ -475,11 +475,11 @@ const ManageSubscriptionsScreen: React.FC = () => {
                size={22} 
                color={theme.colors.primary} 
             />
-            <Text style={{fontSize: 16, color: theme.colors.primary, fontWeight: '700', marginLeft: 6}}>
+            <Text style={{fontSize: 16, color: theme.colors.primary, fontWeight: '700', marginLeft: 6, lineHeight: 24, includeFontPadding: false }}>
               全选
             </Text>
           </TouchableOpacity>
-          <Text style={{fontSize: 14, color: theme.colors.onSurfaceVariant, marginLeft: 8}}>
+          <Text style={{fontSize: 14, color: theme.colors.onSurfaceVariant, marginLeft: 8, lineHeight: 20, includeFontPadding: false }}>
             (已选 {selectedSources.size})
           </Text>
         </View>
@@ -916,6 +916,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   title: {
     fontSize: 18,
+    lineHeight: 26,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
   },
@@ -935,6 +937,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16, // 调整为与编辑模式一致的大小
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '700',
     color: theme.colors.onSurface,
   },
@@ -946,6 +950,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   manageButtonText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.primary,
   },
@@ -1004,6 +1010,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     ...typography.labelSmall,
     color: theme.colors.onSurfaceVariant,
     fontSize: 10,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   // 排序按钮
   sortBtn: {

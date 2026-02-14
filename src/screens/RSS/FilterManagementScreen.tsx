@@ -299,6 +299,8 @@ const createStyles = (theme: any) =>
     loadingText: {
       marginTop: 12,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     header: {
@@ -323,11 +325,15 @@ const createStyles = (theme: any) =>
     },
     headerTitle: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: 'bold',
       color: theme.colors.onSurface,
     },
     headerSubtitle: {
       fontSize: 13,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginTop: 4,
     },
@@ -360,6 +366,8 @@ const createStyles = (theme: any) =>
     },
     keyword: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       flex: 1,
@@ -387,6 +395,8 @@ const createStyles = (theme: any) =>
     },
     badgeText: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '600',
     },
     bindingInfo: {
@@ -399,6 +409,8 @@ const createStyles = (theme: any) =>
     },
     bindingText: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       flex: 1,
     },
@@ -408,12 +420,16 @@ const createStyles = (theme: any) =>
     },
     emptyTitle: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginTop: 16,
     },
     emptyText: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginTop: 8,
       textAlign: 'center',

@@ -6,7 +6,7 @@ import { cloudConfigService } from './CloudConfigService';
 import cacheEventEmitter from './CacheEventEmitter';
 import { themeStorageService } from './ThemeStorageService';
 
-type LLMFeature = 'translation' | 'dictionary' | 'titleTranslation';
+type LLMFeature = 'translation' | 'dictionary' | 'titleTranslation' | 'dailyReport';
 
 type LLMProfile = {
   id: string;
@@ -46,6 +46,7 @@ export class SettingsService {
     PROXY_MODE_CONFIG: 'proxy_mode_config',  // 新增：代理模式配置
     PROXY_SERVERS_CONFIG: 'proxy_servers_config',  // 多代理服务器配置
     RSS_STARTUP_SETTINGS: 'rss_startup_settings', // 新增：RSS启动刷新设置
+    DAILY_REPORT_SETTINGS: 'daily_report_settings', // 日报设置
   };
 
   private constructor() {
@@ -611,10 +612,11 @@ export class SettingsService {
     themeSettings: any;
     rssStartupSettings: any;
     proxyServersConfig: any;
+    dailyReportSettings: any;
     exportedAt: string;
   }> {
     try {
-      const [readingSettings, appSettings, rssSettings, llmSettings, themeSettings, rssStartupSettings, proxyServersConfig] = await Promise.all([
+      const [readingSettings, appSettings, rssSettings, llmSettings, themeSettings, rssStartupSettings, proxyServersConfig, dailyReportSettings] = await Promise.all([
         this.getReadingSettings(),
         this.getAppSettings(),
         this.getRSSSettings(),
@@ -622,6 +624,7 @@ export class SettingsService {
         themeStorageService.getThemeSettings(),
         this.getRSSStartupSettings(),
         this.getProxyServersConfig(),
+        this.getDailyReportSettings(),
       ]);
 
       return {
@@ -632,6 +635,7 @@ export class SettingsService {
         themeSettings,
         rssStartupSettings,
         proxyServersConfig,
+        dailyReportSettings,
         exportedAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -642,6 +646,55 @@ export class SettingsService {
         details: error,
         timestamp: new Date(),
       });
+    }
+  }
+
+  /**
+   * 获取日报设置
+   */
+  public async getDailyReportSettings(): Promise<{
+    enabled: boolean;
+    intervalHours: number;
+    groupNames: string[];
+    articleLimit: number;
+  }> {
+    try {
+      const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.DAILY_REPORT_SETTINGS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          enabled: parsed.enabled !== false,
+          intervalHours: typeof parsed.intervalHours === 'number' ? parsed.intervalHours : 12,
+          groupNames: Array.isArray(parsed.groupNames) ? parsed.groupNames : [],
+          articleLimit: typeof parsed.articleLimit === 'number' ? parsed.articleLimit : 0,
+        };
+      }
+    } catch (error) {
+      logger.error('Error reading daily report settings:', error);
+    }
+    return { enabled: true, intervalHours: 12, groupNames: [], articleLimit: 0 };
+  }
+
+  /**
+   * 保存日报设置
+   */
+  public async saveDailyReportSettings(settings: {
+    enabled?: boolean;
+    intervalHours?: number;
+    groupNames?: string[];
+    articleLimit?: number;
+  }): Promise<void> {
+    try {
+      const current = await this.getDailyReportSettings();
+      const updated = { ...current, ...settings };
+      await AsyncStorage.setItem(
+        SettingsService.STORAGE_KEYS.DAILY_REPORT_SETTINGS,
+        JSON.stringify(updated)
+      );
+      cacheEventEmitter.settingsUpdated('dailyReportSettings');
+      this.scheduleCloudSettingsSync();
+    } catch (error) {
+      logger.error('Error saving daily report settings:', error);
     }
   }
 
@@ -705,6 +758,7 @@ export class SettingsService {
       translation: defaultProfile.id,
       dictionary: defaultProfile.id,
       titleTranslation: defaultProfile.id,
+      dailyReport: defaultProfile.id,
     };
     let ui: LLMSettingsStoreV2['ui'] = { lastEditedProfileId: defaultProfile.id };
 
@@ -715,6 +769,7 @@ export class SettingsService {
         translation: rawBindings.translation,
         dictionary: rawBindings.dictionary,
         titleTranslation: rawBindings.titleTranslation,
+        dailyReport: rawBindings.dailyReport,
       } as any;
       ui = raw.ui || ui;
     } else if (raw && typeof raw === 'object' && typeof raw.provider === 'string') {
@@ -747,6 +802,7 @@ export class SettingsService {
       translation: ensureBinding(bindings.translation),
       dictionary: ensureBinding(bindings.dictionary),
       titleTranslation: ensureBinding(bindings.titleTranslation),
+      dailyReport: ensureBinding(bindings.dailyReport),
     };
 
     const lastEdited = typeof ui?.lastEditedProfileId === 'string' ? ui.lastEditedProfileId : firstId;
@@ -857,8 +913,8 @@ export class SettingsService {
     try {
       await this.databaseService.initializeDatabase();
       await Promise.all([
-        this.databaseService.executeStatement('DELETE FROM dictionary_cache').catch(() => {}),
-        this.databaseService.executeStatement('DELETE FROM translation_cache').catch(() => {}),
+        this.databaseService.executeStatement('DELETE FROM dictionary_cache').catch(() => { }),
+        this.databaseService.executeStatement('DELETE FROM translation_cache').catch(() => { }),
       ]);
       cacheEventEmitter.clearAll();
     } catch (error) {
@@ -1301,9 +1357,9 @@ export class SettingsService {
       };
     } catch (error) {
       logger.error('Error getting proxy mode config:', error);
-      return { 
-        enabled: false, 
-        serverUrl: '', 
+      return {
+        enabled: false,
+        serverUrl: '',
         serverPassword: '',
         serverToken: ''
       };
@@ -1316,7 +1372,7 @@ export class SettingsService {
   public async saveProxyModeConfig(config: ProxyModeConfig): Promise<void> {
     try {
       await AsyncStorage.setItem(
-        SettingsService.STORAGE_KEYS.PROXY_MODE_CONFIG, 
+        SettingsService.STORAGE_KEYS.PROXY_MODE_CONFIG,
         JSON.stringify(config)
       );
     } catch (error) {
@@ -1406,7 +1462,7 @@ export class SettingsService {
       if (configStr) {
         return JSON.parse(configStr);
       }
-      
+
       // 迁移旧版本配置
       const oldConfig = await this.getProxyModeConfig();
       if (oldConfig.serverUrl) {
@@ -1425,7 +1481,7 @@ export class SettingsService {
         await this.saveProxyServersConfig(newConfig);
         return newConfig;
       }
-      
+
       return { servers: [], activeServerId: null };
     } catch (error) {
       logger.error('Error getting proxy servers config:', error);
@@ -1442,7 +1498,7 @@ export class SettingsService {
         SettingsService.STORAGE_KEYS.PROXY_SERVERS_CONFIG,
         JSON.stringify(config)
       );
-      
+
       // 同步到旧版配置以保持兼容性
       const activeServer = config.servers.find(s => s.id === config.activeServerId);
       if (activeServer) {

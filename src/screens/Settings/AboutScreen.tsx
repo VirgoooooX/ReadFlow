@@ -128,12 +128,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   appName: {
     fontSize: 24,
+    lineHeight: 32,
+    includeFontPadding: false,
     fontWeight: 'bold',
     color: theme.colors.onBackground,
     marginBottom: 6,
   },
   appDesc: {
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginBottom: 14,
   },
@@ -145,6 +149,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   versionText: {
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.primary,
   },

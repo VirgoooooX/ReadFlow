@@ -122,16 +122,22 @@ export const createButtonTextStyle = (theme: Theme, variant: 'primary' | 'second
     primary: {
       color: theme.colors.onPrimary,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       fontWeight: '600',
     },
     secondary: {
       color: theme.colors.onSecondaryContainer,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       fontWeight: '600',
     },
     tertiary: {
       color: theme.colors.primary,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       fontWeight: '600',
     },
   };
@@ -160,6 +166,8 @@ export const createEmptyStateStyle = (theme: Theme) => ({
   },
   text: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginBottom: 24,
   },
@@ -171,6 +179,8 @@ export const createEmptyStateStyle = (theme: Theme) => ({
   },
   buttonText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600' as any,
     color: theme.colors.onPrimaryContainer,
   },
@@ -189,12 +199,16 @@ export const createStatCardStyle = (theme: Theme) => ({
   },
   number: {
     fontSize: 24,
+    lineHeight: 32,
+    includeFontPadding: false,
     fontWeight: '700',
     color: theme.colors.primary,
     marginBottom: 8,
   },
   label: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     textAlign: 'center' as any,
   },
@@ -269,26 +283,36 @@ export const createBadgeTextStyle = (theme: Theme, variant: 'primary' | 'seconda
     primary: {
       color: theme.colors.onPrimaryContainer,
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '500' as any,
     },
     secondary: {
       color: theme.colors.onSecondaryContainer,
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '500' as any,
     },
     success: {
       color: theme.semantic.success,
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '500' as any,
     },
     error: {
       color: theme.colors.onErrorContainer,
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '500' as any,
     },
     warning: {
       color: theme.semantic.warning,
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '500' as any,
     },
   };

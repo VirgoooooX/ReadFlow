@@ -449,6 +449,8 @@ const styles = (theme: any) => StyleSheet.create({
   },
   wordText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '700',
     color: theme.colors.onSurface,
     marginBottom: 1,

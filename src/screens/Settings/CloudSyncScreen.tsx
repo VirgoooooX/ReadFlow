@@ -381,7 +381,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                     <CleanText style={styles.cardSubtitle}>{config?.serverUrl}</CleanText>
                 </View>
                 <TouchableOpacity onPress={handleDisconnectCloud} style={styles.disconnectButton}>
-                    <CleanText style={{color: theme.colors.error, fontSize: 13}}>断开</CleanText>
+                    <CleanText style={{color: theme.colors.error, fontSize: 13, lineHeight: 20, includeFontPadding: false }}>断开</CleanText>
                 </TouchableOpacity>
             </View>
             ) : (
@@ -449,7 +449,7 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                         <Icon name="account-circle" size={36} color={theme.colors.primary} />
                         <View style={styles.cardInfo}>
                             <CleanText style={styles.cardTitle}>{config?.auth?.user?.email}</CleanText>
-                            <CleanText style={{fontSize: 12, color: theme.semantic.success}}>已登录</CleanText>
+                            <CleanText style={{fontSize: 12, color: theme.semantic.success, lineHeight: 18, includeFontPadding: false }}>已登录</CleanText>
                         </View>
                         <TouchableOpacity onPress={handleLogoutCloud} style={styles.logoutButton}>
                             <Icon name="logout" size={20} color={theme.colors.onSurfaceVariant} />
@@ -558,6 +558,7 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 4,
       marginTop: 8,
       fontSize: 12,
+      includeFontPadding: false,
       lineHeight: 18,
       marginBottom: 20,
     },
@@ -606,12 +607,15 @@ const createStyles = (theme: any) =>
     },
     optionTitle: {
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '500',
       color: theme.colors.onSurface,
       marginBottom: 2,
     },
     optionDesc: {
         fontSize: 12,
+        includeFontPadding: false,
         color: theme.colors.onSurfaceVariant,
         lineHeight: 16,
     },
@@ -632,6 +636,8 @@ const createStyles = (theme: any) =>
     },
     inputLabel: {
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '500',
       color: theme.colors.onSurface,
       marginLeft: 12,
@@ -642,11 +648,15 @@ const createStyles = (theme: any) =>
       borderRadius: 8,
       padding: 12,
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       color: theme.colors.onSurface,
       marginBottom: 8,
     },
     inputHint: {
       fontSize: 13,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     // Button Styles
@@ -659,6 +669,8 @@ const createStyles = (theme: any) =>
     },
     actionButtonText: {
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '500',
       marginLeft: 8,
       color: theme.colors.primary,
@@ -675,6 +687,8 @@ const createStyles = (theme: any) =>
         color: theme.colors.onPrimary,
         fontWeight: '600',
         fontSize: 15,
+        lineHeight: 22,
+        includeFontPadding: false,
     },
     // Proxy & Connected Card Internal Styles (Adapted)
     cardInternalRow: {
@@ -688,12 +702,16 @@ const createStyles = (theme: any) =>
     },
     cardTitle: {
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 2,
     },
     cardSubtitle: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     emptyStateContainer: {

@@ -273,6 +273,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   previewTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
     marginBottom: 16,
@@ -293,6 +295,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   previewButtons: {
     flexDirection: 'row',
@@ -332,6 +336,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
   },
@@ -343,6 +349,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   currentColorText: {
     color: '#FFFFFF',
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 
@@ -382,6 +390,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   customInputLabel: {
     fontSize: 13,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginBottom: 8,
   },
@@ -396,6 +406,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurface,
     fontFamily: 'monospace',
   },
@@ -423,6 +435,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   resetButton: {
@@ -437,6 +451,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   resetButtonText: {
     color: theme.colors.onSurfaceVariant,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
   },
 
@@ -452,6 +468,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: 13,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },

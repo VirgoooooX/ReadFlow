@@ -14,7 +14,8 @@ import { getTabBarHeight, getTabBarPaddingVertical, getHeaderHeight, HEADER_TITL
 import CustomHeader from '../components/CustomHeader';
 import ScreenWithCustomHeader from '../components/ScreenWithCustomHeader';
 import { getCommonScreenOptions } from './screenOptions';
-import { HomeStackParamList, RSSStackParamList, MainTabParamList, UserStackParamList, VocabularyStackParamList } from './types';
+import { HomeStackParamList, RSSStackParamList, MainTabParamList, UserStackParamList, VocabularyStackParamList, RootStackParamList } from './types';
+
 import {
   View,
   Image,
@@ -48,21 +49,9 @@ import StorageManagementScreen from '../screens/Settings/StorageManagementScreen
 import CustomColorScreen from '../screens/Settings/CustomColorScreen';
 import RSSStartupSettingsScreen from '../screens/Settings/RSSStartupSettingsScreen';
 import { CloudSyncScreen } from '../screens/Settings/CloudSyncScreen';
-
-// 导入类型定义
-export type RootStackParamList = {
-  Auth: undefined;
-  MainTabs: undefined;
-  ArticleDetail: { articleId: number };
-  VocabularyDetail: { entryId: number };
-  RSSSourceDetail: { sourceId: number };
-  AddRSSSource: undefined;
-  ManageSubscriptions: undefined;
-  ReadingSettings: undefined;
-  AppSettings: undefined;
-  CloudSettings: undefined;
-  About: undefined;
-};
+import DailyReportDetailScreen from '../screens/DailyReport/DailyReportDetailScreen';
+import DailyReportListScreen from '../screens/DailyReport/DailyReportListScreen';
+import DailyReportSettingsScreen from '../screens/Settings/DailyReportSettingsScreen';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -133,6 +122,8 @@ function HomeStackNavigator() {
           </ScreenWithCustomHeader>
         )}
       </HomeStack.Screen>
+
+
     </HomeStack.Navigator>
   );
 }
@@ -588,6 +579,36 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
 
+      <UserStack.Screen
+        name="DailyReportSettings"
+        options={{ title: 'AI 日报设置' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="AI 日报设置"
+            showBackButton={true}
+          >
+            <DailyReportSettingsScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+      <UserStack.Screen
+        name="DailyReportList"
+        options={{ title: 'AI 日报历史' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="AI 日报历史"
+            showBackButton={true}
+          >
+            <DailyReportListScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </UserStack.Screen>
+
+
+
     </UserStack.Navigator>
   );
 }
@@ -648,6 +669,8 @@ function MainTabNavigator() {
         },
         tabBarLabelStyle: {
           fontSize: 12,
+          lineHeight: 18,
+          includeFontPadding: false,
           fontWeight: '500',
         },
         headerShown: false,
@@ -672,6 +695,8 @@ function MainTabNavigator() {
             backgroundColor: theme.colors.error,
             color: theme.colors.onError,
             fontSize: 10,
+            lineHeight: 16,
+            includeFontPadding: false,
           }
         }}
       />
@@ -768,6 +793,22 @@ function RootNavigator() {
           ...getCommonScreenOptions(theme),
         }}
       />
+      <RootStack.Screen
+        name="DailyReportDetail"
+        options={{
+          ...getCommonScreenOptions(theme),
+          headerShown: false,
+        }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="AI 日报"
+            showBackButton={true}
+          >
+            <DailyReportDetailScreen {...props} />
+          </ScreenWithCustomHeader>
+        )}
+      </RootStack.Screen>
     </RootStack.Navigator>
   );
 }

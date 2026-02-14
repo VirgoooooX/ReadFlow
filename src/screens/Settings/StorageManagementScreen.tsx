@@ -266,11 +266,15 @@ const createStyles = (theme: any) =>
     },
     overviewTitle: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
     },
     overviewSize: {
       fontSize: 26,
+      lineHeight: 39,
+      includeFontPadding: false,
       fontWeight: '700',
       color: theme.colors.onSurface,
     },
@@ -281,6 +285,8 @@ const createStyles = (theme: any) =>
     },
   sectionTitle: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurfaceVariant,
       marginBottom: 10,
@@ -320,12 +326,16 @@ const createStyles = (theme: any) =>
     },
     storageLabel: {
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 3,
     },
     storageSize: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
 
@@ -347,12 +357,15 @@ const createStyles = (theme: any) =>
     },
     infoTitle: {
       fontSize: 13,
+      lineHeight: 20,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.primary,
       marginBottom: 4,
     },
     infoDesc: {
       fontSize: 12,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       lineHeight: 18,
     },
@@ -382,10 +395,14 @@ const createStyles = (theme: any) =>
     clearButtonText: {
       color: theme.colors.onPrimary,
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '600',
     },
     warningText: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       textAlign: 'center',
       marginTop: 12,

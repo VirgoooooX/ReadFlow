@@ -45,6 +45,8 @@ const ModeSelector = ({ mode, currentMode, onChange, theme }: any) => {
       />
       <Text style={{
         fontSize: 13,
+        lineHeight: 20,
+        includeFontPadding: false,
         fontWeight: '600',
         color: isSelected ? theme.colors.primary : theme.colors.onSurface
       }}>
@@ -79,6 +81,8 @@ const ThemeCard = ({ preset, isSelected, onPress, theme }: any) => (
     <Text 
       style={{
         fontSize: 12,
+        lineHeight: 18,
+        includeFontPadding: false,
         color: isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant,
         textAlign: 'center',
         fontWeight: isSelected ? '600' : '500',
@@ -214,6 +218,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '700',
     color: theme.colors.primary,
     marginBottom: 8,
@@ -249,6 +255,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   menuText: {
     fontSize: 15,
+    lineHeight: 22,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
   },

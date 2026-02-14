@@ -353,12 +353,16 @@ const createStyles = (theme: any) =>
     },
     headerTitle: {
       fontSize: 24,
+      lineHeight: 32,
+      includeFontPadding: false,
       fontWeight: 'bold',
       marginTop: 12,
       color: theme.colors.onSurface,
     },
     headerSubtitle: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginTop: 4,
       textAlign: 'center',
@@ -377,17 +381,23 @@ const createStyles = (theme: any) =>
     },
     label: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 12,
     },
     subLabel: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       fontWeight: '500',
     },
     hint: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginTop: 4,
     },
@@ -397,6 +407,8 @@ const createStyles = (theme: any) =>
       borderRadius: 12,
       padding: 14,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       color: theme.colors.onSurface,
       marginBottom: 12,
       backgroundColor: theme.colors.surfaceContainer,
@@ -434,6 +446,8 @@ const createStyles = (theme: any) =>
     segmentText: {
       fontWeight: '600',
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     segmentTextActive: {
@@ -454,6 +468,8 @@ const createStyles = (theme: any) =>
     },
     countBadge: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.primary,
       backgroundColor: theme.colors.primaryContainer,
@@ -479,11 +495,15 @@ const createStyles = (theme: any) =>
     },
     sourceName: {
       fontSize: 15,
+      lineHeight: 22,
+      includeFontPadding: false,
       fontWeight: '500',
       color: theme.colors.onSurface,
     },
     sourceDesc: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginTop: 2,
     },
@@ -494,6 +514,8 @@ const createStyles = (theme: any) =>
     emptyText: {
       marginTop: 12,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     saveButton: {
@@ -518,6 +540,8 @@ const createStyles = (theme: any) =>
     saveButtonText: {
       color: theme.colors.onPrimary,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: 'bold',
     },
   });

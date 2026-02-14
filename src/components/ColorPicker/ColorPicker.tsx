@@ -115,6 +115,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     },
     title: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: 'bold',
       color: theme.colors.onSurface,
       marginBottom: 16,
@@ -133,6 +135,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     },
     presetsTitle: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 12,
@@ -161,6 +165,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     },
     inputLabel: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 8,
@@ -177,6 +183,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       borderRadius: 8,
       paddingHorizontal: 12,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       color: theme.colors.onSurface,
       backgroundColor: theme.colors.surfaceVariant,
     },
@@ -190,6 +198,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     },
     rgbLabel: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
@@ -201,6 +211,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       borderRadius: 6,
       paddingHorizontal: 8,
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurface,
       backgroundColor: theme.colors.surfaceVariant,
       textAlign: 'center',

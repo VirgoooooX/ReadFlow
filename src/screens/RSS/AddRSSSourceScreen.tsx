@@ -488,12 +488,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   title: {
     fontSize: 24,
+    lineHeight: 32,
+    includeFontPadding: false,
     fontWeight: 'bold',
     color: theme.colors.onSurface,
     marginTop: 8,
   },
   subtitle: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 4,
   },
@@ -505,6 +509,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   label: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 8,
@@ -518,6 +524,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurface,
     minHeight: 48,
   },
@@ -545,6 +553,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   categoryChipTextSelected: {
@@ -572,6 +582,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   contentTypeText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurfaceVariant,
   },
@@ -580,6 +592,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   contentTypeHint: {
     fontSize: 12,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 8,
     lineHeight: 16,
@@ -603,11 +616,14 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   proxyTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
   },
   proxyHint: {
     fontSize: 12,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 4,
     lineHeight: 16,
@@ -617,12 +633,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
+    lineHeight: 26,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginBottom: 16,
   },
@@ -650,11 +670,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   quickSourceName: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
   },
   quickSourceUrl: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     marginTop: 2,
   },
@@ -677,6 +701,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
   },
@@ -696,6 +722,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   addButtonText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onPrimary,
   },

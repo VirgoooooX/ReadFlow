@@ -285,6 +285,8 @@ const styles = StyleSheet.create({
     },
     tabLabel: {
         fontSize: 15,
+        lineHeight: 22,
+        includeFontPadding: false,
         fontWeight: '600',
         textAlign: 'center',
     },

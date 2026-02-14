@@ -28,6 +28,7 @@ import CustomTabBar from '../../components/CustomTabBar';
 import CustomTabContent, { CustomTabContentHandle } from '../../components/CustomTabContent';
 import { useSharedValue } from 'react-native-reanimated';
 import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
+import DailyReportCard from '../../components/DailyReportCard';
 import { Alert, ToastAndroid, Platform } from 'react-native'; // 新增 Alert, ToastAndroid, Platform
 import { needsProxy, toProxyUrl } from '../../utils/imageProxy';
 
@@ -1266,6 +1267,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           />
         </View>
 
+        <DailyReportCard
+          onPress={(reportId) => navigation.navigate('DailyReportDetail' as any, { reportId })}
+        />
+
         <CustomTabContent
           ref={tabContentRef}
           tabs={routes}
@@ -1324,6 +1329,8 @@ const createStyles = (theme: any) =>
     menuText: {
       marginLeft: 12,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
     },
     menuDivider: {
       height: StyleSheet.hairlineWidth,

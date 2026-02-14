@@ -214,6 +214,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
+    lineHeight: 26,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onBackground,
     marginBottom: 12,
@@ -241,12 +243,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   switchTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 2,
   },
   switchDescription: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   formatItem: {
@@ -270,6 +276,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   formatTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 2,
@@ -279,6 +287,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   formatDescription: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   exportButton: {
@@ -293,12 +303,16 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   exportTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 2,
   },
   exportDescription: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   infoCard: {
@@ -314,12 +328,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   infoTitle: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurface,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     lineHeight: 20,
   },

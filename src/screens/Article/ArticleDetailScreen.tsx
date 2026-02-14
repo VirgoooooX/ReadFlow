@@ -279,6 +279,8 @@ const BottomProgressBar: React.FC<{
           )}
           <Text style={{
             fontSize: 14,
+            lineHeight: 20,
+            includeFontPadding: false,
             fontWeight: '600',
             color: pillTextColor,
           }}>
@@ -1442,6 +1444,8 @@ const createStyles = (theme: any, readingSettings?: any) =>
     },
     headerTitle: {
       fontSize: 19,      // 👈 同步 CustomHeader 字号
+      lineHeight: 28,
+      includeFontPadding: false,
       fontWeight: Platform.OS === 'ios' ? '900' : 'bold', // 👈 同步 CustomHeader 字重策略
       color: theme.colors.onPrimary,
     },

@@ -91,7 +91,7 @@ const createStyles = (
   titleLineHeight?: number
 ) => {
   const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : insets.top;
-  
+
   // 确保使用主题色，如果传入了 backgroundColor 则优先使用
   const headerBackgroundColor = backgroundColor || (theme.isDark ? theme.colors.surface : theme.colors.primary);
   const headerTextColor = textColor || (theme.isDark ? theme.colors.onSurface : theme.colors.onPrimary);
@@ -136,7 +136,8 @@ const createStyles = (
       color: headerTextColor,
       textAlign: 'center',
       height: titleHeight,
-      lineHeight: titleLineHeight,
+      lineHeight: titleLineHeight || 28,
+      includeFontPadding: false,
       ...(Platform.OS === 'android' ? { textAlignVertical: 'center' } : {}),
     },
   });

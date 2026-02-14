@@ -201,7 +201,7 @@ const GroupManagementScreen: React.FC = () => {
               </View>
 
               <View style={styles.menuRight}>
-                 <Text style={[styles.statText, { fontSize: 12, color: theme.colors.outline, marginRight: 8 }]}>系统默认</Text>
+                 <Text style={[styles.statText, { fontSize: 12, color: theme.colors.outline, marginRight: 8 , lineHeight: 18, includeFontPadding: false }]}>系统默认</Text>
               </View>
             </View>
           </View>
@@ -406,6 +406,8 @@ const createEditModalStyles = (theme: any) => StyleSheet.create({
   },
   title: {
     fontSize: 22,
+    lineHeight: 30,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 20,
     color: theme.colors.onSurface,
@@ -415,6 +417,8 @@ const createEditModalStyles = (theme: any) => StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     borderWidth: 1,
     marginBottom: 20,
     backgroundColor: theme.colors.surfaceContainer,
@@ -423,6 +427,8 @@ const createEditModalStyles = (theme: any) => StyleSheet.create({
   },
   label: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     marginBottom: 12,
     color: theme.colors.onSurfaceVariant,
   },
@@ -460,6 +466,8 @@ const createEditModalStyles = (theme: any) => StyleSheet.create({
   },
   buttonText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

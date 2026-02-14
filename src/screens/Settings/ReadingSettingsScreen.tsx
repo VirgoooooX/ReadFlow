@@ -318,6 +318,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
 
@@ -328,6 +330,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   hintText: {
     fontSize: 12,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     lineHeight: 16,
   },
@@ -366,6 +369,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   dropdownItemLabel: {
     fontSize: 15,
+    lineHeight: 22,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onSurface,
     marginBottom: 2,
@@ -376,6 +381,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   dropdownItemDescription: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   dropdownItemDescriptionSelected: {

@@ -233,6 +233,8 @@ const createStyles = (theme: any) =>
     },
     actionBtnText: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.primary,
     },

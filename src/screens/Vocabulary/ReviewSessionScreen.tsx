@@ -208,6 +208,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   emptyContainer: {
@@ -217,6 +219,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   progressContainer: {
@@ -237,6 +241,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   progressText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
   },
@@ -256,6 +262,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   wordText: {
     fontSize: 36,
+    lineHeight: 44,
+    includeFontPadding: false,
     fontWeight: 'bold',
     color: theme.colors.onSurface,
     textAlign: 'center',
@@ -269,12 +277,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   contextLabel: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onSurfaceVariant,
     marginBottom: 8,
   },
   contextText: {
     fontSize: 16,
+    includeFontPadding: false,
     color: theme.colors.onSurface,
     lineHeight: 24,
   },
@@ -286,12 +297,15 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   definitionLabel: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onPrimaryContainer,
     marginBottom: 8,
   },
   definitionText: {
     fontSize: 18,
+    includeFontPadding: false,
     fontWeight: '500',
     color: theme.colors.onPrimaryContainer,
     lineHeight: 26,
@@ -307,6 +321,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   showButtonText: {
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.primary,
     marginLeft: 8,
@@ -333,6 +349,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 18,
+    lineHeight: 26,
+    includeFontPadding: false,
     fontWeight: '600',
     color: theme.colors.onPrimary,
   },

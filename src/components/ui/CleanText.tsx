@@ -63,6 +63,7 @@ const createCleanTextStyles = (theme: Theme) => {
     // Display 角色
     displayLarge: {
       fontSize: 57,
+      includeFontPadding: false,
       lineHeight: 64,
       fontWeight: '400',
       letterSpacing: -0.25,
@@ -70,6 +71,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     displayMedium: {
       fontSize: 45,
+      includeFontPadding: false,
       lineHeight: 52,
       fontWeight: '400',
       letterSpacing: 0,
@@ -77,6 +79,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     displaySmall: {
       fontSize: 36,
+      includeFontPadding: false,
       lineHeight: 44,
       fontWeight: '400',
       letterSpacing: 0,
@@ -85,6 +88,7 @@ const createCleanTextStyles = (theme: Theme) => {
     // Headline 角色
     headlineLarge: {
       fontSize: 32,
+      includeFontPadding: false,
       lineHeight: 40,
       fontWeight: '400',
       letterSpacing: 0,
@@ -92,6 +96,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     headlineMedium: {
       fontSize: 28,
+      includeFontPadding: false,
       lineHeight: 36,
       fontWeight: '400',
       letterSpacing: 0,
@@ -99,6 +104,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     headlineSmall: {
       fontSize: 24,
+      includeFontPadding: false,
       lineHeight: 32,
       fontWeight: '400',
       letterSpacing: 0,
@@ -107,6 +113,7 @@ const createCleanTextStyles = (theme: Theme) => {
     // Title 角色
     titleLarge: {
       fontSize: 22,
+      includeFontPadding: false,
       lineHeight: 28,
       fontWeight: '400',
       letterSpacing: 0,
@@ -114,6 +121,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     titleMedium: {
       fontSize: 16,
+      includeFontPadding: false,
       lineHeight: 24,
       fontWeight: '500',
       letterSpacing: 0.15,
@@ -121,6 +129,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     titleSmall: {
       fontSize: 14,
+      includeFontPadding: false,
       lineHeight: 20,
       fontWeight: '500',
       letterSpacing: 0.1,
@@ -129,6 +138,7 @@ const createCleanTextStyles = (theme: Theme) => {
     // Body 角色
     bodyLarge: {
       fontSize: 16,
+      includeFontPadding: false,
       lineHeight: 24,
       fontWeight: '400',
       letterSpacing: 0.5,
@@ -136,6 +146,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     bodyMedium: {
       fontSize: 14,
+      includeFontPadding: false,
       lineHeight: 20,
       fontWeight: '400',
       letterSpacing: 0.25,
@@ -143,6 +154,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     bodySmall: {
       fontSize: 12,
+      includeFontPadding: false,
       lineHeight: 16,
       fontWeight: '400',
       letterSpacing: 0.4,
@@ -151,6 +163,7 @@ const createCleanTextStyles = (theme: Theme) => {
     // Label 角色
     labelLarge: {
       fontSize: 14,
+      includeFontPadding: false,
       lineHeight: 20,
       fontWeight: '500',
       letterSpacing: 0.1,
@@ -158,6 +171,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     labelMedium: {
       fontSize: 12,
+      includeFontPadding: false,
       lineHeight: 16,
       fontWeight: '500',
       letterSpacing: 0.5,
@@ -165,6 +179,7 @@ const createCleanTextStyles = (theme: Theme) => {
     
     labelSmall: {
       fontSize: 11,
+      includeFontPadding: false,
       lineHeight: 16,
       fontWeight: '500',
       letterSpacing: 0.5,

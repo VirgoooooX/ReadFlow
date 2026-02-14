@@ -291,6 +291,8 @@ const createStyles = (theme: any) =>
     },
     sliderLabel: {
       fontSize: 10,
+      lineHeight: 16,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       minWidth: 24,
       textAlign: 'center',

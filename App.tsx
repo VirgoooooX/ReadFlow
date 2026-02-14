@@ -35,6 +35,7 @@ import { configSyncService } from './src/services/ConfigSyncService';
 // 阻止原生启动屏自动消失
 SplashScreen.preventAutoHideAsync();
 
+
 function App(): React.JSX.Element {
   const [appIsReady, setAppIsReady] = useState(false);
 
@@ -65,7 +66,7 @@ function App(): React.JSX.Element {
         ]);
 
         logger.info('✅ 核心服务初始化完成');
-        
+
         // Cloud Config Sync (Cold Start)
         try {
           logger.info('☁️ 检查云端配置同步...');

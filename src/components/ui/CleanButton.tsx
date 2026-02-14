@@ -102,6 +102,7 @@ const createCleanButtonStyles = (theme: Theme) => {
     textFilled: {
       color: theme.colors.onPrimary,
       fontSize: 14,
+      includeFontPadding: false,
       fontWeight: '500',
       lineHeight: 20,
     },
@@ -109,6 +110,7 @@ const createCleanButtonStyles = (theme: Theme) => {
     textOutlined: {
       color: theme.colors.primary,
       fontSize: 14,
+      includeFontPadding: false,
       fontWeight: '500',
       lineHeight: 20,
     },
@@ -116,6 +118,7 @@ const createCleanButtonStyles = (theme: Theme) => {
     textText: {
       color: theme.colors.primary,
       fontSize: 14,
+      includeFontPadding: false,
       fontWeight: '500',
       lineHeight: 20,
     },

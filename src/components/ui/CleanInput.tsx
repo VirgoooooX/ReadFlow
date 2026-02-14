@@ -59,6 +59,7 @@ const createCleanInputStyles = (theme: Theme) => {
     // 标签样式
     label: {
       fontSize: 12,
+      includeFontPadding: false,
       lineHeight: 16,
       fontWeight: '500',
       color: theme.colors.onSurfaceVariant,
@@ -85,6 +86,7 @@ const createCleanInputStyles = (theme: Theme) => {
     inputBase: {
       flex: 1,
       fontSize: 16,
+      includeFontPadding: false,
       lineHeight: 24,
       color: theme.colors.onSurface,
       paddingVertical: 12,
@@ -94,6 +96,8 @@ const createCleanInputStyles = (theme: Theme) => {
     // 尺寸变体
     inputSmall: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       paddingVertical: 8,
       paddingHorizontal: 12,
       minHeight: 32,
@@ -101,6 +105,8 @@ const createCleanInputStyles = (theme: Theme) => {
     
     inputMedium: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       paddingVertical: 12,
       paddingHorizontal: 16,
       minHeight: 48,
@@ -108,6 +114,8 @@ const createCleanInputStyles = (theme: Theme) => {
     
     inputLarge: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       paddingVertical: 16,
       paddingHorizontal: 20,
       minHeight: 56,
@@ -180,6 +188,7 @@ const createCleanInputStyles = (theme: Theme) => {
     // 辅助文本样式
     helperText: {
       fontSize: 12,
+      includeFontPadding: false,
       lineHeight: 16,
       color: theme.colors.onSurfaceVariant,
       marginTop: 4,

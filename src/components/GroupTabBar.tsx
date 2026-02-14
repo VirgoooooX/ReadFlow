@@ -139,6 +139,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   activeTabText: {
@@ -147,6 +149,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   count: {
     fontSize: 12,
+    lineHeight: 18,
+    includeFontPadding: false,
     color: theme.colors.onSurfaceVariant,
   },
   activeCountText: {

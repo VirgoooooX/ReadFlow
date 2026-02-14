@@ -150,6 +150,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   title: {
     fontSize: 22,
+    lineHeight: 30,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 20,
     color: theme.colors.onSurface,
@@ -159,6 +161,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
     borderWidth: 1,
     marginBottom: 20,
     backgroundColor: theme.colors.surfaceContainer,
@@ -167,6 +171,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   label: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     marginBottom: 12,
     color: theme.colors.onSurfaceVariant,
   },
@@ -204,6 +210,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   buttonText: {
     fontSize: 14,
+    lineHeight: 20,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

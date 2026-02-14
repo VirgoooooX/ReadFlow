@@ -296,6 +296,8 @@ const createStyles = (theme: any) =>
     loadingText: {
       marginTop: 12,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     errorContainer: {
@@ -306,6 +308,8 @@ const createStyles = (theme: any) =>
     errorText: {
       marginTop: 12,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       color: theme.colors.error,
     },
     // 单词头部
@@ -320,6 +324,8 @@ const createStyles = (theme: any) =>
     },
     wordText: {
       fontSize: 32,
+      lineHeight: 40,
+      includeFontPadding: false,
       fontWeight: 'bold',
       color: theme.colors.primary,
     },
@@ -336,11 +342,15 @@ const createStyles = (theme: any) =>
     },
     phoneticText: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
     },
     wordFormText: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
     },
@@ -362,15 +372,21 @@ const createStyles = (theme: any) =>
     },
     masteryText: {
       fontSize: 13,
+      lineHeight: 20,
+      includeFontPadding: false,
       fontWeight: '600',
     },
     statLabel: {
       fontSize: 12,
+      lineHeight: 18,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       marginBottom: 4,
     },
     statValue: {
       fontSize: 18,
+      lineHeight: 26,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
     },
@@ -380,6 +396,8 @@ const createStyles = (theme: any) =>
     },
     sectionTitle: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onSurface,
       marginBottom: 12,
@@ -400,17 +418,22 @@ const createStyles = (theme: any) =>
     },
     posText: {
       fontSize: 11,
+      lineHeight: 16,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onPrimary,
     },
     translationText: {
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '500',
       color: theme.colors.onSurface,
       marginBottom: 6,
     },
     definitionText: {
       fontSize: 14,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       lineHeight: 20,
       marginBottom: 6,
@@ -426,6 +449,7 @@ const createStyles = (theme: any) =>
     exampleText: {
       flex: 1,
       fontSize: 13,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
       fontStyle: 'italic',
       marginLeft: 6,
@@ -439,15 +463,19 @@ const createStyles = (theme: any) =>
     },
     contextText: {
       fontSize: 14,
+      includeFontPadding: false,
       color: theme.colors.onSurface,
       lineHeight: 22,
     },
     sourceText: {
       fontSize: 14,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     timeText: {
       fontSize: 14,
+      lineHeight: 20,
+      includeFontPadding: false,
       color: theme.colors.onSurfaceVariant,
     },
     // 删除按钮
@@ -465,6 +493,8 @@ const createStyles = (theme: any) =>
     deleteButtonText: {
       marginLeft: 8,
       fontSize: 16,
+      lineHeight: 24,
+      includeFontPadding: false,
       fontWeight: '600',
       color: theme.colors.onError,
     },

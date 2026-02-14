@@ -17,14 +17,16 @@ export type PerfNavParam = {
 
 // 根堆栈参数列表
 export type RootStackParamList = {
+  Auth: undefined;
   MainTabs: undefined;
-  ArticleDetail: { 
+  ArticleDetail: {
     articleId: number;
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
     currentIndex?: number;  // 当前文章在列表中的索引
     article?: ArticleNavParam;
     perf?: PerfNavParam;
   };
+  DailyReportDetail: { reportId: number };
   VocabularyDetail: { entryId: number };
   RSSSourceDetail: { sourceId: number };
   AddRSSSource: undefined;
@@ -49,7 +51,7 @@ export type HomeStackParamList = {
     sourceId?: number;
     sourceName?: string;
   };
-  ArticleDetail: { 
+  ArticleDetail: {
     articleId: number;
     articleIds?: number[];  // 当前列表的所有文章ID（用于上滑切换）
     currentIndex?: number;  // 当前文章在列表中的索引
@@ -102,6 +104,8 @@ export type UserStackParamList = {
   CloudConnect: undefined; // 连接云端服务器
   FilterManagement: undefined;  // 过滤规则管理
   FilterRuleEditor: { sourceId?: number; ruleId?: number };  // 过滤规则编辑器
+  DailyReportSettings: undefined;  // 日报设置
+  DailyReportList: undefined;  // 日报历史
 };
 
 // 屏幕属性类型定义
@@ -226,6 +230,6 @@ export type NavigationListener<EventName extends keyof NavigationEventMap> = (
 
 declare global {
   namespace ReactNavigation {
-    interface RootParamList extends RootStackParamList {}
+    interface RootParamList extends RootStackParamList { }
   }
 }
