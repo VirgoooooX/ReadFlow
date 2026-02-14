@@ -8,6 +8,7 @@ import fetch from 'node-fetch'; // For warm-up requests
 import cronParser from 'cron-parser';
 import pLimit from 'p-limit';
 import { finished } from 'stream/promises';
+import { dailyReportService } from '../services/DailyReportService';
 
 const router = express.Router();
 
@@ -172,7 +173,7 @@ async function enrichBlocksWithVideoUrls(blocks: any[]) {
  */
 async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = 'http://localhost:3000') {
   if (!articles || articles.length === 0) return;
-  
+
   const settings = storageService.getSettings();
   const envEnabled = process.env.IMAGE_WARMUP_ENABLED;
   const enabled =
@@ -190,7 +191,7 @@ async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = '
 
   for (const article of candidates) {
     let count = 0;
-    
+
     // 1. Cover image
     if (article.imageUrl && needsProxy(article.imageUrl, baseUrl, imageCompression)) {
       urlsToWarm.add(article.imageUrl);
@@ -219,7 +220,7 @@ async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = '
   // Fire requests asynchronously (concurrency limit: 3)
   const urls = Array.from(urlsToWarm);
   const chunkParams: any[] = [];
-  
+
   for (const url of urls) {
     const proxyUrl = getProxyUrl(url, baseUrl, imageCompression, imageQuality);
     if (proxyUrl.startsWith(baseUrl)) {
@@ -326,7 +327,7 @@ async function refreshAllFeedsOnce() {
         await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: startedAtIso, status: 'ok' });
 
         logger.info(`[RSS Refresh] ${feed.name || feed.url} ok upserts=${result.upsertsCount} latest=${result.latestBlockId}`);
-        
+
         // 🔥 Trigger image pre-warming (local loopback)
         // Assume default port 3000 if env not set
         const port = process.env.PORT || 3000;
@@ -401,14 +402,14 @@ export function startRssAutoRefresh() {
 
     refreshTimer = setTimeout(() => {
       refreshAllFeedsOnce()
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => {
-          scheduleNext().catch(() => {});
+          scheduleNext().catch(() => { });
         });
     }, delayMs);
   };
 
-  scheduleNext().catch(() => {});
+  scheduleNext().catch(() => { });
 }
 
 // GET /api/rss?url=...
@@ -439,10 +440,10 @@ router.get('/', async (req: Request, res: Response) => {
     const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
 
     const articles = await rssParserService.fetchAndParseArticles(
-      source, 
-      [], 
-      baseUrl, 
-      imageCompression, 
+      source,
+      [],
+      baseUrl,
+      imageCompression,
       imageQuality,
       true,
       settings.rssFetchTimeoutMs
@@ -693,12 +694,12 @@ router.post('/refresh', async (req: Request, res: Response) => {
     // Even if feed not found in DB (unlikely for sync), we can try to fetch it
     // But we need to store it to generate sync blocks.
     // If client is syncing, feed should be in userFeeds and thus in feeds.
-    
+
     if (!feed) {
-       // If not found, maybe just fetch and parse without storing? 
-       // No, purpose is to update sync blocks.
-       // So we must have it.
-       return res.status(404).json({ error: 'Feed not found (please sync profile first)' });
+      // If not found, maybe just fetch and parse without storing? 
+      // No, purpose is to update sync blocks.
+      // So we must have it.
+      return res.status(404).json({ error: 'Feed not found (please sync profile first)' });
     }
 
     const source: RSSSource = {
@@ -725,11 +726,11 @@ router.post('/refresh', async (req: Request, res: Response) => {
       settings.rssFetchTimeoutMs
     );
     const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
-    
+
     await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: atIso, status: 'ok' });
-    
+
     logger.info(`[RSS Manual Refresh] ${feed.name || feed.url} ok upserts=${result.upsertsCount}`);
-    
+
     // 🔥 Trigger image pre-warming
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     warmUpImages(articles, baseUrl);
@@ -745,7 +746,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
 router.post('/syncState', async (req: Request, res: Response) => {
   try {
     const { userId, states } = req.body;
-    
+
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
@@ -754,7 +755,7 @@ router.post('/syncState', async (req: Request, res: Response) => {
     }
 
     await storageService.updateUserArticleStates(String(userId), states);
-    
+
     res.json({ success: true, count: states.length });
   } catch (error) {
     logger.error('[SyncState] Failed:', error);
@@ -773,11 +774,11 @@ router.get('/syncState', async (req: Request, res: Response) => {
     }
 
     const states = await storageService.getUserArticleStates(userId, since);
-    
-    res.json({ 
+
+    res.json({
       userId,
       since: since || null,
-      states 
+      states
     });
   } catch (error) {
     logger.error('[GetSyncState] Failed:', error);
@@ -873,12 +874,12 @@ router.post('/sync/config', async (req: Request, res: Response) => {
     const incoming = (legacyConfig && typeof legacyConfig === 'object')
       ? legacyConfig
       : {
-          settings: (body as any).settings,
-          sources: (body as any).sources,
-          groups: (body as any).groups,
-          filterRules: (body as any).filterRules,
-          updatedAt: (body as any).updatedAt,
-        };
+        settings: (body as any).settings,
+        sources: (body as any).sources,
+        groups: (body as any).groups,
+        filterRules: (body as any).filterRules,
+        updatedAt: (body as any).updatedAt,
+      };
 
     if (!incoming || typeof incoming !== 'object') {
       return res.status(400).json({ error: 'Config payload is required' });
@@ -904,18 +905,18 @@ router.post('/sync/config', async (req: Request, res: Response) => {
     // Also allow if forced (optional param, but for now just time based)
     // Actually for simple sync, we usually just accept what client pushes if it claims to be newer.
     // Or if we want to be strict: if clientTime > serverTime.
-    
+
     // For MVP: We accept the push and update.
     // The client is responsible for pulling first before pushing to avoid overwriting newer server data blindly,
     // or we can reject here if server is newer.
-    
+
     if (serverTime > clientTime) {
       logger.warn(
         `[SyncConfig] Conflict userId=${userId} serverUpdatedAt=${serverConfigSyncUpdatedAt} clientUpdatedAt=${nextConfigSync.updatedAt}`
       );
-      return res.status(409).json({ 
+      return res.status(409).json({
         error: 'Conflict: Server has newer config',
-        serverUpdatedAt: serverConfigSyncUpdatedAt 
+        serverUpdatedAt: serverConfigSyncUpdatedAt
       });
     }
 
@@ -934,6 +935,92 @@ router.post('/sync/config', async (req: Request, res: Response) => {
     res.json({ success: true, updatedAt: nextConfigSync.updatedAt });
   } catch (error) {
     logger.error('[SyncConfig] POST failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ─── Daily Report Routes ─────────────────────────────────────────────────────
+
+// GET /api/rss/daily-reports - Get daily reports for user
+router.get('/daily-reports', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any)?.user?.id || '');
+    if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 10, 1), 50);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+    const reports = await dailyReportService.getReportsForUser(userId, limit, offset);
+    res.json({ ok: true, reports });
+  } catch (error) {
+    logger.error('[DailyReport] GET list failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/rss/daily-reports/latest - Get latest daily report
+router.get('/daily-reports/latest', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any)?.user?.id || '');
+    if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const report = await dailyReportService.getLatestReport(userId);
+    if (!report) {
+      return res.status(404).json({ ok: false, error: 'No daily report found' });
+    }
+
+    res.json({ ok: true, report });
+  } catch (error) {
+    logger.error('[DailyReport] GET latest failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/rss/daily-reports/:id - Get a single daily report
+router.get('/daily-reports/:id', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any)?.user?.id || '');
+    if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const reportId = parseInt(req.params.id);
+    if (isNaN(reportId)) {
+      return res.status(400).json({ error: 'Invalid report ID' });
+    }
+
+    const report = await dailyReportService.getReportById(reportId, userId);
+    if (!report) {
+      return res.status(404).json({ ok: false, error: 'Report not found' });
+    }
+
+    res.json({ ok: true, report });
+  } catch (error) {
+    logger.error('[DailyReport] GET by ID failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/rss/daily-reports/generate - Manually trigger daily report generation
+router.post('/daily-reports/generate', async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any)?.user?.id || '');
+    if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const result = await dailyReportService.generateForUser(userId);
+    if (!result) {
+      return res.status(400).json({ ok: false, error: 'No articles or LLM config available for report generation' });
+    }
+
+    res.json({ ok: true, report: result });
+  } catch (error) {
+    logger.error('[DailyReport] Generate failed:', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });

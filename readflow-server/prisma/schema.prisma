@@ -203,3 +203,18 @@ model LegacySyncBlockStore {
 
   @@map("legacy_sync_blocks")
 }
+
+model DailyReport {
+  id           Int      @id @default(autoincrement())
+  userId       String                 // 关联用户 ID (对应 User.uuid)
+  title        String                 // 日报标题
+  content      String   @db.Text      // LLM 生成的 Markdown 摘要
+  sourceUrls   Json     @db.JsonB     // 参与总结的文章 URL 列表
+  articleCount Int                    // 总结的文章数量
+  groupNames   Json     @db.JsonB     // 使用的分组名称
+  generatedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([userId, generatedAt])
+  @@map("daily_reports")
+}

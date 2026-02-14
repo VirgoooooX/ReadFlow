@@ -13,6 +13,7 @@ import authRoutes, { verifyToken } from './routes/auth';
 import { logger } from './utils/Logger';
 import { startRssAutoRefresh } from './routes/rss';
 import { storageService } from './services/StorageService';
+import { dailyReportService } from './services/DailyReportService';
 
 // Set timezone to Asia/Shanghai (UTC+8)
 process.env.TZ = 'Asia/Shanghai';
@@ -46,12 +47,12 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const durationMs = Date.now() - start;
-    
+
     // Skip health checks from logging to reduce noise
     if (req.url === '/health' && res.statusCode === 200) return;
 
     const isImage = req.originalUrl.startsWith('/api/image');
-    
+
     if (isImage) {
       const cache = res.getHeader('X-Cache') || 'MISS';
       const contentType = res.getHeader('Content-Type') || 'unknown';
@@ -241,12 +242,30 @@ async function start(): Promise<void> {
     };
 
     setTimeout(() => {
-      runCleanupIfDue().catch(() => {});
+      runCleanupIfDue().catch(() => { });
     }, 30_000);
 
     setInterval(() => {
-      runCleanupIfDue().catch(() => {});
+      runCleanupIfDue().catch(() => { });
     }, 60_000);
+
+    // Daily Report scheduler
+    let dailyReportRunning = false;
+    const runDailyReportIfDue = async () => {
+      if (dailyReportRunning) return;
+      dailyReportRunning = true;
+      try {
+        await dailyReportService.scheduleAllUsers();
+      } catch (e) {
+        logger.error('Daily report generation failed', e);
+      } finally {
+        dailyReportRunning = false;
+      }
+    };
+
+    // Initial run after 60s, then check every 10 minutes
+    setTimeout(() => { runDailyReportIfDue().catch(() => { }); }, 60_000);
+    setInterval(() => { runDailyReportIfDue().catch(() => { }); }, 10 * 60 * 1000);
   });
 }
 
@@ -265,10 +284,10 @@ async function logServerStatus() {
     const uptime = Math.floor(process.uptime());
     const uptimeH = Math.floor(uptime / 3600);
     const uptimeM = Math.floor((uptime % 3600) / 60);
-    
+
     const users = (await storageService.getUsers()).length;
     const feeds = (await storageService.getFeedsLight()).length;
-    
+
     logger.system(
       `Status Update | Memory: rss=${rssMb}MB heap=${heapUsedMb}/${heapTotalMb}MB ext=${externalMb}MB ab=${arrayBuffersMb}MB | Uptime: ${uptimeH}h ${uptimeM}m | Users: ${users} | Feeds: ${feeds}`
     );

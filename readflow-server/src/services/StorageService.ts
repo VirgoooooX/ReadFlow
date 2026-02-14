@@ -86,7 +86,7 @@ interface StoredSyncBlock {
 
 export class StorageService {
   private static instance: StorageService;
-  
+
   private settings: ServerSettings;
   private cacheDir: string;
   private settingsInitialized: boolean = false;
@@ -385,7 +385,7 @@ export class StorageService {
 
   public async upsertUserFromClient(payload: { id: string; username?: string; email?: string; registeredAt?: string; settings?: any; config?: any }) {
     const now = new Date();
-    
+
     // Check duplication by email if provided
     let existingUser = null;
     if (payload.email) {
@@ -406,21 +406,21 @@ export class StorageService {
         // Ignore parsing errors if settings is not object
       }
     }
-    
+
     logger.info(`[Sync] Upserting user ${payload.id}. HasSettings=${!!payload.settings} HasConfig=${!!payload.config}`);
 
     if (existingUser) {
-       // Update
-       const updated = await prisma.user.update({
-         where: { id: existingUser.id }, // Use internal Int ID
-         data: {
-           username: payload.username || existingUser.username,
-           email: payload.email || existingUser.email,
-           syncData: { ...(existingUser.syncData as object), ...syncData }, // Merge
-           lastActive: now,
-         }
-       });
-       return this.mapDbUserToUser(updated);
+      // Update
+      const updated = await prisma.user.update({
+        where: { id: existingUser.id }, // Use internal Int ID
+        data: {
+          username: payload.username || existingUser.username,
+          email: payload.email || existingUser.email,
+          syncData: { ...(existingUser.syncData as object), ...syncData }, // Merge
+          lastActive: now,
+        }
+      });
+      return this.mapDbUserToUser(updated);
     } else {
       // Create
       const created = await prisma.user.create({
@@ -523,7 +523,7 @@ export class StorageService {
 
   public async upsertFeedsFromClient(userId: string, feeds: any[]) {
     const results: Feed[] = [];
-    
+
     // Ensure user exists
     const user = await prisma.user.findUnique({ where: { uuid: userId } });
     if (!user) return [];
@@ -531,7 +531,7 @@ export class StorageService {
     for (const f of feeds) {
       if (!f.url) continue;
       const normalizedUrl = this.normalizeUrl(f.url);
-      
+
       // Upsert Source
       const source = await prisma.rSSSource.upsert({
         where: { url: normalizedUrl },
@@ -593,11 +593,11 @@ export class StorageService {
   public async storeCanonicalArticlesForSource(sourceUrl: string, articles: Omit<Article, 'id'>[]) {
     const normalizedUrl = this.normalizeUrl(sourceUrl);
     const source = await prisma.rSSSource.findUnique({ where: { url: normalizedUrl } });
-    
+
     if (!source) {
-       // Should ensure source exists
-       // But usually it should
-       return { upsertsCount: 0, latestBlockId: 0 };
+      // Should ensure source exists
+      // But usually it should
+      return { upsertsCount: 0, latestBlockId: 0 };
     }
 
     let upsertsCount = 0;
@@ -629,7 +629,7 @@ export class StorageService {
           continue;
         }
       }
-      
+
       // Upsert Article
       // Using upsert to handle updates
       const saved = await prisma.article.upsert({
@@ -649,7 +649,7 @@ export class StorageService {
           readingTime: a.readingTime || 0,
         }
       });
-      
+
       upsertsCount++;
       if (saved.id > maxId) maxId = saved.id;
     }
@@ -663,7 +663,7 @@ export class StorageService {
   public async getSyncBlocksForSource(sourceUrl: string, since: number, maxBlocks: number) {
     const normalizedUrl = this.normalizeUrl(sourceUrl);
     const source = await prisma.rSSSource.findUnique({ where: { url: normalizedUrl } });
-    
+
     const limit = Number.isFinite(maxBlocks) && maxBlocks > 0 ? maxBlocks : 50;
 
     if (!source) return { latest: 0, blocks: [], hasMore: false };
@@ -717,7 +717,7 @@ export class StorageService {
         hasMore,
       })
     );
-    
+
     // Wrap as a single block
     const block: StoredSyncBlock = {
       id: latestId,
@@ -906,7 +906,7 @@ export class StorageService {
 
     for (const s of states) {
       if (!s.articleUrl) continue;
-      
+
       const article = await prisma.article.findUnique({ where: { url: s.articleUrl } });
       if (!article) continue;
 
@@ -941,7 +941,7 @@ export class StorageService {
     }
 
     const states = await prisma.userArticleState.findMany({ where });
-    
+
     // Need to map back articleUrl since we store ArticleID
     // But we need to join Article to get URL
     const statesWithUrl = await prisma.userArticleState.findMany({
@@ -1052,15 +1052,15 @@ export class StorageService {
 
     const seen = new Set<string>();
     const articles = rawArticles.filter((a: any) => {
-        const suffixes = this.buildArticleDedupSuffixes(a.url);
-        const key = suffixes[0] || a.url;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+      const suffixes = this.buildArticleDedupSuffixes(a.url);
+      const key = suffixes[0] || a.url;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    return { 
-      total, 
+    return {
+      total,
       articles: articles.map((a: any) => ({
         id: a.id,
         title: a.title,
@@ -1125,7 +1125,7 @@ export class StorageService {
         try {
           const stat = fs.statSync(full);
           total += stat.size;
-        } catch {}
+        } catch { }
       }
       return total;
     } catch (err) {
@@ -1234,7 +1234,7 @@ export class StorageService {
   public async pruneArticles(days: number): Promise<number> {
     const date = new Date();
     date.setDate(date.getDate() - days);
-    
+
     try {
       const result = await prisma.article.deleteMany({
         where: {
@@ -1325,7 +1325,7 @@ export class StorageService {
       orderBy: { updatedAt: 'asc' },
       take: limit
     });
-    
+
     return words;
   }
 
@@ -1340,7 +1340,7 @@ export class StorageService {
 
   public pruneImages(days: number): { count: number; size: number } {
     if (!fs.existsSync(this.cacheDir)) return { count: 0, size: 0 };
-    
+
     const now = Date.now();
     const msPerDay = 24 * 60 * 60 * 1000;
     let deletedCount = 0;
@@ -1358,7 +1358,7 @@ export class StorageService {
             deletedCount++;
             deletedSize += stat.size;
           }
-        } catch {}
+        } catch { }
       }
     } catch (err) {
       logger.error('Failed to prune images:', err);
@@ -1447,7 +1447,7 @@ export class StorageService {
         Object.prototype.hasOwnProperty.call(syncData, 'readingSettings') ||
         Object.prototype.hasOwnProperty.call(syncData, 'sync'));
     const settings = nestedSettings || (rootLooksLikeSettings ? syncData : undefined);
-     
+
     return {
       id: dbUser.uuid,
       username: dbUser.username,
