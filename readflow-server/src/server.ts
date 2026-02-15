@@ -263,9 +263,9 @@ async function start(): Promise<void> {
       }
     };
 
-    // Initial run after 60s, then check every 10 minutes
+    // Initial run after 60s, then check every 1 minute for precise Cron scheduling
     setTimeout(() => { runDailyReportIfDue().catch(() => { }); }, 60_000);
-    setInterval(() => { runDailyReportIfDue().catch(() => { }); }, 10 * 60 * 1000);
+    setInterval(() => { runDailyReportIfDue().catch(() => { }); }, 60 * 1000);
   });
 }
 

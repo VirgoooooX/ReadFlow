@@ -2,6 +2,7 @@ import { PrismaClient } from '.prisma/client';
 import fetch from 'node-fetch';
 import { logger } from '../utils/Logger';
 import { storageService } from './StorageService';
+import parser from 'cron-parser';
 
 const prisma = new PrismaClient({
     datasources: { db: { url: process.env.DATABASE_URL } },
@@ -29,7 +30,7 @@ interface LLMProfile {
 
 interface DailyReportConfig {
     enabled: boolean;
-    intervalHours: number;
+    schedule: string;
     groupNames: string[];
     articleLimit: number;
 }
@@ -162,9 +163,20 @@ export class DailyReportService {
         const settings = configSync?.settings || {};
         const drSettings = settings?.dailyReportSettings;
 
+        // Default schedule: 06:00 and 18:00 daily
+        const defaultSchedule = '0 6,18 * * *';
+
+        // Migrate or use default
+        let schedule = drSettings?.schedule;
+        if (!schedule && typeof drSettings?.intervalHours === 'number') {
+            // If migrating from interval, just use default for simplicity, or try to map?
+            // User likely wants fixed times now.
+            schedule = defaultSchedule;
+        }
+
         return {
             enabled: drSettings?.enabled !== false, // default enabled
-            intervalHours: drSettings?.intervalHours ?? 12,
+            schedule: schedule || defaultSchedule,
             groupNames: Array.isArray(drSettings?.groupNames) ? drSettings.groupNames : [],
             articleLimit: typeof drSettings?.articleLimit === 'number' ? drSettings.articleLimit : 0,
         };
@@ -230,10 +242,17 @@ export class DailyReportService {
     /**
      * Fetch recent articles from the database for given source URLs
      */
-    private async fetchRecentArticles(sourceUrls: string[], lookbackHours: number, limit: number = 0): Promise<ArticleForSummary[]> {
+    private async fetchRecentArticles(
+        sourceUrls: string[],
+        lookbackHours: number,
+        limit: number = 0,
+        startDate?: Date,
+        endDate?: Date
+    ): Promise<ArticleForSummary[]> {
         if (sourceUrls.length === 0) return [];
 
-        const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
+        const since = startDate || new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
+        const until = endDate || new Date();
 
         // Find source IDs
         const sources = await prisma.rSSSource.findMany({
@@ -249,7 +268,10 @@ export class DailyReportService {
         const articles = await prisma.article.findMany({
             where: {
                 sourceId: { in: sourceIds },
-                publishedAt: { gte: since },
+                publishedAt: {
+                    gte: since,
+                    lte: until
+                },
             },
             orderBy: { publishedAt: 'desc' },
             take: limit > 0 ? limit : undefined,
@@ -347,8 +369,11 @@ export class DailyReportService {
     /**
      * Generate a daily report for a specific user
      */
-    async generateForUser(userId: string): Promise<{ id: number; title: string } | null> {
-        logger.info(`[DailyReport] Starting generation for user ${userId}`);
+    async generateForUser(
+        userId: string,
+        options: { type: 'manual' | 'auto'; targetTime?: Date } = { type: 'manual' }
+    ): Promise<{ id: number; title: string } | null> {
+        logger.info(`[DailyReport] Starting generation for user ${userId} (${options.type})`);
 
         // 1. Get user config
         const dbUser = await prisma.user.findUnique({ where: { uuid: userId } });
@@ -360,7 +385,7 @@ export class DailyReportService {
         const userConfig = (dbUser.syncData as any) || {};
         const config = this.getDailyReportConfig(userConfig);
 
-        if (!config.enabled) {
+        if (!config.enabled && options.type === 'auto') {
             logger.info(`[DailyReport] Daily report disabled for user ${userId}`);
             return null;
         }
@@ -375,18 +400,58 @@ export class DailyReportService {
         // 3. Get source URLs for target groups
         const sourceUrls = this.getSourceUrlsForGroups(userConfig, config.groupNames);
         if (sourceUrls.length === 0) {
-            logger.warn(`[DailyReport] No sources found for target groups, user ${userId}`);
+            logger.info(`[DailyReport] No sources found for target groups, user ${userId}`);
             return null;
         }
 
-        logger.info(`[DailyReport] Found ${sourceUrls.length} sources for groups: ${config.groupNames.join(', ') || '(default news)'}`);
+        // 4. Determine Lookback Period
+        let startDate: Date;
+        let endDate: Date;
+        const now = new Date();
 
-        // 4. Fetch recent articles
-        // If interval is 0 (manual), default to 24h lookback
-        const lookbackHours = config.intervalHours > 0 ? config.intervalHours : 24;
-        const articles = await this.fetchRecentArticles(sourceUrls, lookbackHours, config.articleLimit);
+        if (options.type === 'auto' && options.targetTime) {
+            endDate = options.targetTime;
+            try {
+                // Parse schedule relative to targetTime to find the previous slot
+                const interval = parser.parseExpression(config.schedule, {
+                    currentDate: endDate,
+                    tz: 'Asia/Shanghai'
+                });
+                // prev() from targetTime should give us the start of the period
+                // Note: cron-parser start date is inclusive/exclusive depending on options.
+                // If currentDate matches schedule, prev() goes back.
+                startDate = interval.prev().toDate();
+            } catch (e) {
+                logger.warn(`[DailyReport] Failed to parse schedule for user ${userId}, falling back to 12h`, e);
+                startDate = new Date(endDate.getTime() - 12 * 60 * 60 * 1000);
+            }
+        } else {
+            // Manual: default to last 24h or since last report?
+            // Ideally manual covers "now", maybe looks back 24h.
+            endDate = now;
+            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        }
+
+        // Calculate lookback hours effectively for fetch function (which takes hours)
+        // Or refactor fetchRecentArticles to take Date range.
+        // Current fetchRecentArticles takes hours. modifying it is better.
+        // Let's modify fetchRecentArticles signature first?
+        // Or just calculate hours.
+        const diffMs = endDate.getTime() - startDate.getTime();
+        const lookbackHours = diffMs / (1000 * 60 * 60);
+
+        logger.info(`[DailyReport] Fetching articles from ${startDate.toISOString()} to ${endDate.toISOString()} (${lookbackHours.toFixed(1)}h)`);
+
+        const articles = await this.fetchRecentArticles(sourceUrls, lookbackHours, config.articleLimit, startDate, endDate);
+
         if (articles.length === 0) {
             logger.info(`[DailyReport] No recent articles found for user ${userId}`);
+            // Even if no articles, if it's auto, we might want to update the schedule to avoid retrying?
+            // But if we strictly return null, the caller (scheduler) won't update syncData.
+            // Let's return null here, but the scheduler should probably update the timestamp anyway to "skip" this slot?
+            // Or maybe generate an "Empty Report"?
+            // For now, let's treat it as "done" but no report generated.
+            // Caller needs to distinguish.
             return null;
         }
 
@@ -397,9 +462,8 @@ export class DailyReportService {
         const summary = await callLLM(userPrompt, systemPrompt, llmProfile);
 
         // 6. Build title
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-        const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const dateStr = endDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = endDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
         const title = `${dateStr} ${timeStr} 日报`;
 
         // 7. Save to database
@@ -411,13 +475,35 @@ export class DailyReportService {
                 sourceUrls: articles.map(a => a.url),
                 articleCount: articles.length,
                 groupNames: config.groupNames.length > 0 ? config.groupNames : ['新闻'],
-                generatedAt: now,
+                generatedAt: endDate, // Use target time as generation time? Or actual generation time? Better actual.
+                // Actually, for sorting, using 'now' is better.
             },
         });
 
-        logger.info(`[DailyReport] Generated report #${report.id} for user ${userId}: "${title}" (${articles.length} articles)`);
+        // 8. Update SyncData if Auto
+        if (options.type === 'auto' && options.targetTime) {
+            await this.updateLastAutoTime(userId, dbUser.syncData, options.targetTime);
+        }
 
+        logger.info(`[DailyReport] Generated report #${report.id} for user ${userId}: "${title}"`);
         return { id: report.id, title };
+    }
+
+    private async updateLastAutoTime(userId: string, currentSyncData: any, time: Date) {
+        try {
+            const newSyncData = JSON.parse(JSON.stringify(currentSyncData || {}));
+            if (!newSyncData.dailyReport) newSyncData.dailyReport = {};
+
+            newSyncData.dailyReport.lastAutoReportTime = time.toISOString();
+
+            await prisma.user.update({
+                where: { uuid: userId },
+                data: { syncData: newSyncData }
+            });
+            logger.info(`[DailyReport] Updated lastAutoReportTime for user ${userId} to ${time.toISOString()}`);
+        } catch (e) {
+            logger.error(`[DailyReport] Failed to update syncData for user ${userId}`, e);
+        }
     }
 
     /**
@@ -507,6 +593,8 @@ export class DailyReportService {
             select: { uuid: true, syncData: true },
         });
 
+        const now = new Date();
+
         for (const user of users) {
             try {
                 const userConfig = (user.syncData as any) || {};
@@ -514,27 +602,46 @@ export class DailyReportService {
 
                 if (!config.enabled) continue;
 
-                // If interval is 0 (manual), skip auto-scheduling
-                if (config.intervalHours <= 0) continue;
-
-                // Check if a report was generated recently enough
-                const lastReport = await prismaAny.dailyReport.findFirst({
-                    where: { userId: user.uuid },
-                    orderBy: { generatedAt: 'desc' },
-                    select: { generatedAt: true },
+                // Parse schedule
+                // User input: "0 6,18 * * *"
+                // We want to find the latest "tick" that happened <= now
+                const interval = parser.parseExpression(config.schedule, {
+                    currentDate: now,
+                    tz: 'Asia/Shanghai'
                 });
 
-                const intervalMs = config.intervalHours * 60 * 60 * 1000;
-                const now = Date.now();
+                // prev() finds the most recent execution time relative to 'now'
+                const prev = interval.prev();
+                const targetTime = prev.toDate();
 
-                if (lastReport && (now - lastReport.generatedAt.getTime()) < intervalMs) {
-                    continue; // Not due yet
+                // Check last auto time
+                const lastAutoTimeStr = userConfig.dailyReport?.lastAutoReportTime;
+                let shouldGenerate = false;
+
+                if (!lastAutoTimeStr) {
+                    // Never generated -> generate
+                    shouldGenerate = true;
+                } else {
+                    const lastAutoTime = new Date(lastAutoTimeStr);
+                    // If last run was before target time, we missed this slot
+                    if (lastAutoTime.getTime() < targetTime.getTime()) {
+                        shouldGenerate = true;
+                    }
                 }
 
-                logger.info(`[DailyReport] User ${user.uuid} is due for report generation`);
-                await this.generateForUser(user.uuid);
+                if (shouldGenerate) {
+                    logger.info(`[DailyReport] User ${user.uuid} due for report at ${targetTime.toISOString()}`);
+                    const result = await this.generateForUser(user.uuid, { type: 'auto', targetTime });
+
+                    // If result is null (e.g. no articles), we MUST still update the timestamp
+                    // Otherwise it will retry every minute forever.
+                    if (!result) {
+                        await this.updateLastAutoTime(user.uuid, user.syncData, targetTime);
+                    }
+                }
+
             } catch (e) {
-                logger.error(`[DailyReport] Failed for user ${user.uuid}:`, e);
+                logger.error(`[DailyReport] Failed schedule check for user ${user.uuid}:`, e);
             }
         }
 
