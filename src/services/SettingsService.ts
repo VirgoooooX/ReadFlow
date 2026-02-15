@@ -654,7 +654,7 @@ export class SettingsService {
    */
   public async getDailyReportSettings(): Promise<{
     enabled: boolean;
-    intervalHours: number;
+    schedule: string;
     groupNames: string[];
     articleLimit: number;
   }> {
@@ -662,9 +662,13 @@ export class SettingsService {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.DAILY_REPORT_SETTINGS);
       if (stored) {
         const parsed = JSON.parse(stored);
+        // Migration: If schedule is missing but intervalHours exists, map it best effort or default
+        // Actually, easiest is just default to '0 6,18 * * *' if missing
+        let schedule = typeof parsed.schedule === 'string' ? parsed.schedule : '0 6,18 * * *';
+
         return {
           enabled: parsed.enabled !== false,
-          intervalHours: typeof parsed.intervalHours === 'number' ? parsed.intervalHours : 12,
+          schedule,
           groupNames: Array.isArray(parsed.groupNames) ? parsed.groupNames : [],
           articleLimit: typeof parsed.articleLimit === 'number' ? parsed.articleLimit : 0,
         };
@@ -672,7 +676,7 @@ export class SettingsService {
     } catch (error) {
       logger.error('Error reading daily report settings:', error);
     }
-    return { enabled: true, intervalHours: 12, groupNames: [], articleLimit: 0 };
+    return { enabled: true, schedule: '0 6,18 * * *', groupNames: [], articleLimit: 0 };
   }
 
   /**
@@ -680,7 +684,7 @@ export class SettingsService {
    */
   public async saveDailyReportSettings(settings: {
     enabled?: boolean;
-    intervalHours?: number;
+    schedule?: string;
     groupNames?: string[];
     articleLimit?: number;
   }): Promise<void> {

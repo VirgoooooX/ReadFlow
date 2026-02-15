@@ -19,20 +19,16 @@ import { SettingsService } from '../../services/SettingsService';
 import { RSSGroupService } from '../../services/RSSGroupService';
 import { dailyReportApiService } from '../../services/DailyReportApiService';
 
-const INTERVAL_OPTIONS = [
-    { label: '手动', value: 0 },
-    { label: '6小时', value: 6 },
-    { label: '12小时', value: 12 },
-    { label: '24小时', value: 24 },
-];
-
 const DailyReportSettingsScreen: React.FC = () => {
     const { theme } = useThemeContext();
     const navigation = useNavigation();
     const settingsService = SettingsService.getInstance();
 
     const [enabled, setEnabled] = useState(true);
-    const [intervalHours, setIntervalHours] = useState(12);
+    const [schedule, setSchedule] = useState('0 6,18 * * *');
+    const [scheduleText, setScheduleText] = useState('0 6,18 * * *');
+    const [scheduleError, setScheduleError] = useState('');
+
     const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
     const [articleLimit, setArticleLimit] = useState(0);
     const [articleLimitText, setArticleLimitText] = useState('0');
@@ -47,9 +43,12 @@ const DailyReportSettingsScreen: React.FC = () => {
                 RSSGroupService.getInstance().getAllGroups(),
             ]);
             setEnabled(drSettings.enabled);
-            setIntervalHours(drSettings.intervalHours);
+            const loadedSchedule = drSettings.schedule || '0 6,18 * * *';
+            setSchedule(loadedSchedule);
+            setScheduleText(loadedSchedule);
+
             setSelectedGroups(drSettings.groupNames);
-            setArticleLimit(drSettings.articleLimit || 0); // Default to 0 if undefined
+            setArticleLimit(drSettings.articleLimit || 0);
             setArticleLimitText((drSettings.articleLimit || 0).toString());
             setAllGroups(groups.map((g: any) => ({ id: g.id, name: g.name })));
         } catch (error) {
@@ -68,7 +67,7 @@ const DailyReportSettingsScreen: React.FC = () => {
     }, [navigation]);
 
     const saveSettings = async (updates: any) => {
-        const merged = { enabled, intervalHours, groupNames: selectedGroups, articleLimit, ...updates };
+        const merged = { enabled, schedule, groupNames: selectedGroups, articleLimit, ...updates };
         await settingsService.saveDailyReportSettings(merged);
     };
 
@@ -77,9 +76,35 @@ const DailyReportSettingsScreen: React.FC = () => {
         await saveSettings({ enabled: value });
     };
 
-    const handleIntervalChange = async (hours: number) => {
-        setIntervalHours(hours);
-        await saveSettings({ intervalHours: hours });
+    const validateCron = (cron: string) => {
+        const parts = cron.trim().split(/\s+/);
+        return parts.length === 5;
+    };
+
+    const handleScheduleChange = (text: string) => {
+        setScheduleText(text);
+        if (text.trim() === '') {
+            setScheduleError('Cron 表达式不能为空');
+        } else if (!validateCron(text)) {
+            setScheduleError('格式需为 5 段，例如: 0 6 * * *');
+        } else {
+            setScheduleError('');
+        }
+    };
+
+    const handleScheduleBlur = () => {
+        if (validateCron(scheduleText)) {
+            setSchedule(scheduleText);
+            saveSettings({ schedule: scheduleText });
+        } else {
+            // Revert to valid if invalid? Or just keep showing error
+            // Let's not revert to avoid frustration, just don't save.
+            if (scheduleText.trim() === '') {
+                // If empty, revert
+                setScheduleText(schedule);
+                setScheduleError('');
+            }
+        }
     };
 
     const handleGroupToggle = async (groupName: string) => {
@@ -105,11 +130,11 @@ const DailyReportSettingsScreen: React.FC = () => {
     const handleArticleLimitBlur = () => {
         let val = parseInt(articleLimitText);
         if (isNaN(val) || val < 0) {
-            val = articleLimit; // revert to last valid
+            val = articleLimit;
             setArticleLimitText(val.toString());
         } else {
             setArticleLimit(val);
-            saveSettings({ articleLimit: val }); // Save on blur to ensure validity
+            saveSettings({ articleLimit: val });
         }
     };
 
@@ -149,7 +174,7 @@ const DailyReportSettingsScreen: React.FC = () => {
                     <View style={styles.row}>
                         <View style={styles.rowLeft}>
                             <MaterialIcons name="auto-awesome" size={22} color={theme.colors.primary} />
-                            <Text style={[styles.rowLabel, { color: theme.colors.onSurface }]}>启用 AI 日报</Text>
+                            <Text style={[styles.rowLabel, { color: theme.colors.onSurface }]}>启用自动生成</Text>
                         </View>
                         <Switch
                             value={enabled}
@@ -160,34 +185,38 @@ const DailyReportSettingsScreen: React.FC = () => {
                     </View>
                 </View>
 
-                <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>生成间隔</Text>
-                    <View style={styles.intervalGrid}>
-                        {INTERVAL_OPTIONS.map(opt => (
-                            <TouchableOpacity
-                                key={opt.value}
+                {enabled && (
+                    <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>生成时间表 (Cron)</Text>
+                        <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+                            配置自动生成的 Cron 表达式 (分 时 日 月 周)
+                        </Text>
+                        <View style={styles.inputContainer}>
+                            <TextInput
                                 style={[
-                                    styles.intervalChip,
+                                    styles.textInput,
                                     {
-                                        backgroundColor:
-                                            intervalHours === opt.value ? theme.colors.primary + '20' : theme.colors.background,
-                                        borderColor: intervalHours === opt.value ? theme.colors.primary : theme.colors.outline,
-                                    },
+                                        color: theme.colors.onSurface,
+                                        backgroundColor: theme.colors.surfaceVariant,
+                                        borderColor: scheduleError ? theme.colors.error : theme.colors.outline
+                                    }
                                 ]}
-                                onPress={() => handleIntervalChange(opt.value)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.intervalChipText,
-                                        { color: intervalHours === opt.value ? theme.colors.primary : theme.colors.onSurface },
-                                    ]}
-                                >
-                                    {opt.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                                value={scheduleText}
+                                onChangeText={handleScheduleChange}
+                                onBlur={handleScheduleBlur}
+                                placeholder="0 6,18 * * *"
+                                placeholderTextColor={theme.colors.onSurfaceVariant}
+                                autoCapitalize="none"
+                            />
+                        </View>
+                        {!!scheduleError && (
+                            <Text style={[styles.errorText, { color: theme.colors.error }]}>{scheduleError}</Text>
+                        )}
+                        <Text style={[styles.helperText, { color: theme.colors.onSurfaceVariant }]}>
+                            示例：{'0 6,18 * * *'} (每天 06:00 和 18:00)
+                        </Text>
                     </View>
-                </View>
+                )}
 
                 <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
                     <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>最大文章数限制</Text>
@@ -289,19 +318,6 @@ const styles = StyleSheet.create({
     rowLabel: { fontSize: 15, fontWeight: '500', lineHeight: 22, includeFontPadding: false },
     sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 4, lineHeight: 22, includeFontPadding: false },
     sectionSubtitle: { fontSize: 12, marginBottom: 12, lineHeight: 18, includeFontPadding: false },
-    intervalGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginTop: 8,
-    },
-    intervalChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-    },
-    intervalChipText: { fontSize: 14, fontWeight: '500', lineHeight: 20, includeFontPadding: false },
     groupRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -330,12 +346,22 @@ const styles = StyleSheet.create({
     textInput: {
         borderRadius: 8,
         paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 14,
-        lineHeight: 20,
+        paddingVertical: 10,
+        fontSize: 15,
+        lineHeight: 22,
         includeFontPadding: false,
         borderWidth: 1,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
+    errorText: {
+        marginTop: 6,
+        fontSize: 12,
+    },
+    helperText: {
+        marginTop: 8,
+        fontSize: 12,
+        fontStyle: 'italic',
+    }
 });
 
 export default DailyReportSettingsScreen;
