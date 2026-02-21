@@ -29,7 +29,7 @@ interface LLMProfile {
 
 interface DailyReportConfig {
     enabled: boolean;
-    intervalHours: number;
+    scheduledTime: string; // HH:mm format, e.g. "06:00"
     groupNames: string[];
     articleLimit: number;
 }
@@ -162,9 +162,15 @@ export class DailyReportService {
         const settings = configSync?.settings || {};
         const drSettings = settings?.dailyReportSettings;
 
+        // Backwards compat: if scheduledTime not set, default to "06:00"
+        let scheduledTime = '06:00';
+        if (typeof drSettings?.scheduledTime === 'string' && /^\d{2}:\d{2}$/.test(drSettings.scheduledTime)) {
+            scheduledTime = drSettings.scheduledTime;
+        }
+
         return {
             enabled: drSettings?.enabled !== false, // default enabled
-            intervalHours: drSettings?.intervalHours ?? 12,
+            scheduledTime,
             groupNames: Array.isArray(drSettings?.groupNames) ? drSettings.groupNames : [],
             articleLimit: typeof drSettings?.articleLimit === 'number' ? drSettings.articleLimit : 0,
         };
@@ -230,10 +236,8 @@ export class DailyReportService {
     /**
      * Fetch recent articles from the database for given source URLs
      */
-    private async fetchRecentArticles(sourceUrls: string[], lookbackHours: number, limit: number = 0): Promise<ArticleForSummary[]> {
+    private async fetchRecentArticles(sourceUrls: string[], since: Date, limit: number = 0): Promise<ArticleForSummary[]> {
         if (sourceUrls.length === 0) return [];
-
-        const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
 
         // Find source IDs
         const sources = await prisma.rSSSource.findMany({
@@ -285,44 +289,47 @@ export class DailyReportService {
 - **全球视野**：关注全球科技、金融、地缘政治的互动。
 - **排版美观**：直接从H1标题开始输出，拒绝任何多余的开场白，合理使用 Emoji、加粗、列表等 Markdown 语法，提升阅读体验。
 
-## 输出结构
+## 绝对结构规范（必须严格遵守的标题层级）
 
-### 1. 今日洞察（H1）
+整份报告**只能且必须**包含以下层级的标题，且必须严格按照以下格式输出：
 
-\`# 💡 今日洞察\`
-用**一段话**（100-150字）概括今天最重要的宏观趋势。将科技进步、市场动态和地缘政治联系起来，给出你独到的见解。**不要**使用额外的子标题，重点信息要加粗显示。
+### 1. 今日洞察（全局唯一 H1）
 
-### 2. 分类新闻（H2）
+**必须原样输出：** \`# 💡 今日洞察\`
+用**一段话**（100-150字）概括今天最重要的宏观趋势。将科技进步、市场动态和地缘政治联系起来，给出你独到的见解。**此部分下绝对禁止使用任何子标题**，重点信息请加粗显示。
 
-请将新闻分为以下几类（根据实际内容调整，可增减）：
+### 2. 分类新闻（必须且只能使用 H2）
+
+将新闻分为以下几类（根据实际内容调整，可增减），**分类标题必须是 H2 (##)**：
 
 - \`## 🚀 科技前沿\`
 - \`## 💰 金融市场\`
 - \`## 🌏 全球动态\`
 - \`## 🗞️ 社会百态\`
 
-请根据新闻内容，在每个分类下提炼 3-5 个核心主题（例如 "AI模型与应用"、"硬件创新"、"投融资动态" 等，根据实际内容调整，可增减）
+在每个 H2 分类下，提炼 3-5 个核心主题。**核心主题必须且只能是 H3 (###)**（例如：\`### AI模型与应用\`）。
 
-- 每个主题下面用无序列表列出简短的每条相关新闻的总结，要尽量简练，简短，一句话即可
-- 每个条目之间不加空行
-- 在句末用括号标注来源，如 \`(cnBeta, AIBase)\`
+在每个 H3 核心主题下：
+- 用无序列表列出相关新闻的总结，尽量简练，一句话即可。
+- 每个条目之间不加空行。
+- 在句末用横线或括号标注来源，如 \`(cnBeta, AIBase)\`。
 - 对关键实体（公司、产品、人名）进行**加粗**。
 
-### 3. 资讯速览（H2）
+### 3. 资讯速览（必须且只能使用 H2）
 
-\`## ⚡ 资讯速览\`
-用简短的一句话概括其他值得关注的快讯（10-15条）。
+**必须原样输出：** \`## ⚡ 资讯速览\`
+汇总其他值得关注的快讯（10-15条）。**此部分绝对禁止使用任何 H3 或其他层级的标题**。格式如下：
 
-- **标题**：一句话内容。_(来源)_
+- 内容快讯摘要一句话。_(来源)_
+- 内容快讯摘要一句话。_(来源)_
 
-## 格式要求
+## 其他格式要求
 
-- 严格遵守 H1 (#) 和 H2 (##) 标题层级。
-- **不要**在 H2 之间添加分割线（---）。
-- **不要**换行显示新闻内容，保持 '- **标题**：内容' 的单行格式。
+- **严禁**在上述指定结构之外自创任何 H1、H2、H3 标题。
+- **不要**在标题之间添加分割线（---）。
+- **不要**换行显示新闻快讯，保持单行格式。
 - 来源格式统一为 '_(来源名称)_'，例如 '_(cnBeta)_' 或 '_(BBC, 参考消息)_'。
-- 关键信息（如人名、公司名、数据）适当**加粗**。
-- 段落之间保留空行，但**列表项之间不要留空行**（紧凑列表）。`;
+- 段落之间保留空行，但**列表项之间不要留空行**（保持紧凑）。`;
 
         const systemPrompt = settings.dailyReportSystemPrompt || defaultSystemPrompt;
 
@@ -346,9 +353,10 @@ export class DailyReportService {
 
     /**
      * Generate a daily report for a specific user
+     * @param generatedBy - 'manual' for user-triggered, 'auto' for scheduled
      */
-    async generateForUser(userId: string): Promise<{ id: number; title: string } | null> {
-        logger.info(`[DailyReport] Starting generation for user ${userId}`);
+    async generateForUser(userId: string, generatedBy: 'auto' | 'manual' = 'manual'): Promise<{ id: number; title: string } | null> {
+        logger.info(`[DailyReport] Starting ${generatedBy} generation for user ${userId}`);
 
         // 1. Get user config
         const dbUser = await prisma.user.findUnique({ where: { uuid: userId } });
@@ -372,7 +380,7 @@ export class DailyReportService {
             return null;
         }
 
-        // 3. Get source URLs for target groups
+        // 3. Get source URLs for ALL selected groups
         const sourceUrls = this.getSourceUrlsForGroups(userConfig, config.groupNames);
         if (sourceUrls.length === 0) {
             logger.warn(`[DailyReport] No sources found for target groups, user ${userId}`);
@@ -381,10 +389,9 @@ export class DailyReportService {
 
         logger.info(`[DailyReport] Found ${sourceUrls.length} sources for groups: ${config.groupNames.join(', ') || '(default news)'}`);
 
-        // 4. Fetch recent articles
-        // If interval is 0 (manual), default to 24h lookback
-        const lookbackHours = config.intervalHours > 0 ? config.intervalHours : 24;
-        const articles = await this.fetchRecentArticles(sourceUrls, lookbackHours, config.articleLimit);
+        // 4. Fetch articles from the last 24 hours
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const articles = await this.fetchRecentArticles(sourceUrls, since, config.articleLimit);
         if (articles.length === 0) {
             logger.info(`[DailyReport] No recent articles found for user ${userId}`);
             return null;
@@ -402,7 +409,7 @@ export class DailyReportService {
         const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
         const title = `${dateStr} ${timeStr} 日报`;
 
-        // 7. Save to database
+        // 7. Save to database with generatedBy marker
         const report = await prismaAny.dailyReport.create({
             data: {
                 userId,
@@ -411,11 +418,12 @@ export class DailyReportService {
                 sourceUrls: articles.map(a => a.url),
                 articleCount: articles.length,
                 groupNames: config.groupNames.length > 0 ? config.groupNames : ['新闻'],
+                generatedBy,
                 generatedAt: now,
             },
         });
 
-        logger.info(`[DailyReport] Generated report #${report.id} for user ${userId}: "${title}" (${articles.length} articles)`);
+        logger.info(`[DailyReport] Generated ${generatedBy} report #${report.id} for user ${userId}: "${title}" (${articles.length} articles)`);
 
         return { id: report.id, title };
     }
@@ -498,7 +506,9 @@ export class DailyReportService {
     }
 
     /**
-     * Schedule daily report generation for all users who need it
+     * Schedule daily report generation for all users who need it.
+     * Uses fixed daily time scheduling: checks if current time has passed
+     * the user's scheduledTime and no auto report exists for today.
      */
     async scheduleAllUsers(): Promise<void> {
         logger.info('[DailyReport] Checking all users for due report generation...');
@@ -507,6 +517,8 @@ export class DailyReportService {
             select: { uuid: true, syncData: true },
         });
 
+        const now = new Date();
+
         for (const user of users) {
             try {
                 const userConfig = (user.syncData as any) || {};
@@ -514,25 +526,39 @@ export class DailyReportService {
 
                 if (!config.enabled) continue;
 
-                // If interval is 0 (manual), skip auto-scheduling
-                if (config.intervalHours <= 0) continue;
+                // Parse scheduled time (HH:mm)
+                const [hourStr, minStr] = config.scheduledTime.split(':');
+                const scheduledHour = parseInt(hourStr, 10);
+                const scheduledMin = parseInt(minStr, 10);
+                if (isNaN(scheduledHour) || isNaN(scheduledMin)) continue;
 
-                // Check if a report was generated recently enough
-                const lastReport = await prismaAny.dailyReport.findFirst({
-                    where: { userId: user.uuid },
-                    orderBy: { generatedAt: 'desc' },
-                    select: { generatedAt: true },
+                // Build today's scheduled datetime (server timezone: Asia/Shanghai)
+                const todayScheduled = new Date(now);
+                todayScheduled.setHours(scheduledHour, scheduledMin, 0, 0);
+
+                // Not yet time
+                if (now < todayScheduled) continue;
+
+                // Check if an AUTO report already exists for today
+                // "Today" = from 00:00 of current day
+                const todayStart = new Date(now);
+                todayStart.setHours(0, 0, 0, 0);
+
+                const existingAutoReport = await prismaAny.dailyReport.findFirst({
+                    where: {
+                        userId: user.uuid,
+                        generatedBy: 'auto',
+                        generatedAt: { gte: todayStart },
+                    },
+                    select: { id: true },
                 });
 
-                const intervalMs = config.intervalHours * 60 * 60 * 1000;
-                const now = Date.now();
-
-                if (lastReport && (now - lastReport.generatedAt.getTime()) < intervalMs) {
-                    continue; // Not due yet
+                if (existingAutoReport) {
+                    continue; // Already generated today (auto), skip
                 }
 
-                logger.info(`[DailyReport] User ${user.uuid} is due for report generation`);
-                await this.generateForUser(user.uuid);
+                logger.info(`[DailyReport] User ${user.uuid} is due for auto report (scheduled: ${config.scheduledTime})`);
+                await this.generateForUser(user.uuid, 'auto');
             } catch (e) {
                 logger.error(`[DailyReport] Failed for user ${user.uuid}:`, e);
             }
