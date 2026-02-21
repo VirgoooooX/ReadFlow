@@ -654,7 +654,7 @@ export class SettingsService {
    */
   public async getDailyReportSettings(): Promise<{
     enabled: boolean;
-    intervalHours: number;
+    scheduledTime: string;
     groupNames: string[];
     articleLimit: number;
   }> {
@@ -662,9 +662,14 @@ export class SettingsService {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.DAILY_REPORT_SETTINGS);
       if (stored) {
         const parsed = JSON.parse(stored);
+        // Backwards compat: migrate from intervalHours to scheduledTime
+        let scheduledTime = '06:00';
+        if (typeof parsed.scheduledTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.scheduledTime)) {
+          scheduledTime = parsed.scheduledTime;
+        }
         return {
           enabled: parsed.enabled !== false,
-          intervalHours: typeof parsed.intervalHours === 'number' ? parsed.intervalHours : 12,
+          scheduledTime,
           groupNames: Array.isArray(parsed.groupNames) ? parsed.groupNames : [],
           articleLimit: typeof parsed.articleLimit === 'number' ? parsed.articleLimit : 0,
         };
@@ -672,7 +677,7 @@ export class SettingsService {
     } catch (error) {
       logger.error('Error reading daily report settings:', error);
     }
-    return { enabled: true, intervalHours: 12, groupNames: [], articleLimit: 0 };
+    return { enabled: true, scheduledTime: '06:00', groupNames: [], articleLimit: 0 };
   }
 
   /**
@@ -680,7 +685,7 @@ export class SettingsService {
    */
   public async saveDailyReportSettings(settings: {
     enabled?: boolean;
-    intervalHours?: number;
+    scheduledTime?: string;
     groupNames?: string[];
     articleLimit?: number;
   }): Promise<void> {

@@ -19,11 +19,8 @@ import { SettingsService } from '../../services/SettingsService';
 import { RSSGroupService } from '../../services/RSSGroupService';
 import { dailyReportApiService } from '../../services/DailyReportApiService';
 
-const INTERVAL_OPTIONS = [
-    { label: '手动', value: 0 },
-    { label: '6小时', value: 6 },
-    { label: '12小时', value: 12 },
-    { label: '24小时', value: 24 },
+const TIME_PRESETS = [
+    '06:00', '07:00', '08:00', '09:00', '12:00', '18:00', '22:00',
 ];
 
 const DailyReportSettingsScreen: React.FC = () => {
@@ -32,13 +29,16 @@ const DailyReportSettingsScreen: React.FC = () => {
     const settingsService = SettingsService.getInstance();
 
     const [enabled, setEnabled] = useState(true);
-    const [intervalHours, setIntervalHours] = useState(12);
+    const [scheduledTime, setScheduledTime] = useState('06:00');
+    const [customTime, setCustomTime] = useState('');
     const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
     const [articleLimit, setArticleLimit] = useState(0);
     const [articleLimitText, setArticleLimitText] = useState('0');
     const [allGroups, setAllGroups] = useState<{ id: number; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
+
+    const isPresetTime = TIME_PRESETS.includes(scheduledTime);
 
     const loadSettings = useCallback(async () => {
         try {
@@ -47,9 +47,12 @@ const DailyReportSettingsScreen: React.FC = () => {
                 RSSGroupService.getInstance().getAllGroups(),
             ]);
             setEnabled(drSettings.enabled);
-            setIntervalHours(drSettings.intervalHours);
+            setScheduledTime(drSettings.scheduledTime);
+            if (!TIME_PRESETS.includes(drSettings.scheduledTime)) {
+                setCustomTime(drSettings.scheduledTime);
+            }
             setSelectedGroups(drSettings.groupNames);
-            setArticleLimit(drSettings.articleLimit || 0); // Default to 0 if undefined
+            setArticleLimit(drSettings.articleLimit || 0);
             setArticleLimitText((drSettings.articleLimit || 0).toString());
             setAllGroups(groups.map((g: any) => ({ id: g.id, name: g.name })));
         } catch (error) {
@@ -68,7 +71,7 @@ const DailyReportSettingsScreen: React.FC = () => {
     }, [navigation]);
 
     const saveSettings = async (updates: any) => {
-        const merged = { enabled, intervalHours, groupNames: selectedGroups, articleLimit, ...updates };
+        const merged = { enabled, scheduledTime, groupNames: selectedGroups, articleLimit, ...updates };
         await settingsService.saveDailyReportSettings(merged);
     };
 
@@ -77,9 +80,35 @@ const DailyReportSettingsScreen: React.FC = () => {
         await saveSettings({ enabled: value });
     };
 
-    const handleIntervalChange = async (hours: number) => {
-        setIntervalHours(hours);
-        await saveSettings({ intervalHours: hours });
+    const handleTimePresetSelect = async (time: string) => {
+        setScheduledTime(time);
+        setCustomTime('');
+        await saveSettings({ scheduledTime: time });
+    };
+
+    const handleCustomTimeChange = (text: string) => {
+        // Only allow digits and colon, max 5 chars (HH:mm)
+        const cleaned = text.replace(/[^0-9:]/g, '').slice(0, 5);
+        setCustomTime(cleaned);
+    };
+
+    const handleCustomTimeBlur = async () => {
+        const match = customTime.match(/^(\d{2}):(\d{2})$/);
+        if (match) {
+            const hour = parseInt(match[1], 10);
+            const min = parseInt(match[2], 10);
+            if (hour >= 0 && hour <= 23 && min >= 0 && min <= 59) {
+                const time = `${match[1]}:${match[2]}`;
+                setScheduledTime(time);
+                await saveSettings({ scheduledTime: time });
+                return;
+            }
+        }
+        // Invalid input: revert
+        if (customTime !== '') {
+            setCustomTime('');
+            Alert.alert('格式错误', '请输入有效的时间（格式：HH:mm，如 06:30）');
+        }
     };
 
     const handleGroupToggle = async (groupName: string) => {
@@ -161,32 +190,64 @@ const DailyReportSettingsScreen: React.FC = () => {
                 </View>
 
                 <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>生成间隔</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>每日生成时间</Text>
+                    <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+                        选择每天自动生成日报的时间（服务器时区 UTC+8）
+                    </Text>
                     <View style={styles.intervalGrid}>
-                        {INTERVAL_OPTIONS.map(opt => (
+                        {TIME_PRESETS.map(time => (
                             <TouchableOpacity
-                                key={opt.value}
+                                key={time}
                                 style={[
                                     styles.intervalChip,
                                     {
                                         backgroundColor:
-                                            intervalHours === opt.value ? theme.colors.primary + '20' : theme.colors.background,
-                                        borderColor: intervalHours === opt.value ? theme.colors.primary : theme.colors.outline,
+                                            scheduledTime === time ? theme.colors.primary + '20' : theme.colors.background,
+                                        borderColor: scheduledTime === time ? theme.colors.primary : theme.colors.outline,
                                     },
                                 ]}
-                                onPress={() => handleIntervalChange(opt.value)}
+                                onPress={() => handleTimePresetSelect(time)}
                             >
                                 <Text
                                     style={[
                                         styles.intervalChipText,
-                                        { color: intervalHours === opt.value ? theme.colors.primary : theme.colors.onSurface },
+                                        { color: scheduledTime === time ? theme.colors.primary : theme.colors.onSurface },
                                     ]}
                                 >
-                                    {opt.label}
+                                    {time}
                                 </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
+                    <View style={styles.customTimeRow}>
+                        <Text style={[styles.customTimeLabel, { color: theme.colors.onSurfaceVariant }]}>
+                            自定义时间：
+                        </Text>
+                        <TextInput
+                            style={[
+                                styles.customTimeInput,
+                                {
+                                    color: theme.colors.onSurface,
+                                    backgroundColor: theme.colors.surfaceVariant,
+                                    borderColor: !isPresetTime && scheduledTime === customTime
+                                        ? theme.colors.primary
+                                        : theme.colors.outline,
+                                },
+                            ]}
+                            value={customTime}
+                            onChangeText={handleCustomTimeChange}
+                            onBlur={handleCustomTimeBlur}
+                            placeholder="HH:mm"
+                            placeholderTextColor={theme.colors.onSurfaceVariant}
+                            keyboardType="numbers-and-punctuation"
+                            maxLength={5}
+                        />
+                    </View>
+                    {!isPresetTime && scheduledTime && (
+                        <Text style={[styles.currentTimeHint, { color: theme.colors.primary }]}>
+                            当前设定：{scheduledTime}
+                        </Text>
+                    )}
                 </View>
 
                 <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -260,6 +321,9 @@ const DailyReportSettingsScreen: React.FC = () => {
                             </>
                         )}
                     </TouchableOpacity>
+                    <Text style={[styles.manualHint, { color: theme.colors.onSurfaceVariant }]}>
+                        手动生成不影响每日自动生成
+                    </Text>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -302,6 +366,34 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     intervalChipText: { fontSize: 14, fontWeight: '500', lineHeight: 20, includeFontPadding: false },
+    customTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+        gap: 8,
+    },
+    customTimeLabel: {
+        fontSize: 13,
+        lineHeight: 20,
+        includeFontPadding: false,
+    },
+    customTimeInput: {
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        fontSize: 14,
+        lineHeight: 20,
+        includeFontPadding: false,
+        borderWidth: 1,
+        width: 80,
+        textAlign: 'center',
+    },
+    currentTimeHint: {
+        fontSize: 12,
+        marginTop: 6,
+        lineHeight: 18,
+        includeFontPadding: false,
+    },
     groupRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -322,6 +414,13 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         lineHeight: 22,
+        includeFontPadding: false,
+    },
+    manualHint: {
+        fontSize: 11,
+        textAlign: 'center',
+        marginTop: 8,
+        lineHeight: 16,
         includeFontPadding: false,
     },
     inputContainer: {
