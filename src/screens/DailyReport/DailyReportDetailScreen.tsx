@@ -456,45 +456,62 @@ const DailyReportDetailScreen: React.FC = () => {
         });
     }, [navigation, report?.title]);
 
-    // Build sourceName → articleId map for inline link replacement
-    const sourceNameMap = useMemo(() => {
-        const map = new Map<string, number>();
+    // Build articleIndex (1-based) → articleId map for inline link replacement
+    const articleIndexMap = useMemo(() => {
+        const map = new Map<number, number>();
         const articles = report?.sourceArticles;
-        if (!articles) return map;
+        const urls = report?.sourceUrls;
+        if (!articles || !urls) return map;
+
+        // Build url → articleId lookup
+        const urlToId = new Map<string, number>();
         for (const a of articles) {
-            if (a.sourceName) {
-                // Use first article found for each source name (lowercase key for matching)
-                const key = a.sourceName.toLowerCase();
-                if (!map.has(key)) {
-                    map.set(key, a.articleId);
-                }
+            if (a.url && !urlToId.has(a.url)) {
+                urlToId.set(a.url, a.articleId);
             }
         }
+
+        // sourceUrls are in the same order as articles sent to LLM (1-based index)
+        urls.forEach((url, i) => {
+            const aid = urlToId.get(url);
+            if (aid !== undefined) {
+                map.set(i + 1, aid); // article index is 1-based
+            }
+        });
+
         return map;
-    }, [report?.sourceArticles]);
+    }, [report?.sourceArticles, report?.sourceUrls]);
 
-    // Transform inline source references: <em>(cnBeta, AIBase)</em> → clickable links
+    // Transform inline source references: <em>(cnBeta#3, AIBase#7)</em> → clickable links
     const transformSourceRefs = (html: string): string => {
-        if (sourceNameMap.size === 0) return html;
+        if (articleIndexMap.size === 0) return html;
 
-        // Match <em> tags containing parenthesized source refs like (cnBeta) or (cnBeta, AIBase)
+        // Match <em> tags containing parenthesized source refs like (cnBeta#3) or (cnBeta#3, AIBase#7)
         return html.replace(/<em>\(([^)<]+)\)<\/em>/gi, (_match, innerText: string) => {
-            const sourceNames = innerText.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean);
+            const sourceEntries = innerText.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean);
             const parts: string[] = [];
 
-            for (let i = 0; i < sourceNames.length; i++) {
-                const name = sourceNames[i];
-                const articleId = sourceNameMap.get(name.toLowerCase());
+            for (let i = 0; i < sourceEntries.length; i++) {
+                const entry = sourceEntries[i];
+                // Parse "sourceName#N" format
+                const hashMatch = entry.match(/^(.+?)#(\d+)$/);
 
-                if (articleId) {
-                    // This source has a matching article → make it a clickable link
-                    parts.push(`<a href="#" data-article-id="${articleId}" class="source-ref-link">${name}</a>`);
+                if (hashMatch) {
+                    const displayName = hashMatch[1].trim();
+                    const articleIndex = parseInt(hashMatch[2], 10);
+                    const articleId = articleIndexMap.get(articleIndex);
+
+                    if (articleId) {
+                        parts.push(`<a href="#" data-article-id="${articleId}" class="source-ref-link">${displayName}</a>`);
+                    } else {
+                        parts.push(`<span class="source-ref-group">${displayName}</span>`);
+                    }
                 } else {
-                    // No matching article → keep as plain text
-                    parts.push(`<span class="source-ref-group">${name}</span>`);
+                    // No #N suffix, render as plain text
+                    parts.push(`<span class="source-ref-group">${entry}</span>`);
                 }
 
-                if (i < sourceNames.length - 1) {
+                if (i < sourceEntries.length - 1) {
                     parts.push(`<span class="source-ref-sep">, </span>`);
                 }
             }
@@ -514,7 +531,7 @@ const DailyReportDetailScreen: React.FC = () => {
             console.warn('[DailyReportDetail] Failed to parse markdown:', e);
             return getHtmlTemplate(`<p>${report.content}</p>`, isDark, theme.colors.primary);
         }
-    }, [report?.content, isDark, theme.colors.primary, sourceNameMap]);
+    }, [report?.content, isDark, theme.colors.primary, articleIndexMap]);
 
     const onWebViewMessage = (event: any) => {
         try {
