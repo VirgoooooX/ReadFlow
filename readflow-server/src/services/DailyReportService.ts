@@ -469,11 +469,32 @@ export class DailyReportService {
 
         if (!report) return null;
 
+        // Look up article IDs and titles from sourceUrls
+        const urls: string[] = Array.isArray(report.sourceUrls) ? report.sourceUrls : [];
+        let sourceArticles: { url: string; title: string; articleId: number; sourceName: string }[] = [];
+        if (urls.length > 0) {
+            try {
+                const articles = await prisma.article.findMany({
+                    where: { url: { in: urls } },
+                    select: { id: true, url: true, title: true, source: { select: { name: true } } },
+                });
+                sourceArticles = articles.map(a => ({
+                    url: a.url,
+                    title: a.title,
+                    articleId: a.id,
+                    sourceName: a.source?.name || '',
+                }));
+            } catch (e) {
+                logger.warn('[DailyReport] Failed to lookup source articles:', e);
+            }
+        }
+
         return {
             id: report.id,
             title: report.title,
             content: report.content,
             sourceUrls: report.sourceUrls,
+            sourceArticles,
             articleCount: report.articleCount,
             groupNames: report.groupNames,
             generatedAt: report.generatedAt.toISOString(),
