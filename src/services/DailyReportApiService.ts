@@ -13,6 +13,7 @@ export interface DailyReportSummary {
 
 export interface DailyReportDetail extends DailyReportSummary {
     sourceUrls: string[];
+    sourceArticles?: { url: string; title: string; articleId: number; sourceName: string }[];
     createdAt: string;
 }
 

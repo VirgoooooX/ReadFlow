@@ -346,6 +346,36 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             background: ${colors.border};
             border-radius: 2px;
         }
+        /* ─── Inline Source Reference Links ─── */
+        .source-ref-link {
+            display: inline;
+            color: ${colors.primary} !important;
+            font-style: italic;
+            font-size: 13px;
+            text-decoration: none !important;
+            border-bottom: 1px dashed ${colors.primary}80 !important;
+            padding: 0 1px;
+            transition: opacity 0.15s;
+            cursor: pointer;
+        }
+
+        .source-ref-link:active {
+            opacity: 0.6;
+        }
+
+        .source-ref-group {
+            font-style: italic;
+            font-size: 13px;
+            color: ${colors.emColor};
+            opacity: 0.85;
+        }
+
+        .source-ref-sep {
+            font-style: italic;
+            font-size: 13px;
+            color: ${colors.emColor};
+            opacity: 0.85;
+        }
     </style>
 </head>
 <body>
@@ -361,6 +391,20 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
         // Initial notification
         setTimeout(notifyHeight, 100);
         setTimeout(notifyHeight, 500);
+
+        // Handle source article link clicks
+        document.addEventListener('click', function(e) {
+            var target = e.target;
+            while (target && target.tagName !== 'A') {
+                target = target.parentElement;
+            }
+            if (target && target.dataset && target.dataset.articleId) {
+                e.preventDefault();
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+                    JSON.stringify({ type: 'navigateToArticle', articleId: parseInt(target.dataset.articleId) })
+                );
+            }
+        });
     </script>
 </body>
 </html>`;
@@ -412,23 +456,73 @@ const DailyReportDetailScreen: React.FC = () => {
         });
     }, [navigation, report?.title]);
 
-    // Convert markdown to HTML
+    // Build sourceName → articleId map for inline link replacement
+    const sourceNameMap = useMemo(() => {
+        const map = new Map<string, number>();
+        const articles = report?.sourceArticles;
+        if (!articles) return map;
+        for (const a of articles) {
+            if (a.sourceName) {
+                // Use first article found for each source name (lowercase key for matching)
+                const key = a.sourceName.toLowerCase();
+                if (!map.has(key)) {
+                    map.set(key, a.articleId);
+                }
+            }
+        }
+        return map;
+    }, [report?.sourceArticles]);
+
+    // Transform inline source references: <em>(cnBeta, AIBase)</em> → clickable links
+    const transformSourceRefs = (html: string): string => {
+        if (sourceNameMap.size === 0) return html;
+
+        // Match <em> tags containing parenthesized source refs like (cnBeta) or (cnBeta, AIBase)
+        return html.replace(/<em>\(([^)<]+)\)<\/em>/gi, (_match, innerText: string) => {
+            const sourceNames = innerText.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean);
+            const parts: string[] = [];
+
+            for (let i = 0; i < sourceNames.length; i++) {
+                const name = sourceNames[i];
+                const articleId = sourceNameMap.get(name.toLowerCase());
+
+                if (articleId) {
+                    // This source has a matching article → make it a clickable link
+                    parts.push(`<a href="#" data-article-id="${articleId}" class="source-ref-link">${name}</a>`);
+                } else {
+                    // No matching article → keep as plain text
+                    parts.push(`<span class="source-ref-group">${name}</span>`);
+                }
+
+                if (i < sourceNames.length - 1) {
+                    parts.push(`<span class="source-ref-sep">, </span>`);
+                }
+            }
+
+            return `<span class="source-ref-group">(</span>${parts.join('')}<span class="source-ref-group">)</span>`;
+        });
+    };
+
+    // Convert markdown to HTML and transform source references
     const htmlContent = useMemo(() => {
         if (!report?.content) return '';
         try {
-            const html = marked(report.content, { breaks: true }) as string;
+            let html = marked(report.content, { breaks: true }) as string;
+            html = transformSourceRefs(html);
             return getHtmlTemplate(html, isDark, theme.colors.primary);
         } catch (e) {
             console.warn('[DailyReportDetail] Failed to parse markdown:', e);
             return getHtmlTemplate(`<p>${report.content}</p>`, isDark, theme.colors.primary);
         }
-    }, [report?.content, isDark, theme.colors.primary]);
+    }, [report?.content, isDark, theme.colors.primary, sourceNameMap]);
 
     const onWebViewMessage = (event: any) => {
         try {
             const data = JSON.parse(event.nativeEvent.data);
             if (data.type === 'height' && data.value) {
                 setWebViewHeight(Math.max(data.value, 300));
+            } else if (data.type === 'navigateToArticle' && data.articleId) {
+                (navigation as any).navigate('ArticleDetail', { articleId: data.articleId });
             }
         } catch (e) {
             // ignore
