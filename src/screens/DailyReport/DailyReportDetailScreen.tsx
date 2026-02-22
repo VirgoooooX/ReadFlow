@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     View,
     StyleSheet,
     ActivityIndicator,
     Text,
     useWindowDimensions,
+    Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { dailyReportApiService, DailyReportDetail } from '../../services/DailyReportApiService';
+import { ArticleService } from '../../services/ArticleService';
 import { WebView } from 'react-native-webview';
 import { marked } from 'marked';
 
@@ -398,10 +400,10 @@ const getHtmlTemplate = (htmlContent: string, isDark: boolean, primaryColor: str
             while (target && target.tagName !== 'A') {
                 target = target.parentElement;
             }
-            if (target && target.dataset && target.dataset.articleId) {
+            if (target && target.dataset && target.dataset.articleUrl) {
                 e.preventDefault();
                 window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
-                    JSON.stringify({ type: 'navigateToArticle', articleId: parseInt(target.dataset.articleId) })
+                    JSON.stringify({ type: 'navigateToArticle', articleUrl: target.dataset.articleUrl })
                 );
             }
         });
@@ -456,35 +458,27 @@ const DailyReportDetailScreen: React.FC = () => {
         });
     }, [navigation, report?.title]);
 
-    // Build articleIndex (1-based) → articleId map for inline link replacement
-    const articleIndexMap = useMemo(() => {
-        const map = new Map<number, number>();
-        const articles = report?.sourceArticles;
+    // Build articleIndex (1-based) → URL map for inline link replacement
+    // We use URLs instead of server articleId because server Prisma IDs differ
+    // from local SQLite IDs. The URL is resolved to a local ID at click time.
+    const articleIndexUrlMap = useMemo(() => {
+        const map = new Map<number, string>();
         const urls = report?.sourceUrls;
-        if (!articles || !urls) return map;
-
-        // Build url → articleId lookup
-        const urlToId = new Map<string, number>();
-        for (const a of articles) {
-            if (a.url && !urlToId.has(a.url)) {
-                urlToId.set(a.url, a.articleId);
-            }
-        }
+        if (!urls) return map;
 
         // sourceUrls are in the same order as articles sent to LLM (1-based index)
         urls.forEach((url, i) => {
-            const aid = urlToId.get(url);
-            if (aid !== undefined) {
-                map.set(i + 1, aid); // article index is 1-based
+            if (url) {
+                map.set(i + 1, url); // article index is 1-based
             }
         });
 
         return map;
-    }, [report?.sourceArticles, report?.sourceUrls]);
+    }, [report?.sourceUrls]);
 
     // Transform inline source references: <em>(cnBeta#3, AIBase#7)</em> → clickable links
     const transformSourceRefs = (html: string): string => {
-        if (articleIndexMap.size === 0) return html;
+        if (articleIndexUrlMap.size === 0) return html;
 
         // Match <em> tags containing parenthesized source refs like (cnBeta#3) or (cnBeta#3, AIBase#7)
         return html.replace(/<em>\(([^)<]+)\)<\/em>/gi, (_match, innerText: string) => {
@@ -499,10 +493,12 @@ const DailyReportDetailScreen: React.FC = () => {
                 if (hashMatch) {
                     const displayName = hashMatch[1].trim();
                     const articleIndex = parseInt(hashMatch[2], 10);
-                    const articleId = articleIndexMap.get(articleIndex);
+                    const articleUrl = articleIndexUrlMap.get(articleIndex);
 
-                    if (articleId) {
-                        parts.push(`<a href="#" data-article-id="${articleId}" class="source-ref-link">${displayName}</a>`);
+                    if (articleUrl) {
+                        // Encode URL to safely embed in data attribute
+                        const safeUrl = articleUrl.replace(/"/g, '&quot;');
+                        parts.push(`<a href="#" data-article-url="${safeUrl}" class="source-ref-link">${displayName}</a>`);
                     } else {
                         parts.push(`<span class="source-ref-group">${displayName}</span>`);
                     }
@@ -531,20 +527,27 @@ const DailyReportDetailScreen: React.FC = () => {
             console.warn('[DailyReportDetail] Failed to parse markdown:', e);
             return getHtmlTemplate(`<p>${report.content}</p>`, isDark, theme.colors.primary);
         }
-    }, [report?.content, isDark, theme.colors.primary, articleIndexMap]);
+    }, [report?.content, isDark, theme.colors.primary, articleIndexUrlMap]);
 
-    const onWebViewMessage = (event: any) => {
+    const onWebViewMessage = useCallback(async (event: any) => {
         try {
             const data = JSON.parse(event.nativeEvent.data);
             if (data.type === 'height' && data.value) {
                 setWebViewHeight(Math.max(data.value, 300));
-            } else if (data.type === 'navigateToArticle' && data.articleId) {
-                (navigation as any).navigate('ArticleDetail', { articleId: data.articleId });
+            } else if (data.type === 'navigateToArticle' && data.articleUrl) {
+                // Look up the local SQLite article ID by URL
+                const articleService = ArticleService.getInstance();
+                const localId = await articleService.getArticleIdByUrl(data.articleUrl);
+                if (localId) {
+                    (navigation as any).navigate('ArticleDetail', { articleId: localId });
+                } else {
+                    Alert.alert('提示', '本地未找到该文章，可能尚未同步。');
+                }
             }
         } catch (e) {
             // ignore
         }
-    };
+    }, [navigation]);
 
     if (loading) {
         return (

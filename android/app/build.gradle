@@ -97,8 +97,8 @@ android {
         applicationId 'com.virgoooooox.ReadFlow'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 80201
-        versionName "8.2.1"
+        versionCode 80202
+        versionName "8.2.2"
         ndk {
             abiFilters(*reactNativeArchitectures())
         }

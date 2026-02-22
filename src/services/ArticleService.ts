@@ -34,20 +34,20 @@ export class ArticleService {
       const sourcesResult = await this.databaseService.executeQuery(
         'SELECT id FROM rss_sources WHERE 1=1'
       );
-      
+
       if (!sourcesResult || sourcesResult.length === 0) {
         return [];
       }
 
       const sources = sourcesResult as any[];
-      
+
       // 2. 性能保护：如果源超过 50 个，每个源只取 5 条，防止数据量过大
       const safeLimit = sources.length > 50 ? 5 : limitPerSource;
-      
+
       // 3. 关键优化：改用"应用层聚合"而非 SQL UNION ALL
       // 原因：SQLite 对 UNION ALL 的限制多，改在 JS 做排序更灵活且性能也不差
       const allArticles: Article[] = [];
-      
+
       // 优化：查询 content 字段，以便详情页秒开
       const columns = 'a.id, a.title, a.title_cn, a.content, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.video_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
 
@@ -62,21 +62,21 @@ export class ArticleService {
            LIMIT ${safeLimit}`
         )
       );
-      
+
       const results = await Promise.all(queries);
-      
+
       // 合并所有结果
       results.forEach(sourceArticles => {
         sourceArticles.forEach((row: any) => {
           allArticles.push(this.mapArticleRow(row));
         });
       });
-      
+
       // 4. 在应用层做最终排序（性能优异，且避免 SQL 语法限制）
-      allArticles.sort((a, b) => 
+      allArticles.sort((a, b) =>
         new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
       );
-      
+
       return allArticles;
     } catch (error) {
       logger.error('Error getting initial fair feed:', error);
@@ -100,7 +100,7 @@ export class ArticleService {
     try {
       // 确保数据库已初始化
       await this.databaseService.initializeDatabase();
-      
+
       const {
         limit = 10,
         offset = 0,
@@ -164,7 +164,7 @@ export class ArticleService {
     try {
       // 确保数据库已初始化
       await this.databaseService.initializeDatabase();
-      
+
       const results = await this.databaseService.executeQuery(
         `SELECT a.*, r.title as source_title, r.url as source_url 
          FROM articles a 
@@ -188,6 +188,24 @@ export class ArticleService {
   }
 
   /**
+   * 根据URL获取文章的本地ID
+   */
+  public async getArticleIdByUrl(url: string): Promise<number | null> {
+    try {
+      await this.databaseService.initializeDatabase();
+      const results = await this.databaseService.executeQuery(
+        'SELECT id FROM articles WHERE url = ? LIMIT 1',
+        [url]
+      ).catch(() => []);
+      if (results.length === 0) return null;
+      return Number(results[0].id);
+    } catch (error) {
+      logger.error('Error getting article ID by URL:', error);
+      return null;
+    }
+  }
+
+  /**
    * 搜索文章
    */
   public async searchArticles(query: string, options: {
@@ -197,9 +215,9 @@ export class ArticleService {
   } = {}): Promise<Article[]> {
     try {
       await this.databaseService.initializeDatabase();
-      
+
       const { limit = 20, offset = 0, rssSourceId } = options;
-      
+
       let whereClause = '(a.title LIKE ? OR a.content LIKE ? OR a.summary LIKE ?)';
       const params: any[] = [`%${query}%`, `%${query}%`, `%${query}%`];
 
@@ -240,21 +258,21 @@ export class ArticleService {
         'UPDATE articles SET is_read = 1, read_progress = ?, read_at = ? WHERE id = ?',
         [progress, new Date().toISOString(), id]
       );
-      
+
       // 获取文章的源ID，并更新该源的未读数量
       const article = await this.getArticleById(id);
       if (article) {
         // 🔥 发送文章已读事件，供 UI 乐观更新
-        cacheEventEmitter.emit({ 
-          type: 'articleRead', 
+        cacheEventEmitter.emit({
+          type: 'articleRead',
           articleId: id,
-          sourceId: article.sourceId 
+          sourceId: article.sourceId
         });
 
         if (article.sourceId) {
           await this.updateSourceStats(article.sourceId, { reason: 'markRead' });
         }
-        
+
         cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
       }
     } catch (error) {
@@ -357,17 +375,17 @@ export class ArticleService {
   public async markAllAsRead(sourceId?: number): Promise<void> {
     try {
       await this.databaseService.initializeDatabase();
-      
+
       let query = 'UPDATE articles SET is_read = 1, read_progress = 100, read_at = ? WHERE is_read = 0';
       const params: any[] = [new Date().toISOString()];
-      
+
       if (sourceId !== undefined) {
         query += ' AND rss_source_id = ?';
         params.push(sourceId);
       }
-      
+
       await this.databaseService.executeStatement(query, params);
-      
+
       if (sourceId !== undefined) {
         await this.updateSourceStats(sourceId, { reason: 'markAllRead' });
       } else {
@@ -378,7 +396,7 @@ export class ArticleService {
       logger.error('Error marking all as read:', error);
     }
   }
-  
+
   /**
    * 更新 RSS 源统计信息 (已读计数)
    */
@@ -389,18 +407,18 @@ export class ArticleService {
         [sourceId]
       );
       const unreadCount = unreadCountResult[0]?.count || 0;
-      
+
       await this.databaseService.executeStatement(
         'UPDATE rss_sources SET unread_count = ? WHERE id = ?',
         [unreadCount, sourceId]
       );
-      
+
       // 🔥 发射事件通知 RSS 源统计已更新，触发 UI 刷新
       // 附带 reason，供监听者（如 HomeScreen）决定是否需要重载列表
-      cacheEventEmitter.emit({ 
-        type: 'updateRSSStats', 
+      cacheEventEmitter.emit({
+        type: 'updateRSSStats',
         reason: options.reason,
-        sourceId 
+        sourceId
       });
     } catch (error) {
       logger.error('Error updating source stats:', error);
@@ -471,7 +489,7 @@ export class ArticleService {
         'UPDATE articles SET is_read = 0, read_progress = 0, read_at = NULL WHERE id = ?',
         [id]
       );
-      
+
       // 获取文章的源ID，并更新该源的未读数量
       const article = await this.getArticleById(id);
       if (article && article.sourceId) {
@@ -494,7 +512,7 @@ export class ArticleService {
       }
 
       const newFavoriteStatus = !article.isFavorite;
-      
+
       await this.databaseService.executeStatement(
         'UPDATE articles SET is_favorite = ? WHERE id = ?',
         [newFavoriteStatus ? 1 : 0, id]
@@ -516,7 +534,7 @@ export class ArticleService {
     try {
       await this.databaseService.initializeDatabase();
       const clampedProgress = Math.max(0, Math.min(100, progress));
-      
+
       await this.databaseService.executeStatement(
         'UPDATE articles SET read_progress = ? WHERE id = ?',
         [clampedProgress, id]
@@ -545,7 +563,7 @@ export class ArticleService {
       const tags = [...article.tags];
       if (!tags.includes(tag)) {
         tags.push(tag);
-        
+
         await this.databaseService.executeStatement(
           'UPDATE articles SET tags = ? WHERE id = ?',
           [JSON.stringify(tags), id]
@@ -568,7 +586,7 @@ export class ArticleService {
       }
 
       const tags = article.tags.filter(t => t !== tag);
-      
+
       await this.databaseService.executeStatement(
         'UPDATE articles SET tags = ? WHERE id = ?',
         [JSON.stringify(tags), id]
@@ -588,7 +606,7 @@ export class ArticleService {
       );
 
       const allTags = new Set<string>();
-      
+
       results.forEach(row => {
         try {
           const tags = JSON.parse(row.tags);
@@ -616,7 +634,7 @@ export class ArticleService {
   } = {}): Promise<Article[]> {
     try {
       const { limit = 20, offset = 0 } = options;
-      
+
       // 优化：查询 content 字段
       const columns = 'a.id, a.title, a.title_cn, a.content, a.summary, a.author, a.published_at, a.rss_source_id, a.source_name, a.url, a.image_url, a.video_url, a.image_caption, a.image_credit, a.tags, a.category, a.word_count, a.reading_time, a.difficulty, a.is_read, a.is_favorite, a.read_at, a.read_progress';
 
@@ -750,7 +768,7 @@ export class ArticleService {
     try {
       // 确保数据库已初始化
       await this.databaseService.initializeDatabase();
-      
+
       // 使用单个查询获取所有统计数据，避免多个并行查询导致连接冲突
       const result = await this.databaseService.executeQuery(
         `SELECT 
@@ -822,12 +840,12 @@ export class ArticleService {
       await this.databaseService.initializeDatabase();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-      
+
       const result = await this.databaseService.executeInsert(
         'DELETE FROM articles WHERE published_at < ? AND is_favorite = 0',
         [cutoffDate.toISOString()]
       );
-      
+
       return result.changes || 0;
     } catch (error) {
       logger.error('Error deleting old articles:', error);
@@ -864,7 +882,7 @@ export class ArticleService {
       readAt: row.read_at ? new Date(row.read_at) : undefined,
       readProgress: row.read_progress,
     };
-    
+
     return article;
   }
 
@@ -907,7 +925,7 @@ export class ArticleService {
       // 静默失败：滚动位置不是关键数据，不值得重试或报错
       // 只在非数据库锁定错误时记录，避免日志刷屏
       const isDbLocked = error?.message?.includes('database is locked') ||
-                        error?.toString?.()?.includes('database is locked');
+        error?.toString?.()?.includes('database is locked');
       if (!isDbLocked) {
         logger.warn(`[ScrollPosition] Failed to save for article ${id}:`, error);
       }
@@ -924,11 +942,11 @@ export class ArticleService {
         'SELECT scroll_position FROM articles WHERE id = ?',
         [id]
       );
-      
+
       if (results.length === 0) {
         return 0;
       }
-      
+
       return results[0].scroll_position || 0;
     } catch (error) {
       logger.error('Error getting scroll position:', error);
