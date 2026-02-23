@@ -1,0 +1,182 @@
+body {
+    font-family: 'Fira Sans', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+    outline: 2px solid rgba(79, 70, 229, 0.7);
+    outline-offset: 2px;
+}
+
+#login-password[data-invalid="true"] {
+    border-color: rgba(239, 68, 68, 0.8);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Card & Surface Utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(12px);
+    border: 1px solid #e2e8f0;
+}
+
+.glass-dark {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    border-right: 1px solid rgba(99, 102, 241, 0.12);
+}
+
+.glass-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 6px 16px -4px rgba(15, 23, 42, 0.08);
+    transition: box-shadow 0.2s ease;
+}
+
+.glass-card:hover {
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px -4px rgba(15, 23, 42, 0.12);
+}
+
+/* Sidebar Active State */
+.nav-item.active {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0.05) 100%);
+    border-left-color: #818cf8;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.nav-item {
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.nav-item:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.06);
+    border-left-color: rgba(148, 163, 184, 0.3);
+    color: #e2e8f0;
+}
+
+/* Loading Spinner */
+.loader {
+    border: 2px solid #e2e8f0;
+    border-top: 2px solid #4f46e5;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modal Transitions */
+.modal-enter {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+}
+
+.modal-enter-active {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-exit {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.modal-exit-active {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+    transition: all 0.2s ease-in;
+}
+
+/* Stat Card left border accent */
+.stat-card { border-left: 3px solid transparent; }
+.stat-card-blue { border-left-color: #3b82f6; }
+.stat-card-purple { border-left-color: #8b5cf6; }
+.stat-card-pink { border-left-color: #ec4899; }
+.stat-card-emerald { border-left-color: #10b981; }
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Responsive Mobile Card Tables */
+@media (max-width: 768px) {
+    .responsive-table, .responsive-table thead, .responsive-table tbody, .responsive-table th, .responsive-table td, .responsive-table tr {
+        display: block;
+    }
+    .responsive-table thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+    .responsive-table tr {
+        margin-bottom: 1rem;
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e2e8f0;
+        padding: 0.5rem;
+    }
+    .responsive-table td {
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        position: relative;
+        padding-left: 100px !important;
+        text-align: right;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        min-height: 3.5rem;
+    }
+    .responsive-table td:last-child {
+        border-bottom: 0 !important;
+        justify-content: center;
+    }
+    .responsive-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 1rem;
+        width: 80px;
+        white-space: nowrap;
+        text-align: left;
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.75rem;
+    }
+    .responsive-table td > div {
+        text-align: right;
+    }
+    .responsive-table td > .flex {
+        justify-content: flex-end;
+    }
+}

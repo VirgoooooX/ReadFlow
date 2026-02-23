@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -43,6 +43,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "feat: 添加日报详情页面，支持富文本Markdown渲染和主题切换。",
     "feat: 添加日报详情页面并更新应用版本至 8.2.1。",
     "feat: 新增日报功能，包括API服务、UI界面和导航集成，并更新应用版本。",
     "feat: 添加 AI 日报功能，包括移动端设置界面、后端服务和数据库支持。",
@@ -61,7 +62,6 @@
     "fix(server): 重构图片预热队列为工作线程模式以提升性能",
     "fix: 改进fetch重试逻辑的超时与信号处理",
     "fix: 清理图片代理URL中的额外字符并优化预热流处理",
-    "feat: 升级应用版本至6.6.0并优化服务端图片缓存",
-    "feat(同步): 实现强制刷新功能并更新版本号至6.5.2"
+    "feat: 升级应用版本至6.6.0并优化服务端图片缓存"
   ]
 }
