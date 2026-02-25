@@ -1050,4 +1050,46 @@ router.post('/daily-reports/:id/read', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/rss/daily-reports/articles/cleaned - Get cleaned articles by date range for AI summary
+router.get('/daily-reports/articles/cleaned', async (req: Request, res: Response) => {
+  try {
+    let userId = String((req as any)?.user?.id || '');
+
+    // 如果是 Admin 身份，允许通过参数指定要查的 userId
+    if (userId === 'admin' && req.query.userId) {
+      userId = String(req.query.userId);
+    } else if (!userId || userId === 'admin') {
+      return res.status(401).json({ error: 'Unauthorized: missing user token or target userId' });
+    }
+
+    const { start, end } = req.query;
+    if (!start || !end) {
+      return res.status(400).json({ error: 'Missing required parameters: start, end (format: YYYY-MM-DD or ISO)' });
+    }
+
+    const startDate = new Date(start as string);
+    const endDate = new Date(end as string);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format for start or end' });
+    }
+
+    // Ensure end date covers the whole day if only date is provided
+    if ((end as string).length <= 10) {
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    if (startDate > endDate) {
+      return res.status(400).json({ error: 'start date cannot be after end date' });
+    }
+
+    const articles = await dailyReportService.getCleanedArticlesForDateRange(userId, startDate, endDate);
+
+    res.json({ ok: true, articles });
+  } catch (error) {
+    logger.error('[DailyReport] GET cleaned articles failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 export default router;

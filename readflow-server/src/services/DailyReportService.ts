@@ -276,6 +276,65 @@ export class DailyReportService {
     }
 
     /**
+     * Fetch cleaned articles for a specific user within a date range (for external API use)
+     */
+    async getCleanedArticlesForDateRange(userId: string, startTime: Date, endTime: Date): Promise<ArticleForSummary[]> {
+        // 1. Get user config to determine groups
+        const dbUser = await prisma.user.findUnique({ where: { uuid: userId } });
+        if (!dbUser) {
+            throw new Error(`User not found: ${userId}`);
+        }
+
+        const userConfig = (dbUser.syncData as any) || {};
+        const config = this.getDailyReportConfig(userConfig);
+
+        // 2. Get source URLs for selected groups (or default news groups)
+        const sourceUrls = this.getSourceUrlsForGroups(userConfig, config.groupNames);
+        if (sourceUrls.length === 0) {
+            return [];
+        }
+
+        // 3. Find source IDs
+        const sources = await prisma.rSSSource.findMany({
+            where: { url: { in: sourceUrls } },
+            select: { id: true, name: true },
+        });
+
+        if (sources.length === 0) return [];
+
+        const sourceIdToName = new Map(sources.map(s => [s.id, s.name]));
+        const sourceIds = sources.map(s => s.id);
+
+        // 4. Fetch articles within the date range
+        const articles = await prisma.article.findMany({
+            where: {
+                sourceId: { in: sourceIds },
+                publishedAt: {
+                    gte: startTime,
+                    lte: endTime
+                },
+            },
+            orderBy: { publishedAt: 'desc' },
+            select: {
+                title: true,
+                url: true,
+                content: true,
+                sourceId: true,
+                publishedAt: true,
+            },
+        });
+
+        // 5. Apply the exact same cleaning logic as the daily report
+        return articles.map(a => ({
+            title: a.title,
+            url: a.url,
+            sourceName: sourceIdToName.get(a.sourceId) || 'Unknown',
+            content: truncateText(stripHtmlToText(a.content || ''), 1500),
+            publishedAt: a.publishedAt.toISOString(),
+        }));
+    }
+
+    /**
      * Build the LLM prompt from articles
      */
     private buildPrompt(articles: ArticleForSummary[]): { systemPrompt: string; userPrompt: string } {
