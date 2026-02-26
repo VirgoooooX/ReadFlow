@@ -536,18 +536,11 @@ const ArticleDetailScreen: React.FC = () => {
 
         const settingsService = SettingsService.getInstance();
         const tConfigStart = nowMs();
-        const [proxyConfig, cloudConfig] = await Promise.all([
-          settingsService.getProxyModeConfig(),
-          cloudConfigService.getConfig(),
-        ]);
+        const cloudConfig = await cloudConfigService.getConfig();
         logger.info(`[Perf] [Detail] configLoaded id=${perfId} ms=${Math.round(nowMs() - tConfigStart)}`);
 
         const cloudUrl = (cloudConfig.serverUrl || '').replace(/\/$/, '');
-        const proxyUrl = (proxyConfig.serverUrl || '').replace(/\/$/, '');
-        const activeUrl =
-          cloudConfig.mode === 'cloud' && cloudUrl
-            ? cloudUrl
-            : (proxyConfig.enabled && proxyUrl ? proxyUrl : '');
+        const activeUrl = cloudConfig.mode === 'cloud' && cloudUrl ? cloudUrl : '';
         setProxyServerUrl(activeUrl);
 
         const tArticleStart = nowMs();
@@ -1153,13 +1146,12 @@ const ArticleDetailScreen: React.FC = () => {
       // 【关键修改】确保封面图被正确代理
       // 即使在直连模式下，如果域名在 BLOCKED_DOMAINS 列表中（如 BBC），
       // toProxyUrl 也会强制使用 weserv.nl，而不依赖 proxyServerUrl
-      imageUrl: finalImageUrl ? toProxyUrl(finalImageUrl, proxyServerUrl) : undefined,
+      imageUrl: finalImageUrl ? toProxyUrl(finalImageUrl) : undefined,
       imageCaption: article.imageCaption,
       imageCredit: article.imageCredit,
       articleUrl: article.url,
       initialScrollY,
       vocabularyWords: [],
-      proxyServerUrl,
     });
 
     logger.info('[ArticleDetail] ✅ HTML generated successfully, length:', html.length);

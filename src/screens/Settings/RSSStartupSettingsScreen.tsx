@@ -48,7 +48,7 @@ const RSSStartupSettingsScreen: React.FC = () => {
       newSet.add(id);
     }
     setSelectedIds(newSet);
-    
+
     // 自动保存
     await updateStartupSettings({
       enabled,
@@ -78,7 +78,7 @@ const RSSStartupSettingsScreen: React.FC = () => {
 
   const renderItem = ({ item }: { item: any }) => {
     const isSelected = selectedIds.has(item.id);
-    
+
     return (
       <TouchableOpacity
         style={[styles.sourceItem, !enabled && styles.disabledItem]}
@@ -99,7 +99,7 @@ const RSSStartupSettingsScreen: React.FC = () => {
         <MaterialIcons
           name={isSelected ? 'check-box' : 'check-box-outline-blank'}
           size={24}
-          color={enabled 
+          color={enabled
             ? (isSelected ? theme.colors.primary : theme.colors.onSurfaceVariant)
             : theme.colors.outline
           }
@@ -127,7 +127,7 @@ const RSSStartupSettingsScreen: React.FC = () => {
             }
           />
         </SettingGroup>
-        
+
         <Text style={styles.helperText}>
           开启后，App 启动时会自动在后台刷新选中的 RSS 源。
         </Text>
@@ -140,16 +140,16 @@ const RSSStartupSettingsScreen: React.FC = () => {
             选择要刷新的源 ({selectedIds.size}/{rssSources.length})
           </Text>
           <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              onPress={handleSelectAll} 
+            <TouchableOpacity
+              onPress={handleSelectAll}
               disabled={!enabled}
               style={styles.actionBtn}
             >
               <Text style={[styles.actionBtnText, !enabled && styles.disabledText]}>全选</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
-            <TouchableOpacity 
-              onPress={handleDeselectAll} 
+            <TouchableOpacity
+              onPress={handleDeselectAll}
               disabled={!enabled}
               style={styles.actionBtn}
             >

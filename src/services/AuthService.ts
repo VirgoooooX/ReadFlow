@@ -171,44 +171,30 @@ export class AuthService {
   public async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       const cloudConfig = await cloudConfigService.getConfig();
-      if (cloudConfig.serverUrl) {
-        try {
-          const response = await this.performCloudLogin(credentials);
-          if (response.success && response.user && response.token) {
-            this.currentUser = response.user;
-            this.authToken = response.token;
-            await cloudConfigService.updateConfig({
-              auth: {
-                user: response.user,
-                accessToken: response.token,
-                lastValidatedAt: Date.now(),
-              },
-            });
-          }
-          return response;
-        } catch (e) {
-          // Network error or other crash
-          throw e;
-        }
+      if (!cloudConfig.serverUrl) {
+        return {
+          success: false,
+          message: '请先配置服务端地址！'
+        };
       }
-
-      // Local mode fallback (legacy mock)
-      const response = await this.mockLogin(credentials);
-
+      const response = await this.performCloudLogin(credentials);
       if (response.success && response.user && response.token) {
         this.currentUser = response.user;
         this.authToken = response.token;
-
-        // 更新最后登录时间
-        this.currentUser.lastLoginAt = new Date().toISOString();
+        await cloudConfigService.updateConfig({
+          auth: {
+            user: response.user,
+            accessToken: response.token,
+            lastValidatedAt: Date.now(),
+          },
+        });
       }
-
       return response;
     } catch (error) {
       logger.error('登录失败:', error);
       return {
         success: false,
-        message: '登录过程中出现错误，请重试'
+        message: '登录过程中出现错误，请检查网络和服务器配置'
       };
     }
   }
@@ -219,35 +205,30 @@ export class AuthService {
   public async register(data: RegisterData): Promise<AuthResponse> {
     try {
       const cloudConfig = await cloudConfigService.getConfig();
-      if (cloudConfig.serverUrl) {
-        try {
-          const response = await this.performCloudRegister(data);
-          if (response.success && response.user && response.token) {
-            this.currentUser = response.user;
-            this.authToken = response.token;
-            await cloudConfigService.updateConfig({
-              auth: {
-                user: response.user,
-                accessToken: response.token,
-                lastValidatedAt: Date.now(),
-              },
-            });
-          }
-          return response;
-        } catch (e) {
-          throw e;
-        }
+      if (!cloudConfig.serverUrl) {
+        return {
+          success: false,
+          message: '请先配置服务端地址！'
+        };
       }
-
-      // Local mode fallback
-      const response = await this.mockRegister(data);
-
+      const response = await this.performCloudRegister(data);
+      if (response.success && response.user && response.token) {
+        this.currentUser = response.user;
+        this.authToken = response.token;
+        await cloudConfigService.updateConfig({
+          auth: {
+            user: response.user,
+            accessToken: response.token,
+            lastValidatedAt: Date.now(),
+          },
+        });
+      }
       return response;
     } catch (error) {
       logger.error('注册失败:', error);
       return {
         success: false,
-        message: '注册过程中出现错误，请重试'
+        message: '注册过程中出现错误，请检查网络和服务器配置'
       };
     }
   }
@@ -257,13 +238,25 @@ export class AuthService {
    */
   public async logout(): Promise<void> {
     try {
-      // TODO: 调用API通知服务器登出
-
-      // 清除本地数据
+      // 清除本地认证状态
       this.currentUser = null;
       this.authToken = null;
-
       await cloudConfigService.clearAuth();
+
+      // 清空本地数据库中的用户数据
+      const { databaseService } = require('../database/DatabaseService');
+      await databaseService.clearUserData();
+
+      // 清除用户设置
+      const { settingsService } = require('./SettingsService');
+      await settingsService.clearAllSettings();
+
+      // 发送事件通知相关组件和状态管理进行重置
+      const { default: cacheEventEmitter } = require('./CacheEventEmitter');
+      cacheEventEmitter.clearAll();
+      // 触发全局登出事件，让 Redux / Zustand 能够清空 Store
+      cacheEventEmitter.emit('AUTH_LOGOUT');
+
     } catch (error) {
       logger.error('登出失败:', error);
     }
@@ -281,15 +274,13 @@ export class AuthService {
         };
       }
 
-      // TODO: 替换为实际的API调用
-      const response = await this.mockUpdateProfile(updates);
+      // TODO: 替换为实际的API调用.
+      // const response = await this.performCloudUpdateProfile(updates);
 
-      if (response.success && response.user) {
-        this.currentUser = response.user;
-        await cloudConfigService.updateConfig({ auth: { user: this.currentUser } });
-      }
-
-      return response;
+      return {
+        success: false,
+        message: '暂不支持更新个人信息'
+      };
     } catch (error) {
       logger.error('更新用户信息失败:', error);
       return {
@@ -311,10 +302,10 @@ export class AuthService {
         };
       }
 
-      // TODO: 替换为实际的API调用
-      const response = await this.mockChangePassword(oldPassword, newPassword);
-
-      return response;
+      return {
+        success: false,
+        message: '暂不支持修改密码'
+      };
     } catch (error) {
       logger.error('修改密码失败:', error);
       return {
@@ -330,19 +321,15 @@ export class AuthService {
   private async validateToken(token: string): Promise<boolean> {
     try {
       const cloudConfig = await cloudConfigService.getConfig();
-      if (cloudConfig.serverUrl) {
-        return await this.performCloudValidate(token);
-      }
-      return await this.mockValidateToken(token);
+      if (!cloudConfig.serverUrl) return false;
+      return await this.performCloudValidate(token);
     } catch (error) {
       logger.error('验证token失败:', error);
       return false;
     }
   }
 
-
   // ========== Cloud API Methods ==========
-
   private async getApiUrl(path: string): Promise<string> {
     const cloudConfig = await cloudConfigService.getConfig();
     const baseUrl = cloudConfig.serverUrl;
@@ -510,142 +497,6 @@ export class AuthService {
    */
   public isAuthenticated(): boolean {
     return this.currentUser !== null && this.authToken !== null;
-  }
-
-  // ========== 模拟API方法 ==========
-  // 在实际项目中，这些方法应该替换为真实的API调用
-
-  private async mockLogin(credentials: LoginCredentials): Promise<AuthResponse> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // 从注册用户中查找
-    const registeredUser = this.registeredUsers.get(credentials.email);
-
-    if (registeredUser && registeredUser.password === credentials.password) {
-      // 更新最后登录时间
-      const updatedUser = {
-        ...registeredUser.user,
-        lastLoginAt: new Date().toISOString(),
-      };
-
-      // 更新存储的用户信息
-      this.registeredUsers.set(credentials.email, {
-        ...registeredUser,
-        user: updatedUser
-      });
-      await this.saveRegisteredUsers();
-
-      return {
-        success: true,
-        user: updatedUser,
-        token: 'mock_jwt_token_' + Date.now(),
-        message: '登录成功'
-      };
-    } else {
-      return {
-        success: false,
-        message: '邮箱或密码错误'
-      };
-    }
-  }
-
-  private async mockRegister(data: RegisterData): Promise<AuthResponse> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // 检查邮箱是否已被注册
-    if (this.registeredUsers.has(data.email)) {
-      return {
-        success: false,
-        message: '该邮箱已被注册'
-      };
-    }
-
-    // 创建新用户
-    const newUser: User = {
-      id: Date.now().toString(), // 简单的ID生成
-      username: data.username,
-      email: data.email,
-      avatar: undefined,
-      bio: '',
-      phone: '',
-      location: '',
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
-
-    // 保存到模拟数据库
-    this.registeredUsers.set(data.email, {
-      user: newUser,
-      password: data.password
-    });
-    await this.saveRegisteredUsers();
-
-    return {
-      success: true,
-      message: '注册成功，请登录'
-    };
-  }
-
-  private async mockUpdateProfile(updates: Partial<User>): Promise<AuthResponse> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    if (!this.currentUser) {
-      return {
-        success: false,
-        message: '用户未登录'
-      };
-    }
-
-    const updatedUser: User = {
-      ...this.currentUser,
-      ...updates,
-      id: this.currentUser.id, // 确保ID不被修改
-    };
-
-    // 更新registeredUsers中的用户信息
-    const userRecord = this.registeredUsers.get(this.currentUser.email);
-    if (userRecord) {
-      this.registeredUsers.set(this.currentUser.email, {
-        ...userRecord,
-        user: updatedUser
-      });
-      await this.saveRegisteredUsers();
-    }
-
-    return {
-      success: true,
-      user: updatedUser,
-      message: '更新成功'
-    };
-  }
-
-  private async mockChangePassword(oldPassword: string, newPassword: string): Promise<AuthResponse> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // 模拟旧密码验证
-    if (oldPassword !== '123456') {
-      return {
-        success: false,
-        message: '原密码错误'
-      };
-    }
-
-    return {
-      success: true,
-      message: '密码修改成功'
-    };
-  }
-
-  private async mockValidateToken(token: string): Promise<boolean> {
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // 简单的token格式验证
-    return token.startsWith('mock_jwt_token_');
   }
 }
 

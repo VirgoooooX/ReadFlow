@@ -30,31 +30,6 @@ const MineScreen: React.FC = () => {
   const { user } = state;
   const styles = createStyles(theme);
 
-  // 状态管理
-  const [proxyStatus, setProxyStatus] = useState<{ enabled: boolean; connected: boolean }>({
-    enabled: false,
-    connected: false,
-  });
-
-  // 获取焦点时刷新数据
-  useFocusEffect(
-    useCallback(() => {
-      checkProxyStatus();
-    }, [])
-  );
-
-  const checkProxyStatus = async () => {
-    try {
-      const config = await SettingsService.getInstance().getProxyServersConfig();
-      setProxyStatus({
-        enabled: !!config.activeServerId,
-        connected: config.servers.length > 0,
-      });
-    } catch (error) {
-      console.error('检查代理状态失败:', error);
-    }
-  };
-
   const handleLogout = () => {
     Alert.alert('退出登录', '确定要退出登录吗？', [
       { text: '取消', style: 'cancel' },
@@ -151,15 +126,7 @@ const MineScreen: React.FC = () => {
           onPress={() => navigation.navigate('RSSStartupSettings')}
           color={theme.colors.primary}
         />
-        <SettingItem
-          icon="cloud"
-          label="运行模式与同步"
-          onPress={() => {
-            console.log('Navigating to CloudSettings');
-            navigation.navigate('CloudSettings');
-          }}
-          color={theme.colors.primary}
-        />
+
         <SettingItem
           icon="palette"
           label="主题设置"

@@ -45,14 +45,14 @@ export interface RSSSource {
   unread_count?: number;
   last_updated?: string;
   latest_published_at?: string;
-  
+
   // 📁 分组相关字段
   groupId: number | null;        // 所属分组 ID（null = 未分组）
   groupSortOrder?: number;       // 在分组内的排序
-  
+
   // 🌐 图标相关字段
   iconUrl?: string;              // RSS源图标URL（本地缓存或网络URL）
-  
+
   fetchLimit?: number;           // 每次刷新获取的文章数量
   retentionLimit?: number;       // 每个源保存的文章总数上限
   maxArticles?: number;          // 兼容旧字段
@@ -67,7 +67,7 @@ export interface RSSGroup {
   sortOrder: number;
   createdAt: number;             // 时间戳（毫秒）
   updatedAt: number;
-  
+
   // 📊 统计字段（由 Service 层聚合查询填充）
   sourceCount?: number;          // SQL COUNT 填充
   unreadCount?: number;          // SQL SUM 填充
@@ -180,7 +180,6 @@ export interface AppSettings {
     autoSync: boolean;
     syncInterval: number;
     wifiOnly: boolean;
-    proxyMode?: boolean;  // 是否使用代理服务器模式
     mode: 'local' | 'cloud'; // 同步模式：本地直连 vs 云端同步
     serverUrl?: string;      // 云端服务器地址
     imageCompression?: boolean; // 是否启用云端图片压缩
@@ -268,35 +267,6 @@ export interface ArticleLoadingState {
   articlesCount: number;
   translatedCount: number;
   error?: string;
-}
-
-// 单个代理服务器配置
-export interface ProxyServer {
-  id: string;                 // 唯一标识符
-  name: string;               // 自定义名称
-  serverUrl: string;          // 服务器地址，如 http://192.168.1.100:8080
-  token?: string;             // 认证 Token
-  createdAt: string;          // 创建时间
-  updatedAt: string;          // 更新时间
-  lastTestResult?: 'success' | 'fail';  // 最后测试结果
-  lastTestTime?: string;      // 最后测试时间
-}
-
-// 多代理服务器配置
-export interface ProxyServersConfig {
-  servers: ProxyServer[];     // 服务器列表
-  activeServerId: string | null;  // 当前激活的服务器 ID
-}
-
-// 代理服务器配置类型（保留兼容旧版本）
-export interface ProxyModeConfig {
-  enabled: boolean;           // 是否启用代理模式
-  serverUrl: string;          // 服务器地址，如 http://192.168.1.100:8080
-  serverPassword: string;     // 部署密码
-  serverToken?: string;       // 服务器验证Token (用于注册和连接验证)
-  token?: string;             // 登录后获得的 Token
-  userId?: number;            // 用户 ID
-  lastSyncTime?: string;      // 最后同步时间
 }
 
 // 导航相关类型

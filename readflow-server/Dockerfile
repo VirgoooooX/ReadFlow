@@ -41,6 +41,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
 
 # 创建数据目录
 RUN mkdir -p data public/cache
@@ -57,4 +58,4 @@ ENV SERVER_CHANGELOG=${SERVER_CHANGELOG}
 
 EXPOSE 3000
 
-CMD ["/bin/sh", "-c", "npx prisma migrate deploy && npm start"]
+CMD ["/bin/sh", "-c", "npx prisma migrate deploy && node -e \"const fs=require('fs'); if(fs.existsSync('./scripts/migrate-public-feeds.js')) require('./scripts/migrate-public-feeds.js');\" && npm start"]

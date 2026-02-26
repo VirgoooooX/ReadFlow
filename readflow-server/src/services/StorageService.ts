@@ -51,6 +51,7 @@ export interface Feed {
   url: string;
   name: string;
   category: string;
+  description?: string;
   createdAt: string | Date;
   updatedAt?: string;
   refreshIntervalSeconds?: number;
@@ -451,6 +452,7 @@ export class StorageService {
       url: s.url,
       name: s.name,
       category: s.category,
+      description: s.description || undefined,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt.toISOString(),
       refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
@@ -460,6 +462,7 @@ export class StorageService {
       lastRefreshError: undefined,
       articleCount: s._count?.articles ?? 0,
       subscriberCount: s._count?.users ?? 0,
+      isPublic: s.isPublic,
     }));
   }
 
@@ -470,11 +473,13 @@ export class StorageService {
         url: true,
         name: true,
         category: true,
+        description: true,
         createdAt: true,
         updatedAt: true,
         refreshIntervalSeconds: true,
         refreshCron: true,
         lastFetchAt: true,
+        isPublic: true,
       },
     });
 
@@ -483,6 +488,7 @@ export class StorageService {
       url: s.url,
       name: s.name,
       category: s.category,
+      description: s.description || undefined,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt.toISOString(),
       refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
@@ -490,6 +496,7 @@ export class StorageService {
       lastRefreshAt: s.lastFetchAt?.toISOString(),
       lastRefreshStatus: 'ok',
       lastRefreshError: undefined,
+      isPublic: s.isPublic,
     }));
   }
 
@@ -501,8 +508,10 @@ export class StorageService {
     return userFeeds.map((uf: any) => ({
       id: String(uf.source.id),
       url: uf.source.url,
-      name: uf.source.name,
-      category: uf.source.category,
+      name: uf.customName || uf.source.name,         // Prefer user's custom name
+      category: uf.customCategory || uf.source.category, // Prefer user's custom category
+      description: uf.source.description || undefined,
+      isPublic: uf.source.isPublic,
       createdAt: uf.source.createdAt,
       updatedAt: uf.source.updatedAt.toISOString(),
       refreshIntervalSeconds: uf.source.refreshIntervalSeconds ?? undefined,
@@ -534,45 +543,85 @@ export class StorageService {
       if (!f.url) continue;
       const normalizedUrl = this.normalizeUrl(f.url);
 
-      // Upsert Source
+      // Upsert Source (Global Pool)
       const source = await prisma.rSSSource.upsert({
         where: { url: normalizedUrl },
         update: {
-          name: f.name || undefined,
-          category: f.category || undefined,
+          // DO NOT UPDATE NAME/CATEGORY HERE! It overwrites the global pool!
+          // We only create it if it doesn't exist.
         },
         create: {
           url: normalizedUrl,
           name: f.name || normalizedUrl,
           category: f.category || 'General',
+          description: f.description || null,
+          isPublic: false, // Default to false for user-added sources
         }
       });
 
-      // Link to User
-      await prisma.userFeed.upsert({
+      // Link to User with their custom overrides
+      const uf = await prisma.userFeed.upsert({
         where: {
           userId_sourceId: {
             userId: userId,
             sourceId: source.id
           }
         },
-        update: {},
+        update: {
+          customName: f.name || null,
+          customCategory: f.category || null,
+        },
         create: {
           userId: userId,
-          sourceId: source.id
+          sourceId: source.id,
+          customName: f.name || null,
+          customCategory: f.category || null,
         }
       });
 
       results.push({
         id: String(source.id),
         url: source.url,
-        name: source.name,
-        category: source.category,
+        name: uf.customName || source.name,
+        category: uf.customCategory || source.category,
+        description: source.description || undefined,
+        isPublic: source.isPublic,
         createdAt: source.createdAt,
         updatedAt: source.updatedAt.toISOString(),
-      });
+      } as any);
     }
     return results;
+  }
+
+  public async getPublicFeeds(): Promise<Feed[]> {
+    const sources = await prisma.rSSSource.findMany({
+      where: { isPublic: true },
+      include: {
+        _count: {
+          select: { articles: true, users: true }
+        }
+      },
+      orderBy: {
+        users: {
+          _count: 'desc'
+        }
+      }
+    });
+    return sources.map((s: any) => ({
+      id: String(s.id),
+      url: s.url,
+      name: s.name,
+      category: s.category,
+      description: s.description || undefined,
+      isPublic: s.isPublic,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt.toISOString(),
+      refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
+      refreshCron: s.refreshCron ?? undefined,
+      lastRefreshAt: s.lastFetchAt?.toISOString(),
+      articleCount: s._count?.articles ?? 0,
+      subscriberCount: s._count?.users ?? 0,
+    }));
   }
 
   public async updateFeedRefreshState(feedId: string, data: { lastRefreshAt: string; status: 'ok' | 'error'; error?: string }) {
@@ -973,6 +1022,8 @@ export class StorageService {
       update: {
         name: feed.name,
         category: feed.category,
+        description: feed.description === undefined ? undefined : (feed.description ?? null),
+        isPublic: (feed as any).isPublic ?? false,
         lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
         refreshIntervalSeconds: feed.refreshIntervalSeconds === undefined ? undefined : (feed.refreshIntervalSeconds ?? null),
         refreshCron: feed.refreshCron === undefined ? undefined : (feed.refreshCron ?? null),
@@ -981,6 +1032,8 @@ export class StorageService {
         url: normalizedUrl,
         name: feed.name,
         category: feed.category || 'General',
+        description: feed.description || null,
+        isPublic: (feed as any).isPublic ?? false,
         lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
         refreshIntervalSeconds: feed.refreshIntervalSeconds ?? null,
         refreshCron: feed.refreshCron ?? null,

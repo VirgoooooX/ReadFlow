@@ -1,4 +1,4 @@
-import { RSSSource, Article } from '../../types';
+import { RSSSource, Article, FetchArticlesWithStatsResult } from '../../types';
 
 export interface FeedInfo {
   title?: string;
@@ -10,7 +10,8 @@ export interface IRSSProvider {
   /**
    * Fetch articles from a source
    */
-  fetchArticles(source: RSSSource): Promise<Article[]>;
+  fetchArticlesWithStats(source: RSSSource, options?: { triggerRefresh?: boolean }): Promise<FetchArticlesWithStatsResult>;
+  getPublicFeeds?(): Promise<any[]>;
 
   /**
    * Validate a feed URL

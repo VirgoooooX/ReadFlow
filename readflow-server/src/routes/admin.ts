@@ -24,7 +24,7 @@ const requireAdminAuth = (req: express.Request, res: express.Response, next: exp
   const settings = storageService.getSettings();
   const password = settings.adminPassword || 'admin';
   const authHeader = req.headers['x-admin-token'];
-  
+
   if (authHeader === password) {
     next();
   } else {
@@ -37,7 +37,7 @@ router.post('/login', (req, res) => {
   const { password } = req.body;
   const settings = storageService.getSettings();
   const currentPassword = settings.adminPassword || 'admin';
-  
+
   if (password === currentPassword) {
     res.json({ success: true, token: currentPassword });
   } else {
@@ -71,7 +71,7 @@ router.post('/settings', (req, res) => {
     } catch (error) {
       res.status(500).json({ error: 'Failed to save settings' });
     }
-  })().catch(() => {});
+  })().catch(() => { });
 });
 
 // Users
@@ -131,15 +131,20 @@ router.post('/feeds', async (req, res) => {
           : String(refreshCronRaw).trim() || null;
     const feed = {
       ...req.body,
-      id,
       url: normalizedUrl,
       createdAt: req.body.createdAt || nowIso,
       updatedAt: nowIso,
       refreshIntervalSeconds: req.body.refreshIntervalSeconds ?? defaults.rssDefaultRefreshIntervalSeconds ?? 900,
       refreshCron,
+      isPublic: req.body.isPublic === true,
+      description: req.body.description || null,
     };
     await storageService.saveFeed(feed);
-    res.json(feed);
+
+    // Fetch the real record to get the autoincrement ID
+    const feeds = await storageService.getFeeds();
+    const realFeed = feeds.find(f => f.url === normalizedUrl);
+    res.json(realFeed || feed);
   } catch (error) {
     res.status(500).json({ error: 'Failed to save feed' });
   }
@@ -157,6 +162,8 @@ router.put('/feeds/:id', async (req, res) => {
       ...req.body,
       id: existing.id,
       updatedAt: nowIso,
+      isPublic: req.body.isPublic ?? (existing as any).isPublic ?? false,
+      description: req.body.description ?? (existing as any).description ?? null,
     };
     await storageService.saveFeed(next);
     res.json(next);
@@ -273,17 +280,17 @@ router.get('/status', async (req, res) => {
     const feeds = (await storageService.getFeeds()).length;
     const articleCache = await storageService.getArticleCacheStats();
     const imageCache = storageService.listCachedImages({ limit: 1, offset: 0 }).total;
-    
+
     // New fields
     const dbSize = await storageService.getDatabaseSize();
     const imageCacheSize = storageService.getImageCacheTotalSize();
     const recentArticleCount = await storageService.getRecentArticleCount(24);
-    
-    res.json({ 
-      users, 
-      feeds, 
-      articleCache, 
-      imageCache, 
+
+    res.json({
+      users,
+      feeds,
+      articleCache,
+      imageCache,
       storage: {
         dbSize,
         imageCacheSize,
@@ -319,7 +326,7 @@ router.post('/maintenance/prune-images', (req, res) => {
   try {
     const days = parseInt(req.body.days || '30');
     const result = storageService.pruneImages(days);
-    res.json({ success: true, ...result, message: `Pruned ${result.count} images (${(result.size/1024/1024).toFixed(2)}MB) older than ${days} days` });
+    res.json({ success: true, ...result, message: `Pruned ${result.count} images (${(result.size / 1024 / 1024).toFixed(2)}MB) older than ${days} days` });
   } catch (error) {
     res.status(500).json({ error: 'Failed to prune images' });
   }

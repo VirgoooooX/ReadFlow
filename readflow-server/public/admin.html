@@ -46,6 +46,7 @@
         }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap"
@@ -309,16 +310,83 @@
                 <!-- Toolbar -->
                 <div
                     class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-card p-4 rounded-xl">
-                    <div class="relative w-full md:w-64">
-                        <i
-                            class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input type="text" placeholder="搜索订阅源..."
-                            class="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                    <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <div class="relative w-full sm:w-64">
+                            <i
+                                class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input id="feeds-search" type="text" placeholder="搜索订阅源..."
+                                oninput="applyFeedFilters()"
+                                class="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                        </div>
+                        <select id="feeds-category-filter" onchange="applyFeedFilters()"
+                            class="w-full sm:w-48 px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                            <option value="">全部分类</option>
+                        </select>
+                        <select id="feeds-public-filter" onchange="applyFeedFilters()"
+                            class="w-full sm:w-40 px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                            <option value="all">全部</option>
+                            <option value="public">仅公开池</option>
+                            <option value="private">仅私有</option>
+                        </select>
                     </div>
-                    <button onclick="document.getElementById('add-feed-panel').classList.toggle('hidden')"
-                        class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/20 flex items-center transform hover:-translate-y-0.5">
-                        <i class="fa-solid fa-plus mr-2"></i> 添加新源
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="exportFeeds('csv')"
+                            class="bg-white/70 hover:bg-white text-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/10 border border-white/60 flex items-center transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-download mr-2"></i> 导出CSV
+                        </button>
+                        <button onclick="openImportFeedsDialog()"
+                            class="bg-white/70 hover:bg-white text-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/10 border border-white/60 flex items-center transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-file-import mr-2"></i> 导入CSV/Excel
+                        </button>
+                        <button onclick="document.getElementById('add-feed-panel').classList.toggle('hidden')"
+                            class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/20 flex items-center transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-plus mr-2"></i> 添加新源
+                        </button>
+                    </div>
+                </div>
+                <input id="feeds-import-file" type="file" class="hidden" accept=".csv,.xlsx,.xls"
+                    onchange="importFeedsFromFile(this.files && this.files[0]); this.value='';" />
+                <div id="feeds-bulk-bar"
+                    class="hidden glass-card p-4 rounded-xl flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="text-sm font-bold text-slate-800">
+                            已选 <span id="feeds-bulk-count">0</span> 项
+                        </div>
+                        <button onclick="clearFeedSelection()"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                            清空选择
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="bulkSetPublic(true)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition">
+                            设为公开
+                        </button>
+                        <button onclick="bulkSetPublic(false)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 hover:bg-slate-800 text-white transition">
+                            设为私有
+                        </button>
+                        <button onclick="bulkRefreshFeeds()"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition">
+                            批量刷新
+                        </button>
+                        <button onclick="bulkClearFeedData()"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition">
+                            清空数据
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <input id="feeds-bulk-category" type="text" placeholder="新分类"
+                                class="w-40 px-3 py-1.5 bg-white/70 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                            <button onclick="bulkUpdateCategory()"
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition">
+                                改分类
+                            </button>
+                        </div>
+                        <button onclick="bulkDeleteFeeds()"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition">
+                            删除
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Add Feed Panel -->
@@ -351,10 +419,20 @@
                             <input type="text" id="feed-cron" placeholder="*/15 * * * *"
                                 class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
                         </div>
+                        <div class="md:col-span-12">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">源简介 (简短描述)</label>
+                            <input type="text" id="feed-description" placeholder="例如: 专注于苹果新闻和应用推荐的中文博客..."
+                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
                         <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">公开</label>
+                            <input type="checkbox" id="feed-is-public"
+                                class="mt-2 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        </div>
+                        <div class="md:col-span-2">
                             <button onclick="addFeed()"
                                 class="w-full bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium h-[38px] shadow-lg shadow-slate-800/20">
-                                确定
+                                确定添加
                             </button>
                         </div>
                     </div>
@@ -363,19 +441,24 @@
                 <!-- Table -->
                 <div class="glass-card rounded-xl overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="responsive-table w-full text-left border-collapse">
+                        <table class="responsive-table w-full text-left border-collapse table-fixed">
                             <thead
                                 class="bg-slate-50/30 text-xs uppercase text-slate-600 font-bold border-b border-slate-100/50">
                                 <tr>
-                                    <th class="px-6 py-4">源名称 / 分类</th>
-                                    <th class="px-6 py-4 w-1/3">源地址</th>
-                                    <th class="px-6 py-4 text-center">文章数</th>
-                                    <th class="px-6 py-4 text-center">订阅用户</th>
-                                    <th class="px-6 py-4 text-center">间隔(秒)</th>
-                                    <th class="px-6 py-4 text-center">Cron</th>
-                                    <th class="px-6 py-4">最后更新</th>
-                                    <th class="px-6 py-4 text-center">状态</th>
-                                    <th class="px-6 py-4 text-right">操作</th>
+                                    <th class="px-6 py-4 w-10">
+                                        <input id="feeds-select-all" type="checkbox"
+                                            onchange="toggleSelectAllVisible(this.checked)"
+                                            class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    </th>
+                                    <th class="px-6 py-4 w-[420px]">源名称 / 分类</th>
+                                    <th class="px-6 py-4 w-[520px]">源地址</th>
+                                    <th class="px-6 py-4 text-center w-24">文章数</th>
+                                    <th class="px-6 py-4 text-center w-24">订阅用户</th>
+                                    <th class="px-6 py-4 text-center w-28">间隔(秒)</th>
+                                    <th class="px-6 py-4 text-center w-[200px]">Cron</th>
+                                    <th class="px-6 py-4 w-[190px]">最后更新</th>
+                                    <th class="px-6 py-4 text-center w-24">状态</th>
+                                    <th class="px-6 py-4 text-right w-32">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="feeds-list"

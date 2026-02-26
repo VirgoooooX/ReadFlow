@@ -7,7 +7,6 @@ import { DatabaseService } from '../../database/DatabaseService';
 import { RSSSource, Article, AppError, FetchArticlesWithStatsResult, RefreshSourcesResult } from '../../types';
 import { SettingsService } from '../SettingsService';
 import { localRSSService } from './LocalRSSService';
-import { proxyRSSService } from './ProxyRSSService';
 import { cloudSyncService } from './CloudSyncService';
 import { logger } from './RSSUtils';
 import { InteractionManager } from 'react-native';
@@ -34,8 +33,8 @@ export class RSSService {
    * 添加 RSS 源
    */
   public async addRSSSource(
-    url: string, 
-    title?: string, 
+    url: string,
+    title?: string,
     contentType: 'text' | 'image_text' = 'image_text',
     category: string = '技术',
     sourceMode: 'direct' | 'proxy' = 'direct',
@@ -49,24 +48,16 @@ export class RSSService {
         cleanUrl = cleanUrl.replace(/\/$/, '');
         logger.info(`[addRSSSource] 已移除末尾斜杠: ${url} -> ${cleanUrl}`);
       }
-      
+
       // 1. 验证 RSS 源
       const feedInfo = await localRSSService.validateRSSFeed(cleanUrl);
-      
+
       // 🔥 如果验证过程中发生了 URL 变更（例如 HTTPS -> HTTP 降级），使用新的 URL
       if (feedInfo.url && feedInfo.url !== cleanUrl) {
         logger.info(`[addRSSSource] URL 更新: ${cleanUrl} -> ${feedInfo.url}`);
         cleanUrl = feedInfo.url;
       }
-      
-      // 2. 代理模式：调用服务端订阅 API（仅当源级别选择代理模式时）
-      if (sourceMode === 'proxy') {
-        const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-        if (proxyConfig.enabled && proxyConfig.token) {
-          await proxyRSSService.subscribeToProxyServer(cleanUrl, title, proxyConfig);
-        }
-      }
-      
+
       // 3. 保存到本地数据库
       const rssSource: Omit<RSSSource, 'id'> = {
         sortOrder: 0,
@@ -106,16 +97,8 @@ export class RSSService {
         ...rssSource,
       };
 
-      // 4. 直连模式：立即获取文章（忽略全局代理设置，使用源级别配置）
-      if (sourceMode === 'direct') {
-        await localRSSService.fetchArticlesWithRetry(newSource, 3);
-      } else {
-        // 代理模式：立即获取文章
-        const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-        if (proxyConfig.serverUrl) {
-          await proxyRSSService.fetchArticlesFromProxy(newSource, proxyConfig, { mode: 'refresh' });
-        }
-      }
+      // 4. 获取文章
+      await localRSSService.fetchArticlesWithRetry(newSource, 3);
 
       this.triggerSync();
       return newSource;
@@ -138,7 +121,7 @@ export class RSSService {
       const results = await this.databaseService.executeQuery(`
         SELECT * FROM rss_sources ORDER BY sort_order ASC, id ASC
       `);
-      
+
       return results.map(this.mapRSSSourceRow);
     } catch (error) {
       logger.error('Error getting RSS sources:', error);
@@ -155,11 +138,11 @@ export class RSSService {
         'SELECT * FROM rss_sources WHERE id = ?',
         [id]
       );
-      
+
       if (results.length === 0) {
         return null;
       }
-      
+
       return this.mapRSSSourceRow(results[0]);
     } catch (error) {
       logger.error('Error getting RSS source by ID:', error);
@@ -175,7 +158,7 @@ export class RSSService {
       const results = await this.databaseService.executeQuery(
         'SELECT * FROM rss_sources WHERE is_active = 1 ORDER BY sort_order ASC, id ASC'
       );
-      
+
       return results.map(this.mapRSSSourceRow);
     } catch (error) {
       logger.error('Error getting active RSS sources:', error);
@@ -208,7 +191,7 @@ export class RSSService {
     try {
       const setClause = [];
       const values = [];
-      
+
       if (updates.name !== undefined) {
         setClause.push('title = ?');
         values.push(updates.name);
@@ -249,13 +232,13 @@ export class RSSService {
         setClause.push('retention_limit = ?');
         values.push(updates.retentionLimit);
       }
-      
+
       if (setClause.length === 0) {
         return;
       }
-      
+
       values.push(id);
-      
+
       const sql = `UPDATE rss_sources SET ${setClause.join(', ')} WHERE id = ?`;
       await this.databaseService.executeStatement(sql, values);
       this.triggerSync();
@@ -277,28 +260,15 @@ export class RSSService {
     try {
       const source = await this.getSourceById(id);
       if (!source) return;
-      
-      // 代理模式：调用服务端 API
-      if (source.sourceMode === 'proxy') {
-        const config = await SettingsService.getInstance().getProxyModeConfig();
-        if (config.enabled && config.token) {
-          try {
-            await fetch(`${config.serverUrl}/api/subscribe/${source.id}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${config.token}` },
-            });
-          } catch (error) {
-            logger.warn('Failed to delete source from proxy server:', error);
-          }
-        }
-      }
-      
+
+      if (!source) return;
+
       // 删除本地数据
       await this.databaseService.executeStatement(
         'DELETE FROM articles WHERE rss_source_id = ?',
         [id]
       );
-      
+
       await this.databaseService.executeStatement(
         'DELETE FROM rss_sources WHERE id = ?',
         [id]
@@ -315,11 +285,8 @@ export class RSSService {
     }
   }
 
-  // =================== 文章获取 ===================
-
   /**
    * 获取 RSS 源文章 - 统一入口
-   * 根据源级别的 sourceMode 判断是否使用代理
    */
   public async fetchArticlesFromSource(
     source: RSSSource,
@@ -338,299 +305,17 @@ export class RSSService {
       return { articles: [], insertedCount: 0, updatedCount: 0, upsertedCount: 0 };
     }
 
-    const cloudConfig = await cloudConfigService.getConfig();
-    logger.info(`[fetchArticlesFromSource] Checking sync mode. Enabled: ${cloudConfig.mode === 'cloud'}, URL: ${cloudConfig.serverUrl}`);
-    
-    if (cloudConfig.mode === 'cloud' && cloudConfig.serverUrl) {
-      logger.info(`[fetchArticlesFromSource] ☁️ 云端模式: ${source.name}`);
-      try {
-        return await cloudSyncService.fetchArticlesWithStats(source);
-      } catch (error) {
-        logger.error(`[fetchArticlesFromSource] 云端同步失败，降级到直连模式: ${source.name}`, error);
-        // Fallback to local/direct mode
-      }
-    }
-
-    // 根据源级别配置判断
-    if (source.sourceMode === 'proxy') {
-      // 代理模式
-      const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-      if (!proxyConfig.serverUrl) {
-        logger.warn(`[fetchArticlesFromSource] 源 ${source.name} 配置为代理模式，但未配置代理服务器，回退到直连模式`);
-        const articles = await localRSSService.fetchArticlesWithRetry(source, 3);
-        return { articles, insertedCount: articles.length, updatedCount: 0, upsertedCount: articles.length };
-      }
-      const mode = options.mode || 'refresh';
-      logger.info(`[fetchArticlesFromSource] 🚀 代理模式: ${source.name} (mode: ${mode})`);
-      const articles = await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
-      return { articles, insertedCount: articles.length, updatedCount: 0, upsertedCount: articles.length };
-    } else {
-      // 直连模式
-      logger.info(`[fetchArticlesFromSource] 直连模式: ${source.name}`);
-      const articles = await localRSSService.fetchArticlesWithRetry(source, 3);
-      return { articles, insertedCount: articles.length, updatedCount: 0, upsertedCount: articles.length };
+    logger.info(`[fetchArticlesFromSource] ☁️ 云端模式: ${source.name}`);
+    try {
+      return await cloudSyncService.fetchArticlesWithStats(source);
+    } catch (error) {
+      logger.error(`[fetchArticlesFromSource] 云端同步失败: ${source.name}`, error);
+      throw error;
     }
   }
 
   /**
-   * 刷新所有活跃 RSS 源
-   * 根据每个源的 sourceMode 分别处理
-   */
-  public async refreshAllSources(
-    options: {
-      mode?: 'sync' | 'refresh';
-      maxConcurrent?: number;
-      onProgress?: (current: number, total: number, sourceName: string) => void;
-      onError?: (error: Error, sourceName: string) => void;
-    } = {}
-  ): Promise<RefreshSourcesResult> {
-    const sources = await this.getActiveRSSSources();
-    
-    if (sources.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
-    }
-
-    // 检查全局同步设置
-    const cloudConfig = await cloudConfigService.getConfig();
-    const isCloudMode = cloudConfig.mode === 'cloud' && !!cloudConfig.serverUrl;
-
-    if (isCloudMode) {
-      logger.info(`[RefreshAllSources] ☁️ 全局云端模式开启，所有源走云端同步`);
-      // 走通用 fetchArticlesFromSource，它内部会处理云端逻辑
-      // 我们复用 refreshSources 的并发逻辑，但直接传所有 ID
-      return this.refreshSources(sources.map(s => s.id), options);
-    }
-
-    // 按 sourceMode 分组
-    const directSources = sources.filter(s => s.sourceMode !== 'proxy');
-    const proxySources = sources.filter(s => s.sourceMode === 'proxy');
-    
-    let success = 0;
-    let failed = 0;
-    let totalArticles = 0;
-    let insertedCount = 0;
-    let updatedCount = 0;
-    let upsertedCount = 0;
-    const errors: Array<{ source: string; error: string }> = [];
-    let completed = 0;
-    const total = sources.length;
-
-    // 处理直连源
-    if (directSources.length > 0) {
-      logger.info(`[RefreshAllSources] 直连模式: ${directSources.length} 个源`);
-      const directResult = await localRSSService.refreshSources(directSources, {
-        ...options,
-        onProgress: (current, _, sourceName) => {
-          completed++;
-          options.onProgress?.(completed, total, sourceName);
-        },
-      });
-      success += directResult.success;
-      failed += directResult.failed;
-      totalArticles += directResult.totalArticles;
-      insertedCount += directResult.totalArticles;
-      upsertedCount += directResult.totalArticles;
-      errors.push(...directResult.errors);
-    }
-
-    // 处理代理源
-    if (proxySources.length > 0) {
-      const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-      if (proxyConfig.serverUrl) {
-        logger.info(`[RefreshAllSources] 代理模式: ${proxySources.length} 个源`);
-        const mode = options.mode || 'refresh';
-        
-        for (const source of proxySources) {
-          try {
-            const articles = await proxyRSSService.fetchArticlesFromProxy(source, proxyConfig, { mode });
-            success++;
-            totalArticles += articles.length;
-            insertedCount += articles.length;
-            upsertedCount += articles.length;
-          } catch (error: any) {
-            failed++;
-            errors.push({ source: source.name, error: error.message || '未知错误' });
-            options.onError?.(error, source.name);
-          }
-          completed++;
-          options.onProgress?.(completed, total, source.name);
-        }
-      } else {
-        logger.warn('[RefreshAllSources] 有代理源但未配置代理服务器，跳过');
-        failed += proxySources.length;
-        for (const source of proxySources) {
-          errors.push({ source: source.name, error: '未配置代理服务器' });
-          completed++;
-          options.onProgress?.(completed, total, source.name);
-        }
-      }
-    }
-
-    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
-  }
-
-  /**
-   * 刷新指定的 RSS 源列表
-   */
-  public async refreshSources(
-    sourceIds: number[],
-    options: {
-      mode?: 'sync' | 'refresh';
-      maxConcurrent?: number;
-      onProgress?: (current: number, total: number, sourceName: string) => void;
-      onError?: (error: Error, sourceName: string) => void;
-      onArticlesReady?: (articles: Article[], sourceName: string) => void;
-    } = {}
-  ): Promise<RefreshSourcesResult> {
-    const { mode, maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
-    
-    // 1. 获取所有活跃源
-    const allSources = await this.getActiveRSSSources();
-    
-    // 2. 过滤出需要刷新的源（且必须是活跃的）
-    const sourcesToRefresh = allSources.filter(s => sourceIds.includes(s.id));
-    
-    if (sourcesToRefresh.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
-    }
-
-    // 3. 复用并发逻辑
-    const limiter = this.createLimiter(maxConcurrent);
-    
-    let success = 0;
-    let failed = 0;
-    let totalArticles = 0;
-    let insertedCount = 0;
-    let updatedCount = 0;
-    let upsertedCount = 0;
-    const errors: Array<{ source: string; error: string }> = [];
-    let completed = 0;
-    const total = sourcesToRefresh.length;
-
-    const tasks = sourcesToRefresh.map(source => 
-      limiter(() => 
-        new Promise<void>((resolve, reject) => {
-          InteractionManager.runAfterInteractions(() => {
-            this.fetchArticlesFromSourceWithStats(source, { mode })
-              .then((result) => {
-                success++;
-                totalArticles += result.insertedCount;
-                insertedCount += result.insertedCount;
-                updatedCount += result.updatedCount;
-                upsertedCount += result.upsertedCount;
-                completed++;
-                
-                if (onArticlesReady && result.articles.length > 0) {
-                  onArticlesReady(result.articles, source.name);
-                }
-                
-                onProgress?.(completed, total, source.name);
-                resolve();
-              })
-              .catch((error) => {
-                failed++;
-                completed++;
-                const errorMsg = error.message || '未知错误';
-                errors.push({ source: source.name, error: errorMsg });
-                
-                onError?.(error, source.name);
-                onProgress?.(completed, total, source.name);
-                // 即使失败也 resolve，避免中断整个 Promise.all
-                resolve(); 
-              });
-          });
-        })
-      )
-    );
-
-    await Promise.all(tasks);
-
-    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
-  }
-
-  public async forceCloudRefreshSources(
-    sourceIds: number[],
-    options: {
-      maxConcurrent?: number;
-      onProgress?: (current: number, total: number, sourceName: string) => void;
-      onError?: (error: Error, sourceName: string) => void;
-      onArticlesReady?: (articles: Article[], sourceName: string) => void;
-    } = {}
-  ): Promise<RefreshSourcesResult> {
-    const { maxConcurrent = 2, onProgress, onError, onArticlesReady } = options;
-
-    if (!Array.isArray(sourceIds) || sourceIds.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
-    }
-
-    const cloudConfig = await cloudConfigService.getConfig();
-    const isCloudMode = cloudConfig.mode === 'cloud' && !!cloudConfig.serverUrl;
-    if (!isCloudMode) {
-      return this.refreshSources(sourceIds, { maxConcurrent, onProgress, onError, onArticlesReady, mode: 'refresh' });
-    }
-
-    const allSources = await this.getActiveRSSSources();
-    const sourcesToRefresh = allSources.filter(s => sourceIds.includes(s.id));
-    if (sourcesToRefresh.length === 0) {
-      return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
-    }
-
-    const limiter = this.createLimiter(maxConcurrent);
-
-    let success = 0;
-    let failed = 0;
-    let totalArticles = 0;
-    let insertedCount = 0;
-    let updatedCount = 0;
-    let upsertedCount = 0;
-    const errors: Array<{ source: string; error: string }> = [];
-    let completed = 0;
-    const total = sourcesToRefresh.length;
-
-    const tasks = sourcesToRefresh.map(source =>
-      limiter(
-        () =>
-          new Promise<void>((resolve) => {
-            InteractionManager.runAfterInteractions(() => {
-              cloudSyncService
-                .fetchArticlesWithStats(source, { triggerRefresh: true })
-                .then((result) => {
-                  success++;
-                  totalArticles += result.insertedCount;
-                  insertedCount += result.insertedCount;
-                  updatedCount += result.updatedCount;
-                  upsertedCount += result.upsertedCount;
-                  completed++;
-
-                  if (onArticlesReady && result.articles.length > 0) {
-                    onArticlesReady(result.articles, source.name);
-                  }
-
-                  onProgress?.(completed, total, source.name);
-                  resolve();
-                })
-                .catch((error) => {
-                  failed++;
-                  completed++;
-                  const errorMsg = error?.message || '未知错误';
-                  errors.push({ source: source.name, error: errorMsg });
-
-                  onError?.(error, source.name);
-                  onProgress?.(completed, total, source.name);
-                  resolve();
-                });
-            });
-          })
-      )
-    );
-
-    await Promise.all(tasks);
-
-    return { success, failed, totalArticles, insertedCount, updatedCount, upsertedCount, errors };
-  }
-
-  /**
-   * 【改进】后台刷新所有 RSS 源 (使用优化的并发控制)
+   *后台刷新所有 RSS 源 (使用优化的并发控制)
    * 核心优化：使用简单但有效的 p-limit 模例
    */
   public async refreshAllSourcesBackground(
@@ -641,16 +326,40 @@ export class RSSService {
       onArticlesReady?: (articles: Article[], sourceName: string) => void;
     } = {}
   ): Promise<RefreshSourcesResult> {
+    return this.refreshSources([], options);
+  }
+
+  public async refreshAllSources(options: any = {}): Promise<RefreshSourcesResult> {
+    return this.refreshAllSourcesBackground(options);
+  }
+
+  public async forceCloudRefreshSources(sourceIds: number[], options: any = {}): Promise<RefreshSourcesResult> {
+    return this.refreshSources(sourceIds, options);
+  }
+
+  public async refreshSources(
+    sourceIds: number[] = [],
+    options: {
+      maxConcurrent?: number;
+      onProgress?: (current: number, total: number, sourceName: string) => void;
+      onError?: (error: Error, sourceName: string) => void;
+      onArticlesReady?: (articles: Article[], sourceName: string) => void;
+      mode?: string;
+    } = {}
+  ): Promise<RefreshSourcesResult> {
     const { maxConcurrent = 3, onProgress, onError, onArticlesReady } = options;
-    const sources = await this.getActiveRSSSources();
-    
+    const allSources = await this.getActiveRSSSources();
+    const sources = sourceIds.length > 0
+      ? allSources.filter(s => sourceIds.includes(s.id))
+      : allSources;
+
     if (sources.length === 0) {
       return { success: 0, failed: 0, totalArticles: 0, insertedCount: 0, updatedCount: 0, upsertedCount: 0, errors: [] };
     }
 
     // 使用简单的并发控制器
     const limiter = this.createLimiter(maxConcurrent);
-    
+
     let success = 0;
     let failed = 0;
     let totalArticles = 0;
@@ -660,8 +369,8 @@ export class RSSService {
     const errors: Array<{ source: string; error: string }> = [];
     let completed = 0;
 
-    const tasks = sources.map(source => 
-      limiter(() => 
+    const tasks = sources.map(source =>
+      limiter(() =>
         new Promise<void>((resolve, reject) => {
           InteractionManager.runAfterInteractions(() => {
             this.fetchArticlesFromSourceWithStats(source)
@@ -672,11 +381,11 @@ export class RSSService {
                 updatedCount += result.updatedCount;
                 upsertedCount += result.upsertedCount;
                 completed++;
-                
+
                 if (onArticlesReady && result.articles.length > 0) {
                   onArticlesReady(result.articles, source.name);
                 }
-                
+
                 onProgress?.(completed, sources.length, source.name);
                 resolve();
               })
@@ -685,11 +394,11 @@ export class RSSService {
                 completed++;
                 const errorMsg = error.message || '未知错误';
                 errors.push({ source: source.name, error: errorMsg });
-                
+
                 onError?.(error, source.name);
                 onProgress?.(completed, sources.length, source.name);
                 // 即使失败也 resolve，避免中断整个 Promise.all
-                resolve(); 
+                resolve();
               });
           });
         })
@@ -726,18 +435,6 @@ export class RSSService {
     return (fn: () => Promise<any>) => run(fn);
   }
 
-  /**
-   * 同步所有源到代理服务器
-   */
-  public async syncAllSourcesWithProxyServer(): Promise<void> {
-    const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-    if (!proxyConfig.enabled || !proxyConfig.token) {
-      throw new Error('代理模式未启用');
-    }
-    
-    const sources = await this.getAllRSSSources();
-    await proxyRSSService.syncAllSourcesToProxy(sources, proxyConfig);
-  }
 
   /**
    * 验证 RSS 源
@@ -817,8 +514,8 @@ export class RSSService {
              WHERE id = ?`,
             [
               source.name, source.description, source.category, source.contentType,
-              source.sourceMode, source.isActive ? 1 : 0, 
-              source.fetchLimit ?? source.maxArticles ?? 50, 
+              source.sourceMode, source.isActive ? 1 : 0,
+              source.fetchLimit ?? source.maxArticles ?? 50,
               source.retentionLimit ?? source.maxArticles ?? 100,
               groupId, source.sortOrder, source.updateFrequency,
               id
@@ -831,9 +528,9 @@ export class RSSService {
               (url, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency, last_updated)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              source.url, source.name, source.description, source.category, 
-              source.contentType, source.sourceMode, source.isActive ? 1 : 0, 
-              source.fetchLimit ?? source.maxArticles ?? 50, 
+              source.url, source.name, source.description, source.category,
+              source.contentType, source.sourceMode, source.isActive ? 1 : 0,
+              source.fetchLimit ?? source.maxArticles ?? 50,
               source.retentionLimit ?? source.maxArticles ?? 100,
               groupId, source.sortOrder, source.updateFrequency,
               new Date().toISOString()

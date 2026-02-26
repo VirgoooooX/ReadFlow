@@ -17,6 +17,7 @@ import { useUser } from '../../contexts/UserContext';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AppNavigator';
 import * as StyleUtils from '../../utils/styleUtils';
+import { cloudConfigService } from '../../services/CloudConfigService';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -44,6 +45,26 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { isLoading: authLoading } = state;
   const [errors, setErrors] = useState<Partial<LoginForm>>({});
 
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [serverUrl, setServerUrl] = useState('http://localhost:30000/');
+  const [serverToken, setServerToken] = useState('');
+
+  React.useEffect(() => {
+    const loadConfig = async () => {
+      const config = await cloudConfigService.getConfig();
+      if (config.serverUrl) {
+        setServerUrl(config.serverUrl);
+      } else {
+        setServerUrl('http://localhost:30000/');
+        await cloudConfigService.setServer('http://localhost:30000/');
+      }
+      if (config.serverAccessKey) {
+        setServerToken(config.serverAccessKey);
+      }
+    };
+    loadConfig();
+  }, []);
+
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginForm> = {};
 
@@ -65,6 +86,9 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!validateForm()) return;
+
+    // 在尝试登录前保存配置好的 ServerURL 和 Server Token
+    await cloudConfigService.setServer(serverUrl, serverToken);
 
     const response = await login({ email: form.email, password: form.password });
 
@@ -190,20 +214,47 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
 
-          {/* 分割线 */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>或</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          {/* 高级设置 Toggle */}
+          <TouchableOpacity onPress={() => setShowAdvanced(!showAdvanced)} style={styles.serverSettingsToggle}>
+            <Text style={styles.serverSettingsToggleText}>{showAdvanced ? '收起高级设置' : '高级设置'}</Text>
+          </TouchableOpacity>
 
-          {/* 注册链接 */}
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>还没有账户？</Text>
-            <TouchableOpacity onPress={handleRegister}>
-              <Text style={styles.registerLink}>立即注册</Text>
-            </TouchableOpacity>
-          </View>
+          {showAdvanced && (
+            <View style={styles.serverSettingsContainer}>
+              <Text style={styles.serverSettingsHint}>配置自定义的 ReadFlow 服务端地址</Text>
+              <View style={styles.serverInputRow}>
+                <View style={styles.serverInputContainer}>
+                  <TextInput
+                    style={styles.serverInput}
+                    placeholder="http://192.168.x.x:30000/"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    value={serverUrl}
+                    onChangeText={setServerUrl}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </View>
+              </View>
+
+              <Text style={[styles.serverSettingsHint, { marginTop: 12 }]}>服务端访问令牌 (Server Token, 选填)</Text>
+              <View style={styles.serverInputRow}>
+                <View style={styles.serverInputContainer}>
+                  <TextInput
+                    style={styles.serverInput}
+                    placeholder="填入服务端的 SERVER_TOKEN"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    value={serverToken}
+                    onChangeText={setServerToken}
+                    secureTextEntry={true}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

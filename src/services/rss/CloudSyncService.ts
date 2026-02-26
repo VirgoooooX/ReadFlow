@@ -1,12 +1,12 @@
-import { RSSSource, Article, FetchArticlesWithStatsResult } from '../../types';
-import { IRSSProvider, FeedInfo } from './RSSProvider';
-import { DatabaseService } from '../../database/DatabaseService';
-import { SettingsService } from '../SettingsService';
-import { filterService } from './FilterService';
-import AuthService from '../AuthService';
-import { cloudConfigService } from '../CloudConfigService';
-import { logger } from './RSSUtils';
-import cacheEventEmitter from '../CacheEventEmitter';
+import { RSSSource, Article, FetchArticlesWithStatsResult } from "../../types";
+import { IRSSProvider, FeedInfo } from "./RSSProvider";
+import { DatabaseService } from "../../database/DatabaseService";
+import { SettingsService } from "../SettingsService";
+import { filterService } from "./FilterService";
+import AuthService from "../AuthService";
+import { cloudConfigService } from "../CloudConfigService";
+import { logger } from "./RSSUtils";
+import cacheEventEmitter from "../CacheEventEmitter";
 
 export class CloudSyncService implements IRSSProvider {
   private databaseService = DatabaseService.getInstance();
@@ -16,12 +16,18 @@ export class CloudSyncService implements IRSSProvider {
   private stateSyncNeedsRunAfter: boolean = false;
 
   private normalizeFeedUrl(url: string): string {
-    return String(url || '').trim().replace(/\/$/, '');
+    return String(url || "")
+      .trim()
+      .replace(/\/$/, "");
   }
 
-  private checkAuth() {
-    if (!AuthService.isAuthenticated()) {
-      throw new Error('Cloud mode requires login. Please log in to your account.');
+  private async checkAuth(): Promise<void> {
+    const cloudConfig = await cloudConfigService.getConfig();
+    const token = AuthService.getAuthToken() ?? cloudConfig.auth?.accessToken;
+    if (!token) {
+      throw new Error(
+        "Cloud mode requires login. Please log in to your account.",
+      );
     }
   }
 
@@ -29,23 +35,27 @@ export class CloudSyncService implements IRSSProvider {
     const cloudConfig = await cloudConfigService.getConfig();
     const url = cloudConfig.serverUrl;
     if (!url) {
-      throw new Error('Server URL not configured');
+      throw new Error("Server URL not configured");
     }
     // Remove trailing slash if present
-    return url.replace(/\/$/, '');
+    return url.replace(/\/$/, "");
   }
 
-  private getAuthHeaders(): HeadersInit {
-    const token = AuthService.getAuthToken();
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }
-
-  private async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  private async authenticatedFetch(
+    url: string,
+    options: RequestInit = {},
+  ): Promise<Response> {
     const cloudConfig = await cloudConfigService.getConfig();
+    const token = AuthService.getAuthToken() ?? cloudConfig.auth?.accessToken;
     const headers = {
-      ...this.getAuthHeaders(),
-      ...(cloudConfig.serverAccessKey ? { 'x-server-token': cloudConfig.serverAccessKey, 'x-server-access-key': cloudConfig.serverAccessKey } : {}),
-      ...(options.headers || {})
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(cloudConfig.serverAccessKey
+        ? {
+            "x-server-token": cloudConfig.serverAccessKey,
+            "x-server-access-key": cloudConfig.serverAccessKey,
+          }
+        : {}),
+      ...(options.headers || {}),
     };
     return fetch(url, { ...options, headers });
   }
@@ -57,7 +67,9 @@ export class CloudSyncService implements IRSSProvider {
 
     this.stateSyncTimer = setTimeout(() => {
       this.stateSyncTimer = null;
-      this.runStateSync().catch(err => logger.warn('[CloudSync] Scheduled state sync failed:', err));
+      this.runStateSync().catch((err) =>
+        logger.warn("[CloudSync] Scheduled state sync failed:", err),
+      );
     }, delayMs);
   }
 
@@ -85,18 +97,33 @@ export class CloudSyncService implements IRSSProvider {
     return this.stateSyncInFlight;
   }
 
+  public async getPublicFeeds(): Promise<any[]> {
+    await this.checkAuth();
+    const serverUrl = await this.getServerUrl();
+    const url = `${serverUrl}/api/rss/public`;
+    const response = await this.authenticatedFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch public feeds: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.feeds || [];
+  }
+
   /**
    * Fetch articles from cloud server
    * options.triggerRefresh: If true, force server to refresh feed
    */
-  public async fetchArticles(source: RSSSource, options: { triggerRefresh?: boolean } = {}): Promise<Article[]> {
+  public async fetchArticles(
+    source: RSSSource,
+    options: { triggerRefresh?: boolean } = {},
+  ): Promise<Article[]> {
     const result = await this.fetchArticlesWithStats(source, options);
     return result.articles;
   }
 
   public async fetchArticlesWithStats(
     source: RSSSource,
-    options: { triggerRefresh?: boolean } = {}
+    options: { triggerRefresh?: boolean } = {},
   ): Promise<FetchArticlesWithStatsResult> {
     try {
       const serverUrl = await this.getServerUrl();
@@ -104,7 +131,10 @@ export class CloudSyncService implements IRSSProvider {
       const imageCompression = settings.sync.imageCompression ?? false;
       const cursors = settings.sync.cloudCursors || {};
       const normalizedSourceUrl = this.normalizeFeedUrl(source.url);
-      const since = (cursors as any)[normalizedSourceUrl] ?? (cursors as any)[source.url] ?? 0;
+      const since =
+        (cursors as any)[normalizedSourceUrl] ??
+        (cursors as any)[source.url] ??
+        0;
       logger.info(
         `[CloudSync] Cursor snapshot for ${source.name}:`,
         JSON.stringify({
@@ -112,10 +142,10 @@ export class CloudSyncService implements IRSSProvider {
           normalizedSourceUrl,
           cursorKey: normalizedSourceUrl,
           since,
-        })
+        }),
       );
 
-      this.checkAuth();
+      await this.checkAuth();
       await this.pushUserAndFeedsIfNeeded(serverUrl);
 
       // If triggerRefresh is requested, call refresh endpoint first
@@ -127,13 +157,14 @@ export class CloudSyncService implements IRSSProvider {
           // But CloudSyncService doesn't know feed ID on server.
           // We need a public endpoint: POST /api/rss/refresh?url=...
           const refreshUrl = `${serverUrl}/api/rss/refresh?url=${encodeURIComponent(normalizedSourceUrl)}`;
-          await this.authenticatedFetch(refreshUrl, { method: 'POST' });
+          await this.authenticatedFetch(refreshUrl, { method: "POST" });
         } catch (e) {
           logger.warn(`[CloudSync] Trigger refresh failed:`, e);
         }
       }
 
-      const sourceId = typeof source.id === 'string' ? parseInt(source.id, 10) : source.id;
+      const sourceId =
+        typeof source.id === "string" ? parseInt(source.id, 10) : source.id;
       let cursor = since;
       let latestCursor = since;
       const insertedArticles: Article[] = [];
@@ -144,14 +175,15 @@ export class CloudSyncService implements IRSSProvider {
       let usedLegacyCursor = false;
 
       let localExistingCount = 0;
-      if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
+      if (typeof sourceId === "number" && !Number.isNaN(sourceId)) {
         try {
           const rows = await this.databaseService.executeQuery(
-            'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
-            [sourceId]
+            "SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?",
+            [sourceId],
           );
           const n = rows?.[0]?.count;
-          localExistingCount = typeof n === 'number' ? n : parseInt(String(n ?? '0'), 10) || 0;
+          localExistingCount =
+            typeof n === "number" ? n : parseInt(String(n ?? "0"), 10) || 0;
         } catch {
           localExistingCount = 0;
         }
@@ -163,25 +195,41 @@ export class CloudSyncService implements IRSSProvider {
 
       while (page < maxPages) {
         const syncUrl = `${serverUrl}/api/rss/sync?url=${encodeURIComponent(normalizedSourceUrl)}&mode=serverCursor&since=${cursor}&imageCompression=${imageCompression}`;
-        logger.info(`[CloudSync] Syncing articles for source ${source.name} from ${syncUrl}`);
+        logger.info(
+          `[CloudSync] Syncing articles for source ${source.name} from ${syncUrl}`,
+        );
 
         const syncResp = await this.authenticatedFetch(syncUrl);
         if (syncResp.ok) {
           const payload = await syncResp.json();
           const blocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
-          const upserts = blocks.flatMap((b: any) => (Array.isArray(b?.upserts) ? b.upserts : []));
-          const pageArticles = upserts.map((item: any) => this.mapServerArticle(item, source));
+          const upserts = blocks.flatMap((b: any) =>
+            Array.isArray(b?.upserts) ? b.upserts : [],
+          );
+          const pageArticles = upserts.map((item: any) =>
+            this.mapServerArticle(item, source),
+          );
 
-          const pageLatest = typeof payload?.latest === 'number' ? payload.latest : cursor;
+          const pageLatest =
+            typeof payload?.latest === "number" ? payload.latest : cursor;
           const hasMore = payload?.hasMore === true;
-          const deliveryId = typeof payload?.deliveryId === 'string' && payload.deliveryId ? payload.deliveryId : null;
+          const deliveryId =
+            typeof payload?.deliveryId === "string" && payload.deliveryId
+              ? payload.deliveryId
+              : null;
           const serverCursorMode = !!deliveryId;
           if (serverCursorMode) {
             usedServerCursor = true;
           }
 
-          const filteredPage = await filterService.applyFilterRules<Article>(pageArticles, sourceId, 50);
-          logger.info(`[CloudSync] Filtered articles: ${pageArticles.length} -> ${filteredPage.length}`);
+          const filteredPage = await filterService.applyFilterRules<Article>(
+            pageArticles,
+            sourceId,
+            50,
+          );
+          logger.info(
+            `[CloudSync] Filtered articles: ${pageArticles.length} -> ${filteredPage.length}`,
+          );
           const pageSaveResult = await this.saveArticles(filteredPage);
           logger.info(
             `[CloudSync] Page stats for ${source.name}:`,
@@ -194,7 +242,7 @@ export class CloudSyncService implements IRSSProvider {
               pageArticles: pageArticles.length,
               filtered: filteredPage.length,
               inserted: pageSaveResult.insertedCount,
-            })
+            }),
           );
           insertedArticles.push(...pageSaveResult.insertedArticles);
           insertedCount += pageSaveResult.insertedCount;
@@ -202,13 +250,18 @@ export class CloudSyncService implements IRSSProvider {
           upsertedCount += pageSaveResult.upsertedCount;
 
           if (serverCursorMode) {
-            const ackResp = await this.authenticatedFetch(`${serverUrl}/api/rss/syncAck`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ deliveryId }),
-            });
+            const ackResp = await this.authenticatedFetch(
+              `${serverUrl}/api/rss/syncAck`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deliveryId }),
+              },
+            );
             if (!ackResp.ok) {
-              logger.warn(`[CloudSync] Delivery ACK failed: ${ackResp.status} ${ackResp.statusText}`);
+              logger.warn(
+                `[CloudSync] Delivery ACK failed: ${ackResp.status} ${ackResp.statusText}`,
+              );
               break;
             }
           } else {
@@ -217,10 +270,14 @@ export class CloudSyncService implements IRSSProvider {
               cursor = pageLatest;
               latestCursor = pageLatest;
             } else if (pageLatest < cursor) {
-              logger.warn(`[CloudSync] Sync cursor regressed for ${source.name}, stopping pagination`);
+              logger.warn(
+                `[CloudSync] Sync cursor regressed for ${source.name}, stopping pagination`,
+              );
               break;
             } else if (pageArticles.length > 0 && hasMore) {
-              logger.warn(`[CloudSync] Sync cursor did not advance for ${source.name}, stopping pagination`);
+              logger.warn(
+                `[CloudSync] Sync cursor did not advance for ${source.name}, stopping pagination`,
+              );
               break;
             }
           }
@@ -235,19 +292,32 @@ export class CloudSyncService implements IRSSProvider {
 
         if (syncResp.status === 404) {
           const apiUrl = `${serverUrl}/api/rss?url=${encodeURIComponent(normalizedSourceUrl)}&imageCompression=${imageCompression}`;
-          logger.info(`[CloudSync] Falling back to full fetch for source ${source.name} from ${apiUrl}`);
+          logger.info(
+            `[CloudSync] Falling back to full fetch for source ${source.name} from ${apiUrl}`,
+          );
 
           const response = await this.authenticatedFetch(apiUrl);
           if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            throw new Error(
+              `Server returned ${response.status}: ${response.statusText}`,
+            );
           }
 
           const data = await response.json();
-          const articles = Array.isArray(data) ? data.map((item: any) => this.mapServerArticle(item, source)) : [];
-          const filteredArticles = await filterService.applyFilterRules<Article>(articles, sourceId, 50);
-          logger.info(`[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`);
+          const articles = Array.isArray(data)
+            ? data.map((item: any) => this.mapServerArticle(item, source))
+            : [];
+          const filteredArticles =
+            await filterService.applyFilterRules<Article>(
+              articles,
+              sourceId,
+              50,
+            );
+          logger.info(
+            `[CloudSync] Filtered articles: ${articles.length} -> ${filteredArticles.length}`,
+          );
           const saveResult = await this.saveArticles(filteredArticles);
-          if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
+          if (typeof sourceId === "number" && !Number.isNaN(sourceId)) {
             await this.updateSourceStats(sourceId);
           }
           return {
@@ -258,7 +328,9 @@ export class CloudSyncService implements IRSSProvider {
           };
         }
 
-        throw new Error(`Server returned ${syncResp.status}: ${syncResp.statusText}`);
+        throw new Error(
+          `Server returned ${syncResp.status}: ${syncResp.statusText}`,
+        );
       }
 
       if (usedLegacyCursor && suspiciousCursorReset) {
@@ -268,7 +340,7 @@ export class CloudSyncService implements IRSSProvider {
             sourceUrl: source.url,
             normalizedSourceUrl,
             localExistingCount,
-          })
+          }),
         );
       }
 
@@ -277,17 +349,28 @@ export class CloudSyncService implements IRSSProvider {
         const currentCursors = currentSettings.sync.cloudCursors || {};
         const nextSync = {
           ...currentSettings.sync,
-          cloudCursors: { ...currentCursors, [normalizedSourceUrl]: latestCursor },
+          cloudCursors: {
+            ...currentCursors,
+            [normalizedSourceUrl]: latestCursor,
+          },
         };
-        await this.settingsService.updateAppSettingNoCloudSync('sync', nextSync);
+        await this.settingsService.updateAppSettingNoCloudSync(
+          "sync",
+          nextSync,
+        );
       }
 
-      if (typeof sourceId === 'number' && !Number.isNaN(sourceId)) {
+      if (typeof sourceId === "number" && !Number.isNaN(sourceId)) {
         await this.updateSourceStats(sourceId);
       }
-      return { articles: insertedArticles, insertedCount, updatedCount, upsertedCount };
+      return {
+        articles: insertedArticles,
+        insertedCount,
+        updatedCount,
+        upsertedCount,
+      };
     } catch (error) {
-      logger.error('[CloudSync] Fetch failed:', error);
+      logger.error("[CloudSync] Fetch failed:", error);
       throw error;
     }
   }
@@ -300,7 +383,6 @@ export class CloudSyncService implements IRSSProvider {
         this.settingsService.getLLMSettingsStore(),
       ]);
       const cloudConfig = await cloudConfigService.getConfig();
-      if (cloudConfig.mode !== 'cloud') return;
 
       const now = Date.now();
       const last = appSettings.sync.lastProfilePushAt || 0;
@@ -316,16 +398,22 @@ export class CloudSyncService implements IRSSProvider {
         if (userId !== authUser.id) {
           userId = authUser.id;
           // Update setting immediately to match Auth User
-          await this.settingsService.updateAppSettingNoCloudSync('sync', { ...appSettings.sync, userId });
+          await this.settingsService.updateAppSettingNoCloudSync("sync", {
+            ...appSettings.sync,
+            userId,
+          });
         }
       } else if (!userId) {
         // Fallback: Generate random ID for guest
         userId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-        await this.settingsService.updateAppSettingNoCloudSync('sync', { ...appSettings.sync, userId });
+        await this.settingsService.updateAppSettingNoCloudSync("sync", {
+          ...appSettings.sync,
+          userId,
+        });
       }
 
       const rows: any[] = await this.databaseService.executeQuery(
-        'SELECT id, url, title, category, update_frequency FROM rss_sources ORDER BY id DESC'
+        "SELECT id, url, title, category, update_frequency FROM rss_sources ORDER BY id DESC",
       );
 
       const feeds = rows.map((r: any) => ({
@@ -349,26 +437,34 @@ export class CloudSyncService implements IRSSProvider {
 
       const apiUrl = `${serverUrl}/api/rss/clientSync`;
       const resp = await this.authenticatedFetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!resp.ok) {
-        logger.warn(`[CloudSync] Profile push failed: ${resp.status} ${resp.statusText}`);
+        logger.warn(
+          `[CloudSync] Profile push failed: ${resp.status} ${resp.statusText}`,
+        );
         return;
       }
 
       // Update local userId with the canonical one from server (handles merges)
       const respData = await resp.json();
       if (respData.user && respData.user.id && respData.user.id !== userId) {
-        logger.info(`[CloudSync] Updating local userId from ${userId} to server canonical ${respData.user.id}`);
+        logger.info(
+          `[CloudSync] Updating local userId from ${userId} to server canonical ${respData.user.id}`,
+        );
         userId = respData.user.id;
       }
 
-      await this.settingsService.updateAppSettingNoCloudSync('sync', { ...appSettings.sync, userId, lastProfilePushAt: now });
+      await this.settingsService.updateAppSettingNoCloudSync("sync", {
+        ...appSettings.sync,
+        userId,
+        lastProfilePushAt: now,
+      });
     } catch (error) {
-      logger.warn('[CloudSync] Profile push failed:', error);
+      logger.warn("[CloudSync] Profile push failed:", error);
     }
   }
 
@@ -381,10 +477,11 @@ export class CloudSyncService implements IRSSProvider {
         this.settingsService.getAppSettings(),
         cloudConfigService.getConfig(),
       ]);
-      if (cloudConfig.mode !== 'cloud') return;
 
       if (!AuthService.isAuthenticated()) {
-        logger.info('[CloudSync] Skip state sync: Cloud mode enabled but not logged in');
+        logger.info(
+          "[CloudSync] Skip state sync: Cloud mode enabled but not logged in",
+        );
         return;
       }
 
@@ -392,7 +489,7 @@ export class CloudSyncService implements IRSSProvider {
       if (!userId) {
         return;
       }
-      
+
       const serverUrl = await this.getServerUrl();
       const lastSync = appSettings.sync.lastStateSyncAt || 0;
       const nowIso = new Date().toISOString();
@@ -401,14 +498,14 @@ export class CloudSyncService implements IRSSProvider {
       // In a real app, we should track dirty flags. Here we scan articles updated > lastSync
       // Or just send everything marked as read/fav? Sending all might be heavy.
       // Let's optimize: Send states for articles that are read or favorite
-      
+
       // For MVP: Send all local read/favorite states to server (Merge strategy)
       const localStates = await this.databaseService.executeQuery(
         `SELECT url, is_read, is_favorite, read_progress, updated_at 
          FROM articles 
          WHERE (is_read = 1 OR is_favorite = 1) 
          AND updated_at > ?`, // Only send changes since last sync? Or just all?
-        [new Date(lastSync).toISOString()]
+        [new Date(lastSync).toISOString()],
       );
 
       if (localStates.length > 0) {
@@ -418,13 +515,13 @@ export class CloudSyncService implements IRSSProvider {
           isRead: r.is_read === 1,
           isFavorite: r.is_favorite === 1,
           readProgress: r.read_progress,
-          updatedAt: new Date(r.updated_at).toISOString()
+          updatedAt: new Date(r.updated_at).toISOString(),
         }));
 
         await this.authenticatedFetch(`${serverUrl}/api/rss/syncState`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, states: payload })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, states: payload }),
         });
         logger.info(`[CloudSync] Pushed ${payload.length} article states`);
       }
@@ -435,21 +532,22 @@ export class CloudSyncService implements IRSSProvider {
       if (resp.ok) {
         const data = await resp.json();
         const remoteStates = data.states || [];
-        
+
         if (remoteStates.length > 0) {
           await this.applyRemoteStates(remoteStates);
-          logger.info(`[CloudSync] Pulled ${remoteStates.length} article states`);
+          logger.info(
+            `[CloudSync] Pulled ${remoteStates.length} article states`,
+          );
         }
-        
+
         // Update sync timestamp
-        await this.settingsService.updateAppSettingNoCloudSync('sync', { 
-          ...appSettings.sync, 
-          lastStateSyncAt: Date.now() 
+        await this.settingsService.updateAppSettingNoCloudSync("sync", {
+          ...appSettings.sync,
+          lastStateSyncAt: Date.now(),
         });
       }
-
     } catch (error) {
-      logger.error('[CloudSync] State sync failed:', error);
+      logger.error("[CloudSync] State sync failed:", error);
     }
   }
 
@@ -458,13 +556,13 @@ export class CloudSyncService implements IRSSProvider {
 
     for (const state of states) {
       if (!state.articleUrl) continue;
-      
+
       // Get article source ID before update
       const article = await this.databaseService.executeQuery(
-        'SELECT rss_source_id FROM articles WHERE url = ?',
-        [state.articleUrl]
+        "SELECT rss_source_id FROM articles WHERE url = ?",
+        [state.articleUrl],
       );
-      
+
       if (article.length > 0 && article[0].rss_source_id) {
         affectedSourceIds.add(article[0].rss_source_id);
       }
@@ -479,8 +577,8 @@ export class CloudSyncService implements IRSSProvider {
           state.isFavorite ? 1 : 0,
           state.readProgress || 0,
           new Date().toISOString(), // Update local timestamp
-          state.articleUrl
-        ]
+          state.articleUrl,
+        ],
       );
     }
 
@@ -507,7 +605,7 @@ export class CloudSyncService implements IRSSProvider {
 
       return await response.json();
     } catch (error) {
-      logger.error('[CloudSync] Validation failed:', error);
+      logger.error("[CloudSync] Validation failed:", error);
       throw error;
     }
   }
@@ -515,11 +613,13 @@ export class CloudSyncService implements IRSSProvider {
   private mapServerArticle(item: any, source: RSSSource): Article {
     // readflow-server 返回的字段通常是 camelCase
     return {
-      id: item.id, 
+      id: item.id,
       title: item.title,
-      content: item.content || '',
-      summary: item.summary || item.description || '', 
-      publishedAt: new Date(item.publishedAt || item.published_at || new Date()),
+      content: item.content || "",
+      summary: item.summary || item.description || "",
+      publishedAt: new Date(
+        item.publishedAt || item.published_at || new Date(),
+      ),
       sourceId: source.id,
       sourceName: source.name,
       url: item.url || item.link,
@@ -527,13 +627,13 @@ export class CloudSyncService implements IRSSProvider {
       videoUrl: item.videoUrl || item.video_url,
       author: item.author,
       tags: item.tags || [],
-      category: item.category || source.category || 'Uncategorized',
+      category: item.category || source.category || "Uncategorized",
       wordCount: item.wordCount || 0,
       readingTime: item.readingTime || 0,
-      difficulty: item.difficulty || 'intermediate',
+      difficulty: item.difficulty || "intermediate",
       isRead: false,
       isFavorite: false,
-      readProgress: 0
+      readProgress: 0,
     };
   }
 
@@ -544,7 +644,12 @@ export class CloudSyncService implements IRSSProvider {
     upsertedCount: number;
   }> {
     if (articles.length === 0) {
-      return { insertedArticles: [], insertedCount: 0, updatedCount: 0, upsertedCount: 0 };
+      return {
+        insertedArticles: [],
+        insertedCount: 0,
+        updatedCount: 0,
+        upsertedCount: 0,
+      };
     }
 
     const uniqueByUrl = new Map<string, Article>();
@@ -554,24 +659,26 @@ export class CloudSyncService implements IRSSProvider {
     }
 
     const uniqueArticles = Array.from(uniqueByUrl.values());
-    const urls = uniqueArticles.map(a => a.url).filter(Boolean);
+    const urls = uniqueArticles.map((a) => a.url).filter(Boolean);
     const existingUrls = new Set<string>();
     const inChunkSize = 200;
 
     for (let i = 0; i < urls.length; i += inChunkSize) {
       const chunk = urls.slice(i, i + inChunkSize);
       if (chunk.length === 0) continue;
-      const placeholders = chunk.map(() => '?').join(',');
+      const placeholders = chunk.map(() => "?").join(",");
       const rows = await this.databaseService.executeQuery(
         `SELECT url FROM articles WHERE url IN (${placeholders})`,
-        chunk
+        chunk,
       );
       for (const r of rows) {
         if (r?.url) existingUrls.add(String(r.url));
       }
     }
 
-    const toInsert = uniqueArticles.filter(a => a?.url && !existingUrls.has(a.url));
+    const toInsert = uniqueArticles.filter(
+      (a) => a?.url && !existingUrls.has(a.url),
+    );
     const insertedArticles = toInsert;
     let insertedCount = 0;
     let updatedCount = 0;
@@ -583,7 +690,9 @@ export class CloudSyncService implements IRSSProvider {
         const batch = toInsert.slice(i, i + batchSize);
         if (batch.length === 0) continue;
 
-        const valuesSql = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+        const valuesSql = batch
+          .map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .join(",");
         const sql = `INSERT OR IGNORE INTO articles (
           title, content, summary, published_at, rss_source_id, source_name,
           url, image_url, video_url, author, category, word_count, reading_time, difficulty
@@ -605,7 +714,7 @@ export class CloudSyncService implements IRSSProvider {
             article.category,
             article.wordCount,
             article.readingTime,
-            article.difficulty
+            article.difficulty,
           );
         }
 
@@ -613,11 +722,16 @@ export class CloudSyncService implements IRSSProvider {
         insertedCount += result.changes || 0;
       }
 
-      const toUpdateVideoUrl = uniqueArticles.filter(a => a?.url && typeof a.videoUrl === 'string' && a.videoUrl.trim().length > 0);
+      const toUpdateVideoUrl = uniqueArticles.filter(
+        (a) =>
+          a?.url &&
+          typeof a.videoUrl === "string" &&
+          a.videoUrl.trim().length > 0,
+      );
       for (const article of toUpdateVideoUrl) {
         const result = await this.databaseService.executeInsert(
           'UPDATE articles SET video_url = ? WHERE url = ? AND (video_url IS NULL OR video_url = "")',
-          [article.videoUrl, article.url]
+          [article.videoUrl, article.url],
         );
         updatedCount += result.changes || 0;
       }
@@ -643,21 +757,28 @@ export class CloudSyncService implements IRSSProvider {
     try {
       try {
         const sourceConfig = await this.databaseService.executeQuery(
-          'SELECT fetch_limit, retention_limit FROM rss_sources WHERE id = ?',
-          [sourceId]
+          "SELECT fetch_limit, retention_limit FROM rss_sources WHERE id = ?",
+          [sourceId],
         );
         const retentionLimitRaw = sourceConfig[0]?.retention_limit;
-        const retentionLimit = typeof retentionLimitRaw === 'number' ? retentionLimitRaw : parseInt(String(retentionLimitRaw ?? '100'), 10);
+        const retentionLimit =
+          typeof retentionLimitRaw === "number"
+            ? retentionLimitRaw
+            : parseInt(String(retentionLimitRaw ?? "100"), 10);
 
         if (Number.isFinite(retentionLimit) && retentionLimit > 0) {
           const favCountResult = await this.databaseService.executeQuery(
-            'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_favorite = 1',
-            [sourceId]
+            "SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_favorite = 1",
+            [sourceId],
           );
-          const favCount = typeof favCountResult[0]?.count === 'number'
-            ? favCountResult[0]?.count
-            : parseInt(String(favCountResult[0]?.count ?? '0'), 10);
-          const keepNonFavorite = Math.max(0, retentionLimit - (Number.isFinite(favCount) ? favCount : 0));
+          const favCount =
+            typeof favCountResult[0]?.count === "number"
+              ? favCountResult[0]?.count
+              : parseInt(String(favCountResult[0]?.count ?? "0"), 10);
+          const keepNonFavorite = Math.max(
+            0,
+            retentionLimit - (Number.isFinite(favCount) ? favCount : 0),
+          );
 
           await this.databaseService.executeStatement(
             `DELETE FROM articles 
@@ -667,44 +788,50 @@ export class CloudSyncService implements IRSSProvider {
                ORDER BY published_at DESC 
                LIMIT -1 OFFSET ?
              )`,
-            [sourceId, keepNonFavorite]
+            [sourceId, keepNonFavorite],
           );
         }
       } catch (e) {
-        logger.warn('[CloudSync] Failed to enforce retention_limit:', e);
+        logger.warn("[CloudSync] Failed to enforce retention_limit:", e);
       }
 
       const articleCountResult = await this.databaseService.executeQuery(
-        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?',
-        [sourceId]
+        "SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ?",
+        [sourceId],
       );
       const articleCount = articleCountResult[0]?.count || 0;
 
       const unreadCountResult = await this.databaseService.executeQuery(
-        'SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0',
-        [sourceId]
+        "SELECT COUNT(*) as count FROM articles WHERE rss_source_id = ? AND is_read = 0",
+        [sourceId],
       );
       const unreadCount = unreadCountResult[0]?.count || 0;
 
       const latestPublishedResult = await this.databaseService.executeQuery(
-        'SELECT published_at FROM articles WHERE rss_source_id = ? ORDER BY published_at DESC LIMIT 1',
-        [sourceId]
+        "SELECT published_at FROM articles WHERE rss_source_id = ? ORDER BY published_at DESC LIMIT 1",
+        [sourceId],
       );
       const latestPublishedAt = latestPublishedResult[0]?.published_at ?? null;
 
       await this.databaseService.executeStatement(
-        'UPDATE rss_sources SET last_updated = ?, latest_published_at = ?, article_count = ?, unread_count = ? WHERE id = ?',
-        [new Date().toISOString(), latestPublishedAt, articleCount, unreadCount, sourceId]
+        "UPDATE rss_sources SET last_updated = ?, latest_published_at = ?, article_count = ?, unread_count = ? WHERE id = ?",
+        [
+          new Date().toISOString(),
+          latestPublishedAt,
+          articleCount,
+          unreadCount,
+          sourceId,
+        ],
       );
-      
+
       // Emit event to update UI
-      cacheEventEmitter.emit({ 
-        type: 'updateRSSStats', 
-        reason: 'cloudSync',
-        sourceId 
+      cacheEventEmitter.emit({
+        type: "updateRSSStats",
+        reason: "cloudSync",
+        sourceId,
       });
     } catch (error) {
-      logger.error('[CloudSync] Error updating source stats:', error);
+      logger.error("[CloudSync] Error updating source stats:", error);
     }
   }
 }

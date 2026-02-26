@@ -36,6 +36,139 @@ import CustomTabContent, { CustomTabContentHandle } from '../../components/Custo
 import GroupSelectionModal from '../../components/GroupSelectionModal';
 import { useSharedValue } from 'react-native-reanimated';
 
+// --- Sub-components (Outside to prevent recreation/freeze) ---
+
+const StatCard = React.memo(({ icon, value, label, color, theme, styles }: any) => (
+  <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.statIconCircle, { backgroundColor: `${color}15` }]}>
+      <MaterialIcons name={icon} size={20} color={color} />
+    </View>
+    <View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  </View>
+));
+
+const SourceCard = React.memo(({
+  source, index, total, drag, isActive, isEditMode,
+  selectedSources, theme, styles, onPress, onLongPress, formatTime
+}: any) => {
+  const isSelected = selectedSources.has(source.id);
+  const iconColor = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'][source.id % 5];
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.card,
+        isEditMode && isSelected && styles.cardSelected,
+        isActive && { backgroundColor: theme.colors.surfaceVariant, elevation: 5, transform: [{ scale: 1.02 }] },
+        !source.isActive && { opacity: 0.6 }
+      ]}
+      onPress={() => onPress(source)}
+      onLongPress={() => onLongPress(source.id)}
+      activeOpacity={0.7}
+      disabled={isActive}
+    >
+      <View style={styles.cardInner}>
+        <View style={styles.cardLeft}>
+          {isEditMode ? (
+            <MaterialIcons
+              name={isSelected ? "check-circle" : "radio-button-unchecked"}
+              size={24}
+              color={isSelected ? theme.colors.primary : theme.colors.outline}
+            />
+          ) : (
+            <View style={[styles.iconBox, { backgroundColor: `${iconColor}15` }]}>
+              <MaterialIcons name="rss-feed" size={20} color={iconColor} />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardCenter}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[styles.cardTitle, !source.isActive && { color: theme.colors.outline }]} numberOfLines={1}>
+              {source.name}
+            </Text>
+            {!source.isActive && (
+              <View style={styles.inactiveBadge}>
+                <Text style={styles.inactiveBadgeText}>已停用</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.cardMetaRow}>
+            <Text style={styles.metaText}>
+              最新文章：{formatTime(source.latest_published_at, '暂无')}
+            </Text>
+            <Text style={[styles.metaText, { marginTop: 2 }]}>
+              最近同步：{formatTime(source.last_updated, '从未')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.cardRight}>
+          {isEditMode ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity onLongPress={drag} style={styles.sortBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <MaterialIcons name="drag-handle" size={24} color={isActive ? theme.colors.primary : theme.colors.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {(source.unread_count ?? 0) > 0 && source.isActive && (
+                <View style={[styles.unreadBadge, { backgroundColor: theme.colors.error }]}>
+                  <Text style={styles.unreadBadgeText}>
+                    {(source.unread_count ?? 0) > 99 ? '99+' : source.unread_count}
+                  </Text>
+                </View>
+              )}
+              <MaterialIcons name="chevron-right" size={20} color={theme.colors.outline} />
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const SourceActionSheet = React.memo(({ sourceId, visible, onClose, rssSources, theme, styles, onAction }: any) => {
+  if (!sourceId || !visible) return null;
+  const source = rssSources.find((s: RSSSource) => s.id === sourceId);
+  if (!source) return null;
+
+  const actions = [
+    { icon: 'edit', label: '编辑源', onPress: () => onAction('edit', sourceId) },
+    { icon: 'sync', label: '立即刷新', onPress: () => onAction('sync', sourceId) },
+    {
+      icon: source.isActive ? 'toggle-on' : 'toggle-off',
+      label: source.isActive ? '停用源' : '启用源',
+      color: source.isActive ? theme.colors.primary : theme.colors.outline,
+      onPress: () => onAction('toggle', sourceId)
+    },
+    { icon: 'cleaning-services', label: '清空文章缓存', onPress: () => onAction('clear', sourceId) },
+    { icon: 'delete', label: '删除源', color: theme.colors.error, onPress: () => onAction('delete', sourceId) }
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <View style={styles.actionSheetContainer}>
+          <View style={styles.actionSheetHeader}>
+            <Text style={styles.actionSheetTitle} numberOfLines={1}>{source.name}</Text>
+          </View>
+          {actions.map((action, idx) => (
+            <TouchableOpacity key={idx} style={styles.actionSheetItem} onPress={action.onPress}>
+              <MaterialIcons name={action.icon as any} size={24} color={action.color || theme.colors.onSurface} />
+              <Text style={[styles.actionSheetText, action.color && { color: action.color }]}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+          <View style={{ height: 20 }} />
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+});
+
 type NavigationProp = NativeStackNavigationProp<any, 'ManageSubscriptions'>;
 
 const ManageSubscriptionsScreen: React.FC = () => {
@@ -50,13 +183,16 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  
+
   // 模式控制：普通浏览 vs 管理模式
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedSources, setSelectedSources] = useState<Set<number>>(new Set());
   const [showMoveGroupModal, setShowMoveGroupModal] = useState(false);
   const [activeSourceId, setActiveSourceId] = useState<number | null>(null); // 用于 ActionSheet
   const [showActionSheet, setShowActionSheet] = useState(false); // ActionSheet 显示状态
+  const lastLongPressRef = useRef<{ id: number | null; at: number }>({ id: null, at: 0 });
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   // 1. 计算全局统计数据
   const stats = useMemo(() => {
@@ -69,7 +205,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
       const last = s.latest_published_at ? new Date(s.latest_published_at).getTime() : 0;
       return (now - last) < oneDay;
     }).length;
-    
+
     return { total, unread, active };
   }, [rssSources]);
 
@@ -87,7 +223,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const getFilteredSources = useCallback((tabIndex: number): RSSSource[] => {
     const route = routes[tabIndex];
     if (!route) return rssSources;
-    
+
     if (route.groupId === VIRTUAL_GROUPS.ALL.id) {
       return rssSources;
     } else if (route.groupId === VIRTUAL_GROUPS.UNCATEGORIZED.id) {
@@ -98,7 +234,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
   }, [routes, rssSources]);
 
   const filteredSources = useMemo(() => getFilteredSources(activeIndex), [getFilteredSources, activeIndex]);
-  const styles = createStyles(theme);
 
   // 初始化
   useEffect(() => {
@@ -145,11 +280,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const handleTabPress = useCallback((tabIndex: number) => {
     setActiveIndex(tabIndex);
     tabContentRef.current?.scrollToIndex(tabIndex);
-    // 编辑模式下切换标签，保持编辑状态和选中项（可选，或者清除选中）
-    if (isEditMode) {
-       // 用户可能想跨分组批量操作，这里暂时不清空
-    }
-  }, [isEditMode]);
+  }, []);
 
   const handleIndexChange = useCallback((newIndex: number) => {
     setActiveIndex(newIndex);
@@ -158,26 +289,20 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      // 获取当前 Tab 对应的源列表
       const currentSources = getFilteredSources(activeIndex);
-      // 过滤出活跃的源 ID
       const activeSourceIds = currentSources
         .filter(s => s.isActive)
         .map(s => s.id);
 
       if (activeSourceIds.length === 0) {
-        console.log('[ManageSubscriptions] 当前分组没有活跃源，跳过刷新');
         setRefreshing(false);
         return;
       }
 
-      console.log(`[ManageSubscriptions] 正在刷新当前分组 (${activeSourceIds.length} 个源)...`);
-      
-      // 使用批量同步方法
       await syncSources(activeSourceIds, (current, total, name) => {
-         logger.info(`[ManageSubscriptions] 进度: ${current}/${total} - ${name}`);
+        logger.info(`[ManageSubscriptions] 进度: ${current}/${total} - ${name}`);
       });
-      
+
     } catch (error) {
       console.error('Refresh failed:', error);
       Alert.alert('刷新失败', '同步RSS源时出现错误');
@@ -186,7 +311,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
     }
   };
 
-  // --- 业务逻辑 (完整保留) ---
   const toggleSourceStatus = async (sourceId: number) => {
     try {
       const source = rssSources.find(s => s.id === sourceId);
@@ -213,9 +337,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await rssService.deleteRSSSource(sourceId);
-              // 【优化】触发更细粒度的源删除事件
               cacheEventEmitter.sourceDeleted(sourceId, source?.name);
-              console.log(`✅ 已触发源删除事件: ${source?.name}`);
               await refreshRSSSources();
             } catch (error) {
               console.error('Error deleting source:', error);
@@ -245,11 +367,8 @@ const ManageSubscriptionsScreen: React.FC = () => {
                 'UPDATE rss_sources SET article_count = 0, unread_count = 0 WHERE id = ?',
                 [sourceId]
               );
-              // 【优化】触发更细粒度的清除单源缓存事件
               cacheEventEmitter.clearSourceArticles(sourceId, source?.name);
-              // 同时触发统计更新事件，刷新订阅源页面的未读数量
               cacheEventEmitter.updateRSSStats();
-              console.log(`✅ 已触发清除单源缓存事件: ${source?.name}`);
               await refreshRSSSources();
               Alert.alert('成功', `已清除 "${source?.name}" 的所有文章`);
             } catch (error) {
@@ -275,7 +394,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
       Alert.alert('刷新失败', '无法更新该RSS源');
     }
   };
-  
+
   const handleMoveSource = async (sourceId: number, direction: 'up' | 'down') => {
     try {
       const currentIndex = filteredSources.findIndex(s => s.id === sourceId);
@@ -302,19 +421,20 @@ const ManageSubscriptionsScreen: React.FC = () => {
     }
   };
 
-  // --- 批量操作逻辑 (完整保留) ---
   const toggleEditMode = () => {
     Vibration.vibrate(50);
     setIsEditMode(!isEditMode);
     setSelectedSources(new Set());
   };
 
-  const toggleSelection = (id: number) => {
-    const newSet = new Set(selectedSources);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setSelectedSources(newSet);
-  };
+  const toggleSelection = useCallback((id: number) => {
+    setSelectedSources(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  }, []);
 
   const selectAllSources = () => {
     const allIds = new Set(filteredSources.map(s => s.id));
@@ -330,27 +450,21 @@ const ManageSubscriptionsScreen: React.FC = () => {
       Alert.alert('提示', '请选择至少一个源');
       return;
     }
-    setShowMoveGroupModal(true);
+    setTimeout(() => setShowMoveGroupModal(true), 0);
   };
 
   const handleBatchToggleStatus = async () => {
     if (selectedSources.size === 0) return;
-
-    // 获取选中源的当前状态（如果大部分是开启的，则全部关闭，反之亦然）
     const sources = rssSources.filter(s => selectedSources.has(s.id));
     const activeCount = sources.filter(s => s.isActive).length;
-    const shouldActivate = activeCount < sources.length / 2; // 超过一半关闭才开启，否则全部关闭
+    const shouldActivate = activeCount < sources.length / 2;
 
     try {
-      // 并行更新
-      const updates = sources.map(s => 
+      const updates = sources.map(s =>
         rssService.updateRSSSource(s.id, { isActive: shouldActivate })
       );
       await Promise.all(updates);
-      
-      // 批量刷新
       await refreshRSSSources();
-      
       Alert.alert('成功', `已${shouldActivate ? '启用' : '停用'} ${sources.length} 个源`);
       setIsEditMode(false);
       setSelectedSources(new Set());
@@ -362,11 +476,10 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
   const handleBatchRefresh = async () => {
     if (selectedSources.size === 0) return;
-    
     Alert.alert('提示', `准备刷新 ${selectedSources.size} 个源，这可能需要一点时间`, [
       { text: '取消', style: 'cancel' },
-      { 
-        text: '开始刷新', 
+      {
+        text: '开始刷新',
         onPress: async () => {
           const sourceIds = Array.from(selectedSources);
           setIsEditMode(false);
@@ -375,12 +488,43 @@ const ManageSubscriptionsScreen: React.FC = () => {
             await forceRefreshSources(sourceIds, (current, total, name) => {
               logger.info(`[ManageSubscriptions] 进度: ${current}/${total} - ${name}`);
             });
-          } catch (e) {
-            console.error(e);
-          }
-        } 
+          } catch (e) { console.error(e); }
+        }
       }
     ]);
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedSources.size === 0) {
+      Alert.alert('提示', '请选择至少一个源');
+      return;
+    }
+    Alert.alert(
+      '删除确认',
+      `确定要删除选中的 ${selectedSources.size} 个源吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              for (const sourceId of selectedSources) {
+                await rssService.deleteRSSSource(sourceId);
+                cacheEventEmitter.sourceDeleted(sourceId);
+              }
+              Alert.alert('成功', `已删除 ${selectedSources.size} 个源`);
+              setIsEditMode(false);
+              setSelectedSources(new Set());
+              await refreshRSSSources();
+            } catch (error) {
+              console.error('Failed to delete sources:', error);
+              Alert.alert('失败', '删除源时出现错误');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleMoveToGroup = async (groupId: number | null) => {
@@ -399,318 +543,107 @@ const ManageSubscriptionsScreen: React.FC = () => {
     }
   };
 
-  const handleBatchDelete = () => {
-    if (selectedSources.size === 0) {
-      Alert.alert('提示', '请选择至少一个源');
-      return;
+  const handleSourcePress = useCallback((source: RSSSource) => {
+    if (isEditMode) {
+      toggleSelection(source.id);
+    } else {
+      const now = Date.now();
+      if (lastLongPressRef.current.id === source.id && now - lastLongPressRef.current.at < 800) {
+        return;
+      }
+      navigation.navigate('Articles' as any, {
+        screen: 'HomeMain',
+        params: { sourceId: source.id, sourceName: source.name }
+      } as any);
     }
+  }, [isEditMode, navigation, toggleSelection]);
 
-    Alert.alert(
-      '删除确认',
-      `确定要删除选中的 ${selectedSources.size} 个源吗？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              for (const sourceId of selectedSources) {
-                await rssService.deleteRSSSource(sourceId);
-                // 触发每个源的删除事件
-                cacheEventEmitter.sourceDeleted(sourceId);
-              }
-              console.log(`✅ 已触发批量删除事件: ${selectedSources.size} 个源`);
-              Alert.alert('成功', `已删除 ${selectedSources.size} 个源`);
-              setIsEditMode(false);
-              setSelectedSources(new Set());
-              await refreshRSSSources();
-            } catch (error) {
-              console.error('Failed to delete sources:', error);
-              Alert.alert('失败', '删除源时出现错误');
-            }
-          },
-        },
-      ]
-    );
-  };
+  const handleSourceLongPress = useCallback((id: number) => {
+    if (!isEditMode) {
+      lastLongPressRef.current = { id, at: Date.now() };
+      setActiveSourceId(id);
+      setTimeout(() => setShowActionSheet(true), 0);
+      Vibration.vibrate(50);
+    }
+  }, [isEditMode]);
 
-  const formatTime = (dateStr?: string, emptyText = '从未') => {
+  const handleActionSheetAction = useCallback((type: string, id: number) => {
+    setShowActionSheet(false);
+    switch (type) {
+      case 'edit': editSource(id); break;
+      case 'sync': handleSyncSingleSource(id); break;
+      case 'toggle': toggleSourceStatus(id); break;
+      case 'clear': clearSourceArticles(id); break;
+      case 'delete': setTimeout(() => deleteSource(id), 200); break;
+    }
+  }, [editSource, handleSyncSingleSource, toggleSourceStatus, clearSourceArticles, deleteSource]);
+
+  const formatTime = useCallback((dateStr?: string, emptyText = '从未') => {
     if (!dateStr) return emptyText;
     const date = new Date(dateStr);
     const now = new Date();
-    const diff = (now.getTime() - date.getTime()) / 1000; // seconds
-    
+    const diff = (now.getTime() - date.getTime()) / 1000;
     if (diff < 60) return '刚刚';
     if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
     return `${Math.floor(diff / 86400)}天前`;
-  };
+  }, []);
 
-  // --- 组件渲染 ---
-
-  // 1. 顶部统计卡片 (复用 MineScreen 风格)
-  const StatCard = ({ icon, value, label, color }: any) => (
-    <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
-      <View style={[styles.statIconCircle, { backgroundColor: `${color}15` }]}>
-        <MaterialIcons name={icon} size={20} color={color} />
-      </View>
-      <View>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
-      </View>
+  const renderDashboard = () => (
+    <View style={styles.dashboardContainer}>
+      <StatCard icon="rss-feed" value={stats.total} label="总订阅" color={theme.colors.primary} theme={theme} styles={styles} />
+      <StatCard icon="mark-email-unread" value={stats.unread} label="总未读" color={theme.colors.error} theme={theme} styles={styles} />
+      <StatCard icon="update" value={stats.active} label="近日发文" color={theme.colors.tertiary} theme={theme} styles={styles} />
     </View>
   );
 
   const renderToolbar = () => (
     <View style={styles.toolbar}>
       {isEditMode ? (
-        <View style={{flexDirection: 'row', alignItems: 'center', height: '100%'}}>
-          <TouchableOpacity 
-             onPress={selectedSources.size === filteredSources.length ? deselectAllSources : selectAllSources}
-             style={{flexDirection: 'row', alignItems: 'center', height: '100%', paddingRight: 8}}
+        <View style={{ flexDirection: 'row', alignItems: 'center', height: '100%' }}>
+          <TouchableOpacity
+            onPress={selectedSources.size === filteredSources.length ? deselectAllSources : selectAllSources}
+            style={{ flexDirection: 'row', alignItems: 'center', height: '100%', paddingRight: 8 }}
           >
-            <MaterialIcons 
-               name={selectedSources.size === filteredSources.length ? "check-box" : "check-box-outline-blank"} 
-               size={22} 
-               color={theme.colors.primary} 
+            <MaterialIcons
+              name={selectedSources.size === filteredSources.length ? "check-box" : "check-box-outline-blank"}
+              size={22}
+              color={theme.colors.primary}
             />
-            <Text style={{fontSize: 16, color: theme.colors.primary, fontWeight: '700', marginLeft: 6, lineHeight: 24, includeFontPadding: false }}>
-              全选
-            </Text>
+            <Text style={{ fontSize: 16, color: theme.colors.primary, fontWeight: '700', marginLeft: 6 }}>全选</Text>
           </TouchableOpacity>
-          <Text style={{fontSize: 14, color: theme.colors.onSurfaceVariant, marginLeft: 8, lineHeight: 20, includeFontPadding: false }}>
-            (已选 {selectedSources.size})
-          </Text>
+          <Text style={{ fontSize: 14, color: theme.colors.onSurfaceVariant, marginLeft: 8 }}>(已选 {selectedSources.size})</Text>
         </View>
       ) : (
         <Text style={styles.sectionTitle}>订阅列表</Text>
       )}
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.manageButton}
         onPress={() => {
-           if (isEditMode) {
-             setIsEditMode(false);
-             setSelectedSources(new Set());
-           } else {
-             setIsEditMode(true);
-             Vibration.vibrate(50);
-           }
+          if (isEditMode) {
+            setIsEditMode(false);
+            setSelectedSources(new Set());
+          } else {
+            setIsEditMode(true);
+            Vibration.vibrate(50);
+          }
         }}
       >
-        <Text style={styles.manageButtonText}>
-          {isEditMode ? '完成' : '批量管理'}
-        </Text>
-        {!isEditMode && <MaterialIcons name="playlist-add-check" size={20} color={theme.colors.primary} style={{marginLeft: 4}} />}
-        {/* 为了保持高度一致，编辑模式下添加一个透明的Icon占位，或者不做处理依靠flex布局 */}
-        {isEditMode && <View style={{width: 24}} />} 
+        <Text style={styles.manageButtonText}>{isEditMode ? '完成' : '批量管理'}</Text>
+        {!isEditMode && <MaterialIcons name="playlist-add-check" size={20} color={theme.colors.primary} style={{ marginLeft: 4 }} />}
       </TouchableOpacity>
     </View>
   );
 
-  const renderDashboard = () => (
-    <View style={styles.dashboardContainer}>
-      <StatCard icon="rss-feed" value={stats.total} label="总订阅" color={theme.colors.primary} />
-      <StatCard icon="mark-email-unread" value={stats.unread} label="总未读" color={theme.colors.error} />
-      <StatCard icon="update" value={stats.active} label="近日发文" color={theme.colors.tertiary} />
-    </View>
-  );
-
-  const renderFooter = () => (
+  const renderFooter = useCallback(() => (
     <View style={styles.footerContainer}>
-      <View style={{ height: 60 }} /> 
-      {/* 底部留白给批量操作栏 */}
+      <View style={{ height: 60 }} />
     </View>
-  );
+  ), [styles]);
 
-  // 3. 核心：源卡片 (浏览模式 & 管理模式)
-  const SourceCard = React.memo(({ source, index, total, drag, isActive }: { source: RSSSource, index: number, total: number, drag?: () => void, isActive?: boolean }) => {
-    const isSelected = selectedSources.has(source.id);
-    // 生成伪随机颜色
-    const iconColor = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'][source.id % 5];
-
-    // 浏览模式点击 -> 进文章页；编辑模式点击 -> 选中
-    const handlePress = () => {
-      if (isEditMode) {
-        toggleSelection(source.id);
-      } else {
-        navigation.navigate('Articles' as any, { 
-          screen: 'HomeMain', 
-          params: { sourceId: source.id, sourceName: source.name } 
-        } as any);
-      }
-    };
-
-    // 长按 -> 弹出操作菜单 (仅非编辑模式)
-    const handleLongPress = () => {
-      if (!isEditMode) {
-        setActiveSourceId(source.id);
-        setShowActionSheet(true);
-        Vibration.vibrate(50);
-      }
-    };
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          isEditMode && isSelected && styles.cardSelected,
-          isActive && { backgroundColor: theme.colors.surfaceVariant, elevation: 5, transform: [{ scale: 1.02 }] },
-          // 禁用/停用状态样式
-          !source.isActive && { opacity: 0.6 }
-        ]}
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        activeOpacity={0.7}
-        disabled={isActive}
-      >
-        <View style={styles.cardInner}>
-          {/* 左侧图标或 Checkbox */}
-          <View style={styles.cardLeft}>
-            {isEditMode ? (
-              <MaterialIcons 
-                name={isSelected ? "check-circle" : "radio-button-unchecked"} 
-                size={24} 
-                color={isSelected ? theme.colors.primary : theme.colors.outline} 
-              />
-            ) : (
-              <View style={[styles.iconBox, { backgroundColor: `${iconColor}15` }]}>
-                <MaterialIcons name="rss-feed" size={20} color={iconColor} />
-              </View>
-            )}
-          </View>
-
-          {/* 中间：信息 */}
-          <View style={styles.cardCenter}>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-               <Text style={[styles.cardTitle, !source.isActive && {color: theme.colors.outline}]} numberOfLines={1}>
-                 {source.name}
-               </Text>
-               {!source.isActive && (
-                 <View style={styles.inactiveBadge}>
-                   <Text style={styles.inactiveBadgeText}>已停用</Text>
-                 </View>
-               )}
-            </View>
-            <View style={styles.cardMetaRow}>
-              <Text style={styles.metaText}>
-                最新文章：{formatTime(source.latest_published_at, '暂无')}
-              </Text>
-              <Text style={[styles.metaText, { marginTop: 2 }]}>
-                最近同步：{formatTime(source.last_updated, '从未')}
-              </Text>
-            </View>
-          </View>
-
-          {/* 右侧：未读数字或排序按钮 */}
-          <View style={styles.cardRight}>
-            {isEditMode ? (
-              // 编辑模式显示拖拽手柄
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                 <TouchableOpacity 
-                   onLongPress={drag}
-                   style={styles.sortBtn}
-                   hitSlop={{top:10, bottom:10, left:10, right:10}}
-                 >
-                   <MaterialIcons name="drag-handle" size={24} color={isActive ? theme.colors.primary : theme.colors.onSurfaceVariant} />
-                 </TouchableOpacity>
-              </View>
-            ) : (
-              // 浏览模式显示未读数或箭头
-              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                {/* 显示未读计数 */}
-                {(source.unread_count ?? 0) > 0 && source.isActive && (
-                  <View style={[styles.unreadBadge, { backgroundColor: theme.colors.error }]}>
-                    <Text style={styles.unreadBadgeText}>
-                      {(source.unread_count ?? 0) > 99 ? '99+' : source.unread_count}
-                    </Text>
-                  </View>
-                )}
-                {/* 右箭头 */}
-                <MaterialIcons name="chevron-right" size={20} color={theme.colors.outline} />
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  });
-
-  const SourceActionSheet = ({ sourceId, visible, onClose }: { sourceId: number | null, visible: boolean, onClose: () => void }) => {
-    if (!sourceId || !visible) return null;
-    const source = rssSources.find(s => s.id === sourceId);
-    if (!source) return null;
-
-    const actions = [
-      {
-        icon: 'edit',
-        label: '编辑源',
-        onPress: () => {
-          onClose();
-          editSource(sourceId);
-        }
-      },
-      {
-        icon: 'sync',
-        label: '立即刷新',
-        onPress: () => {
-          onClose();
-          handleSyncSingleSource(sourceId);
-        }
-      },
-      {
-        icon: source.isActive ? 'toggle-on' : 'toggle-off',
-        label: source.isActive ? '停用源' : '启用源',
-        color: source.isActive ? theme.colors.primary : theme.colors.outline,
-        onPress: () => {
-          onClose();
-          toggleSourceStatus(sourceId);
-        }
-      },
-      {
-        icon: 'cleaning-services',
-        label: '清空文章缓存',
-        onPress: () => {
-          onClose();
-          clearSourceArticles(sourceId);
-        }
-      },
-      {
-        icon: 'delete',
-        label: '删除源',
-        color: theme.colors.error,
-        onPress: () => {
-          onClose();
-          setTimeout(() => deleteSource(sourceId), 200);
-        }
-      }
-    ];
-
-    return (
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-          <View style={styles.actionSheetContainer}>
-            <View style={styles.actionSheetHeader}>
-              <Text style={styles.actionSheetTitle} numberOfLines={1}>{source.name}</Text>
-            </View>
-            {actions.map((action, idx) => (
-              <TouchableOpacity key={idx} style={styles.actionSheetItem} onPress={action.onPress}>
-                <MaterialIcons name={action.icon as any} size={24} color={action.color || theme.colors.onSurface} />
-                <Text style={[styles.actionSheetText, action.color && { color: action.color }]}>{action.label}</Text>
-              </TouchableOpacity>
-            ))}
-            <View style={{height: 20}} />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    );
-  };
-
-  // 4. 列表渲染
   const renderScene = useCallback(({ route, index: tabIndex }: any) => {
     const sourcesForTab = getFilteredSources(tabIndex);
-
     if (!isReady) {
       return (
         <View style={styles.loadingContainer}>
@@ -720,87 +653,47 @@ const ManageSubscriptionsScreen: React.FC = () => {
     }
 
     const onDragEnd = async ({ data }: { data: RSSSource[] }) => {
-      console.log(`[ManageSubscriptions] onDragEnd triggered for tab ${tabIndex}, items: ${data.length}`);
-      
-      // 1. 获取当前这批数据的所有原始 sortOrder
-      // 如果原始数据没有 sortOrder (均为0)，则使用索引作为基础
       let originalSortOrders = sourcesForTab.map(s => s.sortOrder || 0).sort((a, b) => a - b);
-      
-      // 2. 关键修正：确保排序值序列是严格递增的，避免数据库 ORDER BY id ASC 干扰
       for (let i = 1; i < originalSortOrders.length; i++) {
-        if (originalSortOrders[i] <= originalSortOrders[i-1]) {
-          originalSortOrders[i] = originalSortOrders[i-1] + 1;
-        }
+        if (originalSortOrders[i] <= originalSortOrders[i - 1]) originalSortOrders[i] = originalSortOrders[i - 1] + 1;
       }
-      
-      // 3. 将这些确保唯一的排序值按新顺序分配
-      const updates = data.map((s, idx) => {
-        return {
-          id: s.id,
-          sortOrder: originalSortOrders[idx] !== undefined ? originalSortOrders[idx] : (originalSortOrders[originalSortOrders.length - 1] || 0) + idx + 1
-        };
-      });
-
-      console.log('[ManageSubscriptions] Updating orders:', updates);
-
+      const updates = data.map((s, idx) => ({
+        id: s.id,
+        sortOrder: originalSortOrders[idx] !== undefined ? originalSortOrders[idx] : (originalSortOrders[originalSortOrders.length - 1] || 0) + idx + 1
+      }));
       try {
         await rssService.updateSourcesOrder(updates);
-        // 触发刷新以同步状态
         await refreshRSSSources();
-        console.log('[ManageSubscriptions] Sort order updated and refreshed');
-        // 可选：添加震动反馈
         Vibration.vibrate(50);
-      } catch (error) {
-        console.error('Error updating sort order:', error);
-        Alert.alert('排序失败', '无法更新顺序到数据库');
-      }
+      } catch (error) { console.error(error); }
     };
 
     return (
       <View style={{ width: screenWidth, flex: 1 }}>
         {isEditMode ? (
-           <DraggableFlatList
-             data={sourcesForTab}
-             keyExtractor={(item) => item.id.toString()}
-             onDragEnd={onDragEnd}
-             renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<RSSSource>) => (
-               <ScaleDecorator>
-                 <SourceCard 
-                   source={item} 
-                   index={getIndex() ?? 0} 
-                   total={sourcesForTab.length} 
-                   drag={drag}
-                   isActive={isActive}
-                 />
-               </ScaleDecorator>
-             )}
-             ListHeaderComponent={() => (
-               <View style={styles.listHeader} />
-             )}
-             ListEmptyComponent={() => (
-               <View style={styles.emptyState}>
-                 <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
-                 <Text style={styles.emptyText}>暂无订阅源</Text>
-               </View>
-             )}
-             ListFooterComponent={renderFooter}
-             initialNumToRender={10}
-             windowSize={5}
-             maxToRenderPerBatch={10}
-             removeClippedSubviews={true}
-             showsVerticalScrollIndicator={false}
-             containerStyle={{ flex: 1 }}
-           />
-        ) : (
-          <FlatList
+          <DraggableFlatList
             data={sourcesForTab}
             keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item, index }) => (
-              <SourceCard source={item} index={index} total={sourcesForTab.length} />
+            onDragEnd={onDragEnd}
+            renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<RSSSource>) => (
+              <ScaleDecorator>
+                <SourceCard
+                  source={item}
+                  index={getIndex() ?? 0}
+                  total={sourcesForTab.length}
+                  drag={drag}
+                  isActive={isActive}
+                  isEditMode={isEditMode}
+                  selectedSources={selectedSources}
+                  theme={theme}
+                  styles={styles}
+                  onPress={handleSourcePress}
+                  onLongPress={handleSourceLongPress}
+                  formatTime={formatTime}
+                />
+              </ScaleDecorator>
             )}
-            ListHeaderComponent={() => (
-              <View style={styles.listHeader} />
-            )}
+            ListHeaderComponent={() => <View style={styles.listHeader} />}
             ListEmptyComponent={() => (
               <View style={styles.emptyState}>
                 <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
@@ -810,89 +703,103 @@ const ManageSubscriptionsScreen: React.FC = () => {
             ListFooterComponent={renderFooter}
             initialNumToRender={10}
             windowSize={5}
-            maxToRenderPerBatch={10}
             removeClippedSubviews={true}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            showsVerticalScrollIndicator={false}
+            containerStyle={{ flex: 1 }}
+          />
+        ) : (
+          <FlatList
+            data={sourcesForTab}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item, index }) => (
+              <SourceCard
+                source={item}
+                index={index}
+                total={sourcesForTab.length}
+                isEditMode={isEditMode}
+                selectedSources={selectedSources}
+                theme={theme}
+                styles={styles}
+                onPress={handleSourcePress}
+                onLongPress={handleSourceLongPress}
+                formatTime={formatTime}
+              />
+            )}
+            ListHeaderComponent={() => <View style={styles.listHeader} />}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="rss-feed" size={48} color={theme.colors.outline} />
+                <Text style={styles.emptyText}>暂无订阅源</Text>
+              </View>
+            )}
+            ListFooterComponent={renderFooter}
+            initialNumToRender={10}
+            windowSize={5}
+            removeClippedSubviews={true}
+            contentContainerStyle={{ flexGrow: 1 }}
           />
         )}
       </View>
     );
-  }, [getFilteredSources, screenWidth, isReady, refreshing, isEditMode, selectedSources, styles, theme]);
+  }, [isReady, screenWidth, isEditMode, selectedSources, styles, theme, renderFooter, formatTime, handleSourcePress, handleSourceLongPress]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
-        {/* 顶部统计区 (固定) */}
+    <GestureHandlerRootView style={styles.container}>
+      <View style={{ flex: 1 }}>
         {renderDashboard()}
-      
-      {/* 工具栏 (订阅列表标题 / 批量操作控制) */}
-      {renderToolbar()}
-
-      {/* Tab 栏 */}
-      <CustomTabBar
-        tabs={routes}
-        scrollX={scrollX}
-        screenWidth={screenWidth}
-        activeIndex={activeIndex}
-        onTabPress={handleTabPress}
-      />
-
-      {/* 列表内容 */}
-      <CustomTabContent
-        ref={tabContentRef}
-        tabs={routes}
-        renderScene={renderScene}
-        scrollX={scrollX}
-        onIndexChange={handleIndexChange}
-        initialIndex={0}
-      />
-      
-      {/* 底部批量操作栏 (编辑模式显示) */}
-      {isEditMode && selectedSources.size > 0 && (
-         <View style={styles.bottomActionBar}>
+        {renderToolbar()}
+        <CustomTabBar
+          tabs={routes}
+          scrollX={scrollX}
+          screenWidth={screenWidth}
+          activeIndex={activeIndex}
+          onTabPress={handleTabPress}
+        />
+        <CustomTabContent
+          ref={tabContentRef}
+          tabs={routes}
+          renderScene={renderScene}
+          scrollX={scrollX}
+          onIndexChange={handleIndexChange}
+          initialIndex={0}
+        />
+        {isEditMode && selectedSources.size > 0 && (
+          <View style={styles.bottomActionBar}>
             <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchMoveToGroup}>
-               <MaterialIcons name="folder" size={20} color="#FFF" />
-               <Text style={styles.bottomActionText}>移动</Text>
+              <MaterialIcons name="folder" size={20} color="#FFF" />
+              <Text style={styles.bottomActionText}>移动</Text>
             </TouchableOpacity>
-            
             <View style={styles.verticalDivider} />
-
             <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchToggleStatus}>
-               <MaterialIcons name="toggle-on" size={20} color="#FFF" />
-               <Text style={styles.bottomActionText}>启/停</Text>
+              <MaterialIcons name="toggle-on" size={20} color="#FFF" />
+              <Text style={styles.bottomActionText}>启/停</Text>
             </TouchableOpacity>
-
             <View style={styles.verticalDivider} />
-
             <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchRefresh}>
-               <MaterialIcons name="sync" size={20} color="#FFF" />
-               <Text style={styles.bottomActionText}>刷新</Text>
+              <MaterialIcons name="sync" size={20} color="#FFF" />
+              <Text style={styles.bottomActionText}>刷新</Text>
             </TouchableOpacity>
-            
             <View style={styles.verticalDivider} />
-            
             <TouchableOpacity style={styles.bottomActionBtn} onPress={handleBatchDelete}>
-               <MaterialIcons name="delete" size={20} color="#FF8A80" />
-               <Text style={[styles.bottomActionText, {color: '#FF8A80'}]}>删除</Text>
+              <MaterialIcons name="delete" size={20} color="#FF8A80" />
+              <Text style={[styles.bottomActionText, { color: '#FF8A80' }]}>删除</Text>
             </TouchableOpacity>
-         </View>
-      )}
-
-      {/* 分组选择弹窗 */}
-      <GroupSelectionModal
-        visible={showMoveGroupModal}
-        groups={groups}
-        onClose={() => setShowMoveGroupModal(false)}
-        onSelect={handleMoveToGroup}
-      />
-
-      {/* 动作菜单 ActionSheet */}
-      <SourceActionSheet 
-        sourceId={activeSourceId} 
-        visible={showActionSheet} 
-        onClose={() => setShowActionSheet(false)} 
-      />
+          </View>
+        )}
+        <GroupSelectionModal
+          visible={showMoveGroupModal}
+          groups={groups}
+          onClose={() => setShowMoveGroupModal(false)}
+          onSelect={handleMoveToGroup}
+        />
+        <SourceActionSheet
+          sourceId={activeSourceId}
+          visible={showActionSheet}
+          onClose={() => setShowActionSheet(false)}
+          rssSources={rssSources}
+          theme={theme}
+          styles={styles}
+          onAction={handleActionSheetAction}
+        />
       </View>
     </GestureHandlerRootView>
   );
@@ -957,8 +864,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
 
   loadingContainer: {
-    flex: 1, 
-    justifyContent: 'center', 
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center'
   },
   // Action Sheet 样式
@@ -1017,7 +924,7 @@ const createStyles = (theme: any) => StyleSheet.create({
   sortBtn: {
     padding: 8,
   },
-  
+
   // Dashboard
   dashboardContainer: {
     flexDirection: 'row',
@@ -1073,24 +980,24 @@ const createStyles = (theme: any) => StyleSheet.create({
 
   // Source Card
   card: {
-      marginHorizontal: 16,
-      marginBottom: 10,
-      backgroundColor: theme.colors.surface,
-      borderRadius: 16,
-      padding: 12,
-      borderWidth: 2, // 始终保留 2px 边框，但平时透明
-      borderColor: 'transparent',
-      // 阴影
-      shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
+    marginHorizontal: 16,
+    marginBottom: 10,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 2, // 始终保留 2px 边框，但平时透明
+    borderColor: 'transparent',
+    // 阴影
+    shadowColor: theme.isDark ? '#000' : (theme.colors.shadow || '#000'),
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: theme.isDark ? 0.3 : 0.05,
     shadowRadius: 2,
     elevation: 1,
   },
   cardSelected: {
-      backgroundColor: theme.isDark ? theme.colors.surfaceContainerHigh : theme.colors.primaryContainer,
-      borderColor: theme.colors.primary, // 选中时显示边框，但因为基准样式已有2px，所以不会撑开
-    },
+    backgroundColor: theme.isDark ? theme.colors.surfaceContainerHigh : theme.colors.primaryContainer,
+    borderColor: theme.colors.primary, // 选中时显示边框，但因为基准样式已有2px，所以不会撑开
+  },
   cardInner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1206,6 +1113,8 @@ const createStyles = (theme: any) => StyleSheet.create({
   emptyText: {
     marginTop: 12,
     color: theme.colors.onSurfaceVariant,
+    includeFontPadding: true,
+    lineHeight: 20,
   },
 
   // Bottom Action Bar

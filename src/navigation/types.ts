@@ -75,6 +75,7 @@ export type VocabularyStackParamList = {
 // RSS堆栈参数列表
 export type RSSStackParamList = {
   RSSMain: undefined;  // 直接显示 ManageSubscriptionsScreen
+  DiscoverRSS: undefined;  // 发现页面
   AddRSSSource: undefined;
   EditRSSSource: { sourceId: number };
   GroupManagement: undefined;  // 分组管理

@@ -7,7 +7,6 @@ export { RSSService, rssService } from './RSSService';
 
 // 子服务
 export { LocalRSSService, localRSSService } from './LocalRSSService';
-export { ProxyRSSService, proxyRSSService } from './ProxyRSSService';
 export { ImageLocalizer, imageLocalizer } from './ImageLocalizer';
 export { FilterService, filterService } from './FilterService';
 

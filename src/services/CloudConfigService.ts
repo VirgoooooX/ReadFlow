@@ -116,8 +116,8 @@ export class CloudConfigService {
 
   private async migrateFromLegacy(): Promise<CloudConfig> {
     const settingsService = SettingsService.getInstance();
-    let mode: CloudMode = 'local';
-    let serverUrl = '';
+    let mode: CloudMode = 'cloud';
+    let serverUrl = 'http://localhost:30000/';
     let serverAccessKey: string | undefined = undefined;
     let auth: CloudAuthState = {};
 
@@ -128,18 +128,6 @@ export class CloudConfigService {
       }
       if (typeof appSettings?.sync?.serverUrl === 'string' && appSettings.sync.serverUrl) {
         serverUrl = appSettings.sync.serverUrl;
-      }
-    } catch {
-    }
-
-    try {
-      const proxyConfig = await settingsService.getProxyModeConfig();
-      if (proxyConfig?.serverUrl && !serverUrl) {
-        serverUrl = proxyConfig.serverUrl;
-      }
-      const legacyToken = (proxyConfig as any)?.serverToken ?? (proxyConfig as any)?.serverAccessKey;
-      if (typeof legacyToken === 'string' && legacyToken) {
-        serverAccessKey = legacyToken;
       }
     } catch {
     }

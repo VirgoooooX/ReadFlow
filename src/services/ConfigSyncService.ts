@@ -21,7 +21,7 @@ export class ConfigSyncService {
   private inFlight: Record<'push' | 'pull', Promise<void> | undefined> = { push: undefined, pull: undefined };
   private inFlightMarker: Record<'push' | 'pull', string | undefined> = { push: undefined, pull: undefined };
 
-  private constructor() {}
+  private constructor() { }
 
   private static stableStringify(value: any): string {
     const seen = new WeakSet<object>();
@@ -64,16 +64,8 @@ export class ConfigSyncService {
     } = exported;
 
     const appSettings = rawAppSettings && typeof rawAppSettings === 'object' ? { ...rawAppSettings } : undefined;
-    if (appSettings && appSettings.sync && typeof appSettings.sync === 'object') {
-      const {
-        cloudCursors: _cloudCursors,
-        lastProfilePushAt: _lastProfilePushAt,
-        lastStateSyncAt: _lastStateSyncAt,
-        lastVocabSyncAt: _lastVocabSyncAt,
-        userId: _userId,
-        ...syncRest
-      } = appSettings.sync;
-      appSettings.sync = syncRest;
+    if (appSettings && 'sync' in appSettings) {
+      delete (appSettings as any).sync;
     }
 
     return {
@@ -161,7 +153,7 @@ export class ConfigSyncService {
     logger.info(`[ConfigSync] ${label} groups requestId=${requestId}: ${this.safeJsonForLog(snapshot?.groups)}`);
     logger.info(`[ConfigSync] ${label} filterRules requestId=${requestId}: ${this.safeJsonForLog(snapshot?.filterRules)}`);
   }
-  
+
   private getSettingsService(): SettingsService {
     if (!this.settingsService) {
       this.settingsService = SettingsService.getInstance();
@@ -204,8 +196,8 @@ export class ConfigSyncService {
    */
   public async syncConfig(mode: 'push' | 'pull'): Promise<void> {
     const cloudConfig = await cloudConfigService.getConfig();
-    if (cloudConfig.mode !== 'cloud' || !cloudConfig.serverUrl) {
-      logger.info('[ConfigSync] Skip sync: Cloud mode not enabled');
+    if (!cloudConfig.serverUrl) {
+      logger.info('[ConfigSync] Skip sync: Server URL not configured');
       return;
     }
 
@@ -235,16 +227,16 @@ export class ConfigSyncService {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     if (cloudConfig.serverAccessKey) {
       headers['x-server-token'] = cloudConfig.serverAccessKey;
       headers['x-server-access-key'] = cloudConfig.serverAccessKey;
     }
-    
+
     return headers;
   }
 
@@ -318,9 +310,6 @@ export class ConfigSyncService {
       `[ConfigSync] Push successful requestId=${requestId}${resData?.updatedAt ? ` serverUpdatedAt=${resData.updatedAt}` : ''}`
     );
     await this.setLastPushedFingerprint(fingerprint);
-    
-    // Trigger Vocabulary Sync
-    this.vocabService.syncToProxyServer().catch(e => logger.warn('[ConfigSync] Vocab sync failed:', e));
   }
 
   private async pullConfig(): Promise<void> {
@@ -353,7 +342,7 @@ export class ConfigSyncService {
 
     const data = await response.json();
     this.logConfigSnapshot(requestId, 'Remote config (pull payload)', data);
-    
+
     // Data structure: { settings, sources, groups, filterRules, timestamp }
     if (!data || Object.keys(data).length === 0) {
       logger.info('[ConfigSync] Remote config is empty.');
@@ -402,10 +391,6 @@ export class ConfigSyncService {
       logger.warn(`[ConfigSync] Post-pull local snapshot export failed requestId=${requestId}:`, e);
     }
     cacheEventEmitter.updateRSSStats();
-    cacheEventEmitter.settingsUpdated('cloudPull');
-
-    // Trigger Vocabulary Sync
-    this.vocabService.syncToProxyServer().catch(e => logger.warn('[ConfigSync] Vocab sync failed:', e));
   }
 }
 

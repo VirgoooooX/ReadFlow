@@ -89,9 +89,8 @@ const ArticleItem = memo(({ item, onPress, styles, theme, proxyServerUrl }: any)
   const imageUri = useMemo(() => {
     if (!item.imageUrl) return null;
 
-    // 只要 needsProxy 为 true，就应该尝试获取代理 URL (自建或公共)
-    if (needsProxy(item.imageUrl, proxyServerUrl)) {
-      const finalUrl = toProxyUrl(item.imageUrl, proxyServerUrl);
+    if (needsProxy(item.imageUrl)) {
+      const finalUrl = toProxyUrl(item.imageUrl);
       if (finalUrl !== item.imageUrl) {
         logger.info(`[ImageProxy] Redirecting: ${item.imageUrl} -> ${finalUrl}`);
       }
@@ -99,7 +98,7 @@ const ArticleItem = memo(({ item, onPress, styles, theme, proxyServerUrl }: any)
     }
 
     return item.imageUrl;
-  }, [item.imageUrl, proxyServerUrl]);
+  }, [item.imageUrl]);
 
   return (
     <TouchableOpacity
@@ -163,7 +162,6 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   theme,
   isActive,
   isNeighbor,
-  proxyServerUrl,
   onLoadMore, // 【新增】加载更多回调
   isLoadingMore, // 【新增】加载更多状态
   hasMore, // 【新增】是否还有更多
@@ -178,7 +176,6 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
   theme: any;
   isActive: boolean;
   isNeighbor: boolean;
-  proxyServerUrl: string;
   onLoadMore: () => void;
   isLoadingMore: boolean;
   hasMore: boolean;
@@ -365,7 +362,6 @@ const ArticleListScene = memo(React.forwardRef(function ArticleListSceneComponen
           onPress={onArticlePress}
           styles={styles}
           theme={theme}
-          proxyServerUrl={proxyServerUrl}
         />
       )}
       ListEmptyComponent={() => (
@@ -409,7 +405,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [isRefreshing]);
 
   const [loadedTabs, setLoadedTabs] = useState<Set<number>>(new Set([0]));
-  const [proxyServerUrl, setProxyServerUrl] = useState<string>(''); // 🔥 新增
   const [showOnlyUnread, setShowOnlyUnread] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
 
@@ -576,21 +571,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       loadArticles(routes[1].key);
     }
   }, [routes, loadArticles, tabDataMap]);
-
-  // 🔥 获取代理配置
-  useEffect(() => {
-    const loadProxyConfig = async () => {
-      try {
-        const config = await SettingsService.getInstance().getProxyModeConfig();
-        if (config.serverUrl) {
-          setProxyServerUrl(config.serverUrl);
-        }
-      } catch (error) {
-        logger.error('Failed to load proxy config:', error);
-      }
-    };
-    loadProxyConfig();
-  }, []);
 
   // 🌟 【已移除】原有的强制后台刷新逻辑已移除，改由 RSSStartupSettings 控制
   // 详见 AppNavigator.tsx 中的 triggerStartupRefresh 调用
@@ -1096,7 +1076,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
           theme={theme}
           isActive={isActive}
           isNeighbor={isNeighbor}
-          proxyServerUrl={proxyServerUrl}
           onLoadMore={() => handleLoadMore(route.key)}
           isLoadingMore={tabData.isLoadingMore}
           hasMore={tabData.hasMore}
@@ -1522,6 +1501,8 @@ const createStyles = (theme: any) =>
       ...typography.bodyLarge,
       color: theme.colors.onSurfaceVariant,
       marginBottom: 24,
+      includeFontPadding: false,
+      textAlignVertical: 'center',
     },
     refreshButton: {
       paddingHorizontal: 24,

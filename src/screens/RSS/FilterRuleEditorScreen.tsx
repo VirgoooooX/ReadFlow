@@ -187,8 +187,8 @@ const FilterRuleEditorScreen: React.FC = () => {
             <Text style={styles.subLabel}>使用正则表达式匹配</Text>
             <Text style={styles.hint}>启用后支持高级模式匹配</Text>
           </View>
-          <Switch 
-            value={isRegex} 
+          <Switch
+            value={isRegex}
             onValueChange={setIsRegex}
             trackColor={{ true: theme.colors.primary }}
           />
@@ -204,10 +204,10 @@ const FilterRuleEditorScreen: React.FC = () => {
             onPress={() => setMode('exclude')}
             activeOpacity={0.8}
           >
-            <MaterialIcons 
-              name="block" 
-              size={18} 
-              color={mode === 'exclude' ? theme.colors.onError : theme.colors.onSurfaceVariant} 
+            <MaterialIcons
+              name="block"
+              size={18}
+              color={mode === 'exclude' ? theme.colors.onError : theme.colors.onSurfaceVariant}
             />
             <Text style={[styles.segmentText, mode === 'exclude' && styles.segmentTextActive]}>
               屏蔽 (黑名单)
@@ -218,10 +218,10 @@ const FilterRuleEditorScreen: React.FC = () => {
             onPress={() => setMode('include')}
             activeOpacity={0.8}
           >
-            <MaterialIcons 
-              name="check-circle" 
-              size={18} 
-              color={mode === 'include' ? theme.colors.onPrimary : theme.colors.onSurfaceVariant} 
+            <MaterialIcons
+              name="check-circle"
+              size={18}
+              color={mode === 'include' ? theme.colors.onPrimary : theme.colors.onSurfaceVariant}
             />
             <Text style={[styles.segmentText, mode === 'include' && styles.segmentTextActive]}>
               保留 (白名单)
@@ -229,8 +229,8 @@ const FilterRuleEditorScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         <Text style={styles.hint}>
-          {mode === 'exclude' 
-            ? '匹配到该规则的文章将被过滤掉' 
+          {mode === 'exclude'
+            ? '匹配到该规则的文章将被过滤掉'
             : '只保留匹配该规则的文章，其他文章将被过滤'}
         </Text>
       </View>
@@ -244,10 +244,10 @@ const FilterRuleEditorScreen: React.FC = () => {
             onPress={() => setScope('global')}
             activeOpacity={0.8}
           >
-            <MaterialIcons 
-              name="public" 
-              size={18} 
-              color={scope === 'global' ? theme.colors.onSecondary : theme.colors.onSurfaceVariant} 
+            <MaterialIcons
+              name="public"
+              size={18}
+              color={scope === 'global' ? theme.colors.onSecondary : theme.colors.onSurfaceVariant}
             />
             <Text style={[styles.segmentText, scope === 'global' && styles.segmentTextActive]}>
               全局 (所有源)
@@ -258,10 +258,10 @@ const FilterRuleEditorScreen: React.FC = () => {
             onPress={() => setScope('specific')}
             activeOpacity={0.8}
           >
-            <MaterialIcons 
-              name="radio-button-checked" 
-              size={18} 
-              color={scope === 'specific' ? theme.colors.onSecondary : theme.colors.onSurfaceVariant} 
+            <MaterialIcons
+              name="radio-button-checked"
+              size={18}
+              color={scope === 'specific' ? theme.colors.onSecondary : theme.colors.onSurfaceVariant}
             />
             <Text style={[styles.segmentText, scope === 'specific' && styles.segmentTextActive]}>
               指定源
@@ -285,7 +285,7 @@ const FilterRuleEditorScreen: React.FC = () => {
                 <Text style={styles.emptyText}>暂无订阅源</Text>
               </View>
             ) : (
-              <ScrollView 
+              <ScrollView
                 style={styles.sourceScrollView}
                 showsVerticalScrollIndicator={true}
                 nestedScrollEnabled={true}

@@ -30,6 +30,7 @@ import VocabularyScreen from '../screens/Vocabulary/VocabularyScreen';
 import ReviewSessionScreen from '../screens/Vocabulary/ReviewSessionScreen';
 import VocabularyDetailScreen from '../screens/Vocabulary/VocabularyDetailScreen';
 import AddRSSSourceScreen from '../screens/RSS/AddRSSSourceScreen';
+import DiscoverRSSScreen from '../screens/RSS/DiscoverRSSScreen';
 import ManageSubscriptionsScreen from '../screens/RSS/ManageSubscriptionsScreen';
 import EditRSSSourceScreen from '../screens/RSS/EditRSSSourceScreen';
 import GroupManagementScreen from '../screens/RSS/GroupManagementScreen';
@@ -42,8 +43,6 @@ import EditProfileScreen from '../screens/User/EditProfileScreen';
 import ReadingSettingsScreen from '../screens/Settings/ReadingSettingsScreen';
 import LLMSettingsScreen from '../screens/Settings/LLMSettingsScreen';
 import ThemeSettingsScreen from '../screens/Settings/ThemeSettingsScreen';
-import { ProxyServerSettingsScreen } from '../screens/Settings/ProxyServerSettingsScreen';
-import { AddEditProxyServerScreen } from '../screens/Settings/AddEditProxyServerScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
 import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
 import CustomColorScreen from '../screens/Settings/CustomColorScreen';
@@ -232,20 +231,46 @@ function RSSStackNavigator() {
             title="订阅源"
             showBackButton={false}
             rightComponent={
-              <TouchableOpacity
-                onPress={() => navigation.navigate('AddRSSSource')}
-                style={{ padding: 4, marginRight: 8 }}
-                activeOpacity={0.6}
-              >
-                <MaterialIcons
-                  name="add"
-                  size={26}
-                  color={isDark ? theme.colors.onSurface : theme.colors.onPrimary}
-                />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('DiscoverRSS')}
+                  style={{ padding: 4, marginRight: 8 }}
+                  activeOpacity={0.6}
+                >
+                  <MaterialIcons
+                    name="explore"
+                    size={26}
+                    color={isDark ? theme.colors.onSurface : theme.colors.onPrimary}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('AddRSSSource')}
+                  style={{ padding: 4, marginRight: 8 }}
+                  activeOpacity={0.6}
+                >
+                  <MaterialIcons
+                    name="add"
+                    size={26}
+                    color={isDark ? theme.colors.onSurface : theme.colors.onPrimary}
+                  />
+                </TouchableOpacity>
+              </View>
             }
           >
             <ManageSubscriptionsScreen />
+          </ScreenWithCustomHeader>
+        )}
+      </RSSStack.Screen>
+      <RSSStack.Screen
+        name="DiscoverRSS"
+        options={{ title: '发现' }}
+      >
+        {(props: any) => (
+          <ScreenWithCustomHeader
+            title="发现公共订阅"
+            showBackButton={true}
+          >
+            <DiscoverRSSScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </RSSStack.Screen>
@@ -407,34 +432,6 @@ function UserStackNavigator() {
             showBackButton={true}
           >
             <CustomColorScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="ProxyServerSettings"
-        options={{ title: '代理服务器' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="代理服务器"
-            showBackButton={true}
-          >
-            <ProxyServerSettingsScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
-        name="AddEditProxyServer"
-        options={({ route }: any) => ({
-          title: route?.params?.serverId ? '编辑服务器' : '添加服务器'
-        })}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title={props.route?.params?.serverId ? '编辑服务器' : '添加服务器'}
-            showBackButton={true}
-          >
-            <AddEditProxyServerScreen {...props} />
           </ScreenWithCustomHeader>
         )}
       </UserStack.Screen>
@@ -737,72 +734,77 @@ function RootNavigator() {
         ...getCommonScreenOptions(theme),
       }}
     >
-      <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
-      <RootStack.Screen
-        name="Auth"
-        component={AuthStackNavigator}
-        options={{ presentation: 'modal' as any }}
-      />
-      <RootStack.Screen
-        name="ArticleDetail"
-        component={ArticleDetailScreen}
-        options={({ navigation, route }) => {
-          const isNextArticle = (route as any).params?.isNextArticle || false;
-          return {
-            ...getCommonScreenOptions(theme),
-            headerShown: true,
-            title: '文章详情',
-            // 翻页用 fade，不影响返回动画
-            ...(isNextArticle && {
-              animation: 'fade',
-              animationDuration: 200,
-            }),
-          };
-        }}
-      />
-      <RootStack.Screen
-        name="VocabularyDetail"
-        component={ArticleDetailScreen}
-        options={({ navigation }) => ({
-          headerShown: true,
-          title: '单词详情',
-          ...getCommonScreenOptions(theme),
-        })}
-      />
-      <RootStack.Screen
-        name="RSSSourceDetail"
-        component={ArticleDetailScreen}
-        options={({ navigation }) => ({
-          headerShown: true,
-          title: 'RSS源详情',
-          ...getCommonScreenOptions(theme),
-        })}
-      />
-      <RootStack.Screen
-        name="AddRSSSource"
-        component={AddRSSSourceScreen}
-        options={{
-          headerShown: true,
-          title: '添加RSS源',
-          ...getCommonScreenOptions(theme),
-        }}
-      />
-      <RootStack.Screen
-        name="DailyReportDetail"
-        options={{
-          ...getCommonScreenOptions(theme),
-          headerShown: false,
-        }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="AI 日报"
-            showBackButton={true}
+      {state.isAuthenticated ? (
+        <>
+          <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
+          <RootStack.Screen
+            name="ArticleDetail"
+            component={ArticleDetailScreen}
+            options={({ navigation, route }) => {
+              const isNextArticle = (route as any).params?.isNextArticle || false;
+              return {
+                ...getCommonScreenOptions(theme),
+                headerShown: true,
+                title: '文章详情',
+                // 翻页用 fade，不影响返回动画
+                ...(isNextArticle && {
+                  animation: 'fade',
+                  animationDuration: 200,
+                }),
+              };
+            }}
+          />
+          <RootStack.Screen
+            name="VocabularyDetail"
+            component={ArticleDetailScreen}
+            options={({ navigation }) => ({
+              headerShown: true,
+              title: '单词详情',
+              ...getCommonScreenOptions(theme),
+            })}
+          />
+          <RootStack.Screen
+            name="RSSSourceDetail"
+            component={ArticleDetailScreen}
+            options={({ navigation }) => ({
+              headerShown: true,
+              title: 'RSS源详情',
+              ...getCommonScreenOptions(theme),
+            })}
+          />
+          <RootStack.Screen
+            name="AddRSSSource"
+            component={AddRSSSourceScreen}
+            options={{
+              headerShown: true,
+              title: '添加RSS源',
+              ...getCommonScreenOptions(theme),
+            }}
+          />
+          <RootStack.Screen
+            name="DailyReportDetail"
+            options={{
+              ...getCommonScreenOptions(theme),
+              headerShown: false,
+            }}
           >
-            <DailyReportDetailScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </RootStack.Screen>
+            {(props: any) => (
+              <ScreenWithCustomHeader
+                title="AI 日报"
+                showBackButton={true}
+              >
+                <DailyReportDetailScreen {...props} />
+              </ScreenWithCustomHeader>
+            )}
+          </RootStack.Screen>
+        </>
+      ) : (
+        <RootStack.Screen
+          name="Auth"
+          component={AuthStackNavigator}
+          options={{ animationTypeForReplace: !state.isAuthenticated ? 'pop' : 'push' }}
+        />
+      )}
     </RootStack.Navigator>
   );
 }

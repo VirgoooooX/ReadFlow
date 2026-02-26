@@ -13,11 +13,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../../navigation/types';
+import type { UserStackParamList } from '../../navigation/types';
 import { dailyReportApiService, DailyReportSummary } from '../../services/DailyReportApiService';
 import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'DailyReportList'>;
+type NavigationProp = NativeStackNavigationProp<UserStackParamList, 'DailyReportList'>;
 
 const DailyReportListScreen: React.FC = () => {
     const { theme } = useThemeContext();

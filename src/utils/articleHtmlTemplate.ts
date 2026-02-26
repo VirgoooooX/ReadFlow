@@ -9,13 +9,13 @@ import type { Theme } from '../theme';
 /**
  * 替换 HTML 中需要代理的图片 URL (包括 src 和 srcset)
  */
-function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
+function proxyImagesInHtml(html: string): string {
   if (!html) return html;
 
   // 1. 替换 src 属性
   let processedHtml = html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
-    if (needsProxy(url, proxyServerUrl)) {
-      return `${prefix}${toProxyUrl(url, proxyServerUrl)}${suffix}`;
+    if (needsProxy(url)) {
+      return `${prefix}${toProxyUrl(url)}${suffix}`;
     }
     return match;
   });
@@ -28,9 +28,9 @@ function proxyImagesInHtml(html: string, proxyServerUrl: string): string {
       const parts = item.trim().split(/\s+/);
       if (parts.length > 0) {
         const url = parts[0];
-        if (needsProxy(url, proxyServerUrl)) {
+        if (needsProxy(url)) {
           // 替换 URL 部分
-          parts[0] = toProxyUrl(url, proxyServerUrl);
+          parts[0] = toProxyUrl(url);
           return parts.join(' ');
         }
       }
@@ -59,11 +59,8 @@ export interface HtmlTemplateOptions {
   imageCaption?: string;    // 【新增】图片说明
   imageCredit?: string;      // 【新增】图片来源/版权
   articleUrl?: string;       // 【新增】文章原始链接，用于视频跳转
-  // 【新增】直接传入初始滚动位置和生词表
   initialScrollY?: number;
   vocabularyWords?: string[];
-  // 【新增】代理服务器地址，用于处理防盗链图片
-  proxyServerUrl?: string;
 }
 
 export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
@@ -85,7 +82,6 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     // 【新增】默认值
     initialScrollY = 0,
     vocabularyWords = [],
-    proxyServerUrl = ''  // 【新增】代理服务器地址
   } = options;
   const isDark = theme.isDark;
 
@@ -112,13 +108,13 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   let optimizedContent = content.replace(/<img\s+/gi, '<img loading="lazy" ');
 
   // 【新增】处理防盗链图片：将需要代理的图片 URL 替换为代理 URL
-  // 即使没有 proxyServerUrl，也要处理被墙域名（走公共代理）
-  optimizedContent = proxyImagesInHtml(optimizedContent, proxyServerUrl);
+  // 强制处理被墙域名（走公共代理）
+  optimizedContent = proxyImagesInHtml(optimizedContent);
 
   // 处理封面图片的代理
   let proxiedImageUrl = imageUrl || '';
-  if (imageUrl && needsProxy(imageUrl, proxyServerUrl)) {
-    proxiedImageUrl = toProxyUrl(imageUrl, proxyServerUrl);
+  if (imageUrl && needsProxy(imageUrl)) {
+    proxiedImageUrl = toProxyUrl(imageUrl);
   }
 
   // CSS 样式 - 优化英文排版和图片说明

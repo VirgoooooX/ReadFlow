@@ -123,7 +123,7 @@ export class DatabaseService {
 
     try {
       console.log('📁 开始数据库迁移...');
-      
+
       // 获取 rss_sources 表信息
       let tableInfo: any[] = [];
       try {
@@ -796,29 +796,26 @@ export class DatabaseService {
   }
 
   /**
-   * 关闭数据库连接
+   * 清空用户关联数据 (登出时调用)
    */
-  public async closeDatabase(): Promise<void> {
+  public async clearUserData(): Promise<void> {
     try {
-      if (this.db) {
-        await this.db.closeAsync();
-        this.db = null;
-      }
-      this.isInitialized = false;
-      console.log('Database connections closed');
-    } catch (error) {
-      console.error('Error closing database:', error);
-    }
-  }
+      await this.initializeDatabase();
+      if (!this.db) return;
 
-  /**
-   * 获取数据库状态
-   */
-  public getStatus(): { isInitialized: boolean; hasMainDb: boolean } {
-    return {
-      isInitialized: this.isInitialized,
-      hasMainDb: this.db !== null,
-    };
+      await this.db.execAsync(`
+        DELETE FROM articles;
+        DELETE FROM reading_history;
+        DELETE FROM vocabulary;
+        DELETE FROM dictionary_cache;
+        DELETE FROM translation_cache;
+        DELETE FROM rss_sources;
+      `);
+      console.log('✅ 用户本地数据已清空');
+    } catch (error) {
+      console.error('❌ 清空用户数据失败:', error);
+      throw error;
+    }
   }
 
   /**
@@ -845,6 +842,32 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * 关闭数据库连接
+   */
+  public async closeDatabase(): Promise<void> {
+    try {
+      if (this.db) {
+        await this.db.closeAsync();
+        this.db = null;
+      }
+      this.isInitialized = false;
+      console.log('Database connections closed');
+    } catch (error) {
+      console.error('Error closing database:', error);
+    }
+  }
+
+  /**
+   * 获取数据库状态
+   */
+  public getStatus(): { isInitialized: boolean; hasMainDb: boolean } {
+    return {
+      isInitialized: this.isInitialized,
+      hasMainDb: this.db !== null,
+    };
+  }
+
   // =================== 过滤规则管理 ===================
 
   /**
@@ -852,7 +875,7 @@ export class DatabaseService {
    */
   public async getEffectiveRules(sourceId: number): Promise<any[]> {
     await this.ensureInitialized();
-    
+
     const sql = `
       SELECT * FROM filter_rules 
       WHERE scope = 'global' 
@@ -861,7 +884,7 @@ export class DatabaseService {
       )
       ORDER BY id DESC
     `;
-    
+
     return await this.executeQuery(sql, [sourceId]);
   }
 
@@ -907,7 +930,7 @@ export class DatabaseService {
         'INSERT INTO filter_rules (keyword, is_regex, mode, scope) VALUES (?, ?, ?, ?)',
         [keyword, isRegex ? 1 : 0, mode, scope]
       );
-      
+
       const ruleId = result.insertId;
 
       // 2. 如果是特定源，插入绑定关系

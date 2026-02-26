@@ -939,6 +939,17 @@ router.post('/sync/config', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/rss/public - Get public feeds from the global pool (No auth required)
+router.get('/public', async (req: Request, res: Response) => {
+  try {
+    const feeds = await storageService.getPublicFeeds();
+    res.json({ ok: true, feeds });
+  } catch (error) {
+    logger.error('[PublicFeeds] GET failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // ─── Daily Report Routes ─────────────────────────────────────────────────────
 
 // GET /api/rss/daily-reports - Get daily reports for user

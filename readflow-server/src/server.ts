@@ -145,6 +145,10 @@ const serverTokenMiddleware = (req: express.Request, res: express.Response, next
 
 // Auth Middleware
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (req.path === '/public' || req.path.endsWith('/public')) {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   const serverToken = process.env.SERVER_TOKEN;
 

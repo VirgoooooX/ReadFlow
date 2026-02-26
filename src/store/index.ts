@@ -7,14 +7,25 @@ import rssSlice from './slices/rssSlice';
 import vocabularySlice from './slices/vocabularySlice';
 import settingsSlice from './slices/settingsSlice';
 
+import { combineReducers } from '@reduxjs/toolkit';
+
+const appReducer = combineReducers({
+  articles: articlesSlice,
+  rss: rssSlice,
+  vocabulary: vocabularySlice,
+  settings: settingsSlice,
+});
+
+const rootReducer = (state: any, action: any) => {
+  if (action.type === 'AUTH_LOGOUT') {
+    state = undefined;
+  }
+  return appReducer(state, action);
+};
+
 // 配置store
 export const store = configureStore({
-  reducer: {
-    articles: articlesSlice,
-    rss: rssSlice,
-    vocabulary: vocabularySlice,
-    settings: settingsSlice,
-  },
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
