@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Pressable,
   Alert,
   RefreshControl,
   Switch,
@@ -52,7 +53,7 @@ const StatCard = React.memo(({ icon, value, label, color, theme, styles }: any) 
 
 const SourceCard = React.memo(({
   source, index, total, drag, isActive, isEditMode,
-  selectedSources, theme, styles, onPress, onLongPress, formatTime
+  selectedSources, theme, styles, onPress, onLongPress, onPressOut, formatTime
 }: any) => {
   const isSelected = selectedSources.has(source.id);
   const iconColor = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'][source.id % 5];
@@ -67,6 +68,7 @@ const SourceCard = React.memo(({
       ]}
       onPress={() => onPress(source)}
       onLongPress={() => onLongPress(source.id)}
+      onPressOut={() => onPressOut?.(source.id)}
       activeOpacity={0.7}
       disabled={isActive}
     >
@@ -132,7 +134,7 @@ const SourceCard = React.memo(({
 });
 
 const SourceActionSheet = React.memo(({ sourceId, visible, onClose, rssSources, theme, styles, onAction }: any) => {
-  if (!sourceId || !visible) return null;
+  if (sourceId === null || sourceId === undefined || !visible) return null;
   const source = rssSources.find((s: RSSSource) => s.id === sourceId);
   if (!source) return null;
 
@@ -151,7 +153,8 @@ const SourceActionSheet = React.memo(({ sourceId, visible, onClose, rssSources, 
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.actionSheetContainer}>
           <View style={styles.actionSheetHeader}>
             <Text style={styles.actionSheetTitle} numberOfLines={1}>{source.name}</Text>
@@ -164,7 +167,7 @@ const SourceActionSheet = React.memo(({ sourceId, visible, onClose, rssSources, 
           ))}
           <View style={{ height: 20 }} />
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 });
@@ -191,6 +194,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const [activeSourceId, setActiveSourceId] = useState<number | null>(null); // 用于 ActionSheet
   const [showActionSheet, setShowActionSheet] = useState(false); // ActionSheet 显示状态
   const lastLongPressRef = useRef<{ id: number | null; at: number }>({ id: null, at: 0 });
+  const pendingActionSheetRef = useRef<number | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -547,6 +551,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
     if (isEditMode) {
       toggleSelection(source.id);
     } else {
+      pendingActionSheetRef.current = null;
       const now = Date.now();
       if (lastLongPressRef.current.id === source.id && now - lastLongPressRef.current.at < 800) {
         return;
@@ -561,10 +566,17 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const handleSourceLongPress = useCallback((id: number) => {
     if (!isEditMode) {
       lastLongPressRef.current = { id, at: Date.now() };
-      setActiveSourceId(id);
-      setTimeout(() => setShowActionSheet(true), 0);
+      pendingActionSheetRef.current = id;
       Vibration.vibrate(50);
     }
+  }, [isEditMode]);
+
+  const handleSourcePressOut = useCallback((id: number) => {
+    if (isEditMode) return;
+    if (pendingActionSheetRef.current !== id) return;
+    pendingActionSheetRef.current = null;
+    setActiveSourceId(id);
+    setShowActionSheet(true);
   }, [isEditMode]);
 
   const handleActionSheetAction = useCallback((type: string, id: number) => {
@@ -689,6 +701,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
                   styles={styles}
                   onPress={handleSourcePress}
                   onLongPress={handleSourceLongPress}
+                  onPressOut={handleSourcePressOut}
                   formatTime={formatTime}
                 />
               </ScaleDecorator>
@@ -721,6 +734,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
                 styles={styles}
                 onPress={handleSourcePress}
                 onLongPress={handleSourceLongPress}
+                onPressOut={handleSourcePressOut}
                 formatTime={formatTime}
               />
             )}
@@ -740,7 +754,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
         )}
       </View>
     );
-  }, [isReady, screenWidth, isEditMode, selectedSources, styles, theme, renderFooter, formatTime, handleSourcePress, handleSourceLongPress]);
+  }, [isReady, screenWidth, isEditMode, selectedSources, styles, theme, renderFooter, formatTime, handleSourcePress, handleSourceLongPress, handleSourcePressOut]);
 
   return (
     <GestureHandlerRootView style={styles.container}>

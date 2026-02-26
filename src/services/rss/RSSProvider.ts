@@ -3,7 +3,9 @@ import { RSSSource, Article, FetchArticlesWithStatsResult } from '../../types';
 export interface FeedInfo {
   title?: string;
   description?: string;
-  isValid: boolean;
+  language?: string;
+  url?: string;
+  isValid?: boolean;
 }
 
 export interface IRSSProvider {

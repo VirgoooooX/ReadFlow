@@ -98,15 +98,25 @@ export class CloudSyncService implements IRSSProvider {
   }
 
   public async getPublicFeeds(): Promise<any[]> {
-    await this.checkAuth();
     const serverUrl = await this.getServerUrl();
     const url = `${serverUrl}/api/rss/public`;
-    const response = await this.authenticatedFetch(url);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch public feeds: ${response.statusText}`);
     }
     const data = await response.json();
     return data.feeds || [];
+  }
+
+  public async lookupPublicFeed(url: string): Promise<any | null> {
+    const serverUrl = await this.getServerUrl();
+    const apiUrl = `${serverUrl}/api/rss/public/lookup?url=${encodeURIComponent(url)}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to lookup public feed: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data?.feed ?? null;
   }
 
   /**
@@ -128,8 +138,9 @@ export class CloudSyncService implements IRSSProvider {
     try {
       const serverUrl = await this.getServerUrl();
       const settings = await this.settingsService.getAppSettings();
-      const imageCompression = settings.sync.imageCompression ?? false;
-      const cursors = settings.sync.cloudCursors || {};
+      const sync = (settings as any)?.sync || {};
+      const imageCompression = sync.imageCompression ?? false;
+      const cursors = sync.cloudCursors || {};
       const normalizedSourceUrl = this.normalizeFeedUrl(source.url);
       const since =
         (cursors as any)[normalizedSourceUrl] ??
@@ -386,7 +397,7 @@ export class CloudSyncService implements IRSSProvider {
 
       const now = Date.now();
       const last = appSettings.sync.lastProfilePushAt || 0;
-      if (now - last < 10 * 60 * 1000) return;
+      const lastHash = (appSettings.sync as any).lastProfilePushHash || '';
 
       // 1. Determine User Identity
       // Priority: AuthService User > Existing Sync ID > Generate New Random ID
@@ -413,16 +424,33 @@ export class CloudSyncService implements IRSSProvider {
       }
 
       const rows: any[] = await this.databaseService.executeQuery(
-        "SELECT id, url, title, category, update_frequency FROM rss_sources ORDER BY id DESC",
+        "SELECT id, url, title, description, category, update_frequency FROM rss_sources ORDER BY id DESC",
       );
 
       const feeds = rows.map((r: any) => ({
         id: r.id,
         url: r.url,
         name: r.title,
+        description: r.description,
         category: r.category,
         updateFrequency: r.update_frequency,
       }));
+
+      const fnv1a = (input: string): string => {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < input.length; i += 1) {
+          hash ^= input.charCodeAt(i);
+          hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+        }
+        return hash.toString(16).padStart(8, '0');
+      };
+      const nextHash = fnv1a(
+        feeds
+          .map((f: any) => `${String(f.url || '')}|${String(f.name || '')}|${String(f.category || '')}|${String(f.description || '')}`)
+          .join('\n'),
+      );
+
+      if (now - last < 10 * 60 * 1000 && nextHash === lastHash) return;
 
       const payload = {
         user: {
@@ -433,6 +461,7 @@ export class CloudSyncService implements IRSSProvider {
         },
         settings: { appSettings, readingSettings, llmSettings },
         feeds,
+        replaceFeeds: true,
       };
 
       const apiUrl = `${serverUrl}/api/rss/clientSync`;
@@ -462,6 +491,7 @@ export class CloudSyncService implements IRSSProvider {
         ...appSettings.sync,
         userId,
         lastProfilePushAt: now,
+        lastProfilePushHash: nextHash,
       });
     } catch (error) {
       logger.warn("[CloudSync] Profile push failed:", error);
@@ -478,7 +508,8 @@ export class CloudSyncService implements IRSSProvider {
         cloudConfigService.getConfig(),
       ]);
 
-      if (!AuthService.isAuthenticated()) {
+      const token = AuthService.getAuthToken() ?? cloudConfig.auth?.accessToken;
+      if (!token) {
         logger.info(
           "[CloudSync] Skip state sync: Cloud mode enabled but not logged in",
         );

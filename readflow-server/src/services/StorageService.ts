@@ -593,6 +593,51 @@ export class StorageService {
     return results;
   }
 
+  public async replaceUserFeedsFromClient(userId: string, feeds: any[]): Promise<{ upserted: number; deleted: number }> {
+    // Ensure user exists
+    const user = await prisma.user.findUnique({ where: { uuid: userId } });
+    if (!user) return { upserted: 0, deleted: 0 };
+
+    const desiredUrls = new Set<string>();
+    for (const f of feeds || []) {
+      if (!f || !f.url) continue;
+      const normalizedUrl = this.normalizeUrl(f.url);
+      if (normalizedUrl) desiredUrls.add(normalizedUrl);
+    }
+
+    const upsertedFeeds = await this.upsertFeedsFromClient(
+      userId,
+      Array.from(desiredUrls).map((u) => {
+        const raw = (feeds || []).find((x: any) => this.normalizeUrl(x?.url) === u) || {};
+        return { ...raw, url: u };
+      }),
+    );
+
+    const links = await prisma.userFeed.findMany({
+      where: { userId },
+      include: { source: { select: { id: true, url: true } } },
+    });
+
+    const toDeleteSourceIds: number[] = [];
+    for (const l of links as any[]) {
+      const url = String(l?.source?.url || '');
+      const keep = desiredUrls.has(url);
+      if (!keep && typeof l?.source?.id === 'number') {
+        toDeleteSourceIds.push(l.source.id);
+      }
+    }
+
+    let deleted = 0;
+    if (toDeleteSourceIds.length > 0) {
+      const res = await prisma.userFeed.deleteMany({
+        where: { userId, sourceId: { in: toDeleteSourceIds } },
+      });
+      deleted = res.count || 0;
+    }
+
+    return { upserted: upsertedFeeds.length, deleted };
+  }
+
   public async getPublicFeeds(): Promise<Feed[]> {
     const sources = await prisma.rSSSource.findMany({
       where: { isPublic: true },
@@ -622,6 +667,33 @@ export class StorageService {
       articleCount: s._count?.articles ?? 0,
       subscriberCount: s._count?.users ?? 0,
     }));
+  }
+
+  public async getPublicFeedByUrl(url: string): Promise<Feed | null> {
+    const normalizedUrl = this.normalizeUrl(url);
+    if (!normalizedUrl) return null;
+    const source = await prisma.rSSSource.findFirst({
+      where: { url: normalizedUrl, isPublic: true },
+      include: {
+        _count: { select: { articles: true, users: true } },
+      },
+    });
+    if (!source) return null;
+    return {
+      id: String((source as any).id),
+      url: (source as any).url,
+      name: (source as any).name,
+      category: (source as any).category,
+      description: (source as any).description || undefined,
+      isPublic: (source as any).isPublic,
+      createdAt: (source as any).createdAt,
+      updatedAt: (source as any).updatedAt.toISOString(),
+      refreshIntervalSeconds: (source as any).refreshIntervalSeconds ?? undefined,
+      refreshCron: (source as any).refreshCron ?? undefined,
+      lastRefreshAt: (source as any).lastFetchAt?.toISOString(),
+      articleCount: (source as any)._count?.articles ?? 0,
+      subscriberCount: (source as any)._count?.users ?? 0,
+    } as any;
   }
 
   public async updateFeedRefreshState(feedId: string, data: { lastRefreshAt: string; status: 'ok' | 'error'; error?: string }) {
@@ -1494,6 +1566,11 @@ export class StorageService {
   // Helpers
   private mapDbUserToUser(dbUser: any): User {
     const syncData = (dbUser.syncData as any) || {};
+    const configSync = syncData && typeof syncData === 'object' ? (syncData as any).configSync : undefined;
+    const settingsFromConfigSync =
+      configSync && typeof configSync === 'object' && (configSync as any).settings && typeof (configSync as any).settings === 'object'
+        ? (configSync as any).settings
+        : undefined;
     const nestedSettings = syncData && typeof syncData === 'object' ? syncData.settings : undefined;
     const rootLooksLikeSettings =
       syncData &&
@@ -1501,7 +1578,23 @@ export class StorageService {
       (Object.prototype.hasOwnProperty.call(syncData, 'appSettings') ||
         Object.prototype.hasOwnProperty.call(syncData, 'readingSettings') ||
         Object.prototype.hasOwnProperty.call(syncData, 'sync'));
-    const settings = nestedSettings || (rootLooksLikeSettings ? syncData : undefined);
+    const settingsRaw = settingsFromConfigSync || nestedSettings || (rootLooksLikeSettings ? syncData : undefined);
+    const settings =
+      settingsRaw && typeof settingsRaw === 'object'
+        ? (() => {
+            const cloned: any = { ...(settingsRaw as any) };
+            if (cloned.appSettings && typeof cloned.appSettings === 'object') {
+              cloned.appSettings = { ...cloned.appSettings };
+              if ('sync' in cloned.appSettings) {
+                delete cloned.appSettings.sync;
+              }
+            }
+            if ('sync' in cloned) {
+              delete cloned.sync;
+            }
+            return cloned;
+          })()
+        : settingsRaw;
 
     return {
       id: dbUser.uuid,

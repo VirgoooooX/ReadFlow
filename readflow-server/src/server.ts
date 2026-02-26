@@ -40,7 +40,18 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public'))); // Serve public files
+app.use(
+  express.static(path.join(__dirname, '../public'), {
+    etag: false,
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      const p = String(filePath || '').toLowerCase();
+      if (p.endsWith('.html') || p.endsWith('.js') || p.endsWith('.css')) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    },
+  })
+);
 
 // Logger middleware
 app.use((req, res, next) => {
@@ -145,7 +156,7 @@ const serverTokenMiddleware = (req: express.Request, res: express.Response, next
 
 // Auth Middleware
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (req.path === '/public' || req.path.endsWith('/public')) {
+  if (req.path.startsWith('/public') || req.path === '/validate') {
     return next();
   }
 

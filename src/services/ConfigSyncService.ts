@@ -9,11 +9,13 @@ import GroupService from './RSSGroupService';
 import { filterService } from './rss/FilterService';
 import { vocabularyService } from './VocabularyService';
 import cacheEventEmitter from './CacheEventEmitter';
+import { DatabaseService } from '../database/DatabaseService';
 
 export class ConfigSyncService {
   private static instance: ConfigSyncService;
-  private static readonly LAST_PUSHED_FINGERPRINT_KEY = 'cloud_config_last_pushed_fingerprint_v1';
+  private static readonly LAST_PUSHED_FINGERPRINT_KEY = 'cloud_config_last_pushed_fingerprint_v2';
   private settingsService?: SettingsService;
+  private databaseService = DatabaseService.getInstance();
   private rssService = rssService;
   private groupService = GroupService;
   private filterService = filterService;
@@ -240,6 +242,63 @@ export class ConfigSyncService {
     return headers;
   }
 
+  private async normalizeRssStartupSettingsForPush(exportedSettings: any): Promise<any> {
+    const settings = exportedSettings && typeof exportedSettings === 'object' ? { ...exportedSettings } : {};
+    const startup = (settings as any).rssStartupSettings;
+    if (!startup || typeof startup !== 'object') return settings;
+    const enabled = !!(startup as any).enabled;
+    const sourceIds = Array.isArray((startup as any).sourceIds) ? (startup as any).sourceIds : [];
+    if (sourceIds.length === 0) {
+      (settings as any).rssStartupSettings = { enabled, sourceUrls: [] };
+      return settings;
+    }
+
+    const rows: any[] = await this.databaseService.executeQuery('SELECT id, url FROM rss_sources').catch(() => []);
+    const idToUrl = new Map<number, string>();
+    for (const r of rows) {
+      const id = typeof r?.id === 'number' ? r.id : parseInt(String(r?.id ?? ''), 10);
+      const url = r?.url ? String(r.url) : '';
+      if (Number.isFinite(id) && url) idToUrl.set(id, url);
+    }
+
+    const sourceUrls = sourceIds
+      .map((id: any) => {
+        const num = typeof id === 'number' ? id : parseInt(String(id ?? ''), 10);
+        return idToUrl.get(num);
+      })
+      .filter(Boolean);
+
+    (settings as any).rssStartupSettings = { enabled, sourceUrls };
+    return settings;
+  }
+
+  private async normalizeRssStartupSettingsForPull(remoteSettings: any): Promise<any> {
+    const settings = remoteSettings && typeof remoteSettings === 'object' ? { ...remoteSettings } : {};
+    const startup = (settings as any).rssStartupSettings;
+    if (!startup || typeof startup !== 'object') return settings;
+    const enabled = !!(startup as any).enabled;
+    const sourceUrls = Array.isArray((startup as any).sourceUrls) ? (startup as any).sourceUrls : [];
+    if (sourceUrls.length === 0) {
+      (settings as any).rssStartupSettings = { enabled, sourceIds: [] };
+      return settings;
+    }
+
+    const rows: any[] = await this.databaseService.executeQuery('SELECT id, url FROM rss_sources').catch(() => []);
+    const urlToId = new Map<string, number>();
+    for (const r of rows) {
+      const id = typeof r?.id === 'number' ? r.id : parseInt(String(r?.id ?? ''), 10);
+      const url = r?.url ? String(r.url) : '';
+      if (Number.isFinite(id) && url) urlToId.set(url, id);
+    }
+
+    const sourceIds = sourceUrls
+      .map((u: any) => urlToId.get(String(u || '')))
+      .filter((v: any) => typeof v === 'number' && Number.isFinite(v));
+
+    (settings as any).rssStartupSettings = { enabled, sourceIds };
+    return settings;
+  }
+
   private async pushConfig(): Promise<void> {
     const requestId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     logger.info(`[ConfigSync] Starting push... requestId=${requestId}`);
@@ -250,7 +309,8 @@ export class ConfigSyncService {
       this.filterService.exportRulesForSync(),
     ]);
 
-    const fingerprint = this.computeConfigFingerprint({ settings, sources, groups, filterRules });
+    const settingsForPush = await this.normalizeRssStartupSettingsForPush(settings);
+    const fingerprint = this.computeConfigFingerprint({ settings: settingsForPush, sources, groups, filterRules });
     const lastFingerprint = await this.getLastPushedFingerprint();
     if (lastFingerprint && lastFingerprint === fingerprint) {
       logger.info(`[ConfigSync] Skip push: Config unchanged requestId=${requestId} fingerprint=${fingerprint}`);
@@ -258,7 +318,7 @@ export class ConfigSyncService {
     }
 
     const payload = {
-      settings: this.sanitizeExportedSettingsForConfigSync(settings),
+      settings: this.sanitizeExportedSettingsForConfigSync(settingsForPush),
       sources,
       groups,
       filterRules,
@@ -366,7 +426,8 @@ export class ConfigSyncService {
     }
 
     if (data.settings) {
-      await this.getSettingsService().importSettings(data.settings);
+      const normalizedSettings = await this.normalizeRssStartupSettingsForPull(data.settings);
+      await this.getSettingsService().importSettings(normalizedSettings);
       logger.info('[ConfigSync] Imported settings');
     }
 

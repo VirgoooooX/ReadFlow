@@ -49,56 +49,99 @@ export class RSSService {
         logger.info(`[addRSSSource] 已移除末尾斜杠: ${url} -> ${cleanUrl}`);
       }
 
-      // 1. 验证 RSS 源
-      const feedInfo = await localRSSService.validateRSSFeed(cleanUrl);
+      let resolvedName = '';
+      let resolvedDescription: string | undefined = undefined;
+      let resolvedCategory = category;
 
-      // 🔥 如果验证过程中发生了 URL 变更（例如 HTTPS -> HTTP 降级），使用新的 URL
-      if (feedInfo.url && feedInfo.url !== cleanUrl) {
-        logger.info(`[addRSSSource] URL 更新: ${cleanUrl} -> ${feedInfo.url}`);
-        cleanUrl = feedInfo.url;
+      const publicFeed = await cloudSyncService.lookupPublicFeed(cleanUrl).catch(() => null);
+      if (publicFeed && publicFeed.url) {
+        cleanUrl = String(publicFeed.url);
+        resolvedName = String(publicFeed.name || '');
+        resolvedDescription = publicFeed.description ? String(publicFeed.description) : undefined;
+        resolvedCategory = publicFeed.category ? String(publicFeed.category) : resolvedCategory;
+      } else {
+        const feedInfo = await cloudSyncService.validateFeed(cleanUrl);
+        if (feedInfo.url && feedInfo.url !== cleanUrl) {
+          logger.info(`[addRSSSource] URL 更新: ${cleanUrl} -> ${feedInfo.url}`);
+          cleanUrl = feedInfo.url;
+        }
+        resolvedDescription = feedInfo.description;
+        const titleCandidate = (title || '').trim();
+        if (titleCandidate && titleCandidate !== '未命名RSS源') {
+          resolvedName = titleCandidate;
+        } else {
+          resolvedName = feedInfo.title || 'Unknown Feed';
+        }
       }
 
       // 3. 保存到本地数据库
       const rssSource: Omit<RSSSource, 'id'> = {
         sortOrder: 0,
-        name: title || feedInfo.title || 'Unknown Feed',
+        name: resolvedName || 'Unknown Feed',
         url: cleanUrl,
-        category,
+        category: resolvedCategory,
         contentType,
         sourceMode,
         isActive: true,
         lastFetchAt: new Date(),
         errorCount: 0,
-        description: feedInfo.description,
+        description: resolvedDescription,
         groupId: null, // 新源默认未分组
         fetchLimit,
         retentionLimit,
       };
 
-      const result = await this.databaseService.executeInsert(
-        `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated, fetch_limit, retention_limit) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          rssSource.url,
-          rssSource.name,
-          rssSource.description,
-          rssSource.category,
-          rssSource.contentType,
-          rssSource.sourceMode,
-          rssSource.isActive ? 1 : 0,
-          rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
-          rssSource.fetchLimit,
-          rssSource.retentionLimit,
-        ]
+      const existingRows = await this.databaseService.executeQuery(
+        'SELECT * FROM rss_sources WHERE url = ?',
+        [rssSource.url]
       );
 
-      const newSource: RSSSource = {
-        id: Number(result.insertId),
-        ...rssSource,
-      };
+      let newSource: RSSSource;
+      if (existingRows.length > 0) {
+        const existing = this.mapRSSSourceRow(existingRows[0]);
+        await this.databaseService.executeStatement(
+          `UPDATE rss_sources SET 
+            title = ?, description = ?, category = ?, content_type = ?, 
+            source_mode = ?, is_active = ?, last_updated = ?, fetch_limit = ?, retention_limit = ?
+           WHERE id = ?`,
+          [
+            rssSource.name,
+            rssSource.description,
+            rssSource.category,
+            rssSource.contentType,
+            rssSource.sourceMode,
+            rssSource.isActive ? 1 : 0,
+            rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
+            rssSource.fetchLimit,
+            rssSource.retentionLimit,
+            existing.id,
+          ]
+        );
+        newSource = { ...existing, ...rssSource, id: existing.id, groupId: existing.groupId };
+      } else {
+        const result = await this.databaseService.executeInsert(
+          `INSERT INTO rss_sources (url, title, description, category, content_type, source_mode, is_active, last_updated, fetch_limit, retention_limit) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rssSource.url,
+            rssSource.name,
+            rssSource.description,
+            rssSource.category,
+            rssSource.contentType,
+            rssSource.sourceMode,
+            rssSource.isActive ? 1 : 0,
+            rssSource.lastFetchAt?.toISOString() || new Date().toISOString(),
+            rssSource.fetchLimit,
+            rssSource.retentionLimit,
+          ]
+        );
+        newSource = {
+          id: Number(result.insertId),
+          ...rssSource,
+        };
+      }
 
-      // 4. 获取文章
-      await localRSSService.fetchArticlesWithRetry(newSource, 3);
+      await cloudSyncService.fetchArticlesWithStats(newSource, { triggerRefresh: true });
 
       this.triggerSync();
       return newSource;
@@ -444,7 +487,12 @@ export class RSSService {
     description?: string;
     language?: string;
   }> {
-    return await localRSSService.validateRSSFeed(url);
+    const data = await cloudSyncService.validateFeed(url);
+    return {
+      title: data.title,
+      description: data.description,
+      language: data.language,
+    };
   }
 
   /**

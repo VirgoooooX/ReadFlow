@@ -118,6 +118,21 @@ export class SettingsService {
     return SettingsService.instance;
   }
 
+  private mergeAppSettingsWithDefaults(input: any): AppSettings {
+    const defaults = this.getDefaultAppSettings();
+    const raw = input && typeof input === 'object' ? input : {};
+    return {
+      ...defaults,
+      ...raw,
+      notifications: { ...defaults.notifications, ...(raw as any).notifications },
+      sync: { ...defaults.sync, ...(raw as any).sync },
+      privacy: { ...defaults.privacy, ...(raw as any).privacy },
+      performance: { ...defaults.performance, ...(raw as any).performance },
+      accessibility: { ...defaults.accessibility, ...(raw as any).accessibility },
+      backup: { ...defaults.backup, ...(raw as any).backup },
+    };
+  }
+
   /**
    * 获取阅读设置
    */
@@ -166,7 +181,7 @@ export class SettingsService {
       const stored = await AsyncStorage.getItem(SettingsService.STORAGE_KEYS.APP_SETTINGS);
 
       if (stored) {
-        return JSON.parse(stored);
+        return this.mergeAppSettingsWithDefaults(JSON.parse(stored));
       }
 
       // 返回默认设置
@@ -182,11 +197,12 @@ export class SettingsService {
    */
   public async saveAppSettings(settings: AppSettings): Promise<void> {
     try {
+      const normalized = this.mergeAppSettingsWithDefaults(settings);
       let shouldSchedule = this.cloudSettingsSyncSuppressDepth === 0;
       if (shouldSchedule) {
         try {
           const previous = await this.getAppSettings();
-          if (this.isOnlySyncRuntimeMetaChanged(previous, settings)) {
+          if (this.isOnlySyncRuntimeMetaChanged(previous, normalized)) {
             shouldSchedule = false;
           }
         } catch {
@@ -195,7 +211,7 @@ export class SettingsService {
 
       await AsyncStorage.setItem(
         SettingsService.STORAGE_KEYS.APP_SETTINGS,
-        JSON.stringify(settings)
+        JSON.stringify(normalized)
       );
       if (shouldSchedule) {
         this.scheduleCloudSettingsSync();
@@ -849,7 +865,13 @@ export class SettingsService {
         }
 
         if (data.appSettings) {
-          await this.saveAppSettings(data.appSettings);
+          const local = await this.getAppSettings();
+          const merged: AppSettings = {
+            ...local,
+            ...(data.appSettings as any),
+            sync: local.sync,
+          };
+          await this.saveAppSettings(merged);
         }
       });
 

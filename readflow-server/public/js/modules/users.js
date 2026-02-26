@@ -143,7 +143,16 @@ window.viewUserSettings = async function (id) {
 
     document.getElementById('user-settings-title').textContent = user.username || 'User';
     document.getElementById('user-settings-subtitle').textContent = user.id;
-    document.getElementById('user-settings-json').textContent = JSON.stringify(user.settings || {}, null, 2);
+    const configSync = user?.config?.configSync || null;
+    const merged =
+        configSync && typeof configSync === 'object'
+            ? (() => {
+                const { settings, ...rest } = configSync;
+                const s = settings && typeof settings === 'object' ? settings : {};
+                return { ...rest, ...s };
+            })()
+            : null;
+    document.getElementById('user-settings-json').textContent = JSON.stringify(merged, null, 2);
 
     const meta = document.getElementById('user-settings-meta');
     const item = (label, val) => `

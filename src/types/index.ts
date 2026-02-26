@@ -187,6 +187,7 @@ export interface AppSettings {
     cloudCursors?: Record<string, number>;
     userId?: string;
     lastProfilePushAt?: number;
+    lastProfilePushHash?: string;
     lastStateSyncAt?: number;
     lastVocabSyncAt?: number;
   };

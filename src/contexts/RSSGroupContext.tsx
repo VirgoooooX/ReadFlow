@@ -41,7 +41,7 @@ export const RSSGroupProvider: React.FC<RSSGroupProviderProps> = ({ children }) 
   const [activeGroupId, setActiveGroupId] = useState<number>(VIRTUAL_GROUPS.ALL.id); // 默认显示全部
   const [isLoading, setIsLoading] = useState(false);
   const groupService = RSSGroupService.getInstance();
-  const hasMigrated = useRef(false); // 🚀 迷移只执行一次
+  const hasMigrated = useRef(false);
 
   // 初始化加载分组
   useEffect(() => {
@@ -51,13 +51,7 @@ export const RSSGroupProvider: React.FC<RSSGroupProviderProps> = ({ children }) 
   const loadGroups = async () => {
     try {
       setIsLoading(true);
-      
-      // 🚀 只在首次加载时运行迁移
-      if (!hasMigrated.current) {
-        await groupService.migrateCategoryToGroups();
-        hasMigrated.current = true;
-      }
-      
+      hasMigrated.current = true;
       const allGroups = await groupService.getAllGroups();
       setGroups(allGroups);
     } catch (error) {

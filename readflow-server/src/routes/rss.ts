@@ -638,6 +638,8 @@ router.get('/profile', async (req: Request, res: Response) => {
     }
 
     const feeds = await storageService.getFeedsForUser(userId);
+    const raw = (user.config && typeof user.config === 'object') ? user.config : {};
+    const configSync = (raw as any).configSync;
     res.json({
       ok: true,
       user: {
@@ -648,6 +650,7 @@ router.get('/profile', async (req: Request, res: Response) => {
         lastActive: user.lastActive,
       },
       settings: user.settings ?? null,
+      configSync: configSync || null,
       feeds,
     });
   } catch (error) {
@@ -657,7 +660,7 @@ router.get('/profile', async (req: Request, res: Response) => {
 
 router.post('/clientSync', async (req: Request, res: Response) => {
   try {
-    const { user, settings, feeds } = req.body || {};
+    const { user, settings, feeds, replaceFeeds } = req.body || {};
     if (!user?.id) {
       return res.status(400).json({ error: 'user.id is required' });
     }
@@ -670,9 +673,18 @@ router.post('/clientSync', async (req: Request, res: Response) => {
       settings: settings ?? user.settings,
     });
 
-    const savedFeeds = Array.isArray(feeds) ? await storageService.upsertFeedsFromClient(savedUser.id, feeds) : [];
+    let savedFeedsCount = 0;
+    if (Array.isArray(feeds)) {
+      if (replaceFeeds === true) {
+        const result = await storageService.replaceUserFeedsFromClient(savedUser.id, feeds);
+        savedFeedsCount = result.upserted;
+      } else {
+        const savedFeeds = await storageService.upsertFeedsFromClient(savedUser.id, feeds);
+        savedFeedsCount = savedFeeds.length;
+      }
+    }
 
-    res.json({ ok: true, user: savedUser, feeds: savedFeeds.length });
+    res.json({ ok: true, user: savedUser, feeds: savedFeedsCount });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -925,6 +937,15 @@ router.post('/sync/config', async (req: Request, res: Response) => {
       config: { configSync: nextConfigSync }
     });
 
+    try {
+      if (Array.isArray((nextConfigSync as any).sources)) {
+        const result = await storageService.replaceUserFeedsFromClient(userId, (nextConfigSync as any).sources);
+        logger.info(`[SyncConfig] Reconciled user feeds userId=${userId} upserted=${result.upserted} deleted=${result.deleted}`);
+      }
+    } catch (e) {
+      logger.warn(`[SyncConfig] Reconcile user feeds failed userId=${userId}:`, e);
+    }
+
     const updatedUser = await storageService.getUserById(userId);
     const persistedRaw = (updatedUser?.config && typeof updatedUser.config === 'object') ? updatedUser.config : {};
     const persistedConfigSync = (persistedRaw as any).configSync;
@@ -946,6 +967,20 @@ router.get('/public', async (req: Request, res: Response) => {
     res.json({ ok: true, feeds });
   } catch (error) {
     logger.error('[PublicFeeds] GET failed:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+router.get('/public/lookup', async (req: Request, res: Response) => {
+  try {
+    const url = req.query.url as string;
+    if (!url) {
+      return res.status(400).json({ ok: false, error: 'URL is required' });
+    }
+    const feed = await storageService.getPublicFeedByUrl(url);
+    res.json({ ok: true, feed });
+  } catch (error) {
+    logger.error('[PublicFeeds] LOOKUP failed:', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });

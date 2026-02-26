@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ScrollView,
 } from 'react-native';
@@ -34,11 +35,8 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <TouchableOpacity 
-        style={styles.overlay} 
-        activeOpacity={1} 
-        onPress={onClose}
-      >
+      <View style={styles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.modalContainer}>
           <View style={styles.header}>
             <Text style={styles.title}>选择目标分组</Text>
@@ -75,7 +73,7 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
             ))}
           </ScrollView>
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 };

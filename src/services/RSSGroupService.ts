@@ -422,13 +422,19 @@ export class RSSGroupService {
             [group.icon || null, group.color || null, group.sortOrder, Date.now(), id]
           );
         } else {
-          // Insert
-          await this.createGroup({
-            name: group.name,
-            icon: group.icon,
-            color: group.color,
-            sortOrder: group.sortOrder,
-          });
+          const now = Date.now();
+          await this.dbService.executeInsert(
+            `INSERT INTO rss_groups (name, icon, color, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              group.name,
+              group.icon || null,
+              group.color || null,
+              group.sortOrder,
+              now,
+              now,
+            ]
+          );
         }
       }
 
