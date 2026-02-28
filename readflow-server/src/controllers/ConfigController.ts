@@ -138,6 +138,7 @@ export class ConfigController {
                 url: f.source.url,
                 name: f.customName || f.source.name,
                 category: f.customCategory || f.source.category,
+                description: f.source.description || null,
                 groupId: f.groupId,
                 groupName: f.group?.name || null,
             }));
@@ -157,7 +158,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const { url, name, category, groupId, groupName } = req.body;
+            const { url, name, category, description, groupId, groupName } = req.body;
             let effectiveGroupId =
                 typeof groupId === 'number'
                     ? groupId
@@ -175,9 +176,20 @@ export class ConfigController {
             // Find or create global source first
             let source = await prisma.rSSSource.findUnique({ where: { url } });
             if (!source) {
+                const desc = typeof description === 'string' ? description.trim() : '';
                 source = await prisma.rSSSource.create({
-                    data: { url, name: name || 'Unknown' }
+                    data: {
+                        url,
+                        name: name || 'Unknown',
+                        category: category || 'General',
+                        description: desc || null,
+                    }
                 });
+            } else {
+                const desc = typeof description === 'string' ? description.trim() : '';
+                if (desc && !String((source as any).description || '').trim()) {
+                    await prisma.rSSSource.update({ where: { id: source.id }, data: { description: desc } });
+                }
             }
 
             const userFeed = await (prisma as any).userFeed.upsert({
@@ -291,7 +303,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const sources = req.body; // Array of { url, name, category, groupId?, groupName? }
+            const sources = req.body; // Array of { url, name, category, description, groupId?, groupName? }
 
             if (!Array.isArray(sources)) return res.status(400).json({ success: false, message: 'Body must be an array' });
 
@@ -327,9 +339,20 @@ export class ConfigController {
 
                 let source = await prisma.rSSSource.findUnique({ where: { url } });
                 if (!source) {
+                    const desc = typeof s?.description === 'string' ? String(s.description).trim() : '';
                     source = await prisma.rSSSource.create({
-                        data: { url, name: s.name || 'Unknown' }
+                        data: {
+                            url,
+                            name: s.name || 'Unknown',
+                            category: s.category || 'General',
+                            description: desc || null,
+                        }
                     });
+                } else {
+                    const desc = typeof s?.description === 'string' ? String(s.description).trim() : '';
+                    if (desc && !String((source as any).description || '').trim()) {
+                        await prisma.rSSSource.update({ where: { id: source.id }, data: { description: desc } });
+                    }
                 }
                 const uf = await (prisma as any).userFeed.upsert({
                     where: { userId_sourceId: { userId: userUuid, sourceId: source.id } },

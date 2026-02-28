@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -43,6 +43,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "chore: 更新版本号至3.0.0并更新changelog",
     "feat: 新增RSS分组管理功能并优化UI交互",
     "feat: 将LLM能力迁移至服务端统一配置并完善云同步功能",
     "feat: 改进云同步与配置管理",
@@ -61,7 +62,6 @@
     "feat(图片代理): 增加图片转码开关配置",
     "feat(rss): 为RSS解析服务添加视频URL支持",
     "ci: 调整发布流程并分离服务器与安卓应用构建触发",
-    "chore: 更新应用和服务器版本号至7.0.2和1.2.3",
-    "chore: 更新版本号至1.2.2并修改发布脚本"
+    "chore: 更新应用和服务器版本号至7.0.2和1.2.3"
   ]
 }

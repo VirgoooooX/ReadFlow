@@ -822,6 +822,20 @@ END $$;
       if (!f.url) continue;
       const normalizedUrl = this.normalizeUrl(f.url);
 
+      const incomingDescriptionRaw = typeof f.description === 'string' ? f.description.trim() : '';
+      if (incomingDescriptionRaw) {
+        const existingDesc = await prisma.rSSSource.findUnique({
+          where: { url: normalizedUrl },
+          select: { id: true, description: true },
+        });
+        if (existingDesc?.id && !String(existingDesc.description || '').trim()) {
+          await prisma.rSSSource.update({
+            where: { id: existingDesc.id },
+            data: { description: incomingDescriptionRaw },
+          });
+        }
+      }
+
       // Upsert Source (Global Pool)
       const source = await prisma.rSSSource.upsert({
         where: { url: normalizedUrl },
@@ -833,7 +847,7 @@ END $$;
           url: normalizedUrl,
           name: f.name || normalizedUrl,
           category: f.category || 'General',
-          description: f.description || null,
+          description: incomingDescriptionRaw || null,
           isPublic: false, // Default to false for user-added sources
         }
       });
