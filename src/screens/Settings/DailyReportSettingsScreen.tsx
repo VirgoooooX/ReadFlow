@@ -18,6 +18,8 @@ import { useNavigation } from '@react-navigation/native';
 import { SettingsService } from '../../services/SettingsService';
 import { RSSGroupService } from '../../services/RSSGroupService';
 import { dailyReportApiService } from '../../services/DailyReportApiService';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { UserStackParamList } from '../../navigation/types';
 
 const TIME_PRESETS = [
     '06:00', '07:00', '08:00', '09:00', '12:00', '18:00', '22:00',
@@ -25,7 +27,7 @@ const TIME_PRESETS = [
 
 const DailyReportSettingsScreen: React.FC = () => {
     const { theme } = useThemeContext();
-    const navigation = useNavigation();
+    const navigation = useNavigation<NativeStackNavigationProp<UserStackParamList>>();
     const settingsService = SettingsService.getInstance();
 
     const [enabled, setEnabled] = useState(true);

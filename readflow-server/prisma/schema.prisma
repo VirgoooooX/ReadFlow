@@ -11,55 +11,87 @@ datasource db {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
+  id   Int    @id @default(autoincrement())
   // Use a string ID for compatibility with existing UUIDs if possible, 
   // or map existing UUIDs to this if we stick to Int. 
   // Given current system uses string UUIDs (simpleHash or nanoid), let's use String @id.
   // Actually, StorageService.ts uses string IDs. Let's keep String to minimize friction.
-  uuid          String    @unique @default(uuid()) // Internal UUID
-  
+  uuid String @unique @default(uuid()) // Internal UUID
+
   // Existing fields
-  username      String
-  email         String?   @unique
-  passwordHash  String?
-  registeredAt  DateTime  @default(now())
-  lastActive    DateTime  @default(now())
-  
-  // JSONB for Config Sync (Settings, Groups, etc.)
-  syncData      Json?     @db.JsonB
-  
+  username     String
+  email        String?  @unique
+  passwordHash String?
+  registeredAt DateTime @default(now())
+  lastActive   DateTime @default(now())
+
   // Relations
-  feeds         UserFeed[]
-  articleStates UserArticleState[]
-  sourceCursors UserSourceCursor[]
+  feeds          UserFeed[]
+  groups         UserRSSGroup[]
+  filterRules    UserFilterRule[]
+  articleStates  UserArticleState[]
+  sourceCursors  UserSourceCursor[]
   syncDeliveries SyncDelivery[]
+  preferences    UserPreference?
+  llmKeys        UserLLMKey[]
+  llmUsageEvents LLMUsageEvent[]
 
   @@map("users")
 }
 
+model UserRSSGroup {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  feeds UserFeed[]
+
+  @@unique([userId, name])
+  @@map("user_rss_groups")
+}
+
+model UserFilterRule {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  type      String   // e.g. "keyword", "title", "content"
+  pattern   String
+  action    String   // e.g. "hide", "highlight"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+
+  @@map("user_filter_rules")
+}
+
 model RSSSource {
-  id          Int      @id @default(autoincrement())
-  url         String   @unique
+  id          Int     @id @default(autoincrement())
+  url         String  @unique
   name        String
-  category    String   @default("General")
-  description String?  @db.Text
-  
+  category    String  @default("General")
+  description String? @db.Text
+
   // Status
-  isActive    Boolean  @default(true)
-  isPublic    Boolean  @default(false)
-  lastFetchAt DateTime?
+  isActive               Boolean   @default(true)
+  isPublic               Boolean   @default(false)
+  lastFetchAt            DateTime?
   refreshIntervalSeconds Int? // Custom refresh interval
-  refreshCron String?
-  errorCount  Int      @default(0)
-  lastErrorMessage String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  refreshCron            String?
+  errorCount             Int       @default(0)
+  lastErrorMessage       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  articles    Article[]
-  users       UserFeed[]
-  userCursors UserSourceCursor[]
+  articles       Article[]
+  users          UserFeed[]
+  userCursors    UserSourceCursor[]
   syncDeliveries SyncDelivery[]
 
   @@map("rss_sources")
@@ -74,58 +106,60 @@ model Article {
   author      String?
   publishedAt DateTime
   imageUrl    String?
-  
-  // Relations
-  sourceId    Int
-  source      RSSSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  
-  // User states are separate
-  userStates  UserArticleState[]
-  
-  // New fields for stats
-  wordCount   Int      @default(0)
-  readingTime Int      @default(0)
 
-  createdAt   DateTime @default(now())
-  
+  // Relations
+  sourceId Int
+  source   RSSSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  // User states are separate
+  userStates UserArticleState[]
+
+  // New fields for stats
+  wordCount   Int @default(0)
+  readingTime Int @default(0)
+
+  createdAt DateTime @default(now())
+
   @@index([publishedAt])
   @@index([sourceId])
   @@map("articles")
 }
 
 model UserFeed {
-  userId          String
-  sourceId        Int
-  
-  customName      String?
-  customCategory  String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  user        User      @relation(fields: [userId], references: [uuid], onDelete: Cascade)
-  source      RSSSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  userId   String
+  sourceId Int
+  groupId  Int?
+
+  customName     String?
+  customCategory String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User          @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  source RSSSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  group  UserRSSGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   @@id([userId, sourceId])
   @@map("user_feeds")
 }
 
 model UserArticleState {
-  id           Int      @id @default(autoincrement())
-  userId       String
-  articleUrl   String   // Link by URL to avoid strict FK constraint if article is deleted but state kept? 
-                        // Better to link by FK to Article.id if possible, but existing system uses URL.
-                        // Let's use Article FK for integrity.
-  articleId    Int
-  
-  isRead       Boolean  @default(false)
-  isFavorite   Boolean  @default(false)
-  readProgress Int      @default(0)
-  
-  updatedAt    DateTime @updatedAt
-  
-  user         User     @relation(fields: [userId], references: [uuid], onDelete: Cascade)
-  article      Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id         Int    @id @default(autoincrement())
+  userId     String
+  articleUrl String // Link by URL to avoid strict FK constraint if article is deleted but state kept? 
+  // Better to link by FK to Article.id if possible, but existing system uses URL.
+  // Let's use Article FK for integrity.
+  articleId  Int
+
+  isRead       Boolean @default(false)
+  isFavorite   Boolean @default(false)
+  readProgress Int     @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, articleId])
   @@map("user_article_states")
@@ -145,13 +179,56 @@ model UserSourceCursor {
   @@map("user_source_cursors")
 }
 
+model UserPreference {
+  userId        String    @id
+  
+  // Settings/Preferences Payload (Theme, Font, Daily Report Settings, etc)
+  // Kept as JSONB for flexible UI options, but separate from massive LLM keys and feeds
+  settings      Json?     @db.JsonB
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UserLLMKey {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  // e.g. "default", "translation", "dictionary", etc.
+  profileId       String
+  name            String
+  provider        String
+  model           String
+  
+  // Encrypted DB Field
+  encryptedApiKey String   @db.Text
+  
+  baseUrl         String
+  temperature     Float    @default(0.7)
+  maxTokens       Int      @default(2048)
+  topP            Float    @default(1.0)
+  isActive        Boolean  @default(true)
+  customModelName String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@map("user_llm_keys")
+}
+
 model SyncDelivery {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   userId          String
   sourceId        Int
   fromExclusiveId Int
   toInclusiveId   Int
-  createdAt       DateTime @default(now())
+  createdAt       DateTime  @default(now())
   ackedAt         DateTime?
 
   user   User      @relation(fields: [userId], references: [uuid], onDelete: Cascade)
@@ -162,31 +239,31 @@ model SyncDelivery {
 }
 
 model Vocabulary {
-  id              Int      @id @default(autoincrement())
-  word            String   @unique
-  definition      Json?    @db.JsonB
+  id              Int     @id @default(autoincrement())
+  word            String  @unique
+  definition      Json?   @db.JsonB
   context         String?
   articleId       Int?
-  sourceArticleId Int?     // Optional link to source article ID if known
-  
+  sourceArticleId Int? // Optional link to source article ID if known
+
   // SRS Stats
-  reviewCount     Int      @default(0)
-  correctCount    Int      @default(0)
-  masteryLevel    Int      @default(0)
-  difficulty      String   @default("medium")
-  
+  reviewCount  Int    @default(0)
+  correctCount Int    @default(0)
+  masteryLevel Int    @default(0)
+  difficulty   String @default("medium")
+
   // Timestamps
-  addedAt         DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  lastReviewedAt  DateTime?
-  nextReviewAt    DateTime @default(now())
-  
+  addedAt        DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastReviewedAt DateTime?
+  nextReviewAt   DateTime  @default(now())
+
   // Meta
-  tags            Json?    @db.JsonB
-  notes           String?
-  
+  tags  Json?   @db.JsonB
+  notes String?
+
   // Soft Delete
-  isDeleted       Boolean  @default(false)
+  isDeleted Boolean @default(false)
 
   @@map("vocabulary")
 }
@@ -211,12 +288,12 @@ model LegacySyncBlockStore {
 
 model DailyReport {
   id           Int      @id @default(autoincrement())
-  userId       String                 // 关联用户 ID (对应 User.uuid)
-  title        String                 // 日报标题
-  content      String   @db.Text      // LLM 生成的 Markdown 摘要
-  sourceUrls   Json     @db.JsonB     // 参与总结的文章 URL 列表
-  articleCount Int                    // 总结的文章数量
-  groupNames   Json     @db.JsonB     // 使用的分组名称
+  userId       String // 关联用户 ID (对应 User.uuid)
+  title        String // 日报标题
+  content      String   @db.Text // LLM 生成的 Markdown 摘要
+  sourceUrls   Json     @db.JsonB // 参与总结的文章 URL 列表
+  articleCount Int // 总结的文章数量
+  groupNames   Json     @db.JsonB // 使用的分组名称
   generatedBy  String   @default("auto") // 生成方式: "auto" | "manual"
   isRead       Boolean  @default(false) // 是否已读
   generatedAt  DateTime @default(now())
@@ -224,4 +301,32 @@ model DailyReport {
 
   @@index([userId, generatedAt])
   @@map("daily_reports")
+}
+
+model LLMUsageEvent {
+  id              String   @id @default(uuid())
+  userId          String
+  requestId       String?
+  feature         String
+  status          String
+  provider        String?
+  model           String?
+  profileId       String?
+  cacheKey        String?
+  cacheHit        Boolean  @default(false)
+  durationMs      Int
+  tokensTotal     Int?
+  tokensPrompt    Int?
+  tokensCompletion Int?
+  httpStatus      Int?
+  errorType       String?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([feature, createdAt])
+  @@index([status, createdAt])
+  @@map("llm_usage_events")
 }

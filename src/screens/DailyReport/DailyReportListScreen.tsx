@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { UserStackParamList } from '../../navigation/types';
 import { dailyReportApiService, DailyReportSummary } from '../../services/DailyReportApiService';
 import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
+import { SettingItem } from '../../components/ui';
 
 type NavigationProp = NativeStackNavigationProp<UserStackParamList, 'DailyReportList'>;
 
@@ -83,6 +84,18 @@ const DailyReportListScreen: React.FC = () => {
         }
     };
 
+    const renderHeader = () => (
+        <View style={styles.headerContainer}>
+            <SettingItem
+                icon="settings"
+                label="AI 日报设置"
+                onPress={() => navigation.navigate('DailyReportSettings')}
+                color={theme.colors.primary}
+                isLast
+            />
+        </View>
+    );
+
 
 
     const renderItem = ({ item }: { item: DailyReportSummary }) => {
@@ -135,7 +148,7 @@ const DailyReportListScreen: React.FC = () => {
 
     return (
         <ScreenWithCustomHeader
-            title="AI 日报历史"
+            title="AI 日报"
             showBackButton={true}
             rightComponent={
                 <TouchableOpacity onPress={handleGenerate} disabled={generating} style={{ padding: 4 }}>
@@ -152,6 +165,7 @@ const DailyReportListScreen: React.FC = () => {
                     data={reports}
                     keyExtractor={item => String(item.id)}
                     renderItem={renderItem}
+                    ListHeaderComponent={renderHeader}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.primary} />
@@ -184,6 +198,7 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     listContent: { paddingVertical: 8 },
+    headerContainer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
     reportItem: {
         marginHorizontal: 16,
         marginVertical: 4,

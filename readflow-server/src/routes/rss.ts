@@ -12,405 +12,7 @@ import { dailyReportService } from '../services/DailyReportService';
 
 const router = express.Router();
 
-let refreshTimer: NodeJS.Timeout | null = null;
-let refreshRunning = false;
-const refreshingFeedIds = new Set<string>();
-const syncModeCounters = { serverCursor: 0, legacy: 0 };
-let lastSyncModeLogAt = 0;
-
-const warmUpQueueLimit = pLimit(3);
-const warmUpRecent = new Map<string, number>();
-const WARMUP_RECENT_TTL_MS = 30 * 60_000;
-const warmUpPending = new Set<string>();
-let warmUpWorkerRunning = false;
-const WARMUP_PENDING_MAX = 2000;
-let warmUpDropped = 0;
-
-async function runWarmUpWorker() {
-  if (warmUpWorkerRunning) return;
-  warmUpWorkerRunning = true;
-  try {
-    let processed = 0;
-    while (warmUpPending.size > 0) {
-      const batch: string[] = [];
-      for (const u of warmUpPending) {
-        batch.push(u);
-        if (batch.length >= 50) break;
-      }
-      for (const u of batch) warmUpPending.delete(u);
-
-      const tasks = batch.map(u =>
-        warmUpQueueLimit(async () => {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 10_000);
-          try {
-            const resp = await fetch(u, { signal: controller.signal } as any);
-            if (resp?.body) {
-              (resp.body as any).resume?.();
-              await finished(resp.body as any);
-            }
-          } catch {
-          } finally {
-            clearTimeout(timer);
-          }
-        })
-      );
-      await Promise.all(tasks);
-      processed += batch.length;
-    }
-    if (processed > 0) {
-      logger.info(`[Pre-warm] Completed for ${processed} images`);
-    }
-    if (warmUpDropped > 0) {
-      logger.warn(`[Pre-warm] Dropped ${warmUpDropped} images due to backlog cap`);
-      warmUpDropped = 0;
-    }
-  } finally {
-    warmUpWorkerRunning = false;
-  }
-}
-
-function redactForLog(input: any, depth: number = 0): any {
-  if (depth > 8) return '[Truncated]';
-  if (input === null || input === undefined) return input;
-  if (typeof input !== 'object') return input;
-  if (Array.isArray(input)) return input.map(v => redactForLog(v, depth + 1));
-
-  const out: any = {};
-  for (const [k, v] of Object.entries(input)) {
-    const keyLower = String(k).toLowerCase();
-    const isSensitive =
-      keyLower !== 'keyword' &&
-      (keyLower.includes('apikey') ||
-        keyLower === 'token' ||
-        keyLower.endsWith('token') ||
-        keyLower.includes('password') ||
-        keyLower.includes('secret') ||
-        keyLower.includes('accesskey'));
-    out[k] = isSensitive ? '***' : redactForLog(v, depth + 1);
-  }
-  return out;
-}
-
-function safeJsonForLog(value: any, maxLen: number = 12000): string {
-  try {
-    const str = JSON.stringify(redactForLog(value));
-    if (str.length > maxLen) return `${str.slice(0, maxLen)}...[Truncated ${str.length - maxLen} chars]`;
-    return str;
-  } catch {
-    return '[Unserializable]';
-  }
-}
-
-function logConfigSyncSnapshot(userId: string, label: string, snapshot: any) {
-  const updatedAt = snapshot?.updatedAt ? String(snapshot.updatedAt) : '';
-  const sourcesCount = Array.isArray(snapshot?.sources) ? snapshot.sources.length : 0;
-  const groupsCount = Array.isArray(snapshot?.groups) ? snapshot.groups.length : 0;
-  const filterRulesCount = Array.isArray(snapshot?.filterRules) ? snapshot.filterRules.length : 0;
-  const hasSettings = !!snapshot?.settings;
-
-  logger.info(
-    `[SyncConfig] ${label} summary userId=${userId} updatedAt=${updatedAt} hasSettings=${hasSettings} sources=${sourcesCount} groups=${groupsCount} filterRules=${filterRulesCount}`
-  );
-  logger.info(`[SyncConfig] ${label} full userId=${userId}: ${safeJsonForLog(snapshot)}`);
-}
-
-function coerceBool(val: unknown): boolean {
-  if (val === true) return true;
-  if (val === false) return false;
-  if (typeof val !== 'string') return false;
-  return val === '1' || val.toLowerCase() === 'true';
-}
-
-function applyProxyToArticle(
-  article: any,
-  baseUrl: string,
-  imageCompression: boolean,
-  imageQuality: number
-) {
-  const content = proxyImages(article.content || '', baseUrl, imageCompression, imageQuality);
-  let imageUrl = article.imageUrl;
-  if (imageUrl && needsProxy(imageUrl, baseUrl, imageCompression)) {
-    imageUrl = getProxyUrl(imageUrl, baseUrl, imageCompression, imageQuality);
-  }
-  return { ...article, content, imageUrl };
-}
-
-function isXchuxingVideoUrl(value: unknown): boolean {
-  if (!value || typeof value !== 'string') return false;
-  try {
-    const urlObj = new URL(value);
-    return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/video/');
-  } catch {
-    return false;
-  }
-}
-
-async function enrichBlocksWithVideoUrls(blocks: any[]) {
-  const limit = pLimit(3);
-  const tasks: Array<Promise<void>> = [];
-  for (const block of blocks) {
-    const upserts = Array.isArray(block?.upserts) ? block.upserts : [];
-    for (const a of upserts) {
-      if (!isXchuxingVideoUrl(a?.url)) continue;
-      if (typeof a?.videoUrl === 'string' && a.videoUrl.trim()) continue;
-      tasks.push(limit(async () => {
-        const videoUrl = await rssParserService.resolveVideoUrl(String(a.url));
-        if (videoUrl) {
-          a.videoUrl = videoUrl;
-        }
-      }));
-    }
-  }
-  if (tasks.length) {
-    await Promise.all(tasks);
-  }
-}
-
-/**
- * Pre-warm images for a list of articles (background task)
- * Extracts first 2 images from latest 5 articles and requests them from local proxy
- */
-async function warmUpImages(articles: Omit<Article, 'id'>[], baseUrl: string = 'http://localhost:3000') {
-  if (!articles || articles.length === 0) return;
-
-  const settings = storageService.getSettings();
-  const envEnabled = process.env.IMAGE_WARMUP_ENABLED;
-  const enabled =
-    envEnabled === undefined
-      ? settings.imageWarmupEnabled !== false
-      : envEnabled === '1' || envEnabled.toLowerCase() === 'true';
-  if (!enabled) return;
-
-  const imageCompression = true; // Always warm up compressed version
-  const imageQuality = settings.imageQuality ?? 80;
-
-  // Process latest 5 articles
-  const candidates = articles.slice(0, 5);
-  const urlsToWarm = new Set<string>();
-
-  for (const article of candidates) {
-    let count = 0;
-
-    // 1. Cover image
-    if (article.imageUrl && needsProxy(article.imageUrl, baseUrl, imageCompression)) {
-      urlsToWarm.add(article.imageUrl);
-      count++;
-    }
-
-    // 2. Images in content (up to 2 total per article)
-    if (article.content) {
-      const imgRegex = /<img[^>]*\ssrc=["']([^"']+)["']/gi;
-      let match;
-      while ((match = imgRegex.exec(article.content)) !== null) {
-        if (count >= 2) break;
-        const src = match[1];
-        if (src && needsProxy(src, baseUrl, imageCompression)) {
-          urlsToWarm.add(src);
-          count++;
-        }
-      }
-    }
-  }
-
-  if (urlsToWarm.size === 0) return;
-
-  logger.info(`[Pre-warm] Warming up ${urlsToWarm.size} images...`);
-
-  // Fire requests asynchronously (concurrency limit: 3)
-  const urls = Array.from(urlsToWarm);
-  const chunkParams: any[] = [];
-
-  for (const url of urls) {
-    const proxyUrl = getProxyUrl(url, baseUrl, imageCompression, imageQuality);
-    if (proxyUrl.startsWith(baseUrl)) {
-      chunkParams.push(proxyUrl);
-    }
-  }
-
-  const now = Date.now();
-  const toWarm: string[] = [];
-  for (const u of chunkParams) {
-    const last = warmUpRecent.get(u);
-    if (last && now - last < WARMUP_RECENT_TTL_MS) continue;
-    warmUpRecent.set(u, now);
-    toWarm.push(u);
-  }
-
-  if (toWarm.length === 0) return;
-
-  if (warmUpRecent.size > 5000) {
-    const pruneBefore = Date.now() - WARMUP_RECENT_TTL_MS;
-    for (const [k, v] of warmUpRecent.entries()) {
-      if (v < pruneBefore) warmUpRecent.delete(k);
-    }
-  }
-
-  for (const u of toWarm) {
-    if (warmUpPending.has(u)) continue;
-    if (warmUpPending.size >= WARMUP_PENDING_MAX) {
-      warmUpDropped += 1;
-      continue;
-    }
-    warmUpPending.add(u);
-  }
-  void runWarmUpWorker();
-}
-
-async function refreshAllFeedsOnce() {
-  if (refreshRunning) return;
-  refreshRunning = true;
-  try {
-    const feeds = await storageService.getFeedsLight();
-    if (!feeds || feeds.length === 0) return;
-
-    const nowDate = new Date();
-    const now = nowDate.getTime();
-    const settings = storageService.getSettings();
-    const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
-    const globalCron = settings.rssDefaultRefreshCron;
-
-    for (const feed of feeds) {
-      if (!feed?.url) continue;
-      try {
-        let cronExpr = feed.refreshCron;
-        if (cronExpr) cronExpr = String(cronExpr).trim();
-        if (!cronExpr) cronExpr = globalCron ? String(globalCron).trim() : undefined;
-
-        if (cronExpr) {
-          try {
-            const base = feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : new Date(0);
-            const interval = cronParser.parseExpression(cronExpr, { currentDate: base });
-            const next = interval.next().toDate();
-            if (next.getTime() > now) continue;
-          } catch (e) {
-            logger.warn(`[RSS Refresh] Invalid cron for ${feed.url}: ${cronExpr}`);
-            cronExpr = undefined;
-          }
-        }
-
-        if (!cronExpr) {
-          const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
-          if (intervalSeconds <= 0) continue;
-
-          const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
-          if (last && now - last < intervalSeconds * 1000) continue;
-        }
-        if (refreshingFeedIds.has(feed.id)) continue;
-        refreshingFeedIds.add(feed.id);
-
-        const source: RSSSource = {
-          id: 0,
-          url: feed.url,
-          name: feed.name || 'Feed',
-          sortOrder: 0,
-          category: feed.category || 'General',
-          contentType: 'image_text',
-          isActive: true,
-          errorCount: 0,
-          groupId: null,
-          maxArticles: settings.rssMaxItemsPerFetch ?? 20,
-        };
-
-        const startedAtIso = new Date().toISOString();
-        const articles = await rssParserService.fetchAndParseArticles(
-          source,
-          [],
-          undefined,
-          true,
-          settings.imageQuality ?? 80,
-          false,
-          settings.rssFetchTimeoutMs
-        );
-        const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
-
-        await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: startedAtIso, status: 'ok' });
-
-        logger.info(`[RSS Refresh] ${feed.name || feed.url} ok upserts=${result.upsertsCount} latest=${result.latestBlockId}`);
-
-        // 🔥 Trigger image pre-warming (local loopback)
-        // Assume default port 3000 if env not set
-        const port = process.env.PORT || 3000;
-        warmUpImages(articles, `http://localhost:${port}`);
-
-      } catch (error) {
-        const atIso = new Date().toISOString();
-        await storageService.updateFeedRefreshState(feed.id, {
-          lastRefreshAt: atIso,
-          status: 'error',
-          error: (error as Error)?.message || String(error),
-        });
-        logger.error(`[RSS Refresh] Failed for ${feed.url}:`, error);
-      } finally {
-        refreshingFeedIds.delete(feed.id);
-      }
-    }
-  } finally {
-    refreshRunning = false;
-  }
-}
-
-export function startRssAutoRefresh() {
-  if (refreshTimer) return;
-  const scheduleNext = async () => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
-      refreshTimer = null;
-    }
-
-    let delayMs = 60_000;
-    try {
-      const feeds = await storageService.getFeedsLight();
-      const settings = storageService.getSettings();
-      const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
-      const globalCron = settings.rssDefaultRefreshCron ? String(settings.rssDefaultRefreshCron).trim() : undefined;
-      const now = Date.now();
-
-      let nextAt = now + delayMs;
-      for (const feed of feeds) {
-        if (!feed?.url) continue;
-
-        let cronExpr = feed.refreshCron;
-        if (cronExpr) cronExpr = String(cronExpr).trim();
-        if (!cronExpr) cronExpr = globalCron;
-
-        if (cronExpr) {
-          try {
-            const base = feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : new Date(0);
-            const interval = cronParser.parseExpression(cronExpr, { currentDate: base });
-            const next = interval.next().toDate().getTime();
-            nextAt = Math.min(nextAt, next);
-            continue;
-          } catch {
-            cronExpr = undefined;
-          }
-        }
-
-        const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
-        if (intervalSeconds <= 0) continue;
-        const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
-        const candidate = last ? last + intervalSeconds * 1000 : now;
-        nextAt = Math.min(nextAt, candidate);
-      }
-
-      delayMs = Math.max(0, nextAt - now);
-      if (!Number.isFinite(delayMs)) delayMs = 60_000;
-      delayMs = Math.min(delayMs, 60 * 60 * 1000);
-    } catch {
-      delayMs = 60_000;
-    }
-
-    refreshTimer = setTimeout(() => {
-      refreshAllFeedsOnce()
-        .catch(() => { })
-        .finally(() => {
-          scheduleNext().catch(() => { });
-        });
-    }, delayMs);
-  };
-
-  scheduleNext().catch(() => { });
-}
+import { rssFetchService } from '../services/RssFetchService';
 
 // GET /api/rss?url=...
 router.get('/', async (req: Request, res: Response) => {
@@ -446,7 +48,8 @@ router.get('/', async (req: Request, res: Response) => {
       imageCompression,
       imageQuality,
       true,
-      settings.rssFetchTimeoutMs
+      settings.rssFetchTimeoutMs,
+      settings.rssFulltextTimeoutMs
     );
     res.json(articles);
   } catch (error) {
@@ -461,7 +64,7 @@ router.get('/sync', async (req: Request, res: Response) => {
     const since = req.query.since ? parseInt(req.query.since as string) : 0;
     const maxBlocks = req.query.maxBlocks ? parseInt(req.query.maxBlocks as string) : 20;
     const limitRaw = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-    const imageCompression = coerceBool(req.query.imageCompression);
+    const imageCompression = rssFetchService.coerceBool(req.query.imageCompression);
     const settings = storageService.getSettings();
     const imageQuality = settings.imageQuality ?? 80;
 
@@ -480,7 +83,7 @@ router.get('/sync', async (req: Request, res: Response) => {
     );
     logger.request(
       '[RSS Sync] request',
-      safeJsonForLog({
+      rssFetchService.safeJsonForLog({
         url,
         mode,
         since,
@@ -492,19 +95,19 @@ router.get('/sync', async (req: Request, res: Response) => {
     );
 
     if (mode === 'serverCursor') {
-      syncModeCounters.serverCursor += 1;
+      rssFetchService.syncModeCounters.serverCursor += 1;
       {
-        const total = syncModeCounters.serverCursor + syncModeCounters.legacy;
+        const total = rssFetchService.syncModeCounters.serverCursor + rssFetchService.syncModeCounters.legacy;
         const now = Date.now();
-        if ((total > 0 && total % 50 === 0) || now - lastSyncModeLogAt > 10 * 60 * 1000) {
-          lastSyncModeLogAt = now;
+        if ((total > 0 && total % 50 === 0) || now - rssFetchService.lastSyncModeLogAt > 10 * 60 * 1000) {
+          rssFetchService.lastSyncModeLogAt = now;
           logger.system(
             '[RSS Sync] mode stats',
-            safeJsonForLog({
+            rssFetchService.safeJsonForLog({
               total,
-              serverCursor: syncModeCounters.serverCursor,
-              legacy: syncModeCounters.legacy,
-              serverCursorRatio: total > 0 ? syncModeCounters.serverCursor / total : 0,
+              serverCursor: rssFetchService.syncModeCounters.serverCursor,
+              legacy: rssFetchService.syncModeCounters.legacy,
+              serverCursorRatio: total > 0 ? rssFetchService.syncModeCounters.serverCursor / total : 0,
             })
           );
         }
@@ -519,7 +122,7 @@ router.get('/sync', async (req: Request, res: Response) => {
       const totalUpserts = blocks.reduce((acc, b) => acc + (Array.isArray(b.upserts) ? b.upserts.length : 0), 0);
       logger.request(
         '[RSS Sync] response',
-        safeJsonForLog({
+        rssFetchService.safeJsonForLog({
           url,
           mode,
           userId,
@@ -535,10 +138,10 @@ router.get('/sync', async (req: Request, res: Response) => {
       const mappedBlocks = blocks.map(b => ({
         id: b.id,
         createdAt: b.createdAt,
-        upserts: b.upserts.map(a => applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
+        upserts: b.upserts.map(a => rssFetchService.applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
       }));
 
-      await enrichBlocksWithVideoUrls(mappedBlocks);
+      await rssFetchService.enrichBlocksWithVideoUrls(mappedBlocks);
 
       return res.json({
         sourceUrl: url,
@@ -551,19 +154,19 @@ router.get('/sync', async (req: Request, res: Response) => {
       });
     }
 
-    syncModeCounters.legacy += 1;
+    rssFetchService.syncModeCounters.legacy += 1;
     {
-      const total = syncModeCounters.serverCursor + syncModeCounters.legacy;
+      const total = rssFetchService.syncModeCounters.serverCursor + rssFetchService.syncModeCounters.legacy;
       const now = Date.now();
-      if ((total > 0 && total % 50 === 0) || now - lastSyncModeLogAt > 10 * 60 * 1000) {
-        lastSyncModeLogAt = now;
+      if ((total > 0 && total % 50 === 0) || now - rssFetchService.lastSyncModeLogAt > 10 * 60 * 1000) {
+        rssFetchService.lastSyncModeLogAt = now;
         logger.system(
           '[RSS Sync] mode stats',
-          safeJsonForLog({
+          rssFetchService.safeJsonForLog({
             total,
-            serverCursor: syncModeCounters.serverCursor,
-            legacy: syncModeCounters.legacy,
-            serverCursorRatio: total > 0 ? syncModeCounters.serverCursor / total : 0,
+            serverCursor: rssFetchService.syncModeCounters.serverCursor,
+            legacy: rssFetchService.syncModeCounters.legacy,
+            serverCursorRatio: total > 0 ? rssFetchService.syncModeCounters.serverCursor / total : 0,
           })
         );
       }
@@ -572,7 +175,7 @@ router.get('/sync', async (req: Request, res: Response) => {
     const totalUpserts = blocks.reduce((acc, b) => acc + (Array.isArray(b.upserts) ? b.upserts.length : 0), 0);
     logger.request(
       '[RSS Sync] response',
-      safeJsonForLog({
+      rssFetchService.safeJsonForLog({
         url,
         mode,
         since,
@@ -586,10 +189,10 @@ router.get('/sync', async (req: Request, res: Response) => {
     const mappedBlocks = blocks.map(b => ({
       id: b.id,
       createdAt: b.createdAt,
-      upserts: b.upserts.map(a => applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
+      upserts: b.upserts.map(a => rssFetchService.applyProxyToArticle(a, baseUrl, imageCompression, imageQuality)),
     }));
 
-    await enrichBlocksWithVideoUrls(mappedBlocks);
+    await rssFetchService.enrichBlocksWithVideoUrls(mappedBlocks);
 
     res.json({
       sourceUrl: url,
@@ -735,7 +338,8 @@ router.post('/refresh', async (req: Request, res: Response) => {
       true,
       settings.imageQuality ?? 80,
       false,
-      settings.rssFetchTimeoutMs
+      settings.rssFetchTimeoutMs,
+      settings.rssFulltextTimeoutMs
     );
     const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
 
@@ -745,7 +349,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
 
     // 🔥 Trigger image pre-warming
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    warmUpImages(articles, baseUrl);
+    rssFetchService.warmUpImages(articles, baseUrl);
 
     res.json({ success: true, ...result });
   } catch (error) {
@@ -815,7 +419,8 @@ router.post('/parse', async (req: Request, res: Response) => {
       true,
       settings.imageQuality ?? 80,
       true,
-      settings.rssFetchTimeoutMs
+      settings.rssFetchTimeoutMs,
+      settings.rssFulltextTimeoutMs
     );
     res.json({ articles });
   } catch (error) {
@@ -865,7 +470,7 @@ router.get('/sync/config', async (req, res) => {
     if (!configSync || typeof configSync !== 'object') {
       return res.status(404).json({ error: 'No remote config' });
     }
-    logConfigSyncSnapshot(String(userId), 'GET', configSync);
+    rssFetchService.logConfigSyncSnapshot(String(userId), 'GET', configSync);
     res.json(configSync);
   } catch (error) {
     logger.error('[SyncConfig] GET failed:', error);
@@ -899,7 +504,7 @@ router.post('/sync/config', async (req: Request, res: Response) => {
 
     const updatedAt = (incoming as any).updatedAt ? String((incoming as any).updatedAt) : new Date().toISOString();
     const nextConfigSync = { ...(incoming as any), updatedAt };
-    logConfigSyncSnapshot(String(userId), 'Incoming', nextConfigSync);
+    rssFetchService.logConfigSyncSnapshot(String(userId), 'Incoming', nextConfigSync);
 
     const user = await storageService.getUserById(userId);
     if (!user) {
@@ -950,7 +555,7 @@ router.post('/sync/config', async (req: Request, res: Response) => {
     const persistedRaw = (updatedUser?.config && typeof updatedUser.config === 'object') ? updatedUser.config : {};
     const persistedConfigSync = (persistedRaw as any).configSync;
     logger.info(`[SyncConfig] Persisted at prisma.user.syncData.configSync userId=${userId}`);
-    logConfigSyncSnapshot(String(userId), 'Persisted', persistedConfigSync);
+    rssFetchService.logConfigSyncSnapshot(String(userId), 'Persisted', persistedConfigSync);
 
     logger.info(`[SyncConfig] Updated config for user ${userId}`);
     res.json({ success: true, updatedAt: nextConfigSync.updatedAt });

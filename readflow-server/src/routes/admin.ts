@@ -50,7 +50,7 @@ router.use(requireAdminAuth);
 
 // Settings
 router.get('/settings', (req, res) => {
-  res.json(storageService.getSettings());
+  res.json(storageService.getAdminSettings());
 });
 
 router.post('/settings', (req, res) => {
@@ -67,11 +67,22 @@ router.post('/settings', (req, res) => {
           })
           .catch(error => logger.error('Settings-triggered cleanup failed', error));
       }
-      res.json(next);
+      res.json(storageService.getAdminSettings());
     } catch (error) {
       res.status(500).json({ error: 'Failed to save settings' });
     }
   })().catch(() => { });
+});
+
+router.get('/llm-usage', async (req, res) => {
+  try {
+    const daysRaw = String((req.query as any)?.days ?? '7').trim();
+    const days = Math.min(90, Math.max(1, parseInt(daysRaw, 10) || 7));
+    const rows = await storageService.getLLMUsageSummary(days);
+    res.json({ rangeDays: days, rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load llm usage' });
+  }
 });
 
 // Users
@@ -232,7 +243,8 @@ router.post('/feeds/:id/refresh', async (req, res) => {
       true,
       settings.imageQuality ?? 80,
       false,
-      settings.rssFetchTimeoutMs
+      settings.rssFetchTimeoutMs,
+      settings.rssFulltextTimeoutMs
     );
     const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
     await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: atIso, status: 'ok' });

@@ -715,6 +715,17 @@ export class SettingsService {
     }
   }
 
+  public async saveDailyReportSettingsNoCloudSync(settings: {
+    enabled?: boolean;
+    scheduledTime?: string;
+    groupNames?: string[];
+    articleLimit?: number;
+  }): Promise<void> {
+    await this.withCloudSettingsSyncSuppressed(async () => {
+      await this.saveDailyReportSettings(settings);
+    });
+  }
+
   /**
    * 获取默认RSS设置
    */
@@ -857,6 +868,7 @@ export class SettingsService {
     llmSettings?: any;
     themeSettings?: any;
     rssStartupSettings?: any;
+    dailyReportSettings?: any;
   }): Promise<void> {
     try {
       await this.withCloudSettingsSyncSuppressed(async () => {
@@ -873,6 +885,10 @@ export class SettingsService {
           };
           await this.saveAppSettings(merged);
         }
+
+        if (data.dailyReportSettings) {
+          await this.saveDailyReportSettings(data.dailyReportSettings);
+        }
       });
 
       if (data.rssSettings) {
@@ -880,7 +896,7 @@ export class SettingsService {
       }
 
       if (data.llmSettings) {
-        await this.saveLLMSettings(data.llmSettings);
+        await this.saveLLMSettingsNoCloudSync(data.llmSettings);
       }
 
       if (data.themeSettings) {
@@ -1126,6 +1142,7 @@ export class SettingsService {
         userId: '',
         lastProfilePushAt: 0,
         lastStateSyncAt: 0,
+        lastStatePullAt: 0,
       },
       privacy: {
         analytics: false,

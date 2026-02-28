@@ -1,9 +1,0 @@
-# Docker ignore file
-*.exe
-*.test
-*.out
-.git
-.gitignore
-*.md
-.env.local
-.env.*.local

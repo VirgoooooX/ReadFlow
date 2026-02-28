@@ -152,7 +152,8 @@ export class RSSParserService {
     imageCompression: boolean = true,
     imageQuality: number = 80,
     applyImageProxy: boolean = true,
-    fetchTimeoutMs?: number
+    fetchTimeoutMs?: number,
+    fulltextTimeoutMs?: number
   ): Promise<Article[]> {
     try {
       logger.info(`Fetching articles from: ${source.url}`);
@@ -180,7 +181,15 @@ export class RSSParserService {
       const xmlText = await response.text();
 
       // 解析 RSS
-      const articles = await this.parseRSSFeed(xmlText, source, baseUrl, imageCompression, imageQuality, applyImageProxy);
+      const articles = await this.parseRSSFeed(
+        xmlText,
+        source,
+        baseUrl,
+        imageCompression,
+        imageQuality,
+        applyImageProxy,
+        fulltextTimeoutMs
+      );
 
       // 应用过滤规则
       const filteredArticles = this.applyFilterRules(articles, filterRules);
@@ -198,7 +207,8 @@ export class RSSParserService {
     baseUrl?: string,
     imageCompression: boolean = true,
     imageQuality: number = 80,
-    applyImageProxy: boolean = true
+    applyImageProxy: boolean = true,
+    fulltextTimeoutMs?: number
   ): Promise<Omit<Article, 'id'>[]> {
     const sourceName = source.name || 'Unknown Source';
     const shouldExtractImages = source.contentType === 'image_text';
@@ -226,7 +236,12 @@ export class RSSParserService {
           item.description = fixedRawContent;
         }
 
-        let content = await this.extractContent(fixedRawContent, itemLink, source.contentType || 'image_text');
+        let content = await this.extractContent(
+          fixedRawContent,
+          itemLink,
+          source.contentType || 'image_text',
+          fulltextTimeoutMs
+        );
 
         if (applyImageProxy) {
           content = proxyImages(content, baseUrl, imageCompression, imageQuality);
@@ -314,7 +329,8 @@ export class RSSParserService {
   private async extractContent(
     rawContent: string,
     url: string,
-    contentType: 'text' | 'image_text' = 'image_text'
+    contentType: 'text' | 'image_text' = 'image_text',
+    fulltextTimeoutMs?: number
   ): Promise<string> {
     try {
       try {
@@ -330,7 +346,7 @@ export class RSSParserService {
         rawContent.includes('查看全文');
 
       if (shouldFetch && url) {
-        const fullContent = await this.fetchFullContent(url);
+        const fullContent = await this.fetchFullContent(url, fulltextTimeoutMs);
         if (fullContent) {
           rawContent = fullContent;
           rawContent = fixRelativeImageUrls(rawContent, url);
@@ -401,7 +417,7 @@ export class RSSParserService {
     }
   }
 
-  private async fetchFullContent(url: string): Promise<string | null> {
+  private async fetchFullContent(url: string, fulltextTimeoutMs?: number): Promise<string | null> {
     try {
       const urlObj = new URL(url);
       const origin = urlObj.origin;
@@ -416,7 +432,10 @@ export class RSSParserService {
             'Accept-Encoding': 'identity',
             'Referer': origin,
           },
-          timeout: RSSParserService.FULLTEXT_TIMEOUT_MS,
+          timeout:
+            typeof fulltextTimeoutMs === 'number' && Number.isFinite(fulltextTimeoutMs)
+              ? fulltextTimeoutMs
+              : RSSParserService.FULLTEXT_TIMEOUT_MS,
           retries: 0,
         });
       });

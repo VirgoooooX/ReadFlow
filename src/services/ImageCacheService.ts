@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { DatabaseService } from '../database/DatabaseService';
 import { logger } from './rss/RSSUtils';
+import { cloudConfigService } from './CloudConfigService';
 
 /**
  * 图片缓存服务 - 将网络图片下载到本地
@@ -14,6 +15,15 @@ class ImageCacheService {
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
     this.cacheDir = `${FileSystem.cacheDirectory}images/`;
+  }
+
+  private async shouldDisableLocalCache(): Promise<boolean> {
+    try {
+      const config = await cloudConfigService.getConfig();
+      return cloudConfigService.isCloudEnabled(config);
+    } catch {
+      return false;
+    }
   }
 
   public static getInstance(): ImageCacheService {
@@ -61,6 +71,7 @@ class ImageCacheService {
    */
   public async cacheImage(url: string): Promise<string | null> {
     if (!url) return null;
+    if (await this.shouldDisableLocalCache()) return null;
 
     try {
       await this.ensureCacheDir();
@@ -133,6 +144,7 @@ class ImageCacheService {
    */
   public async cacheArticleImages(articleId: number, imageUrl: string | null, content: string): Promise<void> {
     if (!imageUrl && !content) return;
+    if (await this.shouldDisableLocalCache()) return;
 
     try {
       // 1. 缓存封面图
@@ -215,6 +227,7 @@ class ImageCacheService {
    */
   public async getImageUri(url: string | null): Promise<string | null> {
     if (!url) return null;
+    if (await this.shouldDisableLocalCache()) return url;
 
     // 如果已经是本地路径，直接返回
     if (url.startsWith('file://') || url.startsWith(this.cacheDir)) {

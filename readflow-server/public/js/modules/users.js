@@ -73,16 +73,28 @@ async function loadUsers() {
 }
 
 async function addUser() {
-    const username = document.getElementById('user-name').value;
-    if (!username) return;
-    await fetch(`${API_BASE}/users`, {
+    const username = String(document.getElementById('user-name')?.value || '').trim();
+    const email = String(document.getElementById('user-email')?.value || '').trim();
+    const password = String(document.getElementById('user-password')?.value || '').trim();
+    if (!username || !email || !password) return;
+    const res = await fetch(`/api/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Token': localStorage.getItem('adminToken') || ''
+        },
+        body: JSON.stringify({ username, email, password })
     });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data?.message || data?.error || '创建失败', 'error');
+        return;
+    }
     document.getElementById('user-name').value = '';
+    document.getElementById('user-email').value = '';
+    document.getElementById('user-password').value = '';
     loadUsers();
-    showToast('用户创建成功');
+    showToast('用户创建成功（可用邮箱登录）');
 }
 
 window.deleteUser = async function (id) {

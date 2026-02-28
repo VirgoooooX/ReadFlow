@@ -6,7 +6,6 @@
 import { DatabaseService } from '../../database/DatabaseService';
 import { RSSSource, Article, AppError, FetchArticlesWithStatsResult, RefreshSourcesResult } from '../../types';
 import { SettingsService } from '../SettingsService';
-import { localRSSService } from './LocalRSSService';
 import { cloudSyncService } from './CloudSyncService';
 import { logger } from './RSSUtils';
 import { InteractionManager } from 'react-native';

@@ -10,8 +10,10 @@ import vocabRoutes from './routes/vocabulary';
 import imageRoutes from './routes/image';
 import adminRoutes from './routes/admin';
 import authRoutes, { verifyToken } from './routes/auth';
+import configRoutes from './routes/config';
+import llmRoutes from './routes/llm';
 import { logger } from './utils/Logger';
-import { startRssAutoRefresh } from './routes/rss';
+import { rssFetchService } from './services/RssFetchService';
 import { storageService } from './services/StorageService';
 import { dailyReportService } from './services/DailyReportService';
 
@@ -148,6 +150,14 @@ const serverTokenMiddleware = (req: express.Request, res: express.Response, next
 
   const token = req.headers['x-server-token'];
   if (token !== process.env.SERVER_TOKEN) {
+    if (req.path === '/register') {
+      const settings = storageService.getSettings();
+      const adminPassword = settings.adminPassword || 'admin';
+      const adminToken = req.headers['x-admin-token'];
+      if (adminToken === adminPassword) {
+        return next();
+      }
+    }
     logger.warn(`[Access Control] Blocked request from ${req.ip} - Invalid Server Token`);
     return res.status(403).json({ error: 'Forbidden: Invalid or missing Server Token' });
   }
@@ -204,6 +214,9 @@ app.use('/api/admin', adminRoutes); // Admin should be protected too, but maybe 
 // Note: Admin UI might not send Bearer token easily if it's a simple HTML. 
 // For now, let's strictly protect /api/rss as requested for sync.
 
+app.use('/api/config', authMiddleware, configRoutes); // Config API protected by auth
+app.use('/api/llm', authMiddleware, llmRoutes);
+
 app.use('/api/auth', serverTokenMiddleware, authRoutes); // Auth routes protected by Server Token if set
 
 app.get('/health', serverTokenMiddleware, (req, res) => {
@@ -226,7 +239,7 @@ async function start(): Promise<void> {
 
   app.listen(PORT, () => {
     logger.system(`Server running on port ${PORT}`);
-    startRssAutoRefresh();
+    rssFetchService.startRssAutoRefresh();
 
     setTimeout(logServerStatus, 5000);
     setInterval(logServerStatus, 60 * 60 * 1000);
@@ -247,7 +260,7 @@ async function start(): Promise<void> {
         const imageResult = await storageService.cleanupImageCache();
         const imageMb = Math.round(imageResult.remainingBytes / 1024 / 1024);
         logger.system(
-          `Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount} deletedImageByAge=${imageResult.deletedByAge} deletedImageByCap=${imageResult.deletedByCap} imageCacheFiles=${imageResult.remainingFiles} imageCacheSize=${imageMb}MB`
+          `Cleanup done | deletedByRetention=${result.deletedByRetention} deletedByMaxCount=${result.deletedByMaxCount} deletedSyncDeliveries=${result.deletedSyncDeliveries} deletedDailyReports=${result.deletedDailyReports} deletedImageByAge=${imageResult.deletedByAge} deletedImageByCap=${imageResult.deletedByCap} imageCacheFiles=${imageResult.remainingFiles} imageCacheSize=${imageMb}MB`
         );
       } catch (e) {
         logger.error('Cleanup failed', e);
@@ -286,6 +299,9 @@ async function start(): Promise<void> {
 
 start().catch(error => {
   logger.error('Server start failed:', error);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
 });
 
 async function logServerStatus() {

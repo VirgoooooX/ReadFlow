@@ -189,6 +189,7 @@ export interface AppSettings {
     lastProfilePushAt?: number;
     lastProfilePushHash?: string;
     lastStateSyncAt?: number;
+    lastStatePullAt?: number;
     lastVocabSyncAt?: number;
   };
   privacy: {

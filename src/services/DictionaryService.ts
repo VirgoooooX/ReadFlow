@@ -1,8 +1,9 @@
 import { DatabaseService } from '../database/DatabaseService';
 import { WordDefinition, DictionaryCacheEntry } from '../types';
-import { SettingsService } from './SettingsService';
 import { logger } from './rss/RSSUtils';
 import { stripHtmlTags } from '../utils/stringUtils';
+import { cloudConfigService } from './CloudConfigService';
+import AuthService from './AuthService';
 /**
  * 词典服务 - 使用LLM查询单词释义，并缓存到本地数据库
  * 支持词形识别（如 running -> run）
@@ -10,11 +11,9 @@ import { stripHtmlTags } from '../utils/stringUtils';
 export class DictionaryService {
   private static instance: DictionaryService;
   private databaseService: DatabaseService;
-  private settingsService: SettingsService;
 
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
-    this.settingsService = SettingsService.getInstance();
   }
 
   public static getInstance(): DictionaryService {
@@ -38,8 +37,8 @@ export class DictionaryService {
         return cachedResult;
       }
 
-      // 2. 本地缓存没有，调用LLM查询
-      logger.info(`🔍 调用LLM查询单词: ${searchWord}`);
+      // 2. 本地缓存没有，调用服务端查询
+      logger.info(`🔍 调用服务端查询单词: ${searchWord}`);
       const llmResult = await this.queryLLM(searchWord, context);
       
       if (llmResult) {
@@ -194,210 +193,47 @@ export class DictionaryService {
    */
   private async queryLLM(word: string, context?: string): Promise<WordDefinition | null> {
     try {
-      const llmSettings = await this.settingsService.getLLMSettingsFor('dictionary');
-      
-      if (!llmSettings?.apiKey) {
-        logger.warn('LLM API key not configured');
-        return null;
+      const config = await cloudConfigService.getConfig();
+      if (!config.serverUrl) return null;
+      const serverUrl = config.serverUrl.replace(/\/$/, '');
+
+      const token = AuthService.getAuthToken() || config.auth?.accessToken;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (config.serverAccessKey) {
+        headers['x-server-token'] = config.serverAccessKey;
+        headers['x-server-access-key'] = config.serverAccessKey;
       }
 
-      const prompt = this.buildPrompt(word, context);
-      
-      // 根据提供商构建请求
-      const response = await this.callLLMAPI(llmSettings, prompt);
-      
-      if (response) {
-        // 记录使用统计
-        await this.logUsage('dictionary', llmSettings.provider, llmSettings.model);
-        return this.parseLLMResponse(response, word);
-      }
+      const resp = await fetch(`${serverUrl}/api/llm/dict`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ word, context }),
+      });
 
-      return null;
-    } catch (error) {
-      logger.error('Error querying LLM:', error);
-      // 记录失败统计
-      const llmSettings = await this.settingsService.getLLMSettingsFor('dictionary');
-      if (llmSettings) {
-        await this.logUsage('dictionary', llmSettings.provider, llmSettings.model, false);
-      }
-      return null;
-    }
-  }
+      if (!resp.ok) return null;
+      const data = await resp.json().catch(() => null);
+      const result = data?.result;
+      if (!result || typeof result !== 'object') return null;
 
-  /**
-   * 构建查询提示词
-   */
-  private buildPrompt(word: string, context?: string): string {
-    let prompt = `请分析英语单词 “${word}”`;
-    
-    if (context) {
-      prompt += `，它在以下句子中出现：“${context}”`;
-    }
-    
-    prompt += `
+      const modelVersion = typeof data?.modelVersion === 'string' ? data.modelVersion : '';
+      const sep = modelVersion.indexOf(':');
+      const provider = sep >= 0 ? modelVersion.slice(0, sep) : 'server';
+      const model = sep >= 0 ? modelVersion.slice(sep + 1) : modelVersion;
+      await this.logUsage('dictionary', provider, model || 'unknown');
 
-请用JSON格式返回，包含以下字段：
-{
-  "word": "当前单词",
-  "baseWord": "原始形式（如果当前是变形词，否则为null）",
-  "wordForm": "词形说明（如'过去式','现在分词','复数'等，如果是原形则为null）",
-  "phonetic": "音标",
-  "definitions": [
-    {
-      "partOfSpeech": "词性",
-      "definition": "英文释义",
-      "translation": "中文翻译",
-      "example": "例句"
-    }
-  ],
-  "baseWordDefinitions": [
-    {
-      "partOfSpeech": "词性",
-      "definition": "原始单词的英文释义",
-      "translation": "中文翻译"
-    }
-  ]
-}
-
-注意：
-1. 如果单词是变形词（如 running, went, dogs），请提供原始单词（run, go, dog）及其释义
-2. 如果单词已经是原形，baseWord和wordForm为null，baseWordDefinitions为空数组
-3. 【重要】仅返回JSON，不要其他说明文字`;
-
-    return prompt;
-  }
-
-  /**
-   * 调用LLM API
-   */
-  private async callLLMAPI(settings: any, prompt: string): Promise<string | null> {
-    try {
-      const { provider, apiKey, baseUrl, model, customModelName, temperature, maxTokens } = settings;
-      
-      let apiEndpoint = baseUrl || 'https://api.openai.com/v1';
-      let actualModel = customModelName || model || 'gpt-3.5-turbo';
-      
-      // 根据提供商调整请求格式
-      if (provider === 'anthropic') {
-        return await this.callAnthropicAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
-      } else {
-        // OpenAI 兼容格式（包括OpenAI、本地模型、自定义API）
-        return await this.callOpenAICompatibleAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
-      }
-    } catch (error) {
-      logger.error('Error calling LLM API:', error);
-      return null;
-    }
-  }
-
-  /**
-   * 调用OpenAI兼容API
-   */
-  private async callOpenAICompatibleAPI(
-    baseUrl: string, 
-    apiKey: string, 
-    model: string, 
-    prompt: string,
-    temperature: number = 0.3,
-    maxTokens: number = 1024
-  ): Promise<string | null> {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: '你是一个英语词典助手，专门帮助用户查询单词释义。请始终用JSON格式回复。' },
-          { role: 'user', content: prompt }
-        ],
-        temperature,
-        max_tokens: maxTokens,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || null;
-  }
-
-  /**
-   * 调用Anthropic API
-   */
-  private async callAnthropicAPI(
-    baseUrl: string,
-    apiKey: string,
-    model: string,
-    prompt: string,
-    temperature: number = 0.3,
-    maxTokens: number = 1024
-  ): Promise<string | null> {
-    const response = await fetch(`${baseUrl}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        temperature,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Anthropic API request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.content?.[0]?.text || null;
-  }
-
-  /**
-   * 解析LLM响应
-   * 【优化】增强 JSON 解析容错性，支持 Markdown 代码块
-   */
-  private parseLLMResponse(response: string, originalWord: string): WordDefinition | null {
-    try {
-      // 1. 清理 Markdown 代码块标记（支持 ```json ... ``` 格式）
-      let cleanJson = response
-        .replace(/```json\s*/g, '') // 移除 ```json
-        .replace(/```\s*/g, '')     // 移除 ```
-        .trim();
-    
-      // 2. 尝试提取 JSON 对象（查找第一个 { 和最后一个 }）
-      const firstBrace = cleanJson.indexOf('{');
-      const lastBrace = cleanJson.lastIndexOf('}');
-      
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
-      }
-    
-      // 3. 尝试解析 JSON
-      const parsed = JSON.parse(cleanJson);
-      
-      // 4. 验证必要字段并构建返回对象
       return {
-        word: parsed.word || originalWord,
-        baseWord: parsed.baseWord || undefined,
-        wordForm: parsed.wordForm || undefined,
-        phonetic: parsed.phonetic || undefined,
-        definitions: Array.isArray(parsed.definitions) ? parsed.definitions : [],
-        baseWordDefinitions: Array.isArray(parsed.baseWordDefinitions) ? parsed.baseWordDefinitions : undefined,
+        word: result.word || word,
+        baseWord: result.baseWord || undefined,
+        wordForm: result.wordForm || undefined,
+        phonetic: result.phonetic || undefined,
+        definitions: Array.isArray(result.definitions) ? result.definitions : [],
+        baseWordDefinitions: Array.isArray(result.baseWordDefinitions) ? result.baseWordDefinitions : undefined,
         source: 'llm',
       };
     } catch (error) {
-      logger.error('❌ Error parsing LLM response:', error);
-      logger.error('   Response preview:', response.substring(0, 200));
+      logger.error('Error querying LLM:', error);
+      await this.logUsage('dictionary', 'server', 'unknown', false);
       return null;
     }
   }

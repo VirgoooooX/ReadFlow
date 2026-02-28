@@ -1,6 +1,7 @@
 import { DatabaseService } from '../database/DatabaseService';
-import { SettingsService } from './SettingsService';
 import { logger } from './rss/RSSUtils';
+import { cloudConfigService } from './CloudConfigService';
+import AuthService from './AuthService';
 
 /**
  * 翻译缓存条目
@@ -21,11 +22,9 @@ export interface TranslationCacheEntry {
 export class TranslationService {
   private static instance: TranslationService;
   private databaseService: DatabaseService;
-  private settingsService: SettingsService;
 
   private constructor() {
     this.databaseService = DatabaseService.getInstance();
-    this.settingsService = SettingsService.getInstance();
   }
 
   public static getInstance(): TranslationService {
@@ -53,8 +52,8 @@ export class TranslationService {
         return cachedResult.translatedText;
       }
 
-      // 2. 本地缓存没有，调用LLM翻译
-      logger.info(`🔍 调用LLM翻译: ${normalizedText.substring(0, 50)}...`);
+      // 2. 本地缓存没有，调用服务端翻译
+      logger.info(`🔍 调用服务端翻译: ${normalizedText.substring(0, 50)}...`);
       const translation = await this.translateWithLLM(normalizedText, sourceLang, targetLang);
       
       if (translation) {
@@ -140,167 +139,43 @@ export class TranslationService {
     targetLang: string
   ): Promise<string | null> {
     try {
-      const llmSettings = await this.settingsService.getLLMSettingsFor('translation');
-      
-      if (!llmSettings?.apiKey) {
-        logger.warn('LLM API key not configured');
-        return null;
+      const config = await cloudConfigService.getConfig();
+      if (!config.serverUrl) return null;
+      const serverUrl = config.serverUrl.replace(/\/$/, '');
+
+      const token = AuthService.getAuthToken() || config.auth?.accessToken;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (config.serverAccessKey) {
+        headers['x-server-token'] = config.serverAccessKey;
+        headers['x-server-access-key'] = config.serverAccessKey;
       }
 
-      const prompt = this.buildTranslationPrompt(text, sourceLang, targetLang);
-      
-      // 调用LLM API
-      const response = await this.callLLMAPI(llmSettings, prompt);
-      
-      if (response) {
-        // 记录使用统计
-        await this.logUsage('translation', llmSettings.provider, llmSettings.model);
-        return response.trim();
-      }
+      const resp = await fetch(`${serverUrl}/api/llm/translate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ text, sourceLang, targetLang }),
+      });
 
-      return null;
+      if (!resp.ok) return null;
+      const data = await resp.json().catch(() => null);
+      const translatedText = typeof data?.translatedText === 'string' ? data.translatedText : null;
+      if (!translatedText) return null;
+
+      const modelVersion = typeof data?.modelVersion === 'string' ? data.modelVersion : '';
+      const sep = modelVersion.indexOf(':');
+      const provider = sep >= 0 ? modelVersion.slice(0, sep) : 'server';
+      const model = sep >= 0 ? modelVersion.slice(sep + 1) : modelVersion;
+      await this.logUsage('translation', provider, model || 'unknown');
+
+      return translatedText.trim();
     } catch (error) {
       logger.error('Error translating with LLM:', error);
-      // 记录失败统计
-      const llmSettings = await this.settingsService.getLLMSettingsFor('translation');
-      if (llmSettings) {
-        await this.logUsage('translation', llmSettings.provider, llmSettings.model, false);
-      }
+      await this.logUsage('translation', 'server', 'unknown', false);
       return null;
     }
   }
 
-
-  /**
-   * 构建翻译提示词
-   */
-  private buildTranslationPrompt(text: string, sourceLang: string, targetLang: string): string {
-    const langMap: { [key: string]: string } = {
-      'en': '英语',
-      'zh': '中文',
-      'ja': '日语',
-      'ko': '韩语',
-      'fr': '法语',
-      'de': '德语',
-      'es': '西班牙语',
-    };
-
-    const sourceLangName = langMap[sourceLang] || sourceLang;
-    const targetLangName = langMap[targetLang] || targetLang;
-
-    return `请将以下${sourceLangName}文本翻译成${targetLangName}。只需要返回翻译结果，不要包含任何解释或说明。
-
-原文：${text}
-
-翻译：`;
-  }
-
-  /**
-   * 调用LLM API
-   */
-  private async callLLMAPI(settings: any, prompt: string): Promise<string | null> {
-    try {
-      const { provider, apiKey, baseUrl, model, customModelName, temperature, maxTokens } = settings;
-      
-      let apiEndpoint = baseUrl || 'https://api.openai.com/v1';
-      let actualModel = customModelName || model || 'gpt-3.5-turbo';
-      
-      // 根据提供商调整请求格式
-      if (provider === 'anthropic') {
-        return await this.callAnthropicAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
-      } else {
-        // OpenAI 兼容格式
-        return await this.callOpenAICompatibleAPI(apiEndpoint, apiKey, actualModel, prompt, temperature, maxTokens);
-      }
-    } catch (error) {
-      logger.error('Error calling LLM API:', error);
-      return null;
-    }
-  }
-
-  /**
-   * 调用OpenAI兼容API
-   */
-  private async callOpenAICompatibleAPI(
-    baseUrl: string,
-    apiKey: string,
-    model: string,
-    prompt: string,
-    temperature: number = 0.3,
-    maxTokens: number = 1024
-  ): Promise<string | null> {
-    // 确保baseUrl格式正确，移除末尾斜杠
-    const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
-    
-    logger.info('🔍 调用LLM翻译:' + prompt.substring(0, 50) + '...');
-    logger.info('🎯 API地址:' + `${cleanBaseUrl}/chat/completions`);
-    logger.info('🤖 模型:' + model);
-    
-    const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: '你是一个专业的翻译助手。' },
-          { role: 'user', content: prompt }
-        ],
-        temperature,
-        max_tokens: maxTokens,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      logger.error('❌ API请求失败:', response.status, errorText);
-      throw new Error(`API request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const result = data.choices?.[0]?.message?.content || null;
-    logger.info('✅ 翻译结果:' + result?.substring(0, 50) + '...');
-    return result;
-  }
-
-
-  /**
-   * 调用Anthropic API
-   */
-  private async callAnthropicAPI(
-    baseUrl: string,
-    apiKey: string,
-    model: string,
-    prompt: string,
-    temperature: number = 0.3,
-    maxTokens: number = 1024
-  ): Promise<string | null> {
-    const response = await fetch(`${baseUrl}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        temperature,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Anthropic API request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.content?.[0]?.text || null;
-  }
 
   /**
    * 记录LLM使用统计

@@ -34,7 +34,6 @@ import WordDefinitionModal from '../../components/WordDefinitionModal';
 import SentenceTranslationModal from '../../components/SentenceTranslationModal';
 import VideoPlayer from '../../components/VideoPlayer';
 import { setLastViewedArticleId } from '../Home/HomeScreen';
-import { toProxyUrl } from '../../utils/imageProxy';
 import { cloudConfigService } from '../../services/CloudConfigService';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
@@ -1143,10 +1142,8 @@ const ArticleDetailScreen: React.FC = () => {
       sourceName: article.sourceName,
       publishedAt: formatDateForMeta(article.publishedAt),
       author: article.author,
-      // 【关键修改】确保封面图被正确代理
-      // 即使在直连模式下，如果域名在 BLOCKED_DOMAINS 列表中（如 BBC），
-      // toProxyUrl 也会强制使用 weserv.nl，而不依赖 proxyServerUrl
-      imageUrl: finalImageUrl ? toProxyUrl(finalImageUrl) : undefined,
+      // 【关键修改】封面图在云端模式下已由后端代理，此处不再处理
+      imageUrl: finalImageUrl ? finalImageUrl : undefined,
       imageCaption: article.imageCaption,
       imageCredit: article.imageCredit,
       articleUrl: article.url,

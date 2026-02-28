@@ -14,6 +14,7 @@ import { DatabaseService } from '../database/DatabaseService';
 export class ConfigSyncService {
   private static instance: ConfigSyncService;
   private static readonly LAST_PUSHED_FINGERPRINT_KEY = 'cloud_config_last_pushed_fingerprint_v2';
+  private static readonly MIGRATION_DONE_PREFIX = 'cloud_config_migration_done_v1:';
   private settingsService?: SettingsService;
   private databaseService = DatabaseService.getInstance();
   private rssService = rssService;
@@ -99,6 +100,100 @@ export class ConfigSyncService {
     try {
       await AsyncStorage.setItem(ConfigSyncService.LAST_PUSHED_FINGERPRINT_KEY, value);
     } catch {
+    }
+  }
+
+  private async clearLastPushedFingerprint(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(ConfigSyncService.LAST_PUSHED_FINGERPRINT_KEY);
+    } catch {
+    }
+  }
+
+  private buildMigrationDoneKey(baseUrl: string, userId: string): string {
+    const normalizedBaseUrl = String(baseUrl || '').replace(/\/$/, '');
+    return `${ConfigSyncService.MIGRATION_DONE_PREFIX}${normalizedBaseUrl}:${String(userId || '')}`;
+  }
+
+  private async isMigrationDone(baseUrl: string, userId: string): Promise<boolean> {
+    const key = this.buildMigrationDoneKey(baseUrl, userId);
+    try {
+      const v = await AsyncStorage.getItem(key);
+      return !!v;
+    } catch {
+      return false;
+    }
+  }
+
+  private async markMigrationDone(baseUrl: string, userId: string): Promise<void> {
+    const key = this.buildMigrationDoneKey(baseUrl, userId);
+    try {
+      await AsyncStorage.setItem(key, new Date().toISOString());
+    } catch {
+    }
+  }
+
+  private isNonEmptyObject(input: any): boolean {
+    if (!input || typeof input !== 'object') return false;
+    if (Array.isArray(input)) return input.length > 0;
+    return Object.keys(input).length > 0;
+  }
+
+  private async hasRemoteConfig(baseUrl: string, headers: HeadersInit): Promise<boolean> {
+    const endpoints = [
+      `${baseUrl}/api/config/preferences`,
+      `${baseUrl}/api/config/groups`,
+      `${baseUrl}/api/config/sources`,
+      `${baseUrl}/api/config/filter-rules`,
+    ];
+    const responses = await Promise.all(
+      endpoints.map((url) => fetch(url, { headers }).catch(() => null as any))
+    );
+
+    for (const res of responses) {
+      if (!res) continue;
+      if (res.status === 404) continue;
+      if (!res.ok) continue;
+      try {
+        const json = await res.json();
+        const data = json?.data ?? json;
+        if (res.url.includes('/preferences')) {
+          if (this.isNonEmptyObject(data)) return true;
+        } else {
+          if (Array.isArray(data) && data.length > 0) return true;
+        }
+      } catch {
+      }
+    }
+    return false;
+  }
+
+  private async hasLocalConfig(): Promise<boolean> {
+    try {
+      const [settings, sources, groups, filterRules] = await Promise.all([
+        this.getSettingsService().exportSettings(),
+        this.rssService.exportSourcesForSync(),
+        this.groupService.exportGroupsForSync(),
+        this.filterService.exportRulesForSync(),
+      ]);
+
+      const settingsForCheck = this.sanitizeExportedSettingsForConfigSync(settings);
+      const hasSettings =
+        this.isNonEmptyObject((settingsForCheck as any).readingSettings) ||
+        this.isNonEmptyObject((settingsForCheck as any).appSettings) ||
+        this.isNonEmptyObject((settingsForCheck as any).rssSettings) ||
+        this.isNonEmptyObject((settingsForCheck as any).themeSettings) ||
+        this.isNonEmptyObject((settingsForCheck as any).dailyReportSettings) ||
+        this.isNonEmptyObject((settingsForCheck as any).rssStartupSettings);
+
+      return (
+        hasSettings ||
+        (Array.isArray(sources) && sources.length > 0) ||
+        (Array.isArray(groups) && groups.length > 0) ||
+        (Array.isArray(filterRules) && filterRules.length > 0)
+      );
+    } catch {
+      return false;
     }
   }
 
@@ -223,6 +318,66 @@ export class ConfigSyncService {
     }
   }
 
+  public async bootstrapConfigAfterAuth(): Promise<void> {
+    const cloudConfig = await cloudConfigService.getConfig();
+    if (!cloudConfigService.isCloudEnabled(cloudConfig)) {
+      return;
+    }
+
+    const userId = cloudConfig.auth?.user?.id ? String(cloudConfig.auth.user.id) : '';
+    if (!userId) return;
+
+    const token = AuthService.getAuthToken() ?? cloudConfig.auth.accessToken;
+    if (!token) return;
+
+    const headers = await this.getAuthHeaders();
+    const baseUrl = cloudConfig.serverUrl.replace(/\/$/, '');
+
+    if (await this.isMigrationDone(baseUrl, userId)) {
+      return;
+    }
+
+    try {
+      const [remoteHasAny, localHasAny] = await Promise.all([
+        this.hasRemoteConfig(baseUrl, headers),
+        this.hasLocalConfig(),
+      ]);
+
+      if (remoteHasAny) {
+        await this.syncConfig('pull');
+        if (localHasAny) {
+          await this.clearLastPushedFingerprint();
+          await this.syncConfig('push');
+        }
+        await this.markMigrationDone(baseUrl, userId);
+        return;
+      }
+
+      if (localHasAny) {
+        await this.syncConfig('push');
+        await this.markMigrationDone(baseUrl, userId);
+        return;
+      }
+
+      await this.markMigrationDone(baseUrl, userId);
+    } catch (e) {
+      logger.warn(`[ConfigSync] bootstrapConfigAfterAuth failed: ${String((e as any)?.message || e)}`);
+    }
+  }
+
+  public async resetBootstrapForCurrentUser(): Promise<void> {
+    const cloudConfig = await cloudConfigService.getConfig();
+    const baseUrl = cloudConfig.serverUrl ? cloudConfig.serverUrl.replace(/\/$/, '') : '';
+    const userId = cloudConfig.auth?.user?.id ? String(cloudConfig.auth.user.id) : '';
+    if (!baseUrl || !userId) return;
+    const key = this.buildMigrationDoneKey(baseUrl, userId);
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch {
+    }
+    await this.clearLastPushedFingerprint();
+  }
+
   private async getAuthHeaders(): Promise<HeadersInit> {
     const cloudConfig = await cloudConfigService.getConfig();
     const token = AuthService.getAuthToken() ?? cloudConfig.auth.accessToken;
@@ -301,7 +456,8 @@ export class ConfigSyncService {
 
   private async pushConfig(): Promise<void> {
     const requestId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-    logger.info(`[ConfigSync] Starting push... requestId=${requestId}`);
+    logger.info(`[ConfigSync] Starting modular push... requestId=${requestId}`);
+
     const [settings, sources, groups, filterRules] = await Promise.all([
       this.getSettingsService().exportSettings(),
       this.rssService.exportSourcesForSync(),
@@ -310,129 +466,137 @@ export class ConfigSyncService {
     ]);
 
     const settingsForPush = await this.normalizeRssStartupSettingsForPush(settings);
-    const fingerprint = this.computeConfigFingerprint({ settings: settingsForPush, sources, groups, filterRules });
+    const fingerprint = this.computeConfigFingerprint({
+      settings: { ...(settingsForPush as any), llmSettings: undefined },
+      sources,
+      groups,
+      filterRules
+    });
     const lastFingerprint = await this.getLastPushedFingerprint();
+
     if (lastFingerprint && lastFingerprint === fingerprint) {
       logger.info(`[ConfigSync] Skip push: Config unchanged requestId=${requestId} fingerprint=${fingerprint}`);
       return;
     }
 
-    const payload = {
-      settings: this.sanitizeExportedSettingsForConfigSync(settingsForPush),
-      sources,
-      groups,
-      filterRules,
-      updatedAt: new Date().toISOString(),
+    const cloudConfig = await cloudConfigService.getConfig();
+    const headers = await this.getAuthHeaders();
+    const baseUrl = cloudConfig.serverUrl.replace(/\/$/, '');
+
+    // 1. Push Preferences (Settings)
+    // Bundles readingSettings, appSettings, rssSettings, themeSettings, dailyReportSettings
+    const preferencesPayload = {
+      readingSettings: settingsForPush.readingSettings,
+      appSettings: this.sanitizeExportedSettingsForConfigSync(settingsForPush.appSettings),
+      rssSettings: settingsForPush.rssSettings,
+      themeSettings: settingsForPush.themeSettings,
+      dailyReportSettings: settingsForPush.dailyReportSettings,
+      rssStartupSettings: settingsForPush.rssStartupSettings,
     };
 
-    this.logConfigSnapshot(requestId, 'Local config (push payload)', payload);
-
-    const cloudConfig = await cloudConfigService.getConfig();
-    const url = `${cloudConfig.serverUrl.replace(/\/$/, '')}/api/rss/sync/config`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: await this.getAuthHeaders(),
-      body: JSON.stringify(payload),
+    const pushPrefs = fetch(`${baseUrl}/api/config/preferences`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(preferencesPayload),
     });
 
-    if (!response.ok) {
-      let body = '';
-      try {
-        body = await response.text();
-      } catch {
+    // 2. Push Groups
+    const pushGroups = fetch(`${baseUrl}/api/config/groups/batch`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(groups),
+    });
+
+    // 3. Push Sources
+    const pushSources = fetch(`${baseUrl}/api/config/sources/batch`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(sources),
+    });
+
+    // 4. Push Filter Rules
+    const pushRules = fetch(`${baseUrl}/api/config/filter-rules/batch`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(filterRules),
+    });
+
+    const responses = await Promise.all([pushPrefs, pushGroups, pushSources, pushRules]);
+
+    for (const res of responses) {
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        logger.error(`[ConfigSync] Push failed for ${res.url}: ${res.status} ${text}`);
+        throw new Error(`Modular push failed at ${res.url}`);
       }
-      if (body && body.length > 2000) {
-        body = `${body.slice(0, 2000)}...[Truncated ${body.length - 2000} chars]`;
-      }
-      if (response.status === 409) {
-        try {
-          const parsed = body ? JSON.parse(body) : null;
-          const serverUpdatedAt = parsed?.serverUpdatedAt ? String(parsed.serverUpdatedAt) : '';
-          logger.warn(
-            `[ConfigSync] Push conflict (409) requestId=${requestId}${serverUpdatedAt ? ` serverUpdatedAt=${serverUpdatedAt}` : ''}${body ? ` body=${body}` : ''}`
-          );
-        } catch {
-          logger.warn(
-            `[ConfigSync] Push conflict (409) requestId=${requestId}${body ? ` body=${body}` : ''}`
-          );
-        }
-      }
-      throw new Error(`Push failed with status: ${response.status}${body ? ` body=${body}` : ''}`);
     }
 
-    let resData: any = null;
-    try {
-      resData = await response.json();
-    } catch {
-    }
-    logger.info(
-      `[ConfigSync] Push successful requestId=${requestId}${resData?.updatedAt ? ` serverUpdatedAt=${resData.updatedAt}` : ''}`
-    );
+    logger.info(`[ConfigSync] Modular push successful requestId=${requestId}`);
     await this.setLastPushedFingerprint(fingerprint);
   }
 
   private async pullConfig(): Promise<void> {
     const requestId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-    logger.info(`[ConfigSync] Starting pull... requestId=${requestId}`);
+    logger.info(`[ConfigSync] Starting modular pull... requestId=${requestId}`);
+
     const cloudConfig = await cloudConfigService.getConfig();
-    const url = `${cloudConfig.serverUrl.replace(/\/$/, '')}/api/rss/sync/config`;
+    const headers = await this.getAuthHeaders();
+    const baseUrl = cloudConfig.serverUrl.replace(/\/$/, '');
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: await this.getAuthHeaders(),
-    });
+    const endpoints = [
+      `${baseUrl}/api/config/preferences`,
+      `${baseUrl}/api/config/groups`,
+      `${baseUrl}/api/config/sources`,
+      `${baseUrl}/api/config/filter-rules`,
+    ];
 
-    if (response.status === 404) {
-      logger.info(`[ConfigSync] No remote config found (404). Skipping pull. requestId=${requestId}`);
-      return;
-    }
-
-    if (!response.ok) {
-      let body = '';
-      try {
-        body = await response.text();
-      } catch {
-      }
-      if (body && body.length > 2000) {
-        body = `${body.slice(0, 2000)}...[Truncated ${body.length - 2000} chars]`;
-      }
-      throw new Error(`Pull failed with status: ${response.status}${body ? ` body=${body}` : ''}`);
-    }
-
-    const data = await response.json();
-    this.logConfigSnapshot(requestId, 'Remote config (pull payload)', data);
-
-    // Data structure: { settings, sources, groups, filterRules, timestamp }
-    if (!data || Object.keys(data).length === 0) {
-      logger.info('[ConfigSync] Remote config is empty.');
-      return;
-    }
-
-    // Apply in order: Groups -> Sources -> FilterRules -> Settings
-    if (data.groups && Array.isArray(data.groups)) {
-      await this.groupService.importGroupsFromSync(data.groups);
-      logger.info(`[ConfigSync] Imported ${data.groups.length} groups`);
-    }
-
-    if (data.sources && Array.isArray(data.sources)) {
-      await this.rssService.importSourcesFromSync(data.sources);
-      logger.info(`[ConfigSync] Imported ${data.sources.length} sources`);
-    }
-
-    if (data.filterRules && Array.isArray(data.filterRules)) {
-      await this.filterService.importRulesFromSync(data.filterRules);
-      logger.info(`[ConfigSync] Imported ${data.filterRules.length} filter rules`);
-    }
-
-    if (data.settings) {
-      const normalizedSettings = await this.normalizeRssStartupSettingsForPull(data.settings);
-      await this.getSettingsService().importSettings(normalizedSettings);
-      logger.info('[ConfigSync] Imported settings');
-    }
-
-    logger.info('[ConfigSync] Pull successful');
     try {
+      const responses = await Promise.all(endpoints.map(url => fetch(url, { headers })));
+
+      const results: any = {};
+      for (const res of responses) {
+        if (res.status === 404) continue;
+        if (!res.ok) throw new Error(`Pull failed: ${res.status} from ${res.url}`);
+
+        const json = await res.json();
+        const data = json.data || json;
+
+        if (res.url.includes('/preferences')) results.preferences = data;
+        else if (res.url.includes('/groups')) results.groups = data;
+        else if (res.url.includes('/sources')) results.sources = data;
+        else if (res.url.includes('/filter-rules')) results.filterRules = data;
+      }
+
+      if (Object.keys(results).length === 0) {
+        logger.info('[ConfigSync] No remote config found.');
+        return;
+      }
+
+      // Apply in order
+      if (results.groups) {
+        await this.groupService.importGroupsFromSync(results.groups);
+        logger.info(`[ConfigSync] Imported ${results.groups.length} groups`);
+      }
+
+      if (results.sources) {
+        await this.rssService.importSourcesFromSync(results.sources);
+        logger.info(`[ConfigSync] Imported ${results.sources.length} sources`);
+      }
+
+      if (results.filterRules) {
+        await this.filterService.importRulesFromSync(results.filterRules);
+        logger.info(`[ConfigSync] Imported ${results.filterRules.length} filter rules`);
+      }
+
+      if (results.preferences) {
+        const normalized = await this.normalizeRssStartupSettingsForPull(results.preferences);
+        await this.getSettingsService().importSettings(normalized);
+        logger.info('[ConfigSync] Imported preferences');
+      }
+
+      logger.info('[ConfigSync] Modular pull successful');
+
+      // Update fingerprint
       const [settings, sources, groups, filterRules] = await Promise.all([
         this.getSettingsService().exportSettings(),
         this.rssService.exportSourcesForSync(),
@@ -441,17 +605,12 @@ export class ConfigSyncService {
       ]);
       const fingerprint = this.computeConfigFingerprint({ settings, sources, groups, filterRules });
       await this.setLastPushedFingerprint(fingerprint);
-      this.logConfigSnapshot(requestId, 'Local config (after pull applied)', {
-        settings: this.sanitizeExportedSettingsForConfigSync(settings),
-        sources,
-        groups,
-        filterRules,
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (e) {
-      logger.warn(`[ConfigSync] Post-pull local snapshot export failed requestId=${requestId}:`, e);
+
+      cacheEventEmitter.updateRSSStats();
+    } catch (error) {
+      logger.error(`[ConfigSync] Modular pull failed requestId=${requestId}:`, error);
+      throw error;
     }
-    cacheEventEmitter.updateRSSStats();
   }
 }
 

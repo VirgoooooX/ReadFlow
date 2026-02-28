@@ -304,6 +304,14 @@ export class DatabaseService {
         FOREIGN KEY (rss_source_id) REFERENCES rss_sources (id) ON DELETE CASCADE
       )`,
 
+      `CREATE TABLE IF NOT EXISTS article_state_changes (
+        article_url TEXT PRIMARY KEY,
+        is_read INTEGER,
+        is_favorite INTEGER,
+        read_progress INTEGER,
+        updated_at TEXT NOT NULL
+      )`,
+
       // RSS源表
       `CREATE TABLE IF NOT EXISTS rss_sources (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,6 +450,7 @@ export class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_articles_is_read ON articles(is_read)',
       'CREATE INDEX IF NOT EXISTS idx_articles_is_favorite ON articles(is_favorite)',
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_url_unique ON articles(url)',
+      'CREATE INDEX IF NOT EXISTS idx_article_state_changes_updated_at ON article_state_changes(updated_at)',
       'CREATE INDEX IF NOT EXISTS idx_vocabulary_word ON vocabulary(word)',
       'CREATE INDEX IF NOT EXISTS idx_vocabulary_added_at ON vocabulary(added_at)',
       'CREATE INDEX IF NOT EXISTS idx_reading_history_article_id ON reading_history(article_id)',
@@ -805,6 +814,7 @@ export class DatabaseService {
 
       await this.db.execAsync(`
         DELETE FROM articles;
+        DELETE FROM article_state_changes;
         DELETE FROM reading_history;
         DELETE FROM vocabulary;
         DELETE FROM dictionary_cache;

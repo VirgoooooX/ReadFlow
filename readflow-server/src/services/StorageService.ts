@@ -1,8 +1,10 @@
 import { PrismaClient } from '.prisma/client';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { logger } from '../utils/Logger';
 import { Article } from '../types';
+import { decrypt, encrypt } from '../utils/encryption';
 
 const prisma = new PrismaClient({
   datasources: {
@@ -12,6 +14,8 @@ const prisma = new PrismaClient({
   },
   log: ['warn', 'error'],
 });
+
+const prismaAny = prisma as any;
 
 export interface ServerSettings {
   imageQuality: number;
@@ -25,12 +29,33 @@ export interface ServerSettings {
   rssDefaultRefreshCron?: string;
   rssMaxItemsPerFetch?: number;
   rssFetchTimeoutMs?: number;
+  rssFulltextTimeoutMs?: number;
   retentionDays?: number;
   retentionMaxArticlesPerFeed?: number;
   cleanupIntervalHours?: number;
   syncPageSizeDefault?: number;
   syncPageSizeMax?: number;
   dailyReportSystemPrompt?: string;
+  dailyReportRetentionDays?: number;
+  llm?: {
+    profiles?: LLMProfileConfig[];
+    bindings?: Partial<Record<LLMFeature, string>>;
+  };
+}
+
+export type LLMFeature = 'translation' | 'dictionary' | 'titleTranslation' | 'dailyReport';
+
+export interface LLMProfileConfig {
+  id: string;
+  name?: string;
+  provider: 'openai-compatible' | 'anthropic';
+  baseUrl: string;
+  model: string;
+  apiKeyEncrypted?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  isActive?: boolean;
 }
 
 // Retain legacy interfaces for compatibility
@@ -111,12 +136,32 @@ export class StorageService {
       rssDefaultRefreshCron: undefined,
       rssMaxItemsPerFetch: 20,
       rssFetchTimeoutMs: 15000,
+      rssFulltextTimeoutMs: 20000,
       retentionDays: 0,
       retentionMaxArticlesPerFeed: 0,
       cleanupIntervalHours: 24,
       syncPageSizeDefault: 200,
       syncPageSizeMax: 2000,
+      dailyReportRetentionDays: 90,
       adminPassword: process.env.ADMIN_PASSWORD || 'admin',
+      llm: {
+        profiles: [
+          {
+            id: 'default',
+            name: 'Default',
+            provider: 'openai-compatible',
+            baseUrl: 'https://api.openai.com/v1',
+            model: 'gpt-4o-mini',
+            isActive: true,
+          },
+        ],
+        bindings: {
+          translation: 'default',
+          dictionary: 'default',
+          titleTranslation: 'default',
+          dailyReport: 'default',
+        },
+      },
     };
   }
 
@@ -130,6 +175,80 @@ export class StorageService {
   public async init(): Promise<void> {
     if (this.settingsInitialized) return;
     try {
+      await prisma.$executeRawUnsafe(`
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'user_preferences'
+  ) THEN
+    CREATE TABLE "user_preferences" (
+      "userId" TEXT NOT NULL,
+      "settings" JSONB,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL,
+      CONSTRAINT "user_preferences_pkey" PRIMARY KEY ("userId")
+    );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'user_preferences_userId_fkey'
+  ) THEN
+    ALTER TABLE "user_preferences"
+      ADD CONSTRAINT "user_preferences_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "users"("uuid")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+      `);
+
+      await prisma.$executeRawUnsafe(`
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'llm_usage_events'
+  ) THEN
+    CREATE TABLE "llm_usage_events" (
+      "id" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "requestId" TEXT,
+      "feature" TEXT NOT NULL,
+      "status" TEXT NOT NULL,
+      "provider" TEXT,
+      "model" TEXT,
+      "profileId" TEXT,
+      "cacheKey" TEXT,
+      "cacheHit" BOOLEAN NOT NULL DEFAULT false,
+      "durationMs" INTEGER NOT NULL,
+      "tokensTotal" INTEGER,
+      "tokensPrompt" INTEGER,
+      "tokensCompletion" INTEGER,
+      "httpStatus" INTEGER,
+      "errorType" TEXT,
+      "errorMessage" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "llm_usage_events_pkey" PRIMARY KEY ("id")
+    );
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'llm_usage_events_userId_fkey'
+  ) THEN
+    ALTER TABLE "llm_usage_events"
+      ADD CONSTRAINT "llm_usage_events_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "users"("uuid")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+      `);
+
       const row = await prisma.serverSetting.findUnique({ where: { key: this.serverSettingsKey } });
       const data = row?.data && typeof row.data === 'object' ? row.data : null;
       if (data) {
@@ -141,10 +260,31 @@ export class StorageService {
           create: { key: this.serverSettingsKey, data: this.settings as any },
         });
       }
+
+      const envAdminPassword = String(process.env.ADMIN_PASSWORD || '').trim();
+      if (envAdminPassword) {
+        this.settings.adminPassword = envAdminPassword;
+      }
+
+      if (!this.settings.adminPassword) {
+        this.settings.adminPassword = 'admin';
+      }
+      this.validateSecurityConfig();
       this.settingsInitialized = true;
     } catch (error) {
       this.settingsInitialized = true;
       logger.error('Failed to init server settings from DB:', error);
+      if (process.env.NODE_ENV === 'production') {
+        throw error;
+      }
+    }
+  }
+
+  private validateSecurityConfig(): void {
+    if (process.env.NODE_ENV !== 'production') return;
+    const adminPassword = String(this.settings.adminPassword || '').trim();
+    if (!adminPassword || adminPassword === 'admin') {
+      throw new Error('ADMIN_PASSWORD must be set to a non-default value in production');
     }
   }
 
@@ -221,6 +361,25 @@ export class StorageService {
   // Settings
   public getSettings(): ServerSettings {
     return { ...this.settings };
+  }
+
+  public getAdminSettings(): ServerSettings {
+    const copy: ServerSettings = JSON.parse(JSON.stringify(this.settings));
+    const profiles = copy.llm?.profiles;
+    if (Array.isArray(profiles)) {
+      copy.llm = copy.llm || {};
+      copy.llm.profiles = profiles.map((p) => {
+        const key = typeof p.apiKeyEncrypted === 'string' ? decrypt(p.apiKeyEncrypted) : '';
+        const hint = key ? `${'*'.repeat(Math.max(0, key.length - 4))}${key.slice(-4)}` : '';
+        return {
+          ...p,
+          apiKeyEncrypted: '',
+          hasApiKey: !!key,
+          apiKeyHint: hint,
+        };
+      });
+    }
+    return copy;
   }
 
   public async saveSettings(newSettings: Partial<ServerSettings>) {
@@ -305,6 +464,7 @@ export class StorageService {
       5000
     );
     setNum('rssFetchTimeoutMs', input.rssFetchTimeoutMs ?? input.fetchTimeoutMs, 1000, 60000);
+    setNum('rssFulltextTimeoutMs', input.rssFulltextTimeoutMs, 1000, 60000);
 
     setNum('syncPageSizeDefault', input.syncPageSizeDefault ?? input.syncDefaultPageSize, 10, 2000);
     setNum(
@@ -325,6 +485,82 @@ export class StorageService {
 
     setStr('adminPassword', input.adminPassword);
     setOptionalStr('dailyReportSystemPrompt', input.dailyReportSystemPrompt);
+    setNum('dailyReportRetentionDays', input.dailyReportRetentionDays, 0, 3650);
+
+    if (input && typeof input === 'object' && input.llm && typeof input.llm === 'object') {
+      const prev = (this.settings && typeof this.settings === 'object' ? this.settings.llm : undefined) || {};
+      const prevProfiles: LLMProfileConfig[] = Array.isArray((prev as any).profiles) ? (prev as any).profiles : [];
+      const prevById = new Map(prevProfiles.map((p) => [p.id, p]));
+
+      const nextLlm: ServerSettings['llm'] = {};
+
+      const rawProfiles = (input.llm as any).profiles;
+      if (Array.isArray(rawProfiles)) {
+        const normalized: LLMProfileConfig[] = [];
+        for (const raw of rawProfiles) {
+          if (!raw || typeof raw !== 'object') continue;
+          const id = String((raw as any).id || '').trim();
+          if (!id) continue;
+          const providerRaw = String((raw as any).provider || '').trim();
+          const provider = providerRaw === 'anthropic' ? 'anthropic' : 'openai-compatible';
+          const baseUrl = String((raw as any).baseUrl || '').trim();
+          const model = String((raw as any).model || '').trim();
+          if (!baseUrl || !model) continue;
+
+          const temperature = (raw as any).temperature;
+          const maxTokens = (raw as any).maxTokens;
+          const topP = (raw as any).topP;
+
+          const next: LLMProfileConfig = {
+            id,
+            name: typeof (raw as any).name === 'string' ? (raw as any).name : undefined,
+            provider,
+            baseUrl,
+            model,
+            isActive: (raw as any).isActive !== false,
+          };
+
+          if (typeof temperature === 'number' && Number.isFinite(temperature)) {
+            next.temperature = Math.max(0, Math.min(2, temperature));
+          }
+          if (typeof maxTokens === 'number' && Number.isFinite(maxTokens)) {
+            next.maxTokens = Math.max(1, Math.min(200000, maxTokens));
+          }
+          if (typeof topP === 'number' && Number.isFinite(topP)) {
+            next.topP = Math.max(0, Math.min(1, topP));
+          }
+
+          const apiKey = typeof (raw as any).apiKey === 'string' ? String((raw as any).apiKey).trim() : '';
+          if (apiKey) {
+            next.apiKeyEncrypted = encrypt(apiKey);
+          } else {
+            const legacyEncrypted = typeof (raw as any).apiKeyEncrypted === 'string' ? String((raw as any).apiKeyEncrypted).trim() : '';
+            if (legacyEncrypted && legacyEncrypted.includes(':')) {
+              next.apiKeyEncrypted = legacyEncrypted;
+            } else {
+            const prevOne = prevById.get(id);
+            if (prevOne?.apiKeyEncrypted) next.apiKeyEncrypted = prevOne.apiKeyEncrypted;
+            }
+          }
+
+          normalized.push(next);
+        }
+        nextLlm.profiles = normalized;
+      }
+
+      const rawBindings = (input.llm as any).bindings;
+      if (rawBindings && typeof rawBindings === 'object') {
+        const b: Partial<Record<LLMFeature, string>> = {};
+        const features: LLMFeature[] = ['translation', 'dictionary', 'titleTranslation', 'dailyReport'];
+        for (const f of features) {
+          const v = (rawBindings as any)[f];
+          if (typeof v === 'string' && v.trim()) b[f] = v.trim();
+        }
+        nextLlm.bindings = b;
+      }
+
+      out.llm = { ...prev, ...nextLlm };
+    }
     return out;
   }
 
@@ -332,21 +568,33 @@ export class StorageService {
   public async getUsers(): Promise<User[]> {
     const users = await prisma.user.findMany({
       include: {
-        _count: { select: { feeds: true } },
+        _count: { select: { feeds: true } }
       },
-    });
+    }) as any[];
+
+    // Fetch preferences manually to avoid include type errors
+    for (const u of users) {
+      u.preference = await prismaAny.userPreference.findUnique({ where: { userId: u.uuid } });
+    }
+
     return users.map(this.mapDbUserToUser);
   }
 
   public async getUserById(id: string): Promise<User | undefined> {
-    const user = await prisma.user.findUnique({ where: { uuid: id } });
+    const user = await prisma.user.findUnique({
+      where: { uuid: id }
+    }) as any;
     if (!user) return undefined;
+    user.preference = await prismaAny.userPreference.findUnique({ where: { userId: user.uuid } });
     return this.mapDbUserToUser(user);
   }
 
   public async findUserByEmail(email: string): Promise<User | undefined> {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email }
+    }) as any;
     if (!user) return undefined;
+    user.preference = await prismaAny.userPreference.findUnique({ where: { userId: user.uuid } });
     return this.mapDbUserToUser(user);
   }
 
@@ -365,14 +613,13 @@ export class StorageService {
       settings: user.settings || user.config?.settings,
     };
 
-    await prisma.user.upsert({
+    const savedUser = await prisma.user.upsert({
       where: { uuid: user.id },
       update: {
         username: user.username,
         email: user.email,
         passwordHash: user.passwordHash,
         lastActive: new Date(user.lastActive),
-        syncData: syncData,
       },
       create: {
         uuid: user.id,
@@ -381,8 +628,13 @@ export class StorageService {
         passwordHash: user.passwordHash,
         registeredAt: new Date(user.registeredAt || new Date()),
         lastActive: new Date(user.lastActive),
-        syncData: syncData,
       },
+    });
+
+    await prismaAny.userPreference.upsert({
+      where: { userId: savedUser.uuid },
+      update: { settings: syncData },
+      create: { userId: savedUser.uuid, settings: syncData }
     });
   }
 
@@ -392,10 +644,18 @@ export class StorageService {
     // Check duplication by email if provided
     let existingUser = null;
     if (payload.email) {
-      existingUser = await prisma.user.findUnique({ where: { email: payload.email } });
+      existingUser = await prisma.user.findUnique({
+        where: { email: payload.email }
+      }) as any;
     }
     if (!existingUser) {
-      existingUser = await prisma.user.findUnique({ where: { uuid: payload.id } });
+      existingUser = await prisma.user.findUnique({
+        where: { uuid: payload.id }
+      }) as any;
+    }
+
+    if (existingUser) {
+      existingUser.preference = await prismaAny.userPreference.findUnique({ where: { userId: existingUser.uuid } });
     }
 
     const syncData = payload.config || {};
@@ -412,31 +672,46 @@ export class StorageService {
 
     logger.info(`[Sync] Upserting user ${payload.id}. HasSettings=${!!payload.settings} HasConfig=${!!payload.config}`);
 
+    let userObj;
     if (existingUser) {
-      // Update
-      const updated = await prisma.user.update({
+      // Update User
+      userObj = await prisma.user.update({
         where: { id: existingUser.id }, // Use internal Int ID
         data: {
           username: payload.username || existingUser.username,
           email: payload.email || existingUser.email,
-          syncData: { ...(existingUser.syncData as object), ...syncData }, // Merge
           lastActive: now,
         }
-      });
-      return this.mapDbUserToUser(updated);
+      }) as any;
+
+      const existingSettingsObj = (existingUser as any).preference?.settings || {};
+
+      userObj.preference = await prismaAny.userPreference.upsert({
+        where: { userId: userObj.uuid },
+        update: { settings: { ...(existingSettingsObj as object), ...syncData } },
+        create: { userId: userObj.uuid, settings: { ...(existingSettingsObj as object), ...syncData } }
+      }) as any;
+
+      return this.mapDbUserToUser(userObj);
     } else {
-      // Create
-      const created = await prisma.user.create({
+      // Create User
+      userObj = await prisma.user.create({
         data: {
           uuid: payload.id,
           username: payload.username || payload.id,
           email: payload.email,
           registeredAt: payload.registeredAt ? new Date(payload.registeredAt) : now,
           lastActive: now,
-          syncData: syncData,
         }
       });
-      return this.mapDbUserToUser(created);
+
+      userObj = Object.assign({}, userObj, {
+        preference: await prismaAny.userPreference.create({
+          data: { userId: userObj.uuid, settings: syncData }
+        })
+      });
+
+      return this.mapDbUserToUser(userObj);
     }
   }
 
@@ -458,8 +733,8 @@ export class StorageService {
       refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
       refreshCron: s.refreshCron ?? undefined,
       lastRefreshAt: s.lastFetchAt?.toISOString(),
-      lastRefreshStatus: 'ok', // Simplified
-      lastRefreshError: undefined,
+      lastRefreshStatus: (s.errorCount && s.lastErrorMessage) ? 'error' : 'ok',
+      lastRefreshError: s.lastErrorMessage || undefined,
       articleCount: s._count?.articles ?? 0,
       subscriberCount: s._count?.users ?? 0,
       isPublic: s.isPublic,
@@ -474,12 +749,15 @@ export class StorageService {
         name: true,
         category: true,
         description: true,
+        isActive: true,
         createdAt: true,
         updatedAt: true,
         refreshIntervalSeconds: true,
         refreshCron: true,
         lastFetchAt: true,
         isPublic: true,
+        errorCount: true,
+        lastErrorMessage: true,
       },
     });
 
@@ -489,13 +767,14 @@ export class StorageService {
       name: s.name,
       category: s.category,
       description: s.description || undefined,
+      isActive: s.isActive !== false,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt.toISOString(),
       refreshIntervalSeconds: s.refreshIntervalSeconds ?? undefined,
       refreshCron: s.refreshCron ?? undefined,
       lastRefreshAt: s.lastFetchAt?.toISOString(),
-      lastRefreshStatus: 'ok',
-      lastRefreshError: undefined,
+      lastRefreshStatus: (s.errorCount && s.lastErrorMessage) ? 'error' : 'ok',
+      lastRefreshError: s.lastErrorMessage || undefined,
       isPublic: s.isPublic,
     }));
   }
@@ -707,7 +986,12 @@ export class StorageService {
       where: { id },
       data: {
         lastFetchAt: new Date(data.lastRefreshAt),
-        // We don't store error status in DB currently to keep it simple, or add fields to RSSSource
+        ...(data.status === 'ok'
+          ? { errorCount: 0, lastErrorMessage: null }
+          : {
+            errorCount: { increment: 1 },
+            lastErrorMessage: (data.error ? String(data.error).slice(0, 500) : 'Unknown error'),
+          }),
       }
     });
   }
@@ -1113,13 +1397,23 @@ export class StorageService {
     });
   }
 
-  public async cleanupArticles(): Promise<{ deletedByRetention: number; deletedByMaxCount: number }> {
+  public async cleanupArticles(): Promise<{
+    deletedByRetention: number;
+    deletedByMaxCount: number;
+    deletedSyncDeliveries: number;
+    deletedDailyReports: number;
+  }> {
     const settings = this.getSettings();
     const retentionDays = settings.retentionDays ?? 0;
     const maxCount = settings.retentionMaxArticlesPerFeed ?? 0;
+    const syncDeliveryRetentionRaw = parseInt(String(process.env.SYNC_DELIVERY_RETENTION_DAYS || ''), 10);
+    const syncDeliveryRetentionDays = Number.isFinite(syncDeliveryRetentionRaw) && syncDeliveryRetentionRaw > 0 ? syncDeliveryRetentionRaw : 30;
+    const dailyReportRetentionDays = settings.dailyReportRetentionDays ?? 90;
 
     let deletedByRetention = 0;
     let deletedByMaxCount = 0;
+    let deletedSyncDeliveries = 0;
+    let deletedDailyReports = 0;
 
     const sources = await prisma.rSSSource.findMany({ select: { id: true } });
 
@@ -1154,7 +1448,27 @@ export class StorageService {
       }
     }
 
-    return { deletedByRetention, deletedByMaxCount };
+    if (syncDeliveryRetentionDays > 0) {
+      const cutoff = new Date(Date.now() - syncDeliveryRetentionDays * 24 * 60 * 60 * 1000);
+      const res = await prisma.syncDelivery.deleteMany({
+        where: {
+          ackedAt: { lt: cutoff },
+        },
+      });
+      deletedSyncDeliveries += res.count || 0;
+    }
+
+    if (dailyReportRetentionDays > 0) {
+      const cutoff = new Date(Date.now() - dailyReportRetentionDays * 24 * 60 * 60 * 1000);
+      const res = await (prisma as any).dailyReport.deleteMany({
+        where: {
+          generatedAt: { lt: cutoff },
+        },
+      });
+      deletedDailyReports += res?.count || 0;
+    }
+
+    return { deletedByRetention, deletedByMaxCount, deletedSyncDeliveries, deletedDailyReports };
   }
 
   public async deleteFeed(id: string) {
@@ -1239,6 +1553,31 @@ export class StorageService {
     } catch (err) {
       logger.error('Failed to get database size:', err);
       return 0;
+    }
+  }
+
+  private computeAdvisoryLockKeys(name: string): { k1: number; k2: number } {
+    const buf = crypto.createHash('sha256').update(String(name || '')).digest();
+    return { k1: buf.readInt32BE(0), k2: buf.readInt32BE(4) };
+  }
+
+  public async tryAcquireAdvisoryLock(name: string): Promise<boolean> {
+    try {
+      const { k1, k2 } = this.computeAdvisoryLockKeys(name);
+      const rows: any[] = await prisma.$queryRaw`SELECT pg_try_advisory_lock(${k1}, ${k2}) as locked`;
+      return !!rows?.[0]?.locked;
+    } catch (e) {
+      logger.warn(`[Lock] tryAcquireAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
+      return true;
+    }
+  }
+
+  public async releaseAdvisoryLock(name: string): Promise<void> {
+    try {
+      const { k1, k2 } = this.computeAdvisoryLockKeys(name);
+      await prisma.$queryRaw`SELECT pg_advisory_unlock(${k1}, ${k2})`;
+    } catch (e) {
+      logger.warn(`[Lock] releaseAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
     }
   }
 
@@ -1563,9 +1902,122 @@ export class StorageService {
     }
   }
 
+  public async recordLLMUsageEvent(event: {
+    userId: string;
+    requestId?: string;
+    feature: string;
+    status: string;
+    provider?: string;
+    model?: string;
+    profileId?: string;
+    cacheKey?: string;
+    cacheHit?: boolean;
+    durationMs: number;
+    tokensTotal?: number;
+    tokensPrompt?: number;
+    tokensCompletion?: number;
+    httpStatus?: number;
+    errorType?: string;
+    errorMessage?: string;
+  }): Promise<void> {
+    const id = crypto.randomUUID();
+    const safeMessage = (() => {
+      const raw = String(event.errorMessage || '').trim();
+      if (!raw) return null;
+      const sliced = raw.length > 500 ? raw.slice(0, 500) : raw;
+      return sliced;
+    })();
+
+    try {
+      await prisma.$executeRaw`
+INSERT INTO "llm_usage_events" (
+  "id",
+  "userId",
+  "requestId",
+  "feature",
+  "status",
+  "provider",
+  "model",
+  "profileId",
+  "cacheKey",
+  "cacheHit",
+  "durationMs",
+  "tokensTotal",
+  "tokensPrompt",
+  "tokensCompletion",
+  "httpStatus",
+  "errorType",
+  "errorMessage"
+) VALUES (
+  ${id},
+  ${event.userId},
+  ${event.requestId ?? null},
+  ${event.feature},
+  ${event.status},
+  ${event.provider ?? null},
+  ${event.model ?? null},
+  ${event.profileId ?? null},
+  ${event.cacheKey ?? null},
+  ${event.cacheHit === true},
+  ${Math.max(0, Math.floor(event.durationMs || 0))},
+  ${event.tokensTotal ?? null},
+  ${event.tokensPrompt ?? null},
+  ${event.tokensCompletion ?? null},
+  ${event.httpStatus ?? null},
+  ${event.errorType ?? null},
+  ${safeMessage}
+)
+      `;
+    } catch (err) {
+      logger.warn(`[LLM] failed to record usage event: ${(err as Error).message}`);
+    }
+  }
+
+  public async getLLMUsageSummary(rangeDays: number): Promise<Array<{
+    day: string;
+    feature: string;
+    requests: number;
+    ok: number;
+    rateLimited: number;
+    cacheHits: number;
+    avgMs: number;
+    p95Ms: number;
+    tokens: number;
+  }>> {
+    const days = Math.min(90, Math.max(1, Math.floor(rangeDays || 7)));
+    const rows: any[] = await prisma.$queryRaw`
+SELECT
+  date_trunc('day', "createdAt") AS day,
+  "feature" AS feature,
+  COUNT(*)::int AS requests,
+  SUM(CASE WHEN "status" = 'ok' THEN 1 ELSE 0 END)::int AS ok,
+  SUM(CASE WHEN "status" = 'rate_limited' THEN 1 ELSE 0 END)::int AS "rateLimited",
+  SUM(CASE WHEN "cacheHit" = true THEN 1 ELSE 0 END)::int AS "cacheHits",
+  COALESCE(AVG("durationMs")::int, 0) AS "avgMs",
+  COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::int, 0) AS "p95Ms",
+  COALESCE(SUM(COALESCE("tokensTotal", 0))::bigint, 0)::bigint AS tokens
+FROM "llm_usage_events"
+WHERE "createdAt" >= (NOW() - (${days}::int * interval '1 day'))
+GROUP BY 1, 2
+ORDER BY 1 DESC, 2 ASC
+    `;
+
+    return rows.map((r) => ({
+      day: new Date(r.day).toISOString(),
+      feature: String(r.feature),
+      requests: Number(r.requests || 0),
+      ok: Number(r.ok || 0),
+      rateLimited: Number(r.rateLimited || 0),
+      cacheHits: Number(r.cacheHits || 0),
+      avgMs: Number(r.avgMs || 0),
+      p95Ms: Number(r.p95Ms || 0),
+      tokens: Number(r.tokens || 0),
+    }));
+  }
+
   // Helpers
   private mapDbUserToUser(dbUser: any): User {
-    const syncData = (dbUser.syncData as any) || {};
+    const syncData = dbUser.preference?.settings || {};
     const configSync = syncData && typeof syncData === 'object' ? (syncData as any).configSync : undefined;
     const settingsFromConfigSync =
       configSync && typeof configSync === 'object' && (configSync as any).settings && typeof (configSync as any).settings === 'object'
@@ -1582,18 +2034,18 @@ export class StorageService {
     const settings =
       settingsRaw && typeof settingsRaw === 'object'
         ? (() => {
-            const cloned: any = { ...(settingsRaw as any) };
-            if (cloned.appSettings && typeof cloned.appSettings === 'object') {
-              cloned.appSettings = { ...cloned.appSettings };
-              if ('sync' in cloned.appSettings) {
-                delete cloned.appSettings.sync;
-              }
+          const cloned: any = { ...(settingsRaw as any) };
+          if (cloned.appSettings && typeof cloned.appSettings === 'object') {
+            cloned.appSettings = { ...cloned.appSettings };
+            if ('sync' in cloned.appSettings) {
+              delete cloned.appSettings.sync;
             }
-            if ('sync' in cloned) {
-              delete cloned.sync;
-            }
-            return cloned;
-          })()
+          }
+          if ('sync' in cloned) {
+            delete cloned.sync;
+          }
+          return cloned;
+        })()
         : settingsRaw;
 
     return {

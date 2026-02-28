@@ -14,6 +14,9 @@ export class CloudSyncService implements IRSSProvider {
   private stateSyncTimer: NodeJS.Timeout | null = null;
   private stateSyncInFlight: Promise<void> | null = null;
   private stateSyncNeedsRunAfter: boolean = false;
+  private static readonly minStateSyncIntervalMs = 10 * 60 * 1000;
+  private static readonly minStatePullIntervalMs = 12 * 60 * 60 * 1000;
+  private statePullInFlight: Promise<boolean> | null = null;
 
   private normalizeFeedUrl(url: string): string {
     return String(url || "")
@@ -62,15 +65,7 @@ export class CloudSyncService implements IRSSProvider {
 
   public async scheduleStateSync(delayMs: number = 10000): Promise<void> {
     this.stateSyncNeedsRunAfter = true;
-    if (this.stateSyncInFlight) return;
-    if (this.stateSyncTimer) return;
-
-    this.stateSyncTimer = setTimeout(() => {
-      this.stateSyncTimer = null;
-      this.runStateSync().catch((err) =>
-        logger.warn("[CloudSync] Scheduled state sync failed:", err),
-      );
-    }, delayMs);
+    void delayMs;
   }
 
   private async runStateSync(): Promise<void> {
@@ -501,7 +496,7 @@ export class CloudSyncService implements IRSSProvider {
   /**
    * Sync User Article States (Read/Favorite)
    */
-  public async syncUserArticleStates(): Promise<void> {
+  public async syncUserArticleStates(mode: 'push' | 'pull' | 'both' = 'both'): Promise<boolean> {
     try {
       const [appSettings, cloudConfig] = await Promise.all([
         this.settingsService.getAppSettings(),
@@ -513,72 +508,169 @@ export class CloudSyncService implements IRSSProvider {
         logger.info(
           "[CloudSync] Skip state sync: Cloud mode enabled but not logged in",
         );
-        return;
+        return false;
       }
 
       const userId = appSettings.sync.userId;
       if (!userId) {
-        return;
+        return false;
       }
 
       const serverUrl = await this.getServerUrl();
       const lastSync = appSettings.sync.lastStateSyncAt || 0;
       const nowIso = new Date().toISOString();
 
-      // 1. Gather local changes (dirty states) - Simplified: Just send all read/fav articles updated recently
-      // In a real app, we should track dirty flags. Here we scan articles updated > lastSync
-      // Or just send everything marked as read/fav? Sending all might be heavy.
-      // Let's optimize: Send states for articles that are read or favorite
+      const remoteSinceIso = new Date(lastSync).toISOString();
 
-      // For MVP: Send all local read/favorite states to server (Merge strategy)
-      const localStates = await this.databaseService.executeQuery(
-        `SELECT url, is_read, is_favorite, read_progress, updated_at 
-         FROM articles 
-         WHERE (is_read = 1 OR is_favorite = 1) 
-         AND updated_at > ?`, // Only send changes since last sync? Or just all?
-        [new Date(lastSync).toISOString()],
-      );
+      let pushOk = true;
+      if (mode === 'push' || mode === 'both') {
+        const dirtyRows: any[] = await this.databaseService
+          .executeQuery(
+            `SELECT article_url, is_read, is_favorite, updated_at
+             FROM article_state_changes
+             ORDER BY updated_at ASC
+             LIMIT 500`
+          )
+          .catch(() => []);
 
-      if (localStates.length > 0) {
-        const payload = localStates.map((r: any) => ({
-          userId,
-          articleUrl: r.url,
-          isRead: r.is_read === 1,
-          isFavorite: r.is_favorite === 1,
-          readProgress: r.read_progress,
-          updatedAt: new Date(r.updated_at).toISOString(),
-        }));
+        const now = Date.now();
+        const shouldSkipBecauseRecent =
+          dirtyRows.length === 0 &&
+          lastSync > 0 &&
+          now - lastSync < CloudSyncService.minStateSyncIntervalMs;
+        if (shouldSkipBecauseRecent) {
+          return true;
+        }
+        if (!shouldSkipBecauseRecent) {
+          let totalPushed = 0;
+          while (dirtyRows.length > 0) {
+            const batch = dirtyRows.splice(0, 200);
+            const payload = batch.map((r: any) => ({
+              articleUrl: String(r.article_url),
+              isRead: r.is_read === 1,
+              isFavorite: r.is_favorite === 1,
+              updatedAt: String(r.updated_at || nowIso),
+            }));
 
-        await this.authenticatedFetch(`${serverUrl}/api/rss/syncState`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, states: payload }),
-        });
-        logger.info(`[CloudSync] Pushed ${payload.length} article states`);
+            const resp = await this.authenticatedFetch(`${serverUrl}/api/rss/syncState`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId, states: payload }),
+            });
+            if (!resp.ok) {
+              pushOk = false;
+              break;
+            }
+            totalPushed += payload.length;
+
+            const placeholders = payload.map(() => '?').join(',');
+            await this.databaseService
+              .executeStatement(
+                `DELETE FROM article_state_changes WHERE article_url IN (${placeholders})`,
+                payload.map((p: any) => p.articleUrl)
+              )
+              .catch(() => { });
+
+            if (dirtyRows.length === 0) {
+              const more: any[] = await this.databaseService
+                .executeQuery(
+                  `SELECT article_url, is_read, is_favorite, updated_at
+                   FROM article_state_changes
+                   ORDER BY updated_at ASC
+                   LIMIT 500`
+                )
+                .catch(() => []);
+              dirtyRows.push(...more);
+            }
+          }
+          if (totalPushed > 0) {
+            logger.info(`[CloudSync] Pushed ${totalPushed} article states`);
+          }
+        }
       }
 
-      // 2. Pull remote changes
-      const pullUrl = `${serverUrl}/api/rss/syncState?userId=${userId}&since=${new Date(lastSync).toISOString()}`;
-      const resp = await this.authenticatedFetch(pullUrl);
-      if (resp.ok) {
-        const data = await resp.json();
-        const remoteStates = data.states || [];
+      if (mode === 'pull' || mode === 'both') {
+        const pullUrl = `${serverUrl}/api/rss/syncState?userId=${userId}&since=${encodeURIComponent(remoteSinceIso)}`;
+        const resp = await this.authenticatedFetch(pullUrl);
+        if (resp.ok) {
+          const data = await resp.json();
+          const remoteStates = data.states || [];
 
-        if (remoteStates.length > 0) {
-          await this.applyRemoteStates(remoteStates);
-          logger.info(
-            `[CloudSync] Pulled ${remoteStates.length} article states`,
-          );
+          if (remoteStates.length > 0) {
+            await this.applyRemoteStates(remoteStates);
+            logger.info(
+              `[CloudSync] Pulled ${remoteStates.length} article states`,
+            );
+          }
+        } else {
+          pushOk = false;
         }
+      }
 
-        // Update sync timestamp
+      if (pushOk) {
         await this.settingsService.updateAppSettingNoCloudSync("sync", {
           ...appSettings.sync,
           lastStateSyncAt: Date.now(),
         });
       }
+      return pushOk;
     } catch (error) {
       logger.error("[CloudSync] State sync failed:", error);
+      return false;
+    }
+  }
+
+  public async flushPendingStateSyncOnAppBackground(): Promise<void> {
+    if (this.stateSyncInFlight) return;
+    if (!this.stateSyncNeedsRunAfter) return;
+    this.stateSyncNeedsRunAfter = false;
+    try {
+      const ok = await this.syncUserArticleStates('push');
+      if (!ok) {
+        this.stateSyncNeedsRunAfter = true;
+      }
+    } catch (e) {
+      this.stateSyncNeedsRunAfter = true;
+      logger.warn("[CloudSync] Flush state sync on background failed:", e);
+    }
+  }
+
+  public async pullUserArticleStatesOnAppActiveIfNeeded(): Promise<void> {
+    if (this.statePullInFlight) {
+      await this.statePullInFlight.catch(() => false);
+      return;
+    }
+
+    this.statePullInFlight = (async () => {
+      const [appSettings, cloudConfig] = await Promise.all([
+        this.settingsService.getAppSettings(),
+        cloudConfigService.getConfig(),
+      ]);
+      const token = AuthService.getAuthToken() ?? cloudConfig.auth?.accessToken;
+      if (!token) return false;
+      if (!cloudConfig.serverUrl) return false;
+      if (!appSettings.sync.userId) return false;
+
+      const lastPullAt = Number(appSettings.sync.lastStatePullAt || 0);
+      const now = Date.now();
+      if (lastPullAt > 0 && now - lastPullAt < CloudSyncService.minStatePullIntervalMs) {
+        return true;
+      }
+
+      const ok = await this.syncUserArticleStates('pull');
+      if (ok) {
+        await this.settingsService.updateAppSettingNoCloudSync("sync", {
+          ...appSettings.sync,
+          lastStatePullAt: Date.now(),
+        });
+      }
+      return ok;
+    })();
+
+    try {
+      await this.statePullInFlight;
+    } finally {
+      this.statePullInFlight = null;
     }
   }
 
@@ -601,12 +693,11 @@ export class CloudSyncService implements IRSSProvider {
       // Update local article if exists
       await this.databaseService.executeStatement(
         `UPDATE articles 
-         SET is_read = ?, is_favorite = ?, read_progress = ?, updated_at = ? 
+         SET is_read = ?, is_favorite = ?, updated_at = ? 
          WHERE url = ?`,
         [
           state.isRead ? 1 : 0,
           state.isFavorite ? 1 : 0,
-          state.readProgress || 0,
           new Date().toISOString(), // Update local timestamp
           state.articleUrl,
         ],

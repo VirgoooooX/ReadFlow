@@ -4,10 +4,141 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import dns from 'dns';
+import net from 'net';
+import { Transform } from 'stream';
 import { logger } from '../utils/Logger';
 import { storageService } from '../services/StorageService';
 
 export class ImageProxyController {
+  private static readonly rateWindowMs = 60_000;
+  private static readonly ipRate = new Map<string, { window: number; count: number; lastSeenAt: number }>();
+
+  private static isPrivateIp(ip: string): boolean {
+    const v = net.isIP(ip);
+    if (v === 4) {
+      const parts = ip.split('.').map((p) => parseInt(p, 10));
+      if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return true;
+      const [a, b] = parts;
+      if (a === 10) return true;
+      if (a === 127) return true;
+      if (a === 0) return true;
+      if (a === 169 && b === 254) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 100 && b >= 64 && b <= 127) return true;
+      if (a >= 224) return true;
+      return false;
+    }
+    if (v === 6) {
+      const normalized = ip.toLowerCase();
+      if (normalized === '::1' || normalized === '::') return true;
+      if (normalized.startsWith('fe80:')) return true;
+      if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+      return false;
+    }
+    return true;
+  }
+
+  private static async assertSafeRemoteUrl(urlStr: string): Promise<URL> {
+    let urlObj: URL;
+    try {
+      urlObj = new URL(urlStr);
+    } catch {
+      throw new Error('Invalid url');
+    }
+    const protocol = urlObj.protocol.toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') throw new Error('Unsupported url protocol');
+    if (urlObj.username || urlObj.password) throw new Error('URL must not contain credentials');
+    const hostname = urlObj.hostname;
+    if (!hostname) throw new Error('Invalid url hostname');
+    if (hostname === 'localhost') throw new Error('Blocked host');
+    const ipType = net.isIP(hostname);
+    if (ipType) {
+      if (this.isPrivateIp(hostname)) throw new Error('Blocked private address');
+      return urlObj;
+    }
+    const lookup = dns.promises.lookup(hostname, { all: true });
+    const records = await Promise.race([
+      lookup,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('DNS lookup timeout')), 2000)),
+    ]);
+    for (const r of records) {
+      if (this.isPrivateIp(String((r as any).address || ''))) {
+        throw new Error('Blocked private address');
+      }
+    }
+    return urlObj;
+  }
+
+  private static createByteLimitStream(maxBytes: number) {
+    let total = 0;
+    return new Transform({
+      transform(chunk, _enc, cb) {
+        total += (chunk as Buffer).length;
+        if (total > maxBytes) {
+          cb(new Error('Image too large'));
+          return;
+        }
+        cb(null, chunk);
+      }
+    });
+  }
+
+  private static getClientIp(req: Request): string {
+    const xf = req.headers['x-forwarded-for'];
+    if (typeof xf === 'string' && xf.trim()) {
+      return xf.split(',')[0].trim();
+    }
+    return String((req as any).ip || (req as any).socket?.remoteAddress || '');
+  }
+
+  private static isRateLimited(req: Request, limitPerMin: number): boolean {
+    if (limitPerMin <= 0) return false;
+    const ip = this.getClientIp(req);
+    if (!ip) return false;
+    const now = Date.now();
+    const window = Math.floor(now / this.rateWindowMs);
+    const key = `${ip}:${window}`;
+    const prev = this.ipRate.get(key);
+    const nextCount = (prev?.count || 0) + 1;
+    this.ipRate.set(key, { window, count: nextCount, lastSeenAt: now });
+
+    if (this.ipRate.size > 20_000) {
+      const pruneBefore = now - 5 * this.rateWindowMs;
+      for (const [k, v] of this.ipRate.entries()) {
+        if (v.lastSeenAt < pruneBefore) this.ipRate.delete(k);
+      }
+    }
+
+    return nextCount > limitPerMin;
+  }
+
+  private static async fetchWithSafeRedirects(
+    startUrl: string,
+    init: any,
+    maxHops: number
+  ): Promise<{ response: any; finalUrl: string }> {
+    let current = startUrl;
+    for (let i = 0; i <= maxHops; i++) {
+      await this.assertSafeRemoteUrl(current);
+      const resp = await fetch(current, { ...init, redirect: 'manual' } as any);
+      const status = resp?.status;
+      const isRedirect = status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+      if (!isRedirect) return { response: resp, finalUrl: current };
+
+      const loc = String(resp.headers?.get?.('location') || '').trim();
+      try {
+        (resp as any).body?.destroy?.();
+      } catch {
+      }
+      if (!loc) return { response: resp, finalUrl: current };
+      if (i >= maxHops) throw new Error('Too many redirects');
+      current = new URL(loc, current).toString();
+    }
+    throw new Error('Too many redirects');
+  }
+
   /**
    * 代理并处理图片
    * GET /api/image?url=...&w=...&q=...
@@ -24,7 +155,7 @@ export class ImageProxyController {
     while (imageUrl.endsWith(']') || imageUrl.endsWith(')') || imageUrl.endsWith('>')) {
       imageUrl = imageUrl.slice(0, -1).trim();
     }
-    const width = req.query.w ? parseInt(req.query.w as string) : null;
+    const widthRaw = req.query.w ? parseInt(req.query.w as string) : null;
     const settings = storageService.getSettings();
     const transcodeEnabled = settings.imageTranscodeEnabled !== false;
     const rawRequested = req.query.raw === '1' || req.query.raw === 'true' || req.query.mode === 'raw';
@@ -32,6 +163,16 @@ export class ImageProxyController {
     const requestedQRaw = req.query.q ? parseInt(req.query.q as string) : null;
     const requestedQ = Number.isFinite(requestedQRaw) ? requestedQRaw : null;
     const quality = requestedQ === 100 ? 100 : (settings.imageQuality || 80);
+    const maxWidthRaw = parseInt(String(process.env.IMAGE_MAX_WIDTH || ''), 10);
+    const maxWidth = Number.isFinite(maxWidthRaw) && maxWidthRaw > 0 ? maxWidthRaw : 2048;
+    const width = widthRaw && widthRaw > 0 ? Math.min(widthRaw, maxWidth) : null;
+    const maxBytesRaw = parseInt(String(process.env.IMAGE_MAX_BYTES || ''), 10);
+    const maxBytes = Number.isFinite(maxBytesRaw) && maxBytesRaw > 0 ? maxBytesRaw : 25 * 1024 * 1024;
+    const weservEnabled = (() => {
+      const v = String(process.env.IMAGE_WESERV_FALLBACK_ENABLED || '').trim().toLowerCase();
+      if (!v) return process.env.NODE_ENV !== 'production';
+      return v === '1' || v === 'true';
+    })();
 
     if (!imageUrl) {
       return res.status(400).send('Missing url parameter');
@@ -47,6 +188,11 @@ export class ImageProxyController {
 
     try {
       const controller = new AbortController();
+      const timeoutMsRaw = parseInt(String(process.env.IMAGE_FETCH_TIMEOUT_MS || ''), 10);
+      const timeoutMs = Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0 ? timeoutMsRaw : 15000;
+      const timeoutId = setTimeout(() => {
+        try { controller.abort(); } catch { }
+      }, timeoutMs);
       let response: any | null = null;
       let transformer: any | null = null;
       let cacheHitStream: fs.ReadStream | null = null;
@@ -57,6 +203,10 @@ export class ImageProxyController {
         finished = true;
         try {
           controller.abort();
+        } catch {
+        }
+        try {
+          clearTimeout(timeoutId);
         } catch {
         }
         try {
@@ -94,9 +244,16 @@ export class ImageProxyController {
           stream.on('error', () => {
             if (!res.headersSent) res.status(500).send('Image cache read failed');
           });
+          fs.promises.utimes(cacheFile, new Date(), new Date()).catch(() => { });
           stream.pipe(res);
           return;
         }
+      }
+
+      const rateLimitRaw = parseInt(String(process.env.IMAGE_RATE_LIMIT_PER_IP_PER_MIN || ''), 10);
+      const rateLimit = Number.isFinite(rateLimitRaw) && rateLimitRaw > 0 ? rateLimitRaw : 0;
+      if (ImageProxyController.isRateLimited(req, rateLimit)) {
+        return res.status(429).send('Too many requests');
       }
 
       // 2. 获取远程图片
@@ -153,7 +310,12 @@ export class ImageProxyController {
 
       for (const referer of referers.length > 0 ? referers : ['']) {
         lastReferer = referer;
-        response = await fetch(imageUrl, { headers: buildHeaders(referer), signal: controller.signal } as any);
+        const result = await ImageProxyController.fetchWithSafeRedirects(
+          imageUrl,
+          { headers: buildHeaders(referer), signal: controller.signal },
+          3
+        );
+        response = result.response;
         if (response.ok) break;
         lastStatus = response.status;
         if (response.status !== 403 && response.status !== 401) break;
@@ -163,15 +325,38 @@ export class ImageProxyController {
         }
       }
 
-      if (response && !response.ok && (lastStatus === 403 || lastStatus === 401)) {
+      if (weservEnabled && response && !response.ok && (lastStatus === 403 || lastStatus === 401)) {
         lastReferer = 'https://images.weserv.nl/';
         const fallbackUrl = `https://images.weserv.nl/?url=${encodeURIComponent(imageUrl)}`;
-        response = await fetch(fallbackUrl, { headers: buildHeaders(lastReferer), signal: controller.signal } as any);
+        response = (await ImageProxyController.fetchWithSafeRedirects(
+          fallbackUrl,
+          { headers: buildHeaders(lastReferer), signal: controller.signal },
+          2
+        )).response;
       }
 
       if (!response.ok) {
         logger.warn(`Failed to fetch image: ${imageUrl}, status: ${response.status}, referer: ${lastReferer || '-'}`);
         return res.status(response.status).send(`Failed to fetch image`);
+      }
+
+      const contentType = String(response.headers?.get?.('content-type') || '').toLowerCase();
+      if (contentType) {
+        const okImage = contentType.startsWith('image/');
+        const likelyNotImage =
+          contentType.startsWith('text/') ||
+          contentType.includes('html') ||
+          contentType.includes('json') ||
+          contentType.includes('xml');
+        if (!okImage && (!raw || likelyNotImage)) {
+          return res.status(415).send('Unsupported media type');
+        }
+      }
+
+      const contentLengthRaw = response.headers?.get?.('content-length');
+      const contentLength = contentLengthRaw ? parseInt(String(contentLengthRaw), 10) : NaN;
+      if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        return res.status(413).send('Image too large');
       }
 
       if (raw) {
@@ -183,7 +368,12 @@ export class ImageProxyController {
         res.setHeader('X-ReadFlow-Image-Mode', 'raw');
         res.setHeader('X-ReadFlow-Image-Source-ContentType', response.headers?.get?.('content-type') || '');
         res.setHeader('X-ReadFlow-Image-Source-ContentLength', response.headers?.get?.('content-length') || '');
-        response.body.pipe(res);
+        const limiter = ImageProxyController.createByteLimitStream(maxBytes);
+        limiter.on('error', () => {
+          cleanup();
+          if (!res.headersSent) res.status(413).send('Image too large');
+        });
+        response.body.pipe(limiter).pipe(res);
         return;
       }
 
@@ -233,7 +423,16 @@ export class ImageProxyController {
       }
 
       // 开始处理
-      response.body.pipe(transformer);
+      const limiter = ImageProxyController.createByteLimitStream(maxBytes);
+      limiter.on('error', () => {
+        cleanup();
+        if (!res.headersSent) res.status(413).send('Image too large');
+      });
+      transformer.on('error', () => {
+        cleanup();
+        if (!res.headersSent) res.status(415).send('Invalid image');
+      });
+      response.body.pipe(limiter).pipe(transformer);
       
       // 分支 1: 写入缓存 (异步)
       transformer.clone().toFile(cacheFile!).catch((err: any) => {

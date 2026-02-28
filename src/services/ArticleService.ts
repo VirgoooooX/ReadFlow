@@ -14,6 +14,48 @@ export class ArticleService {
     this.databaseService = DatabaseService.getInstance();
   }
 
+  private async recordStateChangeByUrl(url: string): Promise<void> {
+    const normalizedUrl = String(url || '').trim();
+    if (!normalizedUrl) return;
+    try {
+      const rows = await this.databaseService.executeQuery(
+        'SELECT url, is_read, is_favorite FROM articles WHERE url = ? LIMIT 1',
+        [normalizedUrl]
+      );
+      const row = rows?.[0];
+      if (!row) return;
+
+      const nowIso = new Date().toISOString();
+      await this.databaseService.executeStatement(
+        `INSERT INTO article_state_changes (article_url, is_read, is_favorite, read_progress, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(article_url) DO UPDATE SET
+           is_read=excluded.is_read,
+           is_favorite=excluded.is_favorite,
+           read_progress=excluded.read_progress,
+           updated_at=excluded.updated_at`,
+        [
+          normalizedUrl,
+          (row as any).is_read === 1 ? 1 : 0,
+          (row as any).is_favorite === 1 ? 1 : 0,
+          null,
+          nowIso,
+        ]
+      );
+    } catch {
+    }
+  }
+
+  private async recordStateChangeById(id: number): Promise<void> {
+    try {
+      const rows = await this.databaseService.executeQuery('SELECT url FROM articles WHERE id = ? LIMIT 1', [id]);
+      const url = rows?.[0]?.url ? String(rows[0].url) : '';
+      if (!url) return;
+      await this.recordStateChangeByUrl(url);
+    } catch {
+    }
+  }
+
   public static getInstance(): ArticleService {
     if (!ArticleService.instance) {
       ArticleService.instance = new ArticleService();
@@ -259,6 +301,8 @@ export class ArticleService {
         [progress, new Date().toISOString(), id]
       );
 
+      await this.recordStateChangeById(id);
+
       // 获取文章的源ID，并更新该源的未读数量
       const article = await this.getArticleById(id);
       if (article) {
@@ -296,7 +340,7 @@ export class ArticleService {
 
       const rows = await this.databaseService
         .executeQuery(
-          `SELECT id, rss_source_id as sourceId FROM articles WHERE id IN (${placeholders})`,
+          `SELECT id, url, rss_source_id as sourceId FROM articles WHERE id IN (${placeholders})`,
           ids
         )
         .catch(() => []);
@@ -304,6 +348,7 @@ export class ArticleService {
       const affectedSourceIds = new Set<number>();
       for (const row of rows) {
         const articleId = Number((row as any).id);
+        const url = (row as any).url ? String((row as any).url) : '';
         const sourceIdRaw = (row as any).sourceId;
         const sourceId = sourceIdRaw === null || sourceIdRaw === undefined ? null : Number(sourceIdRaw);
 
@@ -316,6 +361,9 @@ export class ArticleService {
         }
         if (sourceId !== null && !Number.isNaN(sourceId)) {
           affectedSourceIds.add(sourceId);
+        }
+        if (url) {
+          await this.recordStateChangeByUrl(url);
         }
       }
 
@@ -345,17 +393,21 @@ export class ArticleService {
 
       const rows = await this.databaseService
         .executeQuery(
-          `SELECT DISTINCT rss_source_id as sourceId FROM articles WHERE id IN (${placeholders})`,
+          `SELECT id, url, rss_source_id as sourceId FROM articles WHERE id IN (${placeholders})`,
           ids
         )
         .catch(() => []);
 
       const affectedSourceIds: number[] = [];
       for (const row of rows) {
+        const url = (row as any).url ? String((row as any).url) : '';
         const sourceIdRaw = (row as any).sourceId;
         const sourceId = sourceIdRaw === null || sourceIdRaw === undefined ? null : Number(sourceIdRaw);
         if (sourceId !== null && !Number.isNaN(sourceId)) {
           affectedSourceIds.push(sourceId);
+        }
+        if (url) {
+          await this.recordStateChangeByUrl(url);
         }
       }
 
@@ -490,11 +542,14 @@ export class ArticleService {
         [id]
       );
 
+      await this.recordStateChangeById(id);
+
       // 获取文章的源ID，并更新该源的未读数量
       const article = await this.getArticleById(id);
       if (article && article.sourceId) {
         await this.updateSourceStats(article.sourceId, { reason: 'markUnread' });
       }
+      cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
     } catch (error) {
       logger.error('Error marking article as unread:', error);
     }
@@ -518,6 +573,7 @@ export class ArticleService {
         [newFavoriteStatus ? 1 : 0, id]
       );
 
+      await this.recordStateChangeById(id);
       cloudSyncService.scheduleStateSync().catch(e => logger.warn('[ArticleService] State sync schedule failed:', e));
 
       return newFavoriteStatus;

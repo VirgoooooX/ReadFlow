@@ -103,20 +103,8 @@ const MineScreen: React.FC = () => {
       {/* 第2组: 工具与服务 */}
       <SettingSection title="工具与服务">
         <SettingItem
-          icon="psychology"
-          label="AI 助手配置"
-          onPress={() => navigation.navigate('LLMSettings')}
-          color={theme.colors.primary}
-        />
-        <SettingItem
           icon="auto-awesome"
-          label="AI 日报设置"
-          onPress={() => navigation.navigate('DailyReportSettings')}
-          color={theme.colors.primary}
-        />
-        <SettingItem
-          icon="history"
-          label="AI 日报历史"
+          label="AI 日报"
           onPress={() => navigation.navigate('DailyReportList')}
           color={theme.colors.primary}
         />

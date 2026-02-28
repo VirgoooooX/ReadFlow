@@ -41,7 +41,6 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 import EditProfileScreen from '../screens/User/EditProfileScreen';
 import ReadingSettingsScreen from '../screens/Settings/ReadingSettingsScreen';
-import LLMSettingsScreen from '../screens/Settings/LLMSettingsScreen';
 import ThemeSettingsScreen from '../screens/Settings/ThemeSettingsScreen';
 import AboutScreen from '../screens/Settings/AboutScreen';
 import StorageManagementScreen from '../screens/Settings/StorageManagementScreen';
@@ -397,19 +396,6 @@ function UserStackNavigator() {
         )}
       </UserStack.Screen>
       <UserStack.Screen
-        name="LLMSettings"
-        options={{ title: 'LLM设置' }}
-      >
-        {(props: any) => (
-          <ScreenWithCustomHeader
-            title="LLM设置"
-            showBackButton={true}
-          >
-            <LLMSettingsScreen {...props} />
-          </ScreenWithCustomHeader>
-        )}
-      </UserStack.Screen>
-      <UserStack.Screen
         name="ThemeSettings"
         options={{ title: '主题设置' }}
       >
@@ -592,7 +578,7 @@ function UserStackNavigator() {
 
       <UserStack.Screen
         name="DailyReportList"
-        options={{ title: 'AI 日报历史' }}
+        options={{ title: 'AI 日报' }}
         component={DailyReportListScreen}
       />
 

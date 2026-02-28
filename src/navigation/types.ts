@@ -88,7 +88,6 @@ export type UserStackParamList = {
   UserMain: undefined;
   EditProfile: undefined;
   ReadingSettings: undefined;
-  LLMSettings: undefined;
   ThemeSettings: undefined;
   CustomColor: undefined;
   ProxyServerSettings: undefined;

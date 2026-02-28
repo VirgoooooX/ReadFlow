@@ -3,45 +3,7 @@
  * 用于 WebView 渲柣文章内容，包含样式和交互脚本
  */
 
-import { needsProxy, toProxyUrl } from './imageProxy';
 import type { Theme } from '../theme';
-
-/**
- * 替换 HTML 中需要代理的图片 URL (包括 src 和 srcset)
- */
-function proxyImagesInHtml(html: string): string {
-  if (!html) return html;
-
-  // 1. 替换 src 属性
-  let processedHtml = html.replace(/(<img[^>]*\ssrc=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, url, suffix) => {
-    if (needsProxy(url)) {
-      return `${prefix}${toProxyUrl(url)}${suffix}`;
-    }
-    return match;
-  });
-
-  // 2. 替换 srcset 属性
-  // 格式: srcset="url1 320w, url2 480w"
-  processedHtml = processedHtml.replace(/(<img[^>]*\ssrcset=["'])([^"']+)(["'][^>]*>)/gi, (match, prefix, srcsetContent, suffix) => {
-    // 分割 srcset 中的每一项
-    const sources = srcsetContent.split(',').map((item: string) => {
-      const parts = item.trim().split(/\s+/);
-      if (parts.length > 0) {
-        const url = parts[0];
-        if (needsProxy(url)) {
-          // 替换 URL 部分
-          parts[0] = toProxyUrl(url);
-          return parts.join(' ');
-        }
-      }
-      return item;
-    });
-
-    return `${prefix}${sources.join(', ')}${suffix}`;
-  });
-
-  return processedHtml;
-}
 
 export interface HtmlTemplateOptions {
   theme: Theme;
@@ -107,15 +69,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
   // 【新增】优化1：图片懒加载 - 处理内容添加loading="lazy"属性
   let optimizedContent = content.replace(/<img\s+/gi, '<img loading="lazy" ');
 
-  // 【新增】处理防盗链图片：将需要代理的图片 URL 替换为代理 URL
-  // 强制处理被墙域名（走公共代理）
-  optimizedContent = proxyImagesInHtml(optimizedContent);
-
-  // 处理封面图片的代理
   let proxiedImageUrl = imageUrl || '';
-  if (imageUrl && needsProxy(imageUrl)) {
-    proxiedImageUrl = toProxyUrl(imageUrl);
-  }
 
   // CSS 样式 - 优化英文排版和图片说明
   const css = `

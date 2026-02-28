@@ -5,7 +5,15 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'readflow_jwt_secret_default_key_change_me';
+const JWT_SECRET = (() => {
+  const raw = String(process.env.JWT_SECRET || '').trim();
+  if (raw) return raw;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is required in production');
+  }
+  logger.warn('[Auth] JWT_SECRET is not set; using an insecure development default');
+  return 'readflow_jwt_secret_default_key_change_me';
+})();
 
 // Helper to hash password
 function hashPassword(password: string): string {

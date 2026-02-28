@@ -1,7 +1,8 @@
 import { PrismaClient } from '.prisma/client';
-import fetch from 'node-fetch';
 import { logger } from '../utils/Logger';
 import { storageService } from './StorageService';
+import { llmGatewayService } from './LLMGatewayService';
+import { simpleHash } from '../utils/RSSUtils';
 
 const prisma = new PrismaClient({
     datasources: { db: { url: process.env.DATABASE_URL } },
@@ -12,20 +13,6 @@ const prisma = new PrismaClient({
 const prismaAny = prisma as any;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-interface LLMProfile {
-    id: string;
-    name: string;
-    provider: string;
-    model: string;
-    apiKey: string;
-    baseUrl: string;
-    temperature: number;
-    maxTokens: number;
-    topP: number;
-    isActive: boolean;
-    customModelName?: string;
-}
 
 interface DailyReportConfig {
     enabled: boolean;
@@ -86,62 +73,6 @@ function truncateText(text: string, maxLength: number = 1500): string {
     return text.substring(0, maxLength) + '...';
 }
 
-// ─── LLM Call ────────────────────────────────────────────────────────────────
-
-async function callLLM(
-    prompt: string,
-    systemPrompt: string,
-    profile: LLMProfile
-): Promise<string> {
-    const model = profile.customModelName || profile.model;
-    let baseUrl = profile.baseUrl || 'https://api.openai.com/v1';
-    // Normalize: ensure baseUrl ends with /v1 for OpenAI-compatible APIs
-    baseUrl = baseUrl.replace(/\/+$/, '');
-    if (!baseUrl.endsWith('/v1')) {
-        // Check if it already has a path like /v1/chat/completions
-        if (!baseUrl.includes('/v1')) {
-            baseUrl += '/v1';
-        }
-    }
-
-    const url = `${baseUrl}/chat/completions`;
-
-    const body = {
-        model,
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt },
-        ],
-        temperature: profile.temperature ?? 0.7,
-        max_tokens: profile.maxTokens ?? 4096,
-        top_p: profile.topP ?? 1,
-    };
-
-    logger.info(`[DailyReport] Calling LLM: model=${model} url=${url}`);
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${profile.apiKey}`,
-        },
-        body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`LLM API error ${response.status}: ${text.substring(0, 500)}`);
-    }
-
-    const data = await response.json() as any;
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) {
-        throw new Error('LLM returned empty content');
-    }
-
-    return content;
-}
-
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export class DailyReportService {
@@ -159,8 +90,12 @@ export class DailyReportService {
      */
     private getDailyReportConfig(userConfig: any): DailyReportConfig {
         const configSync = userConfig?.configSync || userConfig;
-        const settings = configSync?.settings || {};
-        const drSettings = settings?.dailyReportSettings;
+        const settings = (configSync?.settings && typeof configSync.settings === 'object') ? configSync.settings : {};
+        const drSettings =
+            settings?.dailyReportSettings
+            || configSync?.dailyReportSettings
+            || userConfig?.dailyReportSettings
+            || (userConfig?.settings && typeof userConfig.settings === 'object' ? userConfig.settings.dailyReportSettings : undefined);
 
         // Backwards compat: if scheduledTime not set, default to "06:00"
         let scheduledTime = '06:00';
@@ -177,60 +112,34 @@ export class DailyReportService {
     }
 
     /**
-     * Extract the LLM profile bound to dailyReport feature
-     */
-    private getLLMProfile(userConfig: any): LLMProfile | null {
-        const configSync = userConfig?.configSync || userConfig;
-        const settings = configSync?.settings || {};
-        const llmSettings = settings?.llmSettings;
-
-        if (!llmSettings || !Array.isArray(llmSettings.profiles) || llmSettings.profiles.length === 0) {
-            return null;
-        }
-
-        const bindings = llmSettings.bindings || {};
-        const boundId = bindings.dailyReport || bindings.translation; // fallback to translation binding
-        if (boundId) {
-            const found = llmSettings.profiles.find((p: LLMProfile) => p.id === boundId);
-            if (found && found.apiKey) return found;
-        }
-
-        // Fallback: first active profile with an API key
-        const fallback = llmSettings.profiles.find((p: LLMProfile) => p.isActive && p.apiKey);
-        return fallback || null;
-    }
-
-    /**
      * Get source URLs for the target groups from user's synced config
      */
-    private getSourceUrlsForGroups(userConfig: any, targetGroupNames: string[]): string[] {
-        const configSync = userConfig?.configSync || userConfig;
-        const sources: any[] = configSync?.sources || [];
+    private async getSourceUrlsForGroups(userId: string, targetGroupNames: string[]): Promise<string[]> {
+        const feeds = await (prisma as any).userFeed.findMany({
+            where: { userId },
+            include: { source: true, group: true }
+        }).catch(() => []);
 
-        if (!Array.isArray(sources) || sources.length === 0) return [];
+        if (!Array.isArray(feeds) || feeds.length === 0) return [];
 
-        // If no target groups specified, default to groups containing "新闻" or "News"
-        const effectiveGroupNames = targetGroupNames.length > 0
-            ? targetGroupNames
-            : []; // will use default matching below
+        const pickDefault = targetGroupNames.length === 0;
+        const groupNameSet = new Set(targetGroupNames.map((n: string) => String(n || '').toLowerCase()).filter(Boolean));
+        const out = new Set<string>();
 
-        if (effectiveGroupNames.length > 0) {
-            const groupNameSet = new Set(effectiveGroupNames.map((n: string) => n.toLowerCase()));
-            return sources
-                .filter((s: any) => s.groupName && groupNameSet.has(s.groupName.toLowerCase()))
-                .map((s: any) => s.url)
-                .filter(Boolean);
+        for (const f of feeds) {
+            const url = f?.source?.url ? String(f.source.url) : '';
+            if (!url) continue;
+            const groupName = f?.group?.name ? String(f.group.name) : '';
+            if (!groupName) continue;
+            const gn = groupName.toLowerCase();
+            if (!pickDefault) {
+                if (groupNameSet.has(gn)) out.add(url);
+                continue;
+            }
+            if (gn.includes('新闻') || gn.includes('news')) out.add(url);
         }
 
-        // Default: match groups containing "新闻" or "news"
-        return sources
-            .filter((s: any) => {
-                if (!s.groupName) return false;
-                const gn = s.groupName.toLowerCase();
-                return gn.includes('新闻') || gn.includes('news');
-            })
-            .map((s: any) => s.url)
-            .filter(Boolean);
+        return Array.from(out);
     }
 
     /**
@@ -285,11 +194,12 @@ export class DailyReportService {
             throw new Error(`User not found: ${userId}`);
         }
 
-        const userConfig = (dbUser.syncData as any) || {};
+        const pref = await prismaAny.userPreference.findUnique({ where: { userId: dbUser.uuid } });
+        const userConfig = pref?.settings || {};
         const config = this.getDailyReportConfig(userConfig);
 
         // 2. Get source URLs for selected groups (or default news groups)
-        const sourceUrls = this.getSourceUrlsForGroups(userConfig, config.groupNames);
+        const sourceUrls = await this.getSourceUrlsForGroups(userId, config.groupNames);
         if (sourceUrls.length === 0) {
             return [];
         }
@@ -424,7 +334,8 @@ export class DailyReportService {
             return null;
         }
 
-        const userConfig = (dbUser.syncData as any) || {};
+        const pref = await prismaAny.userPreference.findUnique({ where: { userId: dbUser.uuid } });
+        const userConfig = pref?.settings || {};
         const config = this.getDailyReportConfig(userConfig);
 
         if (!config.enabled) {
@@ -432,15 +343,8 @@ export class DailyReportService {
             return null;
         }
 
-        // 2. Get LLM profile
-        const llmProfile = this.getLLMProfile(userConfig);
-        if (!llmProfile) {
-            logger.warn(`[DailyReport] No LLM profile found for user ${userId}`);
-            return null;
-        }
-
         // 3. Get source URLs for ALL selected groups
-        const sourceUrls = this.getSourceUrlsForGroups(userConfig, config.groupNames);
+        const sourceUrls = await this.getSourceUrlsForGroups(userId, config.groupNames);
         if (sourceUrls.length === 0) {
             logger.warn(`[DailyReport] No sources found for target groups, user ${userId}`);
             return null;
@@ -460,7 +364,15 @@ export class DailyReportService {
 
         // 5. Build prompt and call LLM
         const { systemPrompt, userPrompt } = this.buildPrompt(articles);
-        const summary = await callLLM(userPrompt, systemPrompt, llmProfile);
+        const combinedPrompt = `${String(systemPrompt || '').trim()}\n\n${String(userPrompt || '').trim()}`.trim();
+        let summary = '';
+        try {
+            const result = await llmGatewayService.dailyReport(userId, combinedPrompt, { v: 1, promptHash: String(simpleHash(combinedPrompt)) });
+            summary = result.text;
+        } catch (e: any) {
+            logger.warn(`[DailyReport] LLM failed user=${userId} err=${String(e?.message || e)}`);
+            return null;
+        }
 
         // 6. Build title
         const now = new Date();
@@ -592,59 +504,67 @@ export class DailyReportService {
      */
     async scheduleAllUsers(): Promise<void> {
         logger.info('[DailyReport] Checking all users for due report generation...');
+        const lockName = 'daily_report_scheduler';
+        const locked = await storageService.tryAcquireAdvisoryLock(lockName);
+        if (!locked) return;
 
-        const users = await prisma.user.findMany({
-            select: { uuid: true, syncData: true },
-        });
+        try {
+            const users = await prisma.user.findMany({
+                select: { uuid: true },
+            });
 
-        const now = new Date();
+            const now = new Date();
 
-        for (const user of users) {
-            try {
-                const userConfig = (user.syncData as any) || {};
-                const config = this.getDailyReportConfig(userConfig);
+            for (const user of users) {
+                try {
+                    const pref = await prismaAny.userPreference.findUnique({ where: { userId: user.uuid } });
+                    const userConfig = pref?.settings || {};
+                    const config = this.getDailyReportConfig(userConfig);
 
-                if (!config.enabled) continue;
+                    if (!config.enabled) continue;
 
-                // Parse scheduled time (HH:mm)
-                const [hourStr, minStr] = config.scheduledTime.split(':');
-                const scheduledHour = parseInt(hourStr, 10);
-                const scheduledMin = parseInt(minStr, 10);
-                if (isNaN(scheduledHour) || isNaN(scheduledMin)) continue;
+                    // Parse scheduled time (HH:mm)
+                    const [hourStr, minStr] = config.scheduledTime.split(':');
+                    const scheduledHour = parseInt(hourStr, 10);
+                    const scheduledMin = parseInt(minStr, 10);
+                    if (isNaN(scheduledHour) || isNaN(scheduledMin)) continue;
 
-                // Build today's scheduled datetime (server timezone: Asia/Shanghai)
-                const todayScheduled = new Date(now);
-                todayScheduled.setHours(scheduledHour, scheduledMin, 0, 0);
+                    // Build today's scheduled datetime (server timezone: Asia/Shanghai)
+                    const todayScheduled = new Date(now);
+                    todayScheduled.setHours(scheduledHour, scheduledMin, 0, 0);
 
-                // Not yet time
-                if (now < todayScheduled) continue;
+                    // Not yet time
+                    if (now < todayScheduled) continue;
 
-                // Check if an AUTO report already exists for today
-                // "Today" = from 00:00 of current day
-                const todayStart = new Date(now);
-                todayStart.setHours(0, 0, 0, 0);
+                    // Check if an AUTO report already exists for today
+                    // "Today" = from 00:00 of current day
+                    const todayStart = new Date(now);
+                    todayStart.setHours(0, 0, 0, 0);
 
-                const existingAutoReport = await prismaAny.dailyReport.findFirst({
-                    where: {
-                        userId: user.uuid,
-                        generatedBy: 'auto',
-                        generatedAt: { gte: todayStart },
-                    },
-                    select: { id: true },
-                });
+                    const existingAutoReport = await prismaAny.dailyReport.findFirst({
+                        where: {
+                            userId: user.uuid,
+                            generatedBy: 'auto',
+                            generatedAt: { gte: todayStart },
+                        },
+                        select: { id: true },
+                    });
 
-                if (existingAutoReport) {
-                    continue; // Already generated today (auto), skip
+                    if (existingAutoReport) {
+                        continue; // Already generated today (auto), skip
+                    }
+
+                    logger.info(`[DailyReport] User ${user.uuid} is due for auto report (scheduled: ${config.scheduledTime})`);
+                    await this.generateForUser(user.uuid, 'auto');
+                } catch (e) {
+                    logger.error(`[DailyReport] Failed for user ${user.uuid}:`, e);
                 }
-
-                logger.info(`[DailyReport] User ${user.uuid} is due for auto report (scheduled: ${config.scheduledTime})`);
-                await this.generateForUser(user.uuid, 'auto');
-            } catch (e) {
-                logger.error(`[DailyReport] Failed for user ${user.uuid}:`, e);
             }
-        }
 
-        logger.info('[DailyReport] Schedule check complete');
+            logger.info('[DailyReport] Schedule check complete');
+        } finally {
+            await storageService.releaseAdvisoryLock(lockName);
+        }
     }
 
     /**

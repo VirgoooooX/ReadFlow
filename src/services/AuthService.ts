@@ -152,6 +152,14 @@ export class AuthService {
             }
 
             await cloudConfigService.updateConfig({ auth: { lastValidatedAt: Date.now() } });
+
+            setTimeout(() => {
+              try {
+                const { configSyncService } = require('./ConfigSyncService');
+                void configSyncService.bootstrapConfigAfterAuth();
+              } catch {
+              }
+            }, 0);
           } else {
             await this.logout();
           }
@@ -188,6 +196,26 @@ export class AuthService {
             lastValidatedAt: Date.now(),
           },
         });
+
+        try {
+          const appSettings = await this.getSettingsService().getAppSettings();
+          const nextUserId = String(response.user.id || '');
+          if (nextUserId && appSettings?.sync?.userId !== nextUserId) {
+            await this.getSettingsService().updateAppSettingNoCloudSync('sync', {
+              ...appSettings.sync,
+              userId: nextUserId,
+            });
+          }
+        } catch {
+        }
+
+        setTimeout(() => {
+          try {
+            const { configSyncService } = require('./ConfigSyncService');
+            void configSyncService.bootstrapConfigAfterAuth();
+          } catch {
+          }
+        }, 0);
       }
       return response;
     } catch (error) {
@@ -222,6 +250,26 @@ export class AuthService {
             lastValidatedAt: Date.now(),
           },
         });
+
+        try {
+          const appSettings = await this.getSettingsService().getAppSettings();
+          const nextUserId = String(response.user.id || '');
+          if (nextUserId && appSettings?.sync?.userId !== nextUserId) {
+            await this.getSettingsService().updateAppSettingNoCloudSync('sync', {
+              ...appSettings.sync,
+              userId: nextUserId,
+            });
+          }
+        } catch {
+        }
+
+        setTimeout(() => {
+          try {
+            const { configSyncService } = require('./ConfigSyncService');
+            void configSyncService.bootstrapConfigAfterAuth();
+          } catch {
+          }
+        }, 0);
       }
       return response;
     } catch (error) {
@@ -390,20 +438,10 @@ export class AuthService {
       remoteSettings && typeof remoteSettings === 'object' && remoteSettings.readingSettings && typeof remoteSettings.readingSettings === 'object'
         ? remoteSettings.readingSettings
         : null;
-    const remoteLLMSettings =
-      remoteSettings && typeof remoteSettings === 'object' && remoteSettings.llmSettings && typeof remoteSettings.llmSettings === 'object'
-        ? remoteSettings.llmSettings
-        : null;
 
     if (remoteReadingSettings) {
       try {
         await this.getSettingsService().saveReadingSettingsNoCloudSync(remoteReadingSettings);
-      } catch {
-      }
-    }
-    if (remoteLLMSettings) {
-      try {
-        await this.getSettingsService().saveLLMSettingsNoCloudSync(remoteLLMSettings);
       } catch {
       }
     }
@@ -419,8 +457,7 @@ export class AuthService {
     };
     await this.getSettingsService().saveAppSettingsNoCloudSync(merged);
     const readingSettings = await this.getSettingsService().getReadingSettings();
-    const llmSettings = await this.getSettingsService().getLLMSettingsStore();
-    await this.pushCloudSettingsFromLocal(token, userId, { appSettings: merged, readingSettings, llmSettings });
+    await this.pushCloudSettingsFromLocal(token, userId, { appSettings: merged, readingSettings });
   }
 
   private async performCloudLogin(credentials: LoginCredentials): Promise<AuthResponse> {

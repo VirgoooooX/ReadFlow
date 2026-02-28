@@ -8,6 +8,7 @@ import { configSyncService } from '../../services/ConfigSyncService';
 import { AppSettings } from '../../types';
 import { SettingsService } from '../../services/SettingsService';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
+import { cloudSyncService } from '../../services/rss/CloudSyncService';
 
 
 type MetaResponse = {
@@ -100,6 +101,35 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
       Alert.alert('成功', mode === 'push' ? '已推送到云端' : '已从云端拉取');
     } catch (error) {
       Alert.alert('失败', '同步发生错误');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleManualStateSync = async () => {
+    setSyncing(true);
+    try {
+      const ok = await cloudSyncService.syncUserArticleStates('both');
+      if (ok) {
+        Alert.alert('成功', '已同步阅读状态');
+      } else {
+        Alert.alert('失败', '同步阅读状态失败');
+      }
+    } catch {
+      Alert.alert('失败', '同步阅读状态失败');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleRerunBootstrap = async () => {
+    setSyncing(true);
+    try {
+      await configSyncService.resetBootstrapForCurrentUser();
+      await configSyncService.bootstrapConfigAfterAuth();
+      Alert.alert('成功', '已重新执行配置迁移');
+    } catch {
+      Alert.alert('失败', '重新执行配置迁移失败');
     } finally {
       setSyncing(false);
     }
@@ -353,6 +383,36 @@ export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {
                 <Icon name="cloud-download" size={24} color={theme.colors.primary} />
                 <View style={styles.optionTextContainer}>
                   <CleanText style={styles.optionTitle}>立即从云端拉取</CleanText>
+                </View>
+              </View>
+              <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <View style={styles.optionDivider} />
+
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={handleManualStateSync}
+              disabled={syncing}
+            >
+              <View style={styles.optionLeft}>
+                <Icon name="sync" size={24} color={theme.colors.primary} />
+                <View style={styles.optionTextContainer}>
+                  <CleanText style={styles.optionTitle}>同步阅读状态</CleanText>
+                </View>
+              </View>
+              <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
+            </TouchableOpacity>
+            <View style={styles.optionDivider} />
+
+            <TouchableOpacity
+              style={styles.optionItem}
+              onPress={handleRerunBootstrap}
+              disabled={syncing}
+            >
+              <View style={styles.optionLeft}>
+                <Icon name="restart-alt" size={24} color={theme.colors.primary} />
+                <View style={styles.optionTextContainer}>
+                  <CleanText style={styles.optionTitle}>重新执行配置迁移</CleanText>
                 </View>
               </View>
               <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />

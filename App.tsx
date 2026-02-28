@@ -31,6 +31,7 @@ import { SettingsService } from './src/services/SettingsService';
 import { RSSService } from './src/services/rss';
 import { logger } from './src/services/rss/RSSUtils';
 import { configSyncService } from './src/services/ConfigSyncService';
+import { cloudSyncService } from './src/services/rss/CloudSyncService';
 
 // 阻止原生启动屏自动消失
 SplashScreen.preventAutoHideAsync();
@@ -111,30 +112,26 @@ function App(): React.JSX.Element {
   }, []);
 
   // 3. App 生命周期管理：监听进入后台/前台，退出时同步
-  // 【暂时禁用】保留代码逻辑，但暂不自动调用
-  // useEffect(() => {
-  //   if (!appIsReady) return;
-  //
-  //   const subscription = AppState.addEventListener('change', async (nextAppState) => {
-  //     if (nextAppState === 'background' || nextAppState === 'inactive') {
-  //       // 进入后台或非活跃状态，同步单词本
-  //       console.log('💾 App 进入后台，开始同步单词本...');
-  //       try {
-  //         const config = await SettingsService.getInstance().getProxyModeConfig();
-  //         if (config.enabled && config.token) {
-  //           await VocabularyService.getInstance().syncToProxyServer();
-  //           console.log('✅ 后台同步完成');
-  //         }
-  //       } catch (error) {
-  //         console.warn('⚠️ 后台同步失败:', error);
-  //       }
-  //     }
-  //   });
-  //
-  //   return () => {
-  //     subscription?.remove();
-  //   };
-  // }, [appIsReady]);
+  useEffect(() => {
+    if (!appIsReady) return;
+
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        cloudSyncService.pullUserArticleStatesOnAppActiveIfNeeded().catch((e) => {
+          logger.warn('⚠️ 前台回填阅读状态失败:', e);
+        });
+      }
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        cloudSyncService.flushPendingStateSyncOnAppBackground().catch((e) => {
+          logger.warn('⚠️ 后台同步阅读状态失败:', e);
+        });
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [appIsReady]);
 
 
   // 如果还没准备好，我们返回一个匹配背景色的空 View

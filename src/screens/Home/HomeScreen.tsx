@@ -31,7 +31,6 @@ import { useSharedValue } from 'react-native-reanimated';
 import ScreenWithCustomHeader from '../../components/ScreenWithCustomHeader';
 import DailyReportCard from '../../components/DailyReportCard';
 import { Alert, ToastAndroid, Platform } from 'react-native'; // 新增 Alert, ToastAndroid, Platform
-import { needsProxy, toProxyUrl } from '../../utils/imageProxy';
 
 // 【修改】全局状态，记录是否切换过文章
 export let lastViewedArticleId: number | null = null;
@@ -88,15 +87,6 @@ const ArticleItem = memo(({ item, onPress, styles, theme, proxyServerUrl }: any)
   // 🔥 处理防盗链图片代理
   const imageUri = useMemo(() => {
     if (!item.imageUrl) return null;
-
-    if (needsProxy(item.imageUrl)) {
-      const finalUrl = toProxyUrl(item.imageUrl);
-      if (finalUrl !== item.imageUrl) {
-        logger.info(`[ImageProxy] Redirecting: ${item.imageUrl} -> ${finalUrl}`);
-      }
-      return finalUrl;
-    }
-
     return item.imageUrl;
   }, [item.imageUrl]);
 

@@ -14,15 +14,15 @@ Thumbs.db
 *.iml
 .gradle/
 local.properties
-
+progress.md
 # Dependencies
 node_modules/
-
+findings.md
 # Environment Variables
 .env
 .env.*
 !.env.example
-
+task_plan.md
 # Build Outputs
 build/
 dist/
@@ -89,3 +89,6 @@ server-go/main.exe
 ui_design_showcase.html
 readflow-server/report_2.txt
 readflow-server/report_46.txt
+findings.md
+progress.md
+task_plan.md
