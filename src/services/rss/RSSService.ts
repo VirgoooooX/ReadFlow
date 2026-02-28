@@ -538,6 +538,11 @@ export class RSSService {
       const groupMap = new Map(groups.map((g: any) => [g.name, g.id]));
 
       for (const source of sources) {
+        const isActive =
+          source.isActive === undefined || source.isActive === null
+            ? true
+            : !(source.isActive === false || source.isActive === 0 || source.isActive === '0' || source.isActive === 'false');
+
         // 解析 Group ID
         let groupId = null;
         if (source.groupName && groupMap.has(source.groupName)) {
@@ -561,7 +566,7 @@ export class RSSService {
              WHERE id = ?`,
             [
               source.name, source.description, source.category, source.contentType,
-              source.sourceMode, source.isActive ? 1 : 0,
+              source.sourceMode, isActive ? 1 : 0,
               source.fetchLimit ?? source.maxArticles ?? 50,
               source.retentionLimit ?? source.maxArticles ?? 100,
               groupId, source.sortOrder, source.updateFrequency,
@@ -576,7 +581,7 @@ export class RSSService {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               source.url, source.name, source.description, source.category,
-              source.contentType, source.sourceMode, source.isActive ? 1 : 0,
+              source.contentType, source.sourceMode, isActive ? 1 : 0,
               source.fetchLimit ?? source.maxArticles ?? 50,
               source.retentionLimit ?? source.maxArticles ?? 100,
               groupId, source.sortOrder, source.updateFrequency,

@@ -230,22 +230,47 @@ function RSSStackNavigator() {
             title="订阅源"
             showBackButton={false}
             rightComponent={
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                height: '100%',
+                paddingRight: 12,
+                marginTop: -1.5
+              }}>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('DiscoverRSS')}
-                  style={{ padding: 4, marginRight: 8 }}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 10,
+                    marginRight: 10,
+                    borderWidth: 0,
+                    backgroundColor: 'transparent',
+                  }}
                   activeOpacity={0.6}
+                  hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
                 >
                   <MaterialIcons
                     name="explore"
-                    size={26}
+                    size={22}
                     color={isDark ? theme.colors.onSurface : theme.colors.onPrimary}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('AddRSSSource')}
-                  style={{ padding: 4, marginRight: 8 }}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 10,
+                    borderWidth: 0,
+                    backgroundColor: 'transparent',
+                  }}
                   activeOpacity={0.6}
+                  hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
                 >
                   <MaterialIcons
                     name="add"
