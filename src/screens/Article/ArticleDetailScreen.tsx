@@ -10,6 +10,7 @@ import {
   InteractionManager,
   Animated, // 【新增】
   Easing,   // 【新增】
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient'; // 【新增】渐变背景
 import * as Haptics from 'expo-haptics'; // 【新增】震动反馈
@@ -35,6 +36,7 @@ import SentenceTranslationModal from '../../components/SentenceTranslationModal'
 import VideoPlayer from '../../components/VideoPlayer';
 import { setLastViewedArticleId } from '../Home/HomeScreen';
 import { cloudConfigService } from '../../services/CloudConfigService';
+import { getHeaderHeight } from '../../constants/navigation';
 
 type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
@@ -410,6 +412,9 @@ const ArticleDetailScreen: React.FC = () => {
     loading: settingsLoading, // Restore destructured variable name
   } = useReadingSettings();
   const insets = useSafeAreaInsets(); // 获取安全区域
+  const headerBaseHeight = getHeaderHeight();
+  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 0 : insets.top;
+  const headerHeight = headerBaseHeight + statusBarHeight;
   const webViewRef = useRef<WebView>(null);
   const perfRef = useRef(perf as any);
   const mountMsRef = useRef(nowMs());
@@ -434,6 +439,11 @@ const ArticleDetailScreen: React.FC = () => {
   const [initialScrollY, setInitialScrollY] = useState(0);
   // 【新增】标题透明度动画值 (0: 显示"文章详情", 1: 显示文章标题)
   const titleFadeAnim = useRef(new Animated.Value(0)).current;
+  const [isImmersive, setIsImmersive] = useState(false);
+  const immersiveAnim = useRef(new Animated.Value(0)).current;
+  const headerSpaceAnim = useRef(new Animated.Value(0)).current;
+  const immersiveLastToggleMsRef = useRef(0);
+  const immersiveLastScrollYRef = useRef(0);
 
   // 【新增】图片预览状态
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
@@ -488,6 +498,24 @@ const ArticleDetailScreen: React.FC = () => {
       aliveRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    Animated.timing(immersiveAnim, {
+      toValue: isImmersive ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [immersiveAnim, isImmersive]);
+
+  useEffect(() => {
+    Animated.timing(headerSpaceAnim, {
+      toValue: isImmersive ? 0 : headerHeight,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [headerHeight, headerSpaceAnim, isImmersive]);
 
   useEffect(() => {
     setWebViewReady(false);
@@ -1045,6 +1073,22 @@ const ArticleDetailScreen: React.FC = () => {
             currentScrollYRef.current = data.scrollY;
             hasScrolledRef.current = true;
 
+            const y = Number(data.scrollY) || 0;
+            const prevY = immersiveLastScrollYRef.current;
+            immersiveLastScrollYRef.current = y;
+            const dy = y - prevY;
+            const tNow = Date.now();
+
+            if (tNow - immersiveLastToggleMsRef.current > 200) {
+              if (!isImmersive && y > 72 && dy > 6) {
+                immersiveLastToggleMsRef.current = tNow;
+                setIsImmersive(true);
+              } else if (isImmersive && (y < 24 || dy < -10)) {
+                immersiveLastToggleMsRef.current = tNow;
+                setIsImmersive(false);
+              }
+            }
+
             const fadeStartY = 24;
             const fadeEndY = 140;
             const titleFade = clamp01((Number(data.scrollY) - fadeStartY) / (fadeEndY - fadeStartY));
@@ -1097,7 +1141,7 @@ const ArticleDetailScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to parse WebView message:', error);
     }
-  }, [handleWordPress, handleSentenceDoubleTap, hasNextArticle, navigateToNextArticle, showLastArticleHint, noUnreadArticle]);
+  }, [handleWordPress, handleSentenceDoubleTap, hasNextArticle, navigateToNextArticle, showLastArticleHint, noUnreadArticle, isImmersive, titleFadeAnim]);
 
   // 【关键修改】在组件卸载（用户退出页面）时，统一保存一次
   // 滚动位置实时记录在 currentScrollYRef 中，只在退出时写入数据库
@@ -1185,18 +1229,35 @@ const ArticleDetailScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar hidden={isImmersive} animated />
       {/* 自定义顶部导航栏 - 为了支持 height: 35 必须使用自定义 View */}
       {/* 【修复】深色模式使用 surface 色，浅色模式使用 primary 色（与 CustomHeader 保持一致） */}
-      <View style={[styles.customHeader, {
-        paddingTop: insets.top - 3, // 👈 整体上移 3 像素，同步 CustomHeader
+      <Animated.View
+        pointerEvents={isImmersive ? 'none' : 'auto'}
+        style={[styles.customHeader, {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        paddingTop: statusBarHeight - 3,
         paddingBottom: 3,           // 👈 补偿间距
-        height: 35 + insets.top,
+        height: headerHeight,
         backgroundColor: theme.isDark ? theme.colors.surface : theme.colors.primary,
         shadowColor: theme.colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 2,
         elevation: 4,
+        transform: [{
+          translateY: immersiveAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, -(headerHeight + 12)],
+          })
+        }],
+        opacity: immersiveAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 0],
+        }),
       }]}>
         <TouchableOpacity
           style={styles.backButton}
@@ -1246,11 +1307,47 @@ const ArticleDetailScreen: React.FC = () => {
         </View>
 
         <View style={styles.headerRight} />
-      </View>
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents={isImmersive ? 'auto' : 'none'}
+        style={{
+          position: 'absolute',
+          left: 12,
+          top: Math.max(12, statusBarHeight),
+          zIndex: 500,
+          opacity: immersiveAnim,
+          transform: [{
+            translateY: immersiveAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-8, 0],
+            })
+          }],
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.isDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.75)',
+          }}
+        >
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={theme.isDark ? '#fff' : '#111'}
+          />
+        </TouchableOpacity>
+      </Animated.View>
 
 
       {/* WebView 内容 */}
-      <View style={styles.readerContainer}>
+      <Animated.View style={[styles.readerContainer, { paddingTop: headerSpaceAnim }]}>
         {typeof article.videoUrl === 'string' && article.videoUrl.trim().length > 0 && (
           <VideoPlayer src={article.videoUrl.trim()} />
         )}
@@ -1332,7 +1429,7 @@ const ArticleDetailScreen: React.FC = () => {
             />
           </Animated.View>
         )}
-      </View>
+      </Animated.View>
 
       {/* 词典弹窗 */}
       <WordDefinitionModal
@@ -1359,6 +1456,8 @@ const ArticleDetailScreen: React.FC = () => {
         imageIndex={0}
         visible={isImageViewVisible}
         onRequestClose={() => setIsImageViewVisible(false)}
+        presentationStyle="overFullScreen"
+        backgroundColor="#000"
         swipeToCloseEnabled={true}
         doubleTapToZoomEnabled={true}
       />
@@ -1419,7 +1518,7 @@ const createStyles = (theme: any, readingSettings?: any) =>
     },
     backButton: {
       width: 48,
-      height: 35 + (Platform.OS === 'android' ? 0 : 0), // 确保按钮高度填满
+      height: getHeaderHeight(),
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 101,
@@ -1433,8 +1532,8 @@ const createStyles = (theme: any, readingSettings?: any) =>
       position: 'relative', // 相对定位，作为绝对定位子元素的锚点
     },
     headerTitle: {
-      fontSize: 19,      // 👈 同步 CustomHeader 字号
-      lineHeight: 28,
+      fontSize: 18,
+      lineHeight: 26,
       includeFontPadding: false,
       fontWeight: Platform.OS === 'ios' ? '900' : 'bold', // 👈 同步 CustomHeader 字重策略
       color: theme.colors.onPrimary,

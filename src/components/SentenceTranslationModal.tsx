@@ -34,6 +34,9 @@ const SentenceTranslationModal: React.FC<SentenceTranslationModalProps> = ({
       visible={visible}
       transparent
       animationType="slide"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>

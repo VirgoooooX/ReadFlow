@@ -6,7 +6,7 @@ const _TAB_BAR_HEIGHT = 50;
 // 标签栏垂直内边距
 const _TAB_BAR_PADDING_VERTICAL = 2;
 // 导航栏高度
-const _HEADER_HEIGHT = 35;
+const _HEADER_HEIGHT = 24;
 
 // 使用函数封装，确保运行时获取值而非编译时内联
 export function getTabBarHeight(): number {

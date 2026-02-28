@@ -113,12 +113,14 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       max-width: 800px;
       margin: 0 auto;
       /* 【优化】Safe Area 适配 */
-      padding-left: max(20px, env(safe-area-inset-left));
-      padding-right: max(20px, env(safe-area-inset-right));
-      padding-top: max(20px, env(safe-area-inset-top));
-      padding-bottom: calc(80px + env(safe-area-inset-bottom));
+      padding-left: max(18px, env(safe-area-inset-left));
+      padding-right: max(18px, env(safe-area-inset-right));
+      padding-top: 18px;
+      padding-bottom: calc(88px + env(safe-area-inset-bottom));
       word-wrap: break-word;
       overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
       
       /* 【紧急修复】直接显示，不依赖 JavaScript */
       opacity: 1 !important;
@@ -126,15 +128,16 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     
     /* 文章头部样式优化 */
     .article-header {
-      margin-bottom: 32px;
+      margin-top: 0;
+      margin-bottom: 22px;
     }
 
     .main-title {
       font-family: ${fontFamily};
-      font-size: 1.4em;
+      font-size: 1.6em;
       font-weight: 700;
-      line-height: 1.25;
-      margin: 0 0 12px 0;
+      line-height: 1.28;
+      margin: 0 0 6px 0;
       color: var(--color-text);
       letter-spacing: -0.02em;
     }
@@ -143,7 +146,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       font-size: 1.2em;
       font-weight: 400;
       line-height: 1.5;
-      margin: 0 0 16px 0;
+      margin: 0 0 12px 0;
       color: var(--color-secondary);
       font-family: ${fontFamily};
     }
@@ -154,7 +157,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       align-items: center;
       font-size: 0.9em;
       color: var(--color-secondary);
-      margin-bottom: 24px;
+      margin-bottom: 18px;
       font-family: sans-serif;
     }
 
@@ -193,17 +196,20 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
     
     /* 正文排版优化 - 英文左对齐 */
     p {
-      margin: 0 0 1.5em 0;
-      /* 英文阅读左对齐比两端对齐更舒适，避免单词间距拉大 */
+      margin: 0 0 1.25em 0;
       text-align: left;
+    }
+
+    p, li {
+      letter-spacing: 0.005em;
     }
     
     /* 正文标题 */
     h1, h2, h3, h4, h5, h6 {
       font-family: ${fontFamily};
-      margin: 2em 0 0.8em 0;
+      margin: 1.6em 0 0.75em 0;
       font-weight: 700;
-      line-height: 1.3;
+      line-height: 1.35;
       color: var(--color-text);
     }
     
@@ -247,7 +253,7 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       border-radius: 8px;
       display: block;
       /* 底部留小一点边距，为了贴近说明文字 */
-      margin: 32px auto 12px auto;
+      margin: 26px auto 12px auto;
     }
     
     /* 多媒体组件优化 (Video, Audio, Iframe) */
