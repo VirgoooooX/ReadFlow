@@ -42,8 +42,8 @@ export class ConfigController {
         }
         if (p.rssSettings && typeof p.rssSettings === 'object') out.rssSettings = p.rssSettings;
         if (p.themeSettings && typeof p.themeSettings === 'object') out.themeSettings = p.themeSettings;
-        if (p.rssStartupSettings) out.rssStartupSettings = this.normalizeRssStartupSettings(p.rssStartupSettings);
-        if (p.dailyReportSettings) out.dailyReportSettings = this.normalizeDailyReportSettings(p.dailyReportSettings);
+        if (p.rssStartupSettings) out.rssStartupSettings = ConfigController.normalizeRssStartupSettings(p.rssStartupSettings);
+        if (p.dailyReportSettings) out.dailyReportSettings = ConfigController.normalizeDailyReportSettings(p.dailyReportSettings);
         return out;
     }
 
@@ -59,6 +59,13 @@ export class ConfigController {
         return out;
     }
 
+    private static isSchemaMissingError(error: any): boolean {
+        const code = String(error?.code || '');
+        if (code === 'P2021' || code === 'P2022') return true;
+        const msg = String(error?.message || '');
+        return msg.includes('does not exist in the current database') || msg.includes('does not exist in the current database.');
+    }
+
     static async getPreferences(req: Request, res: Response) {
         try {
 
@@ -72,10 +79,14 @@ export class ConfigController {
 
             res.json({
                 success: true,
-                data: this.pickPreferences(pref?.settings || {})
+                data: ConfigController.pickPreferences(pref?.settings || {})
             });
         } catch (error) {
             console.error('[ConfigController] getPreferences error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Preferences config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to fetch preferences' });
         }
     }
@@ -84,7 +95,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const settingsPayload = this.sanitizePreferencesPayload(req.body);
+            const settingsPayload = ConfigController.sanitizePreferencesPayload(req.body);
 
             const existing = await (prisma as any).userPreference.findUnique({ where: { userId: userUuid } });
             const existingSettings = existing?.settings && typeof existing.settings === 'object' ? existing.settings : {};
@@ -101,9 +112,13 @@ export class ConfigController {
                 }
             });
 
-            res.json({ success: true, data: this.pickPreferences(pref.settings) });
+            res.json({ success: true, data: ConfigController.pickPreferences(pref.settings) });
         } catch (error) {
             console.error('[ConfigController] updatePreferences error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Preferences config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to update preferences' });
         }
     }
@@ -130,6 +145,10 @@ export class ConfigController {
             res.json({ success: true, data });
         } catch (error) {
             console.error('[ConfigController] getSources error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Sources config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to fetch sources' });
         }
     }
@@ -154,9 +173,9 @@ export class ConfigController {
             }
 
             // Find or create global source first
-            let source = await (prisma as any).rssSource.findUnique({ where: { url } });
+            let source = await prisma.rSSSource.findUnique({ where: { url } });
             if (!source) {
-                source = await (prisma as any).rssSource.create({
+                source = await prisma.rSSSource.create({
                     data: { url, name: name || 'Unknown' }
                 });
             }
@@ -194,6 +213,10 @@ export class ConfigController {
             res.json({ success: true, data: groups });
         } catch (error) {
             console.error('[ConfigController] getGroups error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Groups config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to fetch groups' });
         }
     }
@@ -230,6 +253,10 @@ export class ConfigController {
             res.json({ success: true, data: rules });
         } catch (error) {
             console.error('[ConfigController] getFilterRules error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Filter rules config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to fetch filter rules' });
         }
     }
@@ -298,9 +325,9 @@ export class ConfigController {
                     }
                 }
 
-                let source = await (prisma as any).rssSource.findUnique({ where: { url } });
+                let source = await prisma.rSSSource.findUnique({ where: { url } });
                 if (!source) {
-                    source = await (prisma as any).rssSource.create({
+                    source = await prisma.rSSSource.create({
                         data: { url, name: s.name || 'Unknown' }
                     });
                 }
@@ -321,6 +348,10 @@ export class ConfigController {
             res.json({ success: true, count: results.length });
         } catch (error) {
             console.error('[ConfigController] batchUpsertSources error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Sources config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to batch upsert sources' });
         }
     }
@@ -346,6 +377,10 @@ export class ConfigController {
             res.json({ success: true, count: results.length });
         } catch (error) {
             console.error('[ConfigController] batchUpsertGroups error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Groups config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to batch upsert groups' });
         }
     }
@@ -375,6 +410,10 @@ export class ConfigController {
             res.json({ success: true, count: created.count });
         } catch (error) {
             console.error('[ConfigController] batchUpsertFilterRules error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Filter rules config not available' });
+                return;
+            }
             res.status(500).json({ success: false, message: 'Failed to batch upsert filter rules' });
         }
     }

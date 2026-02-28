@@ -1564,7 +1564,7 @@ END $$;
   public async tryAcquireAdvisoryLock(name: string): Promise<boolean> {
     try {
       const { k1, k2 } = this.computeAdvisoryLockKeys(name);
-      const rows: any[] = await prisma.$queryRaw`SELECT pg_try_advisory_lock(${k1}, ${k2}) as locked`;
+      const rows: any[] = await prisma.$queryRaw`SELECT pg_try_advisory_lock(${k1}::int4, ${k2}::int4) as locked`;
       return !!rows?.[0]?.locked;
     } catch (e) {
       logger.warn(`[Lock] tryAcquireAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
@@ -1575,7 +1575,7 @@ END $$;
   public async releaseAdvisoryLock(name: string): Promise<void> {
     try {
       const { k1, k2 } = this.computeAdvisoryLockKeys(name);
-      await prisma.$queryRaw`SELECT pg_advisory_unlock(${k1}, ${k2})`;
+      await prisma.$queryRaw`SELECT pg_advisory_unlock(${k1}::int4, ${k2}::int4)`;
     } catch (e) {
       logger.warn(`[Lock] releaseAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
     }

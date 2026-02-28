@@ -19,11 +19,31 @@ type MetaResponse = {
 };
 
 function normalizeServerUrl(input: string): string {
-  let url = (input || '').trim().replace(/\/$/, '');
-  if (url && !url.startsWith('http')) {
-    url = `http://${url}`;
+  let raw = String(input || '').trim();
+  raw = raw.replace(/^[\s"'`\[\(]+/, '').replace(/[\s"'`\]\)]+$/, '').trim();
+  if (!raw) return '';
+
+  if (!/^https?:\/\//i.test(raw)) {
+    raw = `http://${raw}`;
   }
-  return url;
+
+  try {
+    const u = new URL(raw);
+    const path = String(u.pathname || '').replace(/\/+$/, '');
+    if (
+      path === '/api' ||
+      path.startsWith('/api/') ||
+      path === '/api/config' ||
+      path.startsWith('/api/config/')
+    ) {
+      u.pathname = '';
+    }
+    u.search = '';
+    u.hash = '';
+    return u.toString().replace(/\/$/, '');
+  } catch {
+    return raw.replace(/\/+$/, '');
+  }
 }
 
 export const CloudSyncScreen: React.FC<any> = ({ navigation }) => {

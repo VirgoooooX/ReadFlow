@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Vibration,
   BackHandler,
-  Modal,
 } from 'react-native';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams, ShadowDecorator, OpacityDecorator } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -68,7 +67,7 @@ const SourceCard = React.memo(({
       ]}
       onPress={() => onPress(source)}
       onLongPress={() => onLongPress(source.id)}
-      onPressOut={() => onPressOut?.(source.id)}
+      onPressOut={onPressOut ? () => onPressOut(source.id) : undefined}
       activeOpacity={0.7}
       disabled={isActive}
     >
@@ -133,42 +132,51 @@ const SourceCard = React.memo(({
   );
 });
 
-const SourceActionSheet = React.memo(({ sourceId, visible, onClose, rssSources, theme, styles, onAction }: any) => {
-  if (sourceId === null || sourceId === undefined || !visible) return null;
-  const source = rssSources.find((s: RSSSource) => s.id === sourceId);
+const SourceActionSheet = React.memo(({ source, visible, onClose, theme, styles, onAction }: any) => {
+  const openedAtRef = React.useRef(0);
+  React.useEffect(() => {
+    if (visible) {
+      openedAtRef.current = Date.now();
+    }
+  }, [visible]);
+
+  const handleBackdropPress = React.useCallback(() => {
+    if (Date.now() - openedAtRef.current < 250) return;
+    onClose();
+  }, [onClose]);
+
+  if (!visible) return null;
   if (!source) return null;
 
   const actions = [
-    { icon: 'edit', label: '编辑源', onPress: () => onAction('edit', sourceId) },
-    { icon: 'sync', label: '立即刷新', onPress: () => onAction('sync', sourceId) },
+    { icon: 'edit', label: '编辑源', onPress: () => onAction('edit', source.id) },
+    { icon: 'sync', label: '立即刷新', onPress: () => onAction('sync', source.id) },
     {
       icon: source.isActive ? 'toggle-on' : 'toggle-off',
       label: source.isActive ? '停用源' : '启用源',
       color: source.isActive ? theme.colors.primary : theme.colors.outline,
-      onPress: () => onAction('toggle', sourceId)
+      onPress: () => onAction('toggle', source.id)
     },
-    { icon: 'cleaning-services', label: '清空文章缓存', onPress: () => onAction('clear', sourceId) },
-    { icon: 'delete', label: '删除源', color: theme.colors.error, onPress: () => onAction('delete', sourceId) }
+    { icon: 'cleaning-services', label: '清空文章缓存', onPress: () => onAction('clear', source.id) },
+    { icon: 'delete', label: '删除源', color: theme.colors.error, onPress: () => onAction('delete', source.id) }
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.actionSheetContainer}>
-          <View style={styles.actionSheetHeader}>
-            <Text style={styles.actionSheetTitle} numberOfLines={1}>{source.name}</Text>
-          </View>
-          {actions.map((action, idx) => (
-            <TouchableOpacity key={idx} style={styles.actionSheetItem} onPress={action.onPress}>
-              <MaterialIcons name={action.icon as any} size={24} color={action.color || theme.colors.onSurface} />
-              <Text style={[styles.actionSheetText, action.color && { color: action.color }]}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={{ height: 20 }} />
+    <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleBackdropPress} />
+      <View style={styles.actionSheetContainer}>
+        <View style={styles.actionSheetHeader}>
+          <Text style={styles.actionSheetTitle} numberOfLines={1}>{source.name}</Text>
         </View>
+        {actions.map((action, idx) => (
+          <TouchableOpacity key={idx} style={styles.actionSheetItem} onPress={action.onPress}>
+            <MaterialIcons name={action.icon as any} size={24} color={action.color || theme.colors.onSurface} />
+            <Text style={[styles.actionSheetText, action.color && { color: action.color }]}>{action.label}</Text>
+          </TouchableOpacity>
+        ))}
+        <View style={{ height: 20 }} />
       </View>
-    </Modal>
+    </View>
   );
 });
 
@@ -194,7 +202,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
   const [activeSourceId, setActiveSourceId] = useState<number | null>(null); // 用于 ActionSheet
   const [showActionSheet, setShowActionSheet] = useState(false); // ActionSheet 显示状态
   const lastLongPressRef = useRef<{ id: number | null; at: number }>({ id: null, at: 0 });
-  const pendingActionSheetRef = useRef<number | null>(null);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -212,6 +219,8 @@ const ManageSubscriptionsScreen: React.FC = () => {
 
     return { total, unread, active };
   }, [rssSources]);
+
+  const sourceMap = useMemo(() => new Map(rssSources.map(s => [s.id, s])), [rssSources]);
 
   // 2. 构建 Tab 列表
   const routes = useMemo(() => {
@@ -454,7 +463,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
       Alert.alert('提示', '请选择至少一个源');
       return;
     }
-    setTimeout(() => setShowMoveGroupModal(true), 0);
+    setShowMoveGroupModal(true);
   };
 
   const handleBatchToggleStatus = async () => {
@@ -548,14 +557,13 @@ const ManageSubscriptionsScreen: React.FC = () => {
   };
 
   const handleSourcePress = useCallback((source: RSSSource) => {
+    const now = Date.now();
+    if (lastLongPressRef.current.id === source.id && now - lastLongPressRef.current.at < 800) {
+      return;
+    }
     if (isEditMode) {
       toggleSelection(source.id);
     } else {
-      pendingActionSheetRef.current = null;
-      const now = Date.now();
-      if (lastLongPressRef.current.id === source.id && now - lastLongPressRef.current.at < 800) {
-        return;
-      }
       navigation.navigate('Articles' as any, {
         screen: 'HomeMain',
         params: { sourceId: source.id, sourceName: source.name }
@@ -564,20 +572,11 @@ const ManageSubscriptionsScreen: React.FC = () => {
   }, [isEditMode, navigation, toggleSelection]);
 
   const handleSourceLongPress = useCallback((id: number) => {
-    if (!isEditMode) {
-      lastLongPressRef.current = { id, at: Date.now() };
-      pendingActionSheetRef.current = id;
-      Vibration.vibrate(50);
-    }
-  }, [isEditMode]);
-
-  const handleSourcePressOut = useCallback((id: number) => {
-    if (isEditMode) return;
-    if (pendingActionSheetRef.current !== id) return;
-    pendingActionSheetRef.current = null;
+    lastLongPressRef.current = { id, at: Date.now() };
+    Vibration.vibrate(50);
     setActiveSourceId(id);
     setShowActionSheet(true);
-  }, [isEditMode]);
+  }, []);
 
   const handleActionSheetAction = useCallback((type: string, id: number) => {
     setShowActionSheet(false);
@@ -701,7 +700,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
                   styles={styles}
                   onPress={handleSourcePress}
                   onLongPress={handleSourceLongPress}
-                  onPressOut={handleSourcePressOut}
                   formatTime={formatTime}
                 />
               </ScaleDecorator>
@@ -734,7 +732,6 @@ const ManageSubscriptionsScreen: React.FC = () => {
                 styles={styles}
                 onPress={handleSourcePress}
                 onLongPress={handleSourceLongPress}
-                onPressOut={handleSourcePressOut}
                 formatTime={formatTime}
               />
             )}
@@ -754,7 +751,7 @@ const ManageSubscriptionsScreen: React.FC = () => {
         )}
       </View>
     );
-  }, [isReady, screenWidth, isEditMode, selectedSources, styles, theme, renderFooter, formatTime, handleSourcePress, handleSourceLongPress, handleSourcePressOut]);
+  }, [getFilteredSources, isReady, screenWidth, isEditMode, selectedSources, styles, theme, renderFooter, formatTime, handleSourcePress, handleSourceLongPress]);
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -806,10 +803,9 @@ const ManageSubscriptionsScreen: React.FC = () => {
           onSelect={handleMoveToGroup}
         />
         <SourceActionSheet
-          sourceId={activeSourceId}
           visible={showActionSheet}
           onClose={() => setShowActionSheet(false)}
-          rssSources={rssSources}
+          source={activeSourceId !== null ? sourceMap.get(activeSourceId) : null}
           theme={theme}
           styles={styles}
           onAction={handleActionSheetAction}
@@ -884,9 +880,10 @@ const createStyles = (theme: any) => StyleSheet.create({
   },
   // Action Sheet 样式
   modalOverlay: {
-    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+    zIndex: 1000,
+    elevation: 1000,
   },
   actionSheetContainer: {
     backgroundColor: theme.colors.surface,

@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
@@ -28,63 +27,69 @@ const GroupSelectionModal: React.FC<GroupSelectionModalProps> = ({
   const { theme } = useThemeContext();
   const styles = createStyles(theme);
 
+  const openedAtRef = useRef(0);
+  useEffect(() => {
+    if (visible) {
+      openedAtRef.current = Date.now();
+    }
+  }, [visible]);
+
+  const handleBackdropPress = useCallback(() => {
+    if (Date.now() - openedAtRef.current < 250) return;
+    onClose();
+  }, [onClose]);
+
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <Text style={styles.title}>选择目标分组</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <MaterialIcons name="close" size={24} color={theme.colors.onSurface} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {/* 默认分组选项 */}
-            <TouchableOpacity
-              style={styles.item}
-              onPress={() => onSelect(null)}
-            >
-              <View style={[styles.iconBox, { backgroundColor: theme.colors.surfaceVariant }]}>
-                <MaterialIcons name="folder-open" size={24} color={theme.colors.onSurfaceVariant} />
-              </View>
-              <Text style={styles.itemText}>默认</Text>
-            </TouchableOpacity>
-
-            {/* 分组列表 */}
-            {groups.map((group) => (
-              <TouchableOpacity
-                key={group.id}
-                style={styles.item}
-                onPress={() => onSelect(group.id)}
-              >
-                <View style={[styles.iconBox, { backgroundColor: group.color || theme.colors.primary }]}>
-                  <MaterialIcons name="folder" size={24} color={theme.colors.onPrimary} />
-                </View>
-                <Text style={styles.itemText}>{group.name}</Text>
-                <Text style={styles.countText}>{group.sourceCount || 0} 个源</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+    <View style={[StyleSheet.absoluteFill, styles.overlay]}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleBackdropPress} />
+      <View style={styles.modalContainer}>
+        <View style={styles.header}>
+          <Text style={styles.title}>选择目标分组</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <MaterialIcons name="close" size={24} color={theme.colors.onSurface} />
+          </TouchableOpacity>
         </View>
+
+        <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() => onSelect(null)}
+          >
+            <View style={[styles.iconBox, { backgroundColor: theme.colors.surfaceVariant }]}>
+              <MaterialIcons name="folder-open" size={24} color={theme.colors.onSurfaceVariant} />
+            </View>
+            <Text style={styles.itemText}>默认</Text>
+          </TouchableOpacity>
+
+          {groups.map((group) => (
+            <TouchableOpacity
+              key={group.id}
+              style={styles.item}
+              onPress={() => onSelect(group.id)}
+            >
+              <View style={[styles.iconBox, { backgroundColor: group.color || theme.colors.primary }]}>
+                <MaterialIcons name="folder" size={24} color={theme.colors.onPrimary} />
+              </View>
+              <Text style={styles.itemText}>{group.name}</Text>
+              <Text style={styles.countText}>{group.sourceCount || 0} 个源</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-    </Modal>
+    </View>
   );
 };
 
 const createStyles = (theme: any) =>
   StyleSheet.create({
     overlay: {
-      flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       justifyContent: 'center',
       padding: 20,
+      zIndex: 1000,
+      elevation: 1000,
     },
     modalContainer: {
       backgroundColor: theme.colors.surface,

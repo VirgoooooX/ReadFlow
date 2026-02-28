@@ -26,6 +26,33 @@ export class ConfigSyncService {
 
   private constructor() { }
 
+  private normalizeCloudBaseUrl(input: string): string {
+    let raw = String(input || '').trim();
+    raw = raw.replace(/^[\s"'`\[\(]+/, '').replace(/[\s"'`\]\)]+$/, '').trim();
+    raw = raw.replace(/\/+$/, '');
+    if (!raw) return '';
+    if (!/^https?:\/\//i.test(raw)) {
+      raw = `http://${raw}`;
+    }
+    try {
+      const u = new URL(raw);
+      const path = String(u.pathname || '').replace(/\/+$/, '');
+      if (
+        path === '/api' ||
+        path.startsWith('/api/') ||
+        path === '/api/config' ||
+        path.startsWith('/api/config/')
+      ) {
+        u.pathname = '';
+      }
+      u.search = '';
+      u.hash = '';
+      return u.toString().replace(/\/$/, '');
+    } catch {
+      return raw.replace(/\/+$/, '');
+    }
+  }
+
   private static stableStringify(value: any): string {
     const seen = new WeakSet<object>();
     const normalize = (input: any): any => {
@@ -331,7 +358,8 @@ export class ConfigSyncService {
     if (!token) return;
 
     const headers = await this.getAuthHeaders();
-    const baseUrl = cloudConfig.serverUrl.replace(/\/$/, '');
+    const baseUrl = this.normalizeCloudBaseUrl(cloudConfig.serverUrl);
+    if (!baseUrl) return;
 
     if (await this.isMigrationDone(baseUrl, userId)) {
       return;
@@ -367,7 +395,7 @@ export class ConfigSyncService {
 
   public async resetBootstrapForCurrentUser(): Promise<void> {
     const cloudConfig = await cloudConfigService.getConfig();
-    const baseUrl = cloudConfig.serverUrl ? cloudConfig.serverUrl.replace(/\/$/, '') : '';
+    const baseUrl = cloudConfig.serverUrl ? this.normalizeCloudBaseUrl(cloudConfig.serverUrl) : '';
     const userId = cloudConfig.auth?.user?.id ? String(cloudConfig.auth.user.id) : '';
     if (!baseUrl || !userId) return;
     const key = this.buildMigrationDoneKey(baseUrl, userId);
@@ -481,7 +509,10 @@ export class ConfigSyncService {
 
     const cloudConfig = await cloudConfigService.getConfig();
     const headers = await this.getAuthHeaders();
-    const baseUrl = cloudConfig.serverUrl.replace(/\/$/, '');
+    const baseUrl = this.normalizeCloudBaseUrl(cloudConfig.serverUrl);
+    if (!baseUrl) {
+      throw new Error('Cloud server URL not configured');
+    }
 
     // 1. Push Preferences (Settings)
     // Bundles readingSettings, appSettings, rssSettings, themeSettings, dailyReportSettings
@@ -524,6 +555,9 @@ export class ConfigSyncService {
     const responses = await Promise.all([pushPrefs, pushGroups, pushSources, pushRules]);
 
     for (const res of responses) {
+      if (res.status === 404) {
+        continue;
+      }
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         logger.error(`[ConfigSync] Push failed for ${res.url}: ${res.status} ${text}`);
@@ -541,7 +575,10 @@ export class ConfigSyncService {
 
     const cloudConfig = await cloudConfigService.getConfig();
     const headers = await this.getAuthHeaders();
-    const baseUrl = cloudConfig.serverUrl.replace(/\/$/, '');
+    const baseUrl = this.normalizeCloudBaseUrl(cloudConfig.serverUrl);
+    if (!baseUrl) {
+      throw new Error('Cloud server URL not configured');
+    }
 
     const endpoints = [
       `${baseUrl}/api/config/preferences`,
@@ -556,7 +593,10 @@ export class ConfigSyncService {
       const results: any = {};
       for (const res of responses) {
         if (res.status === 404) continue;
-        if (!res.ok) throw new Error(`Pull failed: ${res.status} from ${res.url}`);
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`Pull failed: ${res.status} from ${res.url}${text ? ` ${text}` : ''}`);
+        }
 
         const json = await res.json();
         const data = json.data || json;

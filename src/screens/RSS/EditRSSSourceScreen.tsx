@@ -10,16 +10,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Switch,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useThemeContext } from '../../theme';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
+import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
 import type { RSSSource } from '../../types';
-import * as StyleUtils from '../../utils/styleUtils';
 
 type RootStackParamList = {
   EditRSSSource: { sourceId: number };
@@ -31,21 +30,11 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 interface FormData {
   name: string;
   url: string;
-  description: string;
-  category: string;
-  contentType: 'text' | 'image_text';
-  sourceMode: 'direct' | 'proxy';
-  fetchLimit: number;
-  retentionLimit: number;
-  isActive: boolean;
 }
 
 interface FormErrors {
   name?: string;
   url?: string;
-  category?: string;
-  fetchLimit?: string;
-  retentionLimit?: string;
 }
 
 const EditRSSSourceScreen: React.FC = () => {
@@ -54,6 +43,7 @@ const EditRSSSourceScreen: React.FC = () => {
   const { sourceId } = route.params;
   const { theme } = useThemeContext();
   const { refreshRSSSources } = useRSSSource();
+  const { groups, moveSourcesToGroup } = useRSSGroup();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,17 +52,9 @@ const EditRSSSourceScreen: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     url: '',
-    description: '',
-    category: '技术',
-    contentType: 'image_text',
-    sourceMode: 'direct',
-    fetchLimit: 50,
-    retentionLimit: 100,
-    isActive: true,
   });
   const [errors, setErrors] = useState<FormErrors>({});
-
-  const categories = ['技术', '新闻', '科学', '娱乐', '体育', '财经', '其他'];
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
 
   useEffect(() => {
     loadRSSSource();
@@ -94,14 +76,8 @@ const EditRSSSourceScreen: React.FC = () => {
       setFormData({
         name: source.name || '',
         url: source.url,
-        description: source.description || '',
-        category: source.category || '技术',
-        contentType: source.contentType || 'image_text',
-        sourceMode: source.sourceMode || 'direct',
-        fetchLimit: source.fetchLimit ?? 50,
-        retentionLimit: source.retentionLimit ?? 100,
-        isActive: source.isActive,
       });
+      setSelectedGroupId(source.groupId ?? null);
     } catch (error) {
       console.error('Error loading RSS source:', error);
       Alert.alert('错误', '加载RSS源失败，请重试');
@@ -128,10 +104,6 @@ const EditRSSSourceScreen: React.FC = () => {
       newErrors.url = 'RSS源URL不能为空';
     } else if (!isValidURL(formData.url)) {
       newErrors.url = '请输入有效的URL';
-    }
-
-    if (!formData.category) {
-      newErrors.category = '请选择分类';
     }
 
     setErrors(newErrors);
@@ -202,16 +174,13 @@ const EditRSSSourceScreen: React.FC = () => {
         id: sourceId,
         name: formData.name,
         url: formData.url,
-        description: formData.description,
-        category: formData.category,
-        contentType: formData.contentType,
-        sourceMode: formData.sourceMode,
-        fetchLimit: formData.fetchLimit,
-        retentionLimit: formData.retentionLimit,
-        isActive: formData.isActive,
       };
 
       await rssService.updateRSSSource(sourceId, updatedSource);
+
+      if (selectedGroupId !== (originalData?.groupId ?? null)) {
+        await moveSourcesToGroup([sourceId], selectedGroupId);
+      }
 
       // 刷新RSS源列表
       await refreshRSSSources();
@@ -299,174 +268,45 @@ const EditRSSSourceScreen: React.FC = () => {
               {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>分类</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                {categories.map((cat) => (
+            {groups.length > 0 && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>所属分组（可选）</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
                   <TouchableOpacity
-                    key={cat}
                     style={[
                       styles.categoryChip,
-                      formData.category === cat && styles.categoryChipSelected
+                      selectedGroupId === null && styles.categoryChipSelected
                     ]}
-                    onPress={() => updateFormData('category', cat)}
+                    onPress={() => setSelectedGroupId(null)}
                   >
                     <Text style={[
                       styles.categoryChipText,
-                      formData.category === cat && styles.categoryChipTextSelected
+                      selectedGroupId === null && styles.categoryChipTextSelected
                     ]}>
-                      {cat}
+                      默认
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>内容类型</Text>
-              <View style={styles.contentTypeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.contentTypeOption,
-                    formData.contentType === 'image_text' && styles.contentTypeOptionSelected
-                  ]}
-                  onPress={() => updateFormData('contentType', 'image_text')}
-                >
-                  <MaterialIcons
-                    name="image"
-                    size={20}
-                    color={formData.contentType === 'image_text'
-                      ? theme.colors.onPrimary
-                      : theme.colors.onSurfaceVariant
-                    }
-                  />
-                  <Text style={[
-                    styles.contentTypeText,
-                    formData.contentType === 'image_text' && styles.contentTypeTextSelected
-                  ]}>
-                    多媒体内容
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.contentTypeOption,
-                    formData.contentType === 'text' && styles.contentTypeOptionSelected
-                  ]}
-                  onPress={() => updateFormData('contentType', 'text')}
-                >
-                  <MaterialIcons
-                    name="text-fields"
-                    size={20}
-                    color={formData.contentType === 'text'
-                      ? theme.colors.onPrimary
-                      : theme.colors.onSurfaceVariant
-                    }
-                  />
-                  <Text style={[
-                    styles.contentTypeText,
-                    formData.contentType === 'text' && styles.contentTypeTextSelected
-                  ]}>
-                    纯文本
-                  </Text>
-                </TouchableOpacity>
+                  {groups.map((group) => (
+                    <TouchableOpacity
+                      key={group.id}
+                      style={[
+                        styles.categoryChip,
+                        selectedGroupId === group.id && styles.categoryChipSelected
+                      ]}
+                      onPress={() => setSelectedGroupId(group.id)}
+                    >
+                      <Text style={[
+                        styles.categoryChipText,
+                        selectedGroupId === group.id && styles.categoryChipTextSelected
+                      ]}>
+                        {group.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
-              <Text style={styles.contentTypeHint}>
-                {formData.contentType === 'image_text'
-                  ? '将提取图片和视频，适合多媒体内容源'
-                  : '不提取图片和视频，适合纯文本内容源，加载更快'}
-              </Text>
-            </View>
-
-            {/* 代理开关 */}
-            <View style={styles.inputGroup}>
-              <View style={styles.proxyContainer}>
-                <View style={styles.proxyInfo}>
-                  <View style={styles.proxyTitleRow}>
-                    <MaterialIcons 
-                      name="cloud" 
-                      size={20} 
-                      color={formData.sourceMode === 'proxy' ? theme.colors.primary : theme.colors.onSurfaceVariant} 
-                    />
-                    <Text style={styles.proxyTitle}>通过代理获取</Text>
-                  </View>
-                  <Text style={styles.proxyHint}>
-                    使用代理服务器抓取此源，适合需要翻墙的国外源
-                  </Text>
-                </View>
-                <Switch
-                  value={formData.sourceMode === 'proxy'}
-                  onValueChange={(value) => updateFormData('sourceMode', value ? 'proxy' : 'direct')}
-                  trackColor={{ 
-                    false: theme.colors.surfaceVariant,
-                    true: theme.colors.primaryContainer
-                  }}
-                  thumbColor={formData.sourceMode === 'proxy' 
-                    ? theme.colors.primary 
-                    : theme.colors.outline
-                  }
-                />
-              </View>
-            </View>
-
-            {/* 刷新与保留限制 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>刷新获取数量</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  value={String(formData.fetchLimit ?? 0)}
-                  onChangeText={(text) => {
-                    const value = parseInt(text, 10);
-                    if (!isNaN(value) && value >= 0) {
-                      updateFormData('fetchLimit', value);
-                    } else if (text === '') {
-                      updateFormData('fetchLimit', 0);
-                    }
-                  }}
-                  placeholder="例如: 50"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  keyboardType="number-pad"
-                />
-              </View>
-              <Text style={styles.proxyHint}>每次刷新从 RSS 获取的文章数量 (0 为不限制)</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>保存数量上限</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  value={String(formData.retentionLimit ?? 0)}
-                  onChangeText={(text) => {
-                    const value = parseInt(text, 10);
-                    if (!isNaN(value) && value >= 0) {
-                      updateFormData('retentionLimit', value);
-                    } else if (text === '') {
-                      updateFormData('retentionLimit', 0);
-                    }
-                  }}
-                  placeholder="例如: 100"
-                  placeholderTextColor={theme.colors.onSurfaceVariant}
-                  keyboardType="number-pad"
-                />
-              </View>
-              <Text style={styles.proxyHint}>每个源最多保存的文章数量 (0 为不限制，收藏文章不受影响)</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>描述（可选）</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={formData.description}
-                onChangeText={(text) => updateFormData('description', text)}
-                placeholder="简单描述这个RSS源的内容"
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -604,73 +444,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: theme.colors.onPrimary,
     fontWeight: '500',
   },
-  contentTypeContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  contentTypeOption: {
-    ...StyleUtils.createCardStyle(theme),
-    flex: 1,
-    flexDirection: 'row' as any,
-    alignItems: 'center' as any,
-    justifyContent: 'center' as any,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  contentTypeOptionSelected: {
-    backgroundColor: theme.colors.primary,
-  },
-  contentTypeText: {
-    fontSize: 14,
-    lineHeight: 20,
-    includeFontPadding: false,
-    fontWeight: '500',
-    color: theme.colors.onSurfaceVariant,
-  },
-  contentTypeTextSelected: {
-    color: theme.colors.onPrimary,
-  },
-  contentTypeHint: {
-    fontSize: 12,
-    includeFontPadding: false,
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 8,
-    lineHeight: 16,
-  },
-  proxyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...StyleUtils.createCardStyle(theme),
-    borderRadius: 12,
-    padding: 16,
-  },
-  proxyInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  proxyTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  proxyTitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    includeFontPadding: false,
-    fontWeight: '500',
-    color: theme.colors.onSurface,
-  },
-  proxyHint: {
-    fontSize: 12,
-    includeFontPadding: false,
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 4,
-    lineHeight: 16,
-  },
   bottomActions: {
     flexDirection: 'row',
     padding: 16,
@@ -685,8 +458,8 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center' as any,
     justifyContent: 'center' as any,
-    ...StyleUtils.createCardStyle(theme),
     borderRadius: 24,
+    backgroundColor: theme.colors.surfaceContainer,
   },
   cancelButtonText: {
     fontSize: 16,

@@ -212,7 +212,8 @@ const BottomProgressBar: React.FC<{
       bottom: 0,
       left: 0,
       right: 0,
-      zIndex: 100,
+      zIndex: 1,
+      elevation: 1,
     }}>
       {/* A. 进度条（15px 高的渐变色块） */}
       <View style={{

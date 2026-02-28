@@ -18,8 +18,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRSSSource } from '../../contexts/RSSSourceContext';
 import { useRSSGroup } from '../../contexts/RSSGroupContext';
 import { rssService } from '../../services/rss';
-import * as StyleUtils from '../../utils/styleUtils';
-import { Switch } from 'react-native';
 
 type NavigationProp = NativeStackNavigationProp<any, 'AddRSSSource'>;
 
@@ -31,17 +29,9 @@ const AddRSSSourceScreen: React.FC = () => {
 
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('技术');
-  const [contentType, setContentType] = useState<'text' | 'image_text'>('image_text');
-  const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [useProxy, setUseProxy] = useState(false); // 是否通过代理获取
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null); // 📁 选中的分组
-  const [fetchLimit, setFetchLimit] = useState(50);
-  const [retentionLimit, setRetentionLimit] = useState(100);
-
-  const categories = ['技术', '新闻', '博客', '科学', '设计', '其他'];
 
   const validateRSSUrl = async (rssUrl: string) => {
     if (!rssUrl.trim()) {
@@ -69,15 +59,15 @@ const AddRSSSourceScreen: React.FC = () => {
       let helpText = '无法访问该RSS源。\n\n';
       
       if (errorMsg.includes('timeout') || errorMsg.includes('超时')) {
-        helpText += '可能原因：\n• 网络连接较慢\n• RSS源服务器响应慢\n\n建议：\n• 检查网络连接\n• 开启「通过代理获取」开关\n• 稍后再试';
+        helpText += '可能原因：\n• 网络连接较慢\n• RSS源服务器响应慢\n\n建议：\n• 检查网络连接\n• 稍后再试';
       } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
-        helpText += '可能原因：\n• 无法连接到服务器\n• 域名解析失败\n\n建议：\n• 检查URL是否正确\n• 尝试开启「通过代理获取」';
+        helpText += '可能原因：\n• 无法连接到服务器\n• 域名解析失败\n\n建议：\n• 检查URL是否正确';
       } else if (errorMsg.includes('404') || errorMsg.includes('Not Found')) {
         helpText += '可能原因：\n• RSS地址不存在\n\n建议：\n• 检查URL是否完整正确\n• 在浏览器中测试该地址';
       } else if (errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
-        helpText += '可能原因：\n• 服务器拒绝访问\n\n建议：\n• 开启「通过代理获取」开关';
+        helpText += '可能原因：\n• 服务器拒绝访问\n\n建议：\n• 检查该源是否限制访问';
       } else {
-        helpText += '建议：\n• 检查URL是否正确\n• 尝试开启「通过代理获取」\n• 检查网络连接';
+        helpText += '建议：\n• 检查URL是否正确\n• 检查网络连接';
       }
       
       Alert.alert('验证失败', helpText);
@@ -94,11 +84,11 @@ const AddRSSSourceScreen: React.FC = () => {
       const result = await rssService.addRSSSource(
         url.trim(),
         name.trim() || '未命名RSS源',
-        contentType,
-        category,
-        useProxy ? 'proxy' : 'direct',
-        fetchLimit,
-        retentionLimit
+        'image_text',
+        '技术',
+        'direct',
+        50,
+        100
       );
       
       // 📁 如果选择了分组，将源添加到分组
@@ -126,19 +116,6 @@ const AddRSSSourceScreen: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  const handleQuickAdd = (quickUrl: string, quickName: string, quickContentType: 'text' | 'image_text' = 'image_text') => {
-    setUrl(quickUrl);
-    setName(quickName);
-    setContentType(quickContentType);
-  };
-
-  const quickSources = [
-    { name: 'GitHub Blog', url: 'https://github.blog/feed/', contentType: 'image_text' as const },
-    { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', contentType: 'image_text' as const },
-    { name: 'Hacker News', url: 'https://hnrss.org/frontpage', contentType: 'text' as const },
-    { name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/', contentType: 'image_text' as const },
-  ];
 
   const styles = createStyles(theme);
 
@@ -196,85 +173,6 @@ const AddRSSSourceScreen: React.FC = () => {
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>分类</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                {categories.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryChip,
-                      category === cat && styles.categoryChipSelected
-                    ]}
-                    onPress={() => setCategory(cat)}
-                  >
-                    <Text style={[
-                      styles.categoryChipText,
-                      category === cat && styles.categoryChipTextSelected
-                    ]}>
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>内容类型</Text>
-              <View style={styles.contentTypeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.contentTypeOption,
-                    contentType === 'image_text' && styles.contentTypeOptionSelected
-                  ]}
-                  onPress={() => setContentType('image_text')}
-                >
-                  <MaterialIcons 
-                    name="image" 
-                    size={20} 
-                    color={contentType === 'image_text' 
-                      ? theme.colors.onPrimary
-                      : theme.colors.onSurfaceVariant
-                    } 
-                  />
-                  <Text style={[
-                    styles.contentTypeText,
-                    contentType === 'image_text' && styles.contentTypeTextSelected
-                  ]}>
-                    多媒体内容
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.contentTypeOption,
-                    contentType === 'text' && styles.contentTypeOptionSelected
-                  ]}
-                  onPress={() => setContentType('text')}
-                >
-                  <MaterialIcons 
-                    name="text-fields" 
-                    size={20} 
-                    color={contentType === 'text' 
-                      ? theme.colors.onPrimary
-                      : theme.colors.onSurfaceVariant
-                    } 
-                  />
-                  <Text style={[
-                    styles.contentTypeText,
-                    contentType === 'text' && styles.contentTypeTextSelected
-                  ]}>
-                    纯文本
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.contentTypeHint}>
-                {contentType === 'image_text' 
-                  ? '将提取图片和视频，适合多媒体内容源' 
-                  : '不提取图片和视频，适合纯文本内容源，加载更快'}
-              </Text>
-            </View>
-
             {/* 📁 分组选择 */}
             {groups.length > 0 && (
               <View style={styles.inputGroup}>
@@ -318,123 +216,6 @@ const AddRSSSourceScreen: React.FC = () => {
               </View>
             )}
 
-            {/* 代理开关 */}
-            <View style={styles.inputGroup}>
-              <View style={styles.proxyContainer}>
-                <View style={styles.proxyInfo}>
-                  <View style={styles.proxyTitleRow}>
-                    <MaterialIcons 
-                      name="cloud" 
-                      size={20} 
-                      color={useProxy ? theme.colors.primary : theme.colors.onSurfaceVariant} 
-                    />
-                    <Text style={styles.proxyTitle}>通过代理获取</Text>
-                  </View>
-                  <Text style={styles.proxyHint}>
-                    使用代理服务器抓取此源，适合需要翻墙的国外源
-                  </Text>
-                </View>
-                <Switch
-                  value={useProxy}
-                  onValueChange={setUseProxy}
-                  trackColor={{ 
-                    false: theme.colors.surfaceVariant,
-                    true: theme.colors.primaryContainer
-                  }}
-                  thumbColor={useProxy 
-                    ? theme.colors.primary 
-                    : theme.colors.outline
-                  }
-                />
-              </View>
-            </View>
-
-            {/* 刷新与保留限制 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>刷新获取数量</Text>
-              <TextInput
-                style={styles.input}
-                value={String(fetchLimit)}
-                onChangeText={(text) => {
-                  const value = parseInt(text, 10);
-                  if (!isNaN(value) && value >= 0) {
-                    setFetchLimit(value);
-                  } else if (text === '') {
-                    setFetchLimit(0);
-                  }
-                }}
-                placeholder="例如: 50"
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-                keyboardType="number-pad"
-              />
-              <Text style={styles.contentTypeHint}>每次刷新从 RSS 获取的文章数量 (0 为不限制)</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>保存数量上限</Text>
-              <TextInput
-                style={styles.input}
-                value={String(retentionLimit)}
-                onChangeText={(text) => {
-                  const value = parseInt(text, 10);
-                  if (!isNaN(value) && value >= 0) {
-                    setRetentionLimit(value);
-                  } else if (text === '') {
-                    setRetentionLimit(0);
-                  }
-                }}
-                placeholder="例如: 100"
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-                keyboardType="number-pad"
-              />
-              <Text style={styles.contentTypeHint}>每个源最多保存的文章数量 (0 为不限制，收藏不受影响)</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>描述（可选）</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder="简单描述这个RSS源的内容"
-                placeholderTextColor={theme.colors.onSurfaceVariant}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-
-          {/* 快速添加 */}
-          <View style={styles.quickAddSection}>
-            <Text style={styles.sectionTitle}>快速添加</Text>
-            <Text style={styles.sectionSubtitle}>点击下方推荐源快速添加</Text>
-            <View style={styles.quickSourcesList}>
-              {quickSources.map((source) => (
-                <TouchableOpacity
-                  key={source.name}
-                  style={styles.quickSourceItem}
-                  onPress={() => handleQuickAdd(source.url, source.name, source.contentType)}
-                >
-                  <View style={styles.quickSourceIcon}>
-                    <MaterialIcons 
-                      name="rss-feed" 
-                      size={20} 
-                      color={theme.colors.primary} 
-                    />
-                  </View>
-                  <View style={styles.quickSourceContent}>
-                    <Text style={styles.quickSourceName}>{source.name}</Text>
-                    <Text style={styles.quickSourceUrl}>{source.url}</Text>
-                  </View>
-                  <MaterialIcons 
-                    name="add" 
-                    size={20} 
-                    color={theme.colors.onSurfaceVariant} 
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
         </View>
       </ScrollView>
@@ -529,10 +310,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: theme.colors.onSurface,
     minHeight: 48,
   },
-  textArea: {
-    minHeight: 80,
-    paddingTop: 12,
-  },
   validatingIcon: {
     position: 'absolute',
     right: 12,
@@ -560,127 +337,6 @@ const createStyles = (theme: any) => StyleSheet.create({
   categoryChipTextSelected: {
     color: theme.colors.onPrimary,
     fontWeight: '500',
-  },
-  contentTypeContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  contentTypeOption: {
-    ...StyleUtils.createCardStyle(theme),
-    flex: 1,
-    flexDirection: 'row' as any,
-    alignItems: 'center' as any,
-    justifyContent: 'center' as any,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  contentTypeOptionSelected: {
-    backgroundColor: theme.colors.primary,
-  },
-  contentTypeText: {
-    fontSize: 14,
-    lineHeight: 20,
-    includeFontPadding: false,
-    fontWeight: '500',
-    color: theme.colors.onSurfaceVariant,
-  },
-  contentTypeTextSelected: {
-    color: theme.colors.onPrimary,
-  },
-  contentTypeHint: {
-    fontSize: 12,
-    includeFontPadding: false,
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 8,
-    lineHeight: 16,
-  },
-  proxyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...StyleUtils.createCardStyle(theme),
-    borderRadius: 12,
-    padding: 16,
-  },
-  proxyInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  proxyTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  proxyTitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    includeFontPadding: false,
-    fontWeight: '500',
-    color: theme.colors.onSurface,
-  },
-  proxyHint: {
-    fontSize: 12,
-    includeFontPadding: false,
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  quickAddSection: {
-    marginBottom: 100, // 为底部按钮留出空间
-  },
-  sectionTitle: {
-    fontSize: 18,
-    lineHeight: 26,
-    includeFontPadding: false,
-    fontWeight: '600',
-    color: theme.colors.onSurface,
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    includeFontPadding: false,
-    color: theme.colors.onSurfaceVariant,
-    marginBottom: 16,
-  },
-  quickSourcesList: {
-    gap: 8,
-  },
-  quickSourceItem: {
-    flexDirection: 'row' as any,
-    alignItems: 'center' as any,
-    ...StyleUtils.createCardStyle(theme),
-    borderRadius: 12,
-    padding: 12,
-  },
-  quickSourceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  quickSourceContent: {
-    flex: 1,
-  },
-  quickSourceName: {
-    fontSize: 16,
-    lineHeight: 24,
-    includeFontPadding: false,
-    fontWeight: '500',
-    color: theme.colors.onSurface,
-  },
-  quickSourceUrl: {
-    fontSize: 12,
-    lineHeight: 18,
-    includeFontPadding: false,
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 2,
   },
   bottomActions: {
     flexDirection: 'row',

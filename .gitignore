@@ -15,7 +15,7 @@ Thumbs.db
 .gradle/
 local.properties
 progress.md
-# Dependencies
+.trae
 node_modules/
 findings.md
 # Environment Variables
