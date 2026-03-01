@@ -2,9 +2,9 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '8.2.3',
-  buildNumber: 80203,
-  updateTime: '2026-02-22',
+  version: '9.0.0',
+  buildNumber: 90000,
+  updateTime: '2026-02-28',
   changelog: [
     '版本更新 (暂无 Git 提交记录)',
   ],

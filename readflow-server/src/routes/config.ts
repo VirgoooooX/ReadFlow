@@ -3,6 +3,8 @@ import { ConfigController } from '../controllers/ConfigController';
 
 const router = Router();
 
+router.get('/meta', ConfigController.getConfigMeta);
+
 // Configure Preferences
 router.get('/preferences', ConfigController.getPreferences);
 router.put('/preferences', ConfigController.updatePreferences);

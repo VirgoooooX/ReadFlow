@@ -15,6 +15,7 @@ export class ConfigSyncService {
   private static instance: ConfigSyncService;
   private static readonly LAST_PUSHED_FINGERPRINT_KEY = 'cloud_config_last_pushed_fingerprint_v2';
   private static readonly MIGRATION_DONE_PREFIX = 'cloud_config_migration_done_v1:';
+  private static readonly LAST_REMOTE_META_PREFIX = 'cloud_config_last_remote_meta_v1:';
   private settingsService?: SettingsService;
   private databaseService = DatabaseService.getInstance();
   private rssService = rssService;
@@ -140,6 +141,53 @@ export class ConfigSyncService {
   private buildMigrationDoneKey(baseUrl: string, userId: string): string {
     const normalizedBaseUrl = String(baseUrl || '').replace(/\/$/, '');
     return `${ConfigSyncService.MIGRATION_DONE_PREFIX}${normalizedBaseUrl}:${String(userId || '')}`;
+  }
+
+  private buildRemoteMetaKey(baseUrl: string, userId: string): string {
+    const normalizedBaseUrl = String(baseUrl || '').replace(/\/$/, '');
+    return `${ConfigSyncService.LAST_REMOTE_META_PREFIX}${normalizedBaseUrl}:${String(userId || '')}`;
+  }
+
+  private async getLastRemoteMetaFingerprint(baseUrl: string, userId: string): Promise<string | null> {
+    const key = this.buildRemoteMetaKey(baseUrl, userId);
+    try {
+      const v = await AsyncStorage.getItem(key);
+      return v ? String(v) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async setLastRemoteMetaFingerprint(baseUrl: string, userId: string, value: string): Promise<void> {
+    const key = this.buildRemoteMetaKey(baseUrl, userId);
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch {
+    }
+  }
+
+  private async fetchWithTimeout(url: string, options: any, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...(options || {}), signal: controller.signal as any } as any);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async getRemoteConfigMeta(baseUrl: string, headers: HeadersInit): Promise<any | null> {
+    const url = `${baseUrl}/api/config/meta`;
+    try {
+      const res = await this.fetchWithTimeout(url, { headers }, 1500).catch(() => null as any);
+      if (!res) return null;
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      const json = await res.json().catch(() => null);
+      return json?.data ?? json;
+    } catch {
+      return null;
+    }
   }
 
   private async isMigrationDone(baseUrl: string, userId: string): Promise<boolean> {
@@ -345,6 +393,33 @@ export class ConfigSyncService {
     }
   }
 
+  public async syncConfigIfRemoteChanged(reason: 'startup' | 'resume' | 'manual' = 'startup'): Promise<void> {
+    const cloudConfig = await cloudConfigService.getConfig();
+    if (!cloudConfig || cloudConfig.mode !== 'cloud' || !cloudConfig.serverUrl) return;
+
+    const token = AuthService.getAuthToken() ?? cloudConfig.auth?.accessToken;
+    const user = AuthService.getCurrentUser() ?? cloudConfig.auth?.user;
+    const userId = String((user as any)?.id || (user as any)?.uuid || '');
+    if (!token || !userId) return;
+
+    const baseUrl = this.normalizeCloudBaseUrl(cloudConfig.serverUrl);
+    if (!baseUrl) return;
+
+    const headers = await this.getAuthHeaders();
+    const meta = await this.getRemoteConfigMeta(baseUrl, headers);
+    if (!meta) return;
+
+    const fingerprint = typeof meta?.fingerprint === 'string' ? meta.fingerprint : ConfigSyncService.fnv1aHex(ConfigSyncService.stableStringify(meta));
+    const last = await this.getLastRemoteMetaFingerprint(baseUrl, userId);
+    if (last && last === fingerprint) {
+      logger.info(`[ConfigSync] Skip pull: remote meta unchanged reason=${reason}`);
+      return;
+    }
+
+    await this.syncConfig('pull');
+    await this.setLastRemoteMetaFingerprint(baseUrl, userId, fingerprint);
+  }
+
   public async bootstrapConfigAfterAuth(): Promise<void> {
     const cloudConfig = await cloudConfigService.getConfig();
     if (!cloudConfigService.isCloudEnabled(cloudConfig)) {
@@ -495,7 +570,7 @@ export class ConfigSyncService {
 
     const settingsForPush = await this.normalizeRssStartupSettingsForPush(settings);
     const fingerprint = this.computeConfigFingerprint({
-      settings: { ...(settingsForPush as any), llmSettings: undefined },
+      settings: settingsForPush as any,
       sources,
       groups,
       filterRules

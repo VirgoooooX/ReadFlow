@@ -30,7 +30,8 @@ export type CacheEventType =
   | 'batchSyncEnd'
   | 'sourceDeleted'
   | 'sourceUpdated'
-  | 'articleRead';
+  | 'articleRead'
+  | 'authLogout';
 
 // 事件数据接口
 export interface CacheEventData {

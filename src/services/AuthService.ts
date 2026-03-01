@@ -56,6 +56,7 @@ export class AuthService {
   private static readonly REGISTERED_USERS_KEY = 'registered_users';
   private initialized = false;
   private settingsService?: SettingsService;
+  private backgroundValidationInFlight: Promise<void> | null = null;
 
   private getSettingsService(): SettingsService {
     if (!this.settingsService) {
@@ -141,28 +142,21 @@ export class AuthService {
         this.currentUser = JSON.parse(userStr);
 
         if (this.currentUser) {
-          // 验证token是否仍然有效
-          const isValid = await this.validateToken(token);
-          if (isValid) {
-            // 加载用户头像
-            const avatarPath = await AvatarStorageService.getAvatarPath(this.currentUser.id);
-            if (avatarPath && avatarPath !== this.currentUser.avatar) {
-              this.currentUser.avatar = avatarPath;
-              await cloudConfigService.updateConfig({ auth: { user: this.currentUser } });
-            }
-
-            await cloudConfigService.updateConfig({ auth: { lastValidatedAt: Date.now() } });
-
-            setTimeout(() => {
-              try {
-                const { configSyncService } = require('./ConfigSyncService');
-                void configSyncService.bootstrapConfigAfterAuth();
-              } catch {
-              }
-            }, 0);
-          } else {
-            await this.logout();
+          const avatarPath = await AvatarStorageService.getAvatarPath(this.currentUser.id);
+          if (avatarPath && avatarPath !== this.currentUser.avatar) {
+            this.currentUser.avatar = avatarPath;
+            await cloudConfigService.updateConfig({ auth: { user: this.currentUser } });
           }
+
+          setTimeout(() => {
+            try {
+              const { configSyncService } = require('./ConfigSyncService');
+              void configSyncService.bootstrapConfigAfterAuth();
+            } catch {
+            }
+          }, 0);
+
+          void this.validateSessionInBackground();
         }
       }
     } catch (error) {
@@ -302,8 +296,15 @@ export class AuthService {
       // 发送事件通知相关组件和状态管理进行重置
       const { default: cacheEventEmitter } = require('./CacheEventEmitter');
       cacheEventEmitter.clearAll();
-      // 触发全局登出事件，让 Redux / Zustand 能够清空 Store
-      cacheEventEmitter.emit('AUTH_LOGOUT');
+      cacheEventEmitter.emit({ type: 'authLogout' });
+
+      try {
+        const { store } = require('../store');
+        if (store && typeof store.dispatch === 'function') {
+          store.dispatch({ type: 'AUTH_LOGOUT' });
+        }
+      } catch {
+      }
 
     } catch (error) {
       logger.error('登出失败:', error);
@@ -375,6 +376,61 @@ export class AuthService {
       logger.error('验证token失败:', error);
       return false;
     }
+  }
+
+  private async validateTokenWithTimeout(token: string, timeoutMs: number): Promise<boolean> {
+    const cloudConfig = await cloudConfigService.getConfig();
+    if (!cloudConfig.serverUrl) return false;
+    try {
+      const url = await this.getApiUrl('/api/auth/validate');
+      const headers = await this.getHeaders();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ token }),
+          signal: controller.signal as any,
+        } as any);
+        if (!res.ok) return false;
+        const data = await res.json();
+        return !!data.valid;
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  private async validateSessionInBackground(): Promise<void> {
+    if (this.backgroundValidationInFlight) return this.backgroundValidationInFlight;
+
+    this.backgroundValidationInFlight = (async () => {
+      try {
+        const cloudConfig = await cloudConfigService.getConfig();
+        const token = this.authToken || cloudConfig.auth?.accessToken;
+        const user = this.currentUser || cloudConfig.auth?.user;
+        if (!token || !user) return;
+        if (!cloudConfig.serverUrl) return;
+
+        const lastValidatedAt = typeof cloudConfig.auth?.lastValidatedAt === 'number' ? cloudConfig.auth.lastValidatedAt : 0;
+        if (lastValidatedAt && Date.now() - lastValidatedAt < 6 * 60 * 60 * 1000) return;
+
+        const ok = await this.validateTokenWithTimeout(token, 1500);
+        if (ok) {
+          await cloudConfigService.updateConfig({ auth: { lastValidatedAt: Date.now() } });
+          return;
+        }
+
+        await this.logout();
+      } finally {
+        this.backgroundValidationInFlight = null;
+      }
+    })();
+
+    return this.backgroundValidationInFlight;
   }
 
   // ========== Cloud API Methods ==========

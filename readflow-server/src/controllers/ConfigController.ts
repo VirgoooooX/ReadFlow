@@ -15,6 +15,44 @@ declare global {
 
 export class ConfigController {
 
+    static async getConfigMeta(req: Request, res: Response) {
+        try {
+            const userUuid = req.user?.id || req.user?.uuid;
+            if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+            const [pref, groupsAgg, feedsAgg, rulesAgg] = await Promise.all([
+                prisma.userPreference.findUnique({ where: { userId: userUuid }, select: { updatedAt: true } }).catch(() => null),
+                (prisma as any).userRSSGroup.aggregate({ where: { userId: userUuid }, _max: { updatedAt: true } }).catch(() => null),
+                (prisma as any).userFeed.aggregate({ where: { userId: userUuid }, _max: { updatedAt: true } }).catch(() => null),
+                (prisma as any).userRSSFilterRule.aggregate({ where: { userId: userUuid }, _max: { updatedAt: true } }).catch(() => null),
+            ]);
+
+            const preferencesUpdatedAt = pref?.updatedAt ? pref.updatedAt.toISOString() : null;
+            const groupsUpdatedAt = groupsAgg?._max?.updatedAt ? new Date(groupsAgg._max.updatedAt).toISOString() : null;
+            const sourcesUpdatedAt = feedsAgg?._max?.updatedAt ? new Date(feedsAgg._max.updatedAt).toISOString() : null;
+            const filterRulesUpdatedAt = rulesAgg?._max?.updatedAt ? new Date(rulesAgg._max.updatedAt).toISOString() : null;
+
+            const fingerprint = [
+                preferencesUpdatedAt || '',
+                groupsUpdatedAt || '',
+                sourcesUpdatedAt || '',
+                filterRulesUpdatedAt || '',
+            ].join('|');
+
+            res.json({
+                success: true,
+                data: { preferencesUpdatedAt, groupsUpdatedAt, sourcesUpdatedAt, filterRulesUpdatedAt, fingerprint },
+            });
+        } catch (error) {
+            console.error('[ConfigController] getConfigMeta error:', error);
+            if (ConfigController.isSchemaMissingError(error)) {
+                res.status(404).json({ success: false, message: 'Config meta not available' });
+                return;
+            }
+            res.status(500).json({ success: false, message: 'Failed to fetch config meta' });
+        }
+    }
+
     private static normalizeDailyReportSettings(value: any): any {
         const raw = value && typeof value === 'object' ? value : {};
         const enabled = raw.enabled !== false;
@@ -139,6 +177,13 @@ export class ConfigController {
                 name: f.customName || f.source.name,
                 category: f.customCategory || f.source.category,
                 description: f.source.description || null,
+                contentType: f.contentType || null,
+                sourceMode: f.sourceMode || null,
+                isActive: f.isActive !== false,
+                fetchLimit: typeof f.fetchLimit === 'number' ? f.fetchLimit : null,
+                retentionLimit: typeof f.retentionLimit === 'number' ? f.retentionLimit : null,
+                sortOrder: typeof f.sortOrder === 'number' ? f.sortOrder : null,
+                updateFrequency: typeof f.updateFrequency === 'number' ? f.updateFrequency : null,
                 groupId: f.groupId,
                 groupName: f.group?.name || null,
             }));
@@ -158,7 +203,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const { url, name, category, description, groupId, groupName } = req.body;
+            const { url, name, category, description, groupId, groupName, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency } = req.body;
             let effectiveGroupId =
                 typeof groupId === 'number'
                     ? groupId
@@ -194,13 +239,31 @@ export class ConfigController {
 
             const userFeed = await (prisma as any).userFeed.upsert({
                 where: { userId_sourceId: { userId: userUuid, sourceId: source.id } },
-                update: { customName: name, customCategory: category, groupId: effectiveGroupId },
+                update: {
+                    customName: name,
+                    customCategory: category,
+                    groupId: effectiveGroupId,
+                    isActive: isActive !== false,
+                    contentType: typeof contentType === 'string' ? contentType : null,
+                    sourceMode: typeof sourceMode === 'string' ? sourceMode : null,
+                    fetchLimit: typeof fetchLimit === 'number' ? fetchLimit : null,
+                    retentionLimit: typeof retentionLimit === 'number' ? retentionLimit : null,
+                    sortOrder: typeof sortOrder === 'number' ? sortOrder : null,
+                    updateFrequency: typeof updateFrequency === 'number' ? updateFrequency : null,
+                },
                 create: {
                     userId: userUuid,
                     sourceId: source.id,
                     customName: name,
                     customCategory: category,
-                    groupId: effectiveGroupId
+                    groupId: effectiveGroupId,
+                    isActive: isActive !== false,
+                    contentType: typeof contentType === 'string' ? contentType : null,
+                    sourceMode: typeof sourceMode === 'string' ? sourceMode : null,
+                    fetchLimit: typeof fetchLimit === 'number' ? fetchLimit : null,
+                    retentionLimit: typeof retentionLimit === 'number' ? retentionLimit : null,
+                    sortOrder: typeof sortOrder === 'number' ? sortOrder : null,
+                    updateFrequency: typeof updateFrequency === 'number' ? updateFrequency : null,
                 }
             });
 
@@ -237,12 +300,22 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const { name, sortOrder } = req.body;
+            const { name, icon, color, sortOrder } = req.body;
 
             const group = await (prisma as any).userRSSGroup.upsert({
                 where: { userId_name: { userId: userUuid, name } },
-                update: { sortOrder },
-                create: { userId: userUuid, name, sortOrder }
+                update: {
+                    sortOrder,
+                    icon: typeof icon === 'string' ? icon : null,
+                    color: typeof color === 'string' ? color : null,
+                },
+                create: {
+                    userId: userUuid,
+                    name,
+                    sortOrder,
+                    icon: typeof icon === 'string' ? icon : null,
+                    color: typeof color === 'string' ? color : null,
+                }
             });
 
             res.json({ success: true, data: group });
@@ -258,11 +331,21 @@ export class ConfigController {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-            const rules = await (prisma as any).userFilterRule.findMany({
+            const rules = await (prisma as any).userRSSFilterRule.findMany({
                 where: { userId: userUuid }
             });
 
-            res.json({ success: true, data: rules });
+            const data = (rules || []).map((r: any) => ({
+                keyword: r.keyword,
+                mode: r.mode,
+                isRegex: r.isRegex,
+                scope: r.scope,
+                sourceUrls: Array.isArray(r.sourceUrls) ? r.sourceUrls : (r.sourceUrls ? r.sourceUrls : []),
+                target: r.target || 'title_summary',
+                isActive: r.isActive !== false,
+            }));
+
+            res.json({ success: true, data });
         } catch (error) {
             console.error('[ConfigController] getFilterRules error:', error);
             if (ConfigController.isSchemaMissingError(error)) {
@@ -277,17 +360,43 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const { id, type, pattern, action, isActive } = req.body;
+            const { id, keyword, mode, isRegex, scope, sourceUrls, sourceUrl, target, isActive, type, pattern, action } = req.body;
+
+            const effectiveKeyword = typeof keyword === 'string' && keyword.trim() ? keyword.trim() : (typeof pattern === 'string' ? pattern.trim() : '');
+            const effectiveMode = mode === 'include' || mode === 'exclude' ? mode : 'exclude';
+            const effectiveIsRegex = Boolean(isRegex);
+            const urlsRaw = Array.isArray(sourceUrls) ? sourceUrls : (typeof sourceUrl === 'string' ? [sourceUrl] : []);
+            const urls = urlsRaw.map((u: any) => String(u || '').trim()).filter(Boolean);
+            const effectiveScope = scope === 'specific' || urls.length > 0 ? 'specific' : 'global';
+            const effectiveTarget = typeof target === 'string' && target.trim() ? target.trim() : 'title_summary';
+            const effectiveIsActive = isActive !== false;
 
             let rule;
             if (id) {
-                rule = await (prisma as any).userFilterRule.update({
+                rule = await (prisma as any).userRSSFilterRule.update({
                     where: { id },
-                    data: { type, pattern, action, isActive }
+                    data: {
+                        keyword: effectiveKeyword,
+                        mode: effectiveMode,
+                        isRegex: effectiveIsRegex,
+                        scope: effectiveScope,
+                        sourceUrls: effectiveScope === 'specific' ? urls : [],
+                        target: effectiveTarget,
+                        isActive: effectiveIsActive,
+                    }
                 });
             } else {
-                rule = await (prisma as any).userFilterRule.create({
-                    data: { userId: userUuid, type, pattern, action, isActive }
+                rule = await (prisma as any).userRSSFilterRule.create({
+                    data: {
+                        userId: userUuid,
+                        keyword: effectiveKeyword,
+                        mode: effectiveMode,
+                        isRegex: effectiveIsRegex,
+                        scope: effectiveScope,
+                        sourceUrls: effectiveScope === 'specific' ? urls : [],
+                        target: effectiveTarget,
+                        isActive: effectiveIsActive,
+                    }
                 });
             }
 
@@ -303,7 +412,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const sources = req.body; // Array of { url, name, category, description, groupId?, groupName? }
+            const sources = req.body; // Array of { url, name, category, description, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency, groupId?, groupName? }
 
             if (!Array.isArray(sources)) return res.status(400).json({ success: false, message: 'Body must be an array' });
 
@@ -356,13 +465,31 @@ export class ConfigController {
                 }
                 const uf = await (prisma as any).userFeed.upsert({
                     where: { userId_sourceId: { userId: userUuid, sourceId: source.id } },
-                    update: { customName: s.name, customCategory: s.category, groupId: effectiveGroupId },
+                    update: {
+                        customName: s.name,
+                        customCategory: s.category,
+                        groupId: effectiveGroupId,
+                        isActive: s?.isActive !== false,
+                        contentType: typeof s?.contentType === 'string' ? s.contentType : null,
+                        sourceMode: typeof s?.sourceMode === 'string' ? s.sourceMode : null,
+                        fetchLimit: typeof s?.fetchLimit === 'number' ? s.fetchLimit : null,
+                        retentionLimit: typeof s?.retentionLimit === 'number' ? s.retentionLimit : null,
+                        sortOrder: typeof s?.sortOrder === 'number' ? s.sortOrder : null,
+                        updateFrequency: typeof s?.updateFrequency === 'number' ? s.updateFrequency : null,
+                    },
                     create: {
                         userId: userUuid,
                         sourceId: source.id,
                         customName: s.name,
                         customCategory: s.category,
-                        groupId: effectiveGroupId
+                        groupId: effectiveGroupId,
+                        isActive: s?.isActive !== false,
+                        contentType: typeof s?.contentType === 'string' ? s.contentType : null,
+                        sourceMode: typeof s?.sourceMode === 'string' ? s.sourceMode : null,
+                        fetchLimit: typeof s?.fetchLimit === 'number' ? s.fetchLimit : null,
+                        retentionLimit: typeof s?.retentionLimit === 'number' ? s.retentionLimit : null,
+                        sortOrder: typeof s?.sortOrder === 'number' ? s.sortOrder : null,
+                        updateFrequency: typeof s?.updateFrequency === 'number' ? s.updateFrequency : null,
                     }
                 });
                 results.push(uf);
@@ -383,7 +510,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const groups = req.body; // Array of { name, sortOrder }
+            const groups = req.body; // Array of { name, icon, color, sortOrder }
 
             if (!Array.isArray(groups)) return res.status(400).json({ success: false, message: 'Body must be an array' });
 
@@ -391,8 +518,18 @@ export class ConfigController {
             for (const g of groups) {
                 const group = await (prisma as any).userRSSGroup.upsert({
                     where: { userId_name: { userId: userUuid, name: g.name } },
-                    update: { sortOrder: g.sortOrder },
-                    create: { userId: userUuid, name: g.name, sortOrder: g.sortOrder }
+                    update: {
+                        sortOrder: g.sortOrder,
+                        icon: typeof g?.icon === 'string' ? g.icon : null,
+                        color: typeof g?.color === 'string' ? g.color : null,
+                    },
+                    create: {
+                        userId: userUuid,
+                        name: g.name,
+                        sortOrder: g.sortOrder,
+                        icon: typeof g?.icon === 'string' ? g.icon : null,
+                        color: typeof g?.color === 'string' ? g.color : null,
+                    }
                 });
                 results.push(group);
             }
@@ -412,23 +549,37 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const rules = req.body; // Array of { type, pattern, action, isActive }
+            const rules = req.body; // Array of { keyword, mode, isRegex, scope, sourceUrls, target, isActive }
 
             if (!Array.isArray(rules)) return res.status(400).json({ success: false, message: 'Body must be an array' });
 
-            // For rules, maybe delete existing and recreate or match by pattern?
-            // Existing sync behavior replaces all rules. Let's recreate.
-            await (prisma as any).userFilterRule.deleteMany({ where: { userId: userUuid } });
+            await (prisma as any).userRSSFilterRule.deleteMany({ where: { userId: userUuid } });
 
-            const created = await (prisma as any).userFilterRule.createMany({
-                data: rules.map((r: any) => ({
-                    userId: userUuid,
-                    type: r.type,
-                    pattern: r.pattern,
-                    action: r.action,
-                    isActive: r.isActive !== false
-                }))
-            });
+            const data = rules
+                .map((r: any) => {
+                    const keyword = typeof r?.keyword === 'string' ? r.keyword.trim() : '';
+                    if (!keyword) return null;
+                    const mode = r?.mode === 'include' ? 'include' : 'exclude';
+                    const isRegex = Boolean(r?.isRegex ?? r?.is_regex);
+                    const urlsRaw = Array.isArray(r?.sourceUrls) ? r.sourceUrls : (typeof r?.sourceUrl === 'string' ? [r.sourceUrl] : []);
+                    const urls = urlsRaw.map((u: any) => String(u || '').trim()).filter(Boolean);
+                    const scope = r?.scope === 'specific' || urls.length > 0 ? 'specific' : 'global';
+                    const target = typeof r?.target === 'string' && r.target.trim() ? r.target.trim() : 'title_summary';
+                    const isActive = r?.isActive !== false;
+                    return {
+                        userId: userUuid,
+                        keyword,
+                        mode,
+                        isRegex,
+                        scope,
+                        sourceUrls: scope === 'specific' ? urls : [],
+                        target,
+                        isActive,
+                    };
+                })
+                .filter(Boolean);
+
+            const created = await (prisma as any).userRSSFilterRule.createMany({ data });
 
             res.json({ success: true, count: created.count });
         } catch (error) {

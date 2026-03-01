@@ -410,16 +410,20 @@ export class RSSGroupService {
       for (const group of groups) {
         // 检查是否存在 (by Name)
         const existing = await this.dbService.executeQuery(
-          'SELECT id FROM rss_groups WHERE name = ?',
+          'SELECT id, icon, color, sort_order FROM rss_groups WHERE name = ?',
           [group.name]
         );
 
         if (existing.length > 0) {
           // Update
-          const id = existing[0].id;
+          const row = existing[0] || {};
+          const id = row.id;
+          const nextIcon = typeof group.icon === 'string' ? group.icon : row.icon;
+          const nextColor = typeof group.color === 'string' ? group.color : row.color;
+          const nextSortOrder = typeof group.sortOrder === 'number' ? group.sortOrder : row.sort_order;
           await this.dbService.executeStatement(
             'UPDATE rss_groups SET icon = ?, color = ?, sort_order = ?, updated_at = ? WHERE id = ?',
-            [group.icon || null, group.color || null, group.sortOrder, Date.now(), id]
+            [nextIcon || null, nextColor || null, nextSortOrder, Date.now(), id]
           );
         } else {
           const now = Date.now();

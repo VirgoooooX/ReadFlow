@@ -152,7 +152,7 @@ const DailyReportSettingsScreen: React.FC = () => {
                 Alert.alert('生成成功', `日报 "${result.title}" 已生成`);
             }
         } catch (error: any) {
-            Alert.alert('生成失败', error?.message || '请检查 LLM 设置和网络连接');
+            Alert.alert('生成失败', error?.message || '请检查服务端配置和网络连接');
         } finally {
             setGenerating(false);
         }

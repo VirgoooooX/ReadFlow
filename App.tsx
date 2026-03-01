@@ -12,6 +12,7 @@ import { Provider } from 'react-redux';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { Asset } from 'expo-asset';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 导入store和主题
 import { store } from './src/store';
@@ -20,15 +21,11 @@ import { UserProvider } from './src/contexts/UserContext';
 import { RSSSourceProvider } from './src/contexts/RSSSourceContext';
 import { RSSGroupProvider } from './src/contexts/RSSGroupContext';
 import { ReadingSettingsProvider } from './src/contexts/ReadingSettingsContext';
-import { AppSettingsProvider } from './src/contexts/AppSettingsContext';
 import { AppNavigator } from './src/navigation';
 
 // 导入数据库初始化和认证服务
 import { databaseService } from './src/database/DatabaseService';
 import AuthService from './src/services/AuthService';
-import { VocabularyService } from './src/services/VocabularyService';
-import { SettingsService } from './src/services/SettingsService';
-import { RSSService } from './src/services/rss';
 import { logger } from './src/services/rss/RSSUtils';
 import { configSyncService } from './src/services/ConfigSyncService';
 import { cloudSyncService } from './src/services/rss/CloudSyncService';
@@ -68,39 +65,8 @@ function App(): React.JSX.Element {
 
         logger.info('✅ 核心服务初始化完成');
 
-        // Cloud Config Sync (Cold Start)
-        try {
-          logger.info('☁️ 检查云端配置同步...');
-          configSyncService.syncConfig('pull').catch(err => {
-            logger.warn('⚠️ 云端配置同步失败:', err);
-          });
-        } catch (e) {
-          logger.warn('⚠️ 云端配置同步初始化失败:', e);
-        }
+        AsyncStorage.removeItem('llm_settings').catch(() => {});
 
-        // 【暂时禁用】如果启用了代理模式，尝试同步单词本和文章
-        // 保留代码逻辑，但暂不自动调用，等后续手动触发
-        // try {
-        //   const proxyConfig = await SettingsService.getInstance().getProxyModeConfig();
-        //   if (proxyConfig.enabled && proxyConfig.token) {
-        //     logger.info('🔄 开始同步单词本...');
-        //     const vocabService = VocabularyService.getInstance();
-        //     // 异步同步单词本，不阻塞启动
-        //     vocabService.syncToProxyServer().catch(err => {
-        //       logger.warn('⚠️ 单词本同步失败:', err);
-        //     });
-        //     
-        //     // 异步同步文章，不阻塞启动
-        //     logger.info('📰 开始同步文章...');
-        //     RSSService.getInstance().refreshAllSources().then(result => {
-        //       logger.info(`✅ 文章同步完成: 成功 ${result.success}, 失败 ${result.failed}, 新文章 ${result.totalArticles}`);
-        //     }).catch(err => {
-        //       logger.warn('⚠️ 文章同步失败:', err);
-        //     });
-        //   }
-        // } catch (syncError) {
-        //   logger.warn('⚠️ 同步检查失败:', syncError);
-        // }
       } catch (e) {
         logger.warn('⚠️ 初始化阶段发生非致命错误:', e);
       } finally {
@@ -111,6 +77,13 @@ function App(): React.JSX.Element {
     prepare();
   }, []);
 
+  useEffect(() => {
+    if (!appIsReady) return;
+    configSyncService.syncConfigIfRemoteChanged('startup').catch((err) => {
+      logger.warn('⚠️ 云端配置检查失败:', err);
+    });
+  }, [appIsReady]);
+
   // 3. App 生命周期管理：监听进入后台/前台，退出时同步
   useEffect(() => {
     if (!appIsReady) return;
@@ -119,6 +92,9 @@ function App(): React.JSX.Element {
       if (nextAppState === 'active') {
         cloudSyncService.pullUserArticleStatesOnAppActiveIfNeeded().catch((e) => {
           logger.warn('⚠️ 前台回填阅读状态失败:', e);
+        });
+        configSyncService.syncConfigIfRemoteChanged('resume').catch((e) => {
+          logger.warn('⚠️ 前台检查云端配置失败:', e);
         });
       }
       if (nextAppState === 'background' || nextAppState === 'inactive') {
@@ -145,17 +121,15 @@ function App(): React.JSX.Element {
       <SafeAreaProvider>
         <ThemeProvider initialTheme="system">
           <UserProvider>
-            <AppSettingsProvider>
-              <RSSSourceProvider>
-                <RSSGroupProvider>
-                  <ReadingSettingsProvider>
-                    <View style={styles.container}>
-                      <AppNavigator />
-                    </View>
-                  </ReadingSettingsProvider>
-                </RSSGroupProvider>
-              </RSSSourceProvider>
-            </AppSettingsProvider>
+            <RSSSourceProvider>
+              <RSSGroupProvider>
+                <ReadingSettingsProvider>
+                  <View style={styles.container}>
+                    <AppNavigator />
+                  </View>
+                </ReadingSettingsProvider>
+              </RSSGroupProvider>
+            </RSSSourceProvider>
           </UserProvider>
         </ThemeProvider>
       </SafeAreaProvider>

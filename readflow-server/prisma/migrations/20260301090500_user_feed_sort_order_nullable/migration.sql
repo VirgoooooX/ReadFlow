@@ -1,0 +1,2 @@
+ALTER TABLE "user_feeds" ALTER COLUMN "sortOrder" DROP DEFAULT;
+ALTER TABLE "user_feeds" ALTER COLUMN "sortOrder" DROP NOT NULL;

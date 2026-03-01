@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import AuthService, { User, LoginCredentials, RegisterData, AuthResponse } from '../services/AuthService';
+import cacheEventEmitter from '../services/CacheEventEmitter';
 
 export interface UserState {
   user: User | null;
@@ -107,6 +108,15 @@ export function UserProvider({ children }: UserProviderProps) {
     };
 
     initializeAuth();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = cacheEventEmitter.subscribe((event) => {
+      if (event?.type === 'authLogout') {
+        dispatch({ type: 'LOGOUT' });
+      }
+    });
+    return unsubscribe;
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {

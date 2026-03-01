@@ -43,6 +43,8 @@ model UserRSSGroup {
   id        Int      @id @default(autoincrement())
   userId    String
   name      String
+  icon      String?
+  color     String?
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -67,6 +69,25 @@ model UserFilterRule {
   user User @relation(fields: [userId], references: [uuid], onDelete: Cascade)
 
   @@map("user_filter_rules")
+}
+
+model UserRSSFilterRule {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  keyword   String
+  mode      String
+  isRegex   Boolean  @default(false)
+  scope     String   @default("global")
+  sourceUrls Json?   @db.JsonB
+  target    String?  // e.g. "title_summary"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_rss_filter_rules")
 }
 
 model RSSSource {
@@ -132,6 +153,13 @@ model UserFeed {
 
   customName     String?
   customCategory String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int?
+  contentType    String?
+  sourceMode     String?
+  fetchLimit     Int?
+  retentionLimit Int?
+  updateFrequency Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

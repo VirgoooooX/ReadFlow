@@ -551,13 +551,41 @@ export class RSSService {
 
         // 检查是否存在 (by URL)
         const existing = await this.databaseService.executeQuery(
-          'SELECT id FROM rss_sources WHERE url = ?',
+          'SELECT id, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency FROM rss_sources WHERE url = ?',
           [source.url]
         );
 
         if (existing.length > 0) {
           // Update
-          const id = existing[0].id;
+          const row = existing[0] || {};
+          const id = row.id;
+
+          const nextTitle = typeof source.name === 'string' ? source.name : row.title;
+          const nextDescription = typeof source.description === 'string' ? source.description : row.description;
+          const nextCategory = typeof source.category === 'string' ? source.category : row.category;
+          const nextContentType = typeof source.contentType === 'string' ? source.contentType : row.content_type;
+          const nextSourceMode = typeof source.sourceMode === 'string' ? source.sourceMode : row.source_mode;
+          const nextFetchLimit =
+            typeof source.fetchLimit === 'number'
+              ? source.fetchLimit
+              : (typeof source.maxArticles === 'number' ? source.maxArticles : (typeof row.fetch_limit === 'number' ? row.fetch_limit : 50));
+          const nextRetentionLimit =
+            typeof source.retentionLimit === 'number'
+              ? source.retentionLimit
+              : (typeof source.maxArticles === 'number' ? source.maxArticles : (typeof row.retention_limit === 'number' ? row.retention_limit : 100));
+          const nextGroupId =
+            groupId !== null && groupId !== undefined
+              ? groupId
+              : (typeof row.group_id === 'number' ? row.group_id : null);
+          const nextSortOrder =
+            typeof source.sortOrder === 'number'
+              ? source.sortOrder
+              : (typeof row.sort_order === 'number' ? row.sort_order : 0);
+          const nextUpdateFrequency =
+            typeof source.updateFrequency === 'number'
+              ? source.updateFrequency
+              : (typeof row.update_frequency === 'number' ? row.update_frequency : 3600);
+
           await this.databaseService.executeStatement(
             `UPDATE rss_sources SET 
               title = ?, description = ?, category = ?, content_type = ?, 
@@ -565,11 +593,11 @@ export class RSSService {
               group_id = ?, sort_order = ?, update_frequency = ?
              WHERE id = ?`,
             [
-              source.name, source.description, source.category, source.contentType,
-              source.sourceMode, isActive ? 1 : 0,
-              source.fetchLimit ?? source.maxArticles ?? 50,
-              source.retentionLimit ?? source.maxArticles ?? 100,
-              groupId, source.sortOrder, source.updateFrequency,
+              nextTitle, nextDescription, nextCategory, nextContentType,
+              nextSourceMode, isActive ? 1 : 0,
+              nextFetchLimit,
+              nextRetentionLimit,
+              nextGroupId, nextSortOrder, nextUpdateFrequency,
               id
             ]
           );
