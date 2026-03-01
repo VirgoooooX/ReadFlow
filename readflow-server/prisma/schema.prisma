@@ -29,6 +29,7 @@ model User {
   feeds          UserFeed[]
   groups         UserRSSGroup[]
   filterRules    UserFilterRule[]
+  rssFilterRules UserRSSFilterRule[]
   articleStates  UserArticleState[]
   sourceCursors  UserSourceCursor[]
   syncDeliveries SyncDelivery[]
