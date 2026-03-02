@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -43,6 +43,7 @@
     "typescript": "^5.3.3"
   },
   "changelog": [
+    "feat: 在用户模型中添加 RSS 过滤规则关联",
     "feat: 升级至 v9.0.0 并重构配置同步与认证机制",
     "feat: 为 RSS 源添加描述字段并升级至版本 9.0.0",
     "chore: 更新版本号至3.0.0并更新changelog",
@@ -61,7 +62,6 @@
     "feat: 实现核心应用功能，包括认证、RSS管理、词汇学习、日报、设置以及新的后端服务。",
     "refactor(admin): 重构管理后台界面并改进无障碍访问",
     "chore: 更新服务器版本号至1.2.5并更新变更日志",
-    "feat(图片代理): 增加图片转码开关配置",
-    "feat(rss): 为RSS解析服务添加视频URL支持"
+    "feat(图片代理): 增加图片转码开关配置"
   ]
 }
