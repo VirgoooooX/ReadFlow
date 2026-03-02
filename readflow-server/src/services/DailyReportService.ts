@@ -29,6 +29,14 @@ interface ArticleForSummary {
     publishedAt: string;
 }
 
+interface ArticleForRaw {
+    title: string;
+    url: string;
+    sourceName: string;
+    content: string;
+    publishedAt: string;
+}
+
 // ─── Content Cleaning ────────────────────────────────────────────────────────
 
 function stripHtmlToText(html: string): string {
@@ -240,6 +248,58 @@ export class DailyReportService {
             url: a.url,
             sourceName: sourceIdToName.get(a.sourceId) || 'Unknown',
             content: truncateText(stripHtmlToText(a.content || ''), 1500),
+            publishedAt: a.publishedAt.toISOString(),
+        }));
+    }
+
+    async getRawArticlesForDateRange(userId: string, startTime: Date, endTime: Date): Promise<ArticleForRaw[]> {
+        const dbUser = await prisma.user.findUnique({ where: { uuid: userId } });
+        if (!dbUser) {
+            throw new Error(`User not found: ${userId}`);
+        }
+
+        const pref = await prismaAny.userPreference.findUnique({ where: { userId: dbUser.uuid } });
+        const userConfig = pref?.settings || {};
+        const config = this.getDailyReportConfig(userConfig);
+
+        const sourceUrls = await this.getSourceUrlsForGroups(userId, config.groupNames);
+        if (sourceUrls.length === 0) {
+            return [];
+        }
+
+        const sources = await prisma.rSSSource.findMany({
+            where: { url: { in: sourceUrls } },
+            select: { id: true, name: true },
+        });
+
+        if (sources.length === 0) return [];
+
+        const sourceIdToName = new Map(sources.map(s => [s.id, s.name]));
+        const sourceIds = sources.map(s => s.id);
+
+        const articles = await prisma.article.findMany({
+            where: {
+                sourceId: { in: sourceIds },
+                publishedAt: {
+                    gte: startTime,
+                    lte: endTime
+                },
+            },
+            orderBy: { publishedAt: 'desc' },
+            select: {
+                title: true,
+                url: true,
+                content: true,
+                sourceId: true,
+                publishedAt: true,
+            },
+        });
+
+        return articles.map(a => ({
+            title: a.title,
+            url: a.url,
+            sourceName: sourceIdToName.get(a.sourceId) || 'Unknown',
+            content: a.content || '',
             publishedAt: a.publishedAt.toISOString(),
         }));
     }
