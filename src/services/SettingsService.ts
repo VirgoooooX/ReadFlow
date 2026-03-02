@@ -1015,6 +1015,8 @@ export class SettingsService {
         SettingsService.STORAGE_KEYS.RSS_STARTUP_SETTINGS,
         JSON.stringify(settings)
       );
+      cacheEventEmitter.settingsUpdated('rssStartupSettings');
+      this.scheduleCloudSettingsSync();
     } catch (error) {
       logger.error('Error saving RSS startup settings:', error);
       throw new AppError({
