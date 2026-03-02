@@ -79,11 +79,11 @@ function _renderFeeds() {
         const descTitleEsc = escapeHtml(desc ? `简介: ${desc}\n(点击可修改)` : '点击可编辑简介');
         return `
     <tr class="hover:bg-white/60 transition group border-b border-slate-200/60 last:border-0">
-        <td class="px-6 py-4 align-middle">
+        <td class="px-4 py-4 align-middle">
             <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 ${checked} onchange="toggleFeedSelect('${id}', this.checked)">
         </td>
-        <td data-label="源名称" class="px-6 py-4 align-middle">
+        <td data-label="源名称" class="px-4 py-4 align-middle">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-600 text-sm border border-slate-200 shrink-0">
                     <i class="fa-solid fa-rss"></i>
@@ -103,7 +103,7 @@ function _renderFeeds() {
                 </div>
             </div>
         </td>
-        <td data-label="源地址" class="px-6 py-4 align-middle">
+        <td data-label="源地址" class="px-4 py-4 align-middle">
             <div class="flex items-center gap-2 min-w-0">
                 <a href="${escapeHtml(f.url)}" target="_blank" rel="noreferrer noopener"
                     class="text-blue-600 hover:text-blue-800 hover:underline text-xs font-mono truncate min-w-0 flex-1"
@@ -117,38 +117,38 @@ function _renderFeeds() {
                 </button>
             </div>
         </td>
-        <td data-label="文章数" class="px-6 py-4 text-center align-middle">
+        <td data-label="文章数" class="px-4 py-4 text-center align-middle">
             <button onclick="viewFeedArticles('${id}')" class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition" title="查看文章列表">
                 ${f.articleCount ?? 0}
             </button>
         </td>
-        <td data-label="订阅用户" class="px-6 py-4 text-center align-middle">
+        <td data-label="订阅用户" class="px-4 py-4 text-center align-middle">
             <button onclick="viewFeedSubscribers('${id}')" class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition" title="查看订阅用户">
                 ${f.subscriberCount ?? 0}
             </button>
         </td>
-        <td data-label="间隔(秒)" class="px-6 py-4 text-center align-middle">
+        <td data-label="间隔(秒)" class="px-4 py-4 text-center align-middle">
             <input type="number" value="${f.refreshIntervalSeconds ?? ''}"
                 class="w-20 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm"
                 onchange="updateFeedInterval('${id}', this.value)" placeholder="默认">
         </td>
-        <td data-label="CRON" class="px-6 py-4 text-center align-middle">
+        <td data-label="CRON" class="px-4 py-4 text-center align-middle">
             <input type="text" value="${escapeHtml(f.refreshCron ?? '')}"
                 class="w-44 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm font-mono"
                 onchange="updateFeedCron('${id}', this.value)" placeholder="Cron">
         </td>
-        <td data-label="最后更新" class="px-6 py-4 text-xs align-middle">
+        <td data-label="最后更新" class="px-4 py-4 text-xs align-middle">
             <div class="text-slate-700 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
             <div class="text-slate-500 text-[10px] mt-0.5 scale-90 origin-left">Last check</div>
         </td>
-        <td data-label="状态" class="px-6 py-4 text-center align-middle">
+        <td data-label="状态" class="px-4 py-4 text-center align-middle">
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusBg} ${statusColor} border border-black/5 whitespace-nowrap min-w-[52px] justify-center">
                 <span class="w-1.5 h-1.5 rounded-full bg-current mr-1.5 flex-shrink-0"></span>
                 ${statusText}
             </span>
             ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-500 ml-1 cursor-help" title="${escapeHtml(f.lastRefreshError)}"></i>` : ''}
         </td>
-        <td data-label="操作" class="px-6 py-4 text-right align-middle">
+        <td data-label="操作" class="px-4 py-4 text-right align-middle">
             <div class="flex justify-end space-x-1">
                 <button onclick="refreshFeed('${id}')" class="text-slate-600 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition" title="立即刷新">
                     <i class="fa-solid fa-rotate"></i>

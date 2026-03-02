@@ -440,25 +440,25 @@
 
                 <!-- Table -->
                 <div class="glass-card rounded-xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="responsive-table w-full text-left border-collapse table-fixed">
+                    <div class="overflow-x-scroll overflow-y-auto max-h-[70vh]">
+                        <table class="responsive-table w-full text-left border-collapse table-auto">
                             <thead
                                 class="bg-slate-50/30 text-xs uppercase text-slate-600 font-bold border-b border-slate-100/50">
                                 <tr>
-                                    <th class="px-6 py-4 w-10">
+                                    <th class="px-4 py-4 whitespace-nowrap">
                                         <input id="feeds-select-all" type="checkbox"
                                             onchange="toggleSelectAllVisible(this.checked)"
                                             class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                                     </th>
-                                    <th class="px-6 py-4 w-[420px]">源名称 / 分类</th>
-                                    <th class="px-6 py-4 w-[520px]">源地址</th>
-                                    <th class="px-6 py-4 text-center w-24">文章数</th>
-                                    <th class="px-6 py-4 text-center w-24">订阅用户</th>
-                                    <th class="px-6 py-4 text-center w-28">间隔(秒)</th>
-                                    <th class="px-6 py-4 text-center w-[200px]">Cron</th>
-                                    <th class="px-6 py-4 w-[190px]">最后更新</th>
-                                    <th class="px-6 py-4 text-center w-24">状态</th>
-                                    <th class="px-6 py-4 text-right w-32">操作</th>
+                                    <th class="px-4 py-4">源名称 / 分类</th>
+                                    <th class="px-4 py-4">源地址</th>
+                                    <th class="px-4 py-4 text-center whitespace-nowrap">文章数</th>
+                                    <th class="px-4 py-4 text-center whitespace-nowrap">订阅用户</th>
+                                    <th class="px-4 py-4 text-center whitespace-nowrap">间隔(秒)</th>
+                                    <th class="px-4 py-4 text-center whitespace-nowrap">Cron</th>
+                                    <th class="px-4 py-4 whitespace-nowrap">最后更新</th>
+                                    <th class="px-4 py-4 text-center whitespace-nowrap">状态</th>
+                                    <th class="px-4 py-4 text-right whitespace-nowrap">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="feeds-list"
