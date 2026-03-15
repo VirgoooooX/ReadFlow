@@ -1581,8 +1581,8 @@ END $$;
       const rows: any[] = await prisma.$queryRaw`SELECT pg_try_advisory_lock(${k1}::int4, ${k2}::int4) as locked`;
       return !!rows?.[0]?.locked;
     } catch (e) {
-      logger.warn(`[Lock] tryAcquireAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
-      return true;
+      logger.error(`[Lock] tryAcquireAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
+      return false;
     }
   }
 
@@ -1594,6 +1594,61 @@ END $$;
       logger.warn(`[Lock] releaseAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
     }
   }
+
+  public async forceReleaseAdvisoryLock(name: string): Promise<void> {
+    try {
+      logger.warn(`[Lock] Force releasing advisory lock name=${String(name)}`);
+      await prisma.$queryRaw`SELECT pg_advisory_unlock_all()`;
+      logger.info(`[Lock] Successfully force released advisory lock name=${String(name)}`);
+    } catch (e) {
+      logger.error(`[Lock] forceReleaseAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
+    }
+  }
+
+  /**
+   * Get diagnostic information about an advisory lock status.
+   * Queries the pg_locks view to determine if a lock is held, and if so, by which process.
+   * 
+   * @param name - The lock name to check
+   * @returns Lock status information, or null if query fails
+   */
+  public async getAdvisoryLockStatus(name: string): Promise<{
+      isLocked: boolean;
+      holderPid?: number;
+      lockType?: string;
+      granted?: boolean;
+    } | null> {
+      try {
+        const { k1, k2 } = this.computeAdvisoryLockKeys(name);
+        const rows: any[] = await prisma.$queryRaw`
+          SELECT
+            pid,
+            locktype,
+            granted,
+            mode
+          FROM pg_locks
+          WHERE locktype = 'advisory'
+            AND classid = ${k1}::int4
+            AND objid = ${k2}::int4
+        `;
+
+        if (rows.length === 0) {
+          return { isLocked: false };
+        }
+
+        const lockInfo = rows[0];
+        return {
+          isLocked: true,
+          holderPid: lockInfo.pid,
+          lockType: lockInfo.locktype,
+          granted: lockInfo.granted
+        };
+      } catch (e) {
+        logger.error(`[Lock] getAdvisoryLockStatus failed name=${String(name)} err=${String((e as any)?.message || e)}`);
+        return null;
+      }
+    }
+
 
   public getImageCacheTotalSize(): number {
     if (!fs.existsSync(this.cacheDir)) return 0;

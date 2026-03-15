@@ -92,3 +92,7 @@ readflow-server/report_46.txt
 findings.md
 progress.md
 task_plan.md
+.kiro/specs/rss-refresh-timer-stops/.config.kiro
+.kiro/specs/rss-refresh-timer-stops/bugfix.md
+.kiro/specs/rss-refresh-timer-stops/design.md
+.kiro/specs/rss-refresh-timer-stops/tasks.md

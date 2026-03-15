@@ -25,6 +25,9 @@ export class RssFetchService {
     public WARMUP_PENDING_MAX = 2000;
     public warmUpDropped = 0;
 
+    private lockFailureCount: number = 0;
+    private lastSuccessfulRefreshAt: number | null = null;
+
     private constructor() { }
 
     public static getInstance(): RssFetchService {
@@ -266,15 +269,86 @@ export class RssFetchService {
     }
 
     public async refreshAllFeedsOnce() {
-        if (this.refreshRunning) return;
+        if (this.refreshRunning) {
+            logger.warn('[RSS Refresh] Skip: refreshRunning is already true');
+            return;
+        }
         this.refreshRunning = true;
         const lockName = 'rss_auto_refresh';
         let locked = false;
+        let refreshSucceeded = false;
+        const startTime = Date.now();
         try {
-            locked = await storageService.tryAcquireAdvisoryLock(lockName);
-            if (!locked) return;
+            logger.info('[RSS Refresh] Starting refreshAllFeedsOnce...');
+            
+            // Try to acquire lock with exception handling
+            try {
+                locked = await storageService.tryAcquireAdvisoryLock(lockName);
+            } catch (error) {
+                // If lock acquisition throws, treat it as a failure
+                logger.error('[RSS Refresh] Exception during lock acquisition:', error);
+                locked = false;
+            }
+            
+            if (!locked) {
+                // Increment failure count
+                this.lockFailureCount++;
+                
+                // Calculate time since last success
+                const timeSinceLastSuccess = this.lastSuccessfulRefreshAt 
+                    ? Date.now() - this.lastSuccessfulRefreshAt 
+                    : Infinity;
+                
+                // Log warning with failure count and time since last success
+                logger.warn(
+                    `[RSS Refresh] Could not acquire advisory lock (failure #${this.lockFailureCount}, ` +
+                    `${timeSinceLastSuccess === Infinity ? 'never succeeded' : Math.round(timeSinceLastSuccess / 1000) + 's since last success'})`
+                );
+                
+                // Implement force release logic: if lockFailureCount >= 3 OR timeSinceLastSuccess > 5 minutes
+                const FORCE_RELEASE_FAILURE_THRESHOLD = 3;
+                const FORCE_RELEASE_TIME_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+                
+                if (this.lockFailureCount >= FORCE_RELEASE_FAILURE_THRESHOLD || timeSinceLastSuccess > FORCE_RELEASE_TIME_THRESHOLD_MS) {
+                    // Log ERROR when force release is triggered
+                    logger.error(
+                        `[RSS Refresh] Lock appears stuck (${this.lockFailureCount} consecutive failures, ` +
+                        `${timeSinceLastSuccess === Infinity ? 'never succeeded' : Math.round(timeSinceLastSuccess / 1000) + 's since last success'}). ` +
+                        `Attempting force release...`
+                    );
+                    
+                    // Call forceReleaseAdvisoryLock
+                    await storageService.forceReleaseAdvisoryLock(lockName);
+                    
+                    // Retry lock acquisition
+                    try {
+                        locked = await storageService.tryAcquireAdvisoryLock(lockName);
+                    } catch (retryError) {
+                        logger.error('[RSS Refresh] Exception during retry lock acquisition:', retryError);
+                        locked = false;
+                    }
+                    
+                    if (locked) {
+                        // Log INFO when lock acquired after force release
+                        logger.info('[RSS Refresh] Successfully acquired lock after force release');
+                        // Reset lockFailureCount to 0 on successful lock acquisition
+                        this.lockFailureCount = 0;
+                    } else {
+                        logger.error('[RSS Refresh] Still cannot acquire lock after force release');
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            } else {
+                // Reset lockFailureCount to 0 on successful lock acquisition
+                this.lockFailureCount = 0;
+            }
             const feeds = await storageService.getFeedsLight();
-            if (!feeds || feeds.length === 0) return;
+            if (!feeds || feeds.length === 0) {
+                logger.info('[RSS Refresh] No feeds found to refresh');
+                return;
+            }
 
             const nowDate = new Date();
             const now = nowDate.getTime();
@@ -364,74 +438,145 @@ export class RssFetchService {
             }));
 
             await Promise.all(tasks);
+            
+            // Mark refresh as successful if we reached this point without exceptions
+            refreshSucceeded = true;
+        } catch (error) {
+            // Catch all unexpected exceptions to ensure finally block executes
+            // Log at ERROR level and do not re-throw to ensure timer chain continues
+            logger.error('[RSS Refresh] Unexpected error in refreshAllFeedsOnce:', error);
         } finally {
             if (locked) {
                 await storageService.releaseAdvisoryLock(lockName);
             }
+            
+            // Update lastSuccessfulRefreshAt only if refresh completed without errors
+            if (refreshSucceeded) {
+                this.lastSuccessfulRefreshAt = Date.now();
+            }
+            
             this.refreshRunning = false;
+            const duration = Date.now() - startTime;
+            logger.info(`[RSS Refresh] refreshAllFeedsOnce completed in ${duration}ms`);
         }
     }
 
     public startRssAutoRefresh() {
         if (this.refreshTimer) return;
         const scheduleNext = async () => {
-            if (this.refreshTimer) {
-                clearTimeout(this.refreshTimer);
-                this.refreshTimer = null;
-            }
-
-            let delayMs = 60_000;
             try {
-                const feeds = await storageService.getFeedsLight();
-                const settings = storageService.getSettings();
-                const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
-                const globalCron = settings.rssDefaultRefreshCron ? String(settings.rssDefaultRefreshCron).trim() : undefined;
-                const now = Date.now();
+                if (this.refreshTimer) {
+                    clearTimeout(this.refreshTimer);
+                    this.refreshTimer = null;
+                }
 
-                let nextAt = now + delayMs;
-                for (const feed of feeds) {
-                    if (!feed?.url) continue;
+                let delayMs = 60_000;
+                try {
+                    const feeds = await storageService.getFeedsLight();
+                    const settings = storageService.getSettings();
+                    const globalIntervalSeconds = settings.rssDefaultRefreshIntervalSeconds ?? 900;
+                    const globalCron = settings.rssDefaultRefreshCron ? String(settings.rssDefaultRefreshCron).trim() : undefined;
+                    const now = Date.now();
 
-                    let cronExpr = feed.refreshCron;
-                    if (cronExpr) cronExpr = String(cronExpr).trim();
-                    if (!cronExpr) cronExpr = globalCron;
+                    let nextAt = now + delayMs;
+                    let maxInterval = globalIntervalSeconds;
+                    for (const feed of feeds) {
+                        if (!feed?.url) continue;
 
-                    if (cronExpr) {
-                        try {
-                            const base = feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : new Date(0);
-                            const interval = cronParser.parseExpression(cronExpr, { currentDate: base });
-                            const next = interval.next().toDate().getTime();
-                            nextAt = Math.min(nextAt, next);
-                            continue;
-                        } catch {
-                            cronExpr = undefined;
+                        let cronExpr = feed.refreshCron;
+                        if (cronExpr) cronExpr = String(cronExpr).trim();
+                        if (!cronExpr) cronExpr = globalCron;
+
+                        if (cronExpr) {
+                            try {
+                                const base = feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : new Date(0);
+                                const interval = cronParser.parseExpression(cronExpr, { currentDate: base });
+                                const next = interval.next().toDate().getTime();
+                                nextAt = Math.min(nextAt, next);
+                                continue;
+                            } catch {
+                                cronExpr = undefined;
+                            }
+                        }
+
+                        const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
+                        if (intervalSeconds > maxInterval) {
+                            maxInterval = intervalSeconds;
+                        }
+                        if (intervalSeconds <= 0) continue;
+                        const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
+                        const candidate = last ? last + intervalSeconds * 1000 : now;
+                        nextAt = Math.min(nextAt, candidate);
+                    }
+
+                    // Timer health check: detect if timer chain is running but not executing refreshes
+                    if (this.lastSuccessfulRefreshAt) {
+                        const timeSinceLastSuccess = now - this.lastSuccessfulRefreshAt;
+                        const maxIntervalMs = maxInterval * 2 * 1000;
+                        if (timeSinceLastSuccess > maxIntervalMs) {
+                            logger.error(`[RSS Refresh] Timer appears stuck: no successful refresh for ${Math.round(timeSinceLastSuccess / 1000)}s (max interval: ${maxInterval}s)`);
                         }
                     }
 
-                    const intervalSeconds = feed.refreshIntervalSeconds ?? globalIntervalSeconds;
-                    if (intervalSeconds <= 0) continue;
-                    const last = feed.lastRefreshAt ? Date.parse(feed.lastRefreshAt) : 0;
-                    const candidate = last ? last + intervalSeconds * 1000 : now;
-                    nextAt = Math.min(nextAt, candidate);
+                    delayMs = Math.max(0, nextAt - now);
+                    if (!Number.isFinite(delayMs)) delayMs = 60_000;
+                    delayMs = Math.min(delayMs, 60 * 60 * 1000);
+
+                    const nextAtDate = new Date(now + delayMs).toLocaleString();
+                    logger.info(`[RSS Refresh] Next refresh scheduled in ${Math.round(delayMs / 1000)}s (at ${nextAtDate})`);
+                } catch (err) {
+                    logger.error('[RSS Refresh] Error in scheduleNext calculation:', err);
+                    delayMs = 60_000;
                 }
 
-                delayMs = Math.max(0, nextAt - now);
-                if (!Number.isFinite(delayMs)) delayMs = 60_000;
-                delayMs = Math.min(delayMs, 60 * 60 * 1000);
-            } catch {
-                delayMs = 60_000;
-            }
-
-            this.refreshTimer = setTimeout(() => {
-                this.refreshAllFeedsOnce()
-                    .catch(() => { })
-                    .finally(() => {
-                        scheduleNext().catch(() => { });
+                this.refreshTimer = setTimeout(() => {
+                    try {
+                        this.refreshAllFeedsOnce()
+                            .catch((err) => { logger.error('[RSS Refresh] Uncaught error in refreshAllFeedsOnce:', err); })
+                            .finally(() => {
+                                scheduleNext().catch((err) => {
+                                    logger.error('[RSS Refresh] Error scheduling next, retrying in 60s:', err);
+                                    // If scheduleNext fails, retry after 60 seconds to ensure timer chain continues
+                                    setTimeout(() => {
+                                        scheduleNext().catch((retryErr) => {
+                                            logger.error('[RSS Refresh] Retry of scheduleNext also failed:', retryErr);
+                                        });
+                                    }, 60_000);
+                                });
+                            });
+                    } catch (err) {
+                        logger.error('[RSS Refresh] Error in setTimeout callback:', err);
+                        // Ensure timer chain continues even if callback throws synchronously
+                        scheduleNext().catch((scheduleErr) => {
+                            logger.error('[RSS Refresh] Error scheduling next after callback error, retrying in 60s:', scheduleErr);
+                            setTimeout(() => {
+                                scheduleNext().catch((retryErr) => {
+                                    logger.error('[RSS Refresh] Retry of scheduleNext also failed:', retryErr);
+                                });
+                            }, 60_000);
+                        });
+                    }
+                }, delayMs);
+            } catch (err) {
+                logger.error('[RSS Refresh] Error in scheduleNext body, retrying in 60s:', err);
+                // If scheduleNext body fails, retry after 60 seconds to ensure timer chain continues
+                this.refreshTimer = setTimeout(() => {
+                    scheduleNext().catch((retryErr) => {
+                        logger.error('[RSS Refresh] Retry of scheduleNext also failed:', retryErr);
                     });
-            }, delayMs);
+                }, 60_000);
+            }
         };
 
-        scheduleNext().catch(() => { });
+        scheduleNext().catch((err) => {
+            logger.error('[RSS Refresh] Error in initial scheduleNext, retrying in 60s:', err);
+            // If initial scheduleNext fails, retry after 60 seconds
+            setTimeout(() => {
+                scheduleNext().catch((retryErr) => {
+                    logger.error('[RSS Refresh] Retry of initial scheduleNext also failed:', retryErr);
+                });
+            }, 60_000);
+        });
     }
 }
 

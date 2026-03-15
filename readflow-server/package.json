@@ -11,7 +11,8 @@
     "db:migrate": "npx prisma migrate dev",
     "db:import": "ts-node scripts/migrate-json-to-pg.ts",
     "release": "node scripts/release.mjs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest --run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -20,17 +21,17 @@
     "@mozilla/readability": "^0.5.0",
     "@prisma/client": "5.7.0",
     "cors": "^2.8.5",
+    "cron-parser": "^4.9.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "he": "^1.2.0",
     "jsonwebtoken": "^9.0.3",
     "linkedom": "^0.16.8",
     "node-fetch": "^2.7.0",
-    "cron-parser": "^4.9.0",
     "p-limit": "^3.1.0",
+    "prisma": "5.7.0",
     "react-native-rss-parser": "^1.5.1",
-    "sharp": "^0.34.5",
-    "prisma": "5.7.0"
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -39,8 +40,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.10.6",
     "@types/node-fetch": "^2.6.9",
+    "@vitest/ui": "^4.1.0",
+    "fast-check": "^4.6.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.0"
   },
   "changelog": [
     "feat: 添加获取原始文章列表的每日报告接口",
