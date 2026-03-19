@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -47,6 +47,8 @@
     "vitest": "^4.1.0"
   },
   "changelog": [
+    "chore: 删除已弃用的RSS获取服务测试文件",
+    "chore: 更新版本号至3.0.7并同步更新变更日志",
     "fix(RssFetchService): 修复RSS刷新计时器因锁获取失败而停止的问题",
     "chore: 更新版本号至3.0.6并同步更新变更日志",
     "feat: 添加获取原始文章列表的每日报告接口",
@@ -64,8 +66,6 @@
     "feat: 新增 RSS 路由，实现 RSS 订阅源刷新、图片预热和代理以及视频 URL 解析功能。",
     "feat: 添加管理面板，包含核心功能以及用户、订阅源和系统管理模块。",
     "feat: 添加日报详情页面，支持富文本Markdown渲染和主题切换。",
-    "feat: 添加日报详情页面并更新应用版本至 8.2.1。",
-    "feat: 新增日报功能，包括API服务、UI界面和导航集成，并更新应用版本。",
-    "feat: 添加 AI 日报功能，包括移动端设置界面、后端服务和数据库支持。"
+    "feat: 添加日报详情页面并更新应用版本至 8.2.1。"
   ]
 }
