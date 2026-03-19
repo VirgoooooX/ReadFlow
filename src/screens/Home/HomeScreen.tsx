@@ -48,19 +48,21 @@ export const setLastViewedArticleId = (id: number | null) => {
     didSwitchArticle = true;
   }
   lastViewedArticleId = id;
-  needRefreshOnReturn = true; // 【新增】进入详情页后，返回时需要刷新
+  // 【修复】只在实际切换文章时才设置为true，否则设置为false
+  needRefreshOnReturn = didSwitchArticle;
 };
 
 export const getPendingScrollInfo = () => {
   const shouldScroll = didSwitchArticle;
   const articleId = lastViewedArticleId;
   const shouldRefresh = needRefreshOnReturn; // 【新增】获取是否需要刷新
+  const didSwitchArticleFlag = didSwitchArticle; // 【新增】获取是否切换过文章
   // 清空状态
   didSwitchArticle = false;
   initialArticleId = null;
   lastViewedArticleId = null;
   needRefreshOnReturn = false; // 【新增】清空刷新标记
-  return { shouldScroll, articleId, shouldRefresh };
+  return { shouldScroll, articleId, shouldRefresh, didSwitchArticle: didSwitchArticleFlag };
 };
 
 type Props = HomeStackScreenProps<'HomeMain'>;
@@ -792,10 +794,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             break;
           }
 
-          // 🔥 优化：如果是标记已读/未读触发的统计更新，且当前不是"仅看未读"模式，则忽略刷新
-          // 因为列表项的已读状态已通过 articleRead 事件或本地乐观更新处理了
-          if ((eventData.reason === 'markRead' || eventData.reason === 'markUnread' || eventData.reason === 'markAllRead') && !showOnlyUnread) {
-            logger.info(`[HomeScreen] 📊 收到 ${eventData.reason} 触发的统计更新，忽略全量刷新`);
+          // 【修复】完全跳过标记已读/未读事件，不清除缓存，不重新加载列表
+          // 这些事件只影响统计数据，不影响列表结构或内容
+          if (eventData.reason === 'markRead' || eventData.reason === 'markUnread' || eventData.reason === 'markAllRead') {
+            logger.info(`[HomeScreen] 📊 收到 ${eventData.reason} 触发的统计更新，完全跳过缓存清除和列表重新加载`);
             break;
           }
 
@@ -844,8 +846,8 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
   useFocusEffect(useCallback(() => {
     // 获取滚动信息和刷新标记
-    const { shouldScroll, articleId, shouldRefresh } = getPendingScrollInfo();
-    logger.info('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId, 'shouldRefresh:', shouldRefresh);
+    const { shouldScroll, articleId, shouldRefresh, didSwitchArticle: didSwitch } = getPendingScrollInfo();
+    logger.info('[HomeScreen] useFocusEffect, shouldScroll:', shouldScroll, 'articleId:', articleId, 'shouldRefresh:', shouldRefresh, 'didSwitchArticle:', didSwitch);
 
     const currentRoute = routes[index];
 
@@ -863,9 +865,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     };
 
-    // 【新增】如果从详情页返回，刷新当前标签的数据以更新已读状态
-    if (shouldRefresh && currentRoute) {
-      logger.info('[HomeScreen] Refreshing articles after returning from detail page');
+    // 【修复】只在shouldRefresh=true AND didSwitchArticle=true时才刷新
+    // 如果shouldRefresh=true但didSwitchArticle=false，说明是后台恢复，不需要刷新
+    if (shouldRefresh && didSwitch && currentRoute) {
+      logger.info('[HomeScreen] Refreshing articles after returning from detail page (article was switched)');
       loadArticles(currentRoute.key, false).then(() => {
         // 刷新完成后再滚动
         performScroll();

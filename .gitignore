@@ -30,7 +30,7 @@ out/
 web-build/
 .next/
 *.tsbuildinfo
-
+.kiro
 # Cache & Debug
 .cache/
 .parcel-cache

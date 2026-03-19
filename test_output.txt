@@ -1,0 +1,14 @@
+
+> readflow@1.0.0 test
+> vitest --run src/screens/Home/HomeScreen.test.ts
+
+ DEPRECATED  `test.poolOptions` was removed in Vitest 4. All previous `poolOptions` are now top-level options. Please, refer to the migration guide: https://vitest.dev/guide/migration#pool-rework
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90mL:/Web/TechFlowMobile/TechFlowMobile[39m
+
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m29 passed[39m[22m[90m (29)[39m
+[2m   Start at [22m 13:18:41
+[2m   Duration [22m 131ms[2m (transform 26ms, setup 0ms, import 35ms, tests 6ms, environment 0ms)[22m
+
