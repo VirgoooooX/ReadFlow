@@ -2,11 +2,13 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '9.1.1',
-  buildNumber: 90101,
-  updateTime: '2026-03-01',
+  version: '9.2.1',
+  buildNumber: 90201,
+  updateTime: '2026-03-19',
   changelog: [
-    '版本更新 (暂无 Git 提交记录)',
+    '修复应用后台恢复和标记已读事件导致的滚动位置重置问题',
+    '更新版本号至3.0.8并清理变更日志',
+    '删除变更日志中重复和过时的条目以保持整洁',
   ],
 };
 

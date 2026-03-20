@@ -801,6 +801,13 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
             break;
           }
 
+          // 【新增】如果是后台恢复（没有待处理的滚动信息），不要清空缓存
+          // 这样可以避免后台时的缓存事件导致列表被清空
+          if (lastViewedArticleId === null && initialArticleId === null && !didSwitchArticle) {
+            logger.info('[HomeScreen] 📊 后台恢复，跳过缓存清空');
+            break;
+          }
+
           logger.info('[HomeScreen] 📊 收到RSS统计更新事件，准备刷新（防抖处理）');
 
           // 🛑 防抖：2秒内多次收到事件，只刷新一次
@@ -904,7 +911,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       navigation.setParams({ sourceId: null, sourceName: null } as any);
       return;
     }
-  }, [index, routes, sceneRefsMap, navigation, route]));
+  }, [index, routes, sceneRefsMap, navigation, route, loadArticles]);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
