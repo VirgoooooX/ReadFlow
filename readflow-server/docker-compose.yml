@@ -12,6 +12,12 @@ services:
     restart: unless-stopped
     ports:
       - "30000:3000"
+    # 限制 Docker 容器日志大小，防止磁盘被日志撑满
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"   # 单个日志文件最大 10MB
+        max-file: "3"     # 最多保留 3 个日志文件 (共 30MB 上限)
     volumes:
       # 持久化数据
       - ./data:/app/data
@@ -28,6 +34,9 @@ services:
       - IMAGE_WARMUP_ENABLED=${IMAGE_WARMUP_ENABLED:-0}
       - SHARP_CACHE_MEMORY_MB=${SHARP_CACHE_MEMORY_MB:-64}
       - SHARP_CONCURRENCY=${SHARP_CONCURRENCY:-2}
+      - LOG_LEVEL=${LOG_LEVEL:-WARN}           # 日志级别: DEBUG / INFO / WARN / ERROR
+      - LOG_FILE_ENABLED=${LOG_FILE_ENABLED:-1} # 是否写应用日志文件
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7} # 应用日志文件保留天数
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,6 +45,12 @@ services:
     image: postgres:15-alpine
     container_name: readflow-postgres
     restart: always
+    # 限制 PostgreSQL 容器日志大小
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

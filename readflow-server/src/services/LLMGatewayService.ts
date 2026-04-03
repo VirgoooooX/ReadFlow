@@ -136,7 +136,7 @@ export class LLMGatewayService {
         tokensPrompt = cached.tokensPrompt;
         tokensCompletion = cached.tokensCompletion;
         const durationMs = Date.now() - startedAt;
-        logger.system(`[LLM] ok requestId=${requestId} user=${userId} feature=${feature} provider=${profile.provider} model=${profile.model} ms=${durationMs} cacheKey=${cacheKey} cache=hit`);
+        logger.debug(`[LLM] ok requestId=${requestId} user=${userId} feature=${feature} provider=${profile.provider} model=${profile.model} ms=${durationMs} cacheKey=${cacheKey} cache=hit`);
         return {
           cacheKey,
           modelVersion: `${profile.provider}:${profile.model}`,
@@ -163,7 +163,7 @@ export class LLMGatewayService {
 
       this.setCache(cacheKey, result);
       const durationMs = Date.now() - startedAt;
-      logger.system(`[LLM] ok requestId=${requestId} user=${userId} feature=${feature} provider=${profile.provider} model=${profile.model} ms=${durationMs} cacheKey=${cacheKey}${result.tokens ? ` tokens=${result.tokens}` : ''}`);
+      logger.debug(`[LLM] ok requestId=${requestId} user=${userId} feature=${feature} provider=${profile.provider} model=${profile.model} ms=${durationMs} cacheKey=${cacheKey}${result.tokens ? ` tokens=${result.tokens}` : ''}`);
 
       return {
         cacheKey,

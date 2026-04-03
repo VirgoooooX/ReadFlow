@@ -70,7 +70,7 @@ export class RssFetchService {
                 processed += batch.length;
             }
             if (processed > 0) {
-                logger.info(`[Pre-warm] Completed for ${processed} images`);
+                logger.debug(`[Pre-warm] Completed for ${processed} images`);
             }
             if (this.warmUpDropped > 0) {
                 logger.warn(`[Pre-warm] Dropped ${this.warmUpDropped} images due to backlog cap`);
@@ -120,10 +120,10 @@ export class RssFetchService {
         const filterRulesCount = Array.isArray(snapshot?.filterRules) ? snapshot.filterRules.length : 0;
         const hasSettings = !!snapshot?.settings;
 
-        logger.info(
+        logger.debug(
             `[SyncConfig] ${label} summary userId=${userId} updatedAt=${updatedAt} hasSettings=${hasSettings} sources=${sourcesCount} groups=${groupsCount} filterRules=${filterRulesCount}`
         );
-        logger.info(`[SyncConfig] ${label} full userId=${userId}: ${this.safeJsonForLog(snapshot)}`);
+        logger.debug(`[SyncConfig] ${label} full userId=${userId}: ${this.safeJsonForLog(snapshot)}`);
     }
 
     public coerceBool(val: unknown): boolean {
@@ -226,7 +226,7 @@ export class RssFetchService {
 
         if (urlsToWarm.size === 0) return;
 
-        logger.info(`[Pre-warm] Warming up ${urlsToWarm.size} images...`);
+        logger.debug(`[Pre-warm] Warming up ${urlsToWarm.size} images...`);
 
         // Fire requests asynchronously (concurrency limit: 3)
         const urls = Array.from(urlsToWarm);
@@ -279,7 +279,7 @@ export class RssFetchService {
         let refreshSucceeded = false;
         const startTime = Date.now();
         try {
-            logger.info('[RSS Refresh] Starting refreshAllFeedsOnce...');
+            logger.debug('[RSS Refresh] Starting refreshAllFeedsOnce...');
             
             // Try to acquire lock with exception handling
             try {
@@ -330,7 +330,7 @@ export class RssFetchService {
                     
                     if (locked) {
                         // Log INFO when lock acquired after force release
-                        logger.info('[RSS Refresh] Successfully acquired lock after force release');
+                        logger.debug('[RSS Refresh] Successfully acquired lock after force release');
                         // Reset lockFailureCount to 0 on successful lock acquisition
                         this.lockFailureCount = 0;
                     } else {
@@ -346,7 +346,7 @@ export class RssFetchService {
             }
             const feeds = await storageService.getFeedsLight();
             if (!feeds || feeds.length === 0) {
-                logger.info('[RSS Refresh] No feeds found to refresh');
+                logger.debug('[RSS Refresh] No feeds found to refresh');
                 return;
             }
 
@@ -417,7 +417,7 @@ export class RssFetchService {
 
                     await storageService.updateFeedRefreshState(feed.id, { lastRefreshAt: startedAtIso, status: 'ok' });
 
-                    logger.info(`[RSS Refresh] ${feed.name || feed.url} ok upserts=${result.upsertsCount} latest=${result.latestBlockId}`);
+                    logger.debug(`[RSS Refresh] ${feed.name || feed.url} ok upserts=${result.upsertsCount} latest=${result.latestBlockId}`);
 
                     // 🔥 Trigger image pre-warming (local loopback)
                     // Assume default port 3000 if env not set
@@ -457,7 +457,7 @@ export class RssFetchService {
             
             this.refreshRunning = false;
             const duration = Date.now() - startTime;
-            logger.info(`[RSS Refresh] refreshAllFeedsOnce completed in ${duration}ms`);
+            logger.debug(`[RSS Refresh] refreshAllFeedsOnce completed in ${duration}ms`);
         }
     }
 
@@ -523,7 +523,7 @@ export class RssFetchService {
                     delayMs = Math.min(delayMs, 60 * 60 * 1000);
 
                     const nextAtDate = new Date(now + delayMs).toLocaleString();
-                    logger.info(`[RSS Refresh] Next refresh scheduled in ${Math.round(delayMs / 1000)}s (at ${nextAtDate})`);
+                    logger.debug(`[RSS Refresh] Next refresh scheduled in ${Math.round(delayMs / 1000)}s (at ${nextAtDate})`);
                 } catch (err) {
                     logger.error('[RSS Refresh] Error in scheduleNext calculation:', err);
                     delayMs = 60_000;

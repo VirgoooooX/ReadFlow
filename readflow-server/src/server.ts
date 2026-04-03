@@ -65,17 +65,25 @@ app.use((req, res, next) => {
     if (req.url === '/health' && res.statusCode === 200) return;
 
     const isImage = req.originalUrl.startsWith('/api/image');
+    const isError = res.statusCode >= 400;
 
     if (isImage) {
-      const cache = res.getHeader('X-Cache') || 'MISS';
-      const contentType = res.getHeader('Content-Type') || 'unknown';
-      const size = res.getHeader('Content-Length') || 0;
-      const imageUrl = req.query.url || 'unknown';
-      logger.request(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} (${durationMs}ms) [${cache}, ${contentType}, ${size}B, url=${imageUrl}]`);
+      // 图片代理请求量极大，只在出错时用 warn 记录
+      if (isError) {
+        const imageUrl = req.query.url || 'unknown';
+        logger.warn(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} (${durationMs}ms) [url=${imageUrl}]`);
+      } else {
+        logger.debug(`IMG ${res.statusCode} (${durationMs}ms) ${req.query.url || ''}`);
+      }
       return;
     }
 
-    logger.request(`${req.method} ${req.url} ${res.statusCode} (${durationMs}ms)`);
+    // 非图片请求：出错用 warn，正常用 debug
+    if (isError) {
+      logger.warn(`${req.method} ${req.url} ${res.statusCode} (${durationMs}ms)`);
+    } else {
+      logger.debug(`${req.method} ${req.url} ${res.statusCode} (${durationMs}ms)`);
+    }
   });
   next();
 });

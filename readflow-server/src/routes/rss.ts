@@ -81,7 +81,7 @@ router.get('/sync', async (req: Request, res: Response) => {
       1,
       Math.min(Number.isFinite(limitRaw as number) ? (limitRaw as number) : defaultLimit, effectiveMax)
     );
-    logger.request(
+    logger.debug(
       '[RSS Sync] request',
       rssFetchService.safeJsonForLog({
         url,
@@ -101,7 +101,7 @@ router.get('/sync', async (req: Request, res: Response) => {
         const now = Date.now();
         if ((total > 0 && total % 50 === 0) || now - rssFetchService.lastSyncModeLogAt > 10 * 60 * 1000) {
           rssFetchService.lastSyncModeLogAt = now;
-          logger.system(
+          logger.debug(
             '[RSS Sync] mode stats',
             rssFetchService.safeJsonForLog({
               total,
@@ -120,7 +120,7 @@ router.get('/sync', async (req: Request, res: Response) => {
       const { deliveryId, since: cursorSince, latest, blocks, hasMore } =
         await storageService.getSyncDeliveryForSourceUser(userId, url, effectiveLimit);
       const totalUpserts = blocks.reduce((acc, b) => acc + (Array.isArray(b.upserts) ? b.upserts.length : 0), 0);
-      logger.request(
+      logger.debug(
         '[RSS Sync] response',
         rssFetchService.safeJsonForLog({
           url,
@@ -160,7 +160,7 @@ router.get('/sync', async (req: Request, res: Response) => {
       const now = Date.now();
       if ((total > 0 && total % 50 === 0) || now - rssFetchService.lastSyncModeLogAt > 10 * 60 * 1000) {
         rssFetchService.lastSyncModeLogAt = now;
-        logger.system(
+        logger.debug(
           '[RSS Sync] mode stats',
           rssFetchService.safeJsonForLog({
             total,
@@ -173,7 +173,7 @@ router.get('/sync', async (req: Request, res: Response) => {
     }
     const { latest, blocks, hasMore } = await storageService.getSyncBlocksForSource(url, Number.isFinite(since) ? since : 0, effectiveLimit);
     const totalUpserts = blocks.reduce((acc, b) => acc + (Array.isArray(b.upserts) ? b.upserts.length : 0), 0);
-    logger.request(
+    logger.debug(
       '[RSS Sync] response',
       rssFetchService.safeJsonForLog({
         url,
@@ -545,7 +545,7 @@ router.post('/sync/config', async (req: Request, res: Response) => {
     try {
       if (Array.isArray((nextConfigSync as any).sources)) {
         const result = await storageService.replaceUserFeedsFromClient(userId, (nextConfigSync as any).sources);
-        logger.info(`[SyncConfig] Reconciled user feeds userId=${userId} upserted=${result.upserted} deleted=${result.deleted}`);
+        logger.debug(`[SyncConfig] Reconciled user feeds userId=${userId} upserted=${result.upserted} deleted=${result.deleted}`);
       }
     } catch (e) {
       logger.warn(`[SyncConfig] Reconcile user feeds failed userId=${userId}:`, e);
@@ -554,10 +554,10 @@ router.post('/sync/config', async (req: Request, res: Response) => {
     const updatedUser = await storageService.getUserById(userId);
     const persistedRaw = (updatedUser?.config && typeof updatedUser.config === 'object') ? updatedUser.config : {};
     const persistedConfigSync = (persistedRaw as any).configSync;
-    logger.info(`[SyncConfig] Persisted at prisma.user.syncData.configSync userId=${userId}`);
+    logger.debug(`[SyncConfig] Persisted at prisma.user.syncData.configSync userId=${userId}`);
     rssFetchService.logConfigSyncSnapshot(String(userId), 'Persisted', persistedConfigSync);
 
-    logger.info(`[SyncConfig] Updated config for user ${userId}`);
+    logger.debug(`[SyncConfig] Updated config for user ${userId}`);
     res.json({ success: true, updatedAt: nextConfigSync.updatedAt });
   } catch (error) {
     logger.error('[SyncConfig] POST failed:', error);

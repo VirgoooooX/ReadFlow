@@ -14,6 +14,30 @@ const dateStampFormatter = new Intl.DateTimeFormat('en-CA', {
 
 const getDateStamp = () => dateStampFormatter.format(new Date());
 
+// =================== 日志级别 ===================
+
+const LOG_LEVELS = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+} as const;
+
+type LogLevelName = keyof typeof LOG_LEVELS;
+
+/**
+ * 从环境变量读取日志级别，默认 WARN（生产环境只记录警告和错误）
+ * 可通过 LOG_LEVEL=INFO 或 LOG_LEVEL=DEBUG 开启更多日志
+ */
+function resolveLogLevel(): number {
+  const raw = (process.env.LOG_LEVEL || 'WARN').trim().toUpperCase();
+  return LOG_LEVELS[raw as LogLevelName] ?? LOG_LEVELS.WARN;
+}
+
+const currentLogLevel = resolveLogLevel();
+
+// =================== 文件日志 ===================
+
 class DailyFileSink {
   private readonly enabled: boolean;
   private readonly logDir: string;
@@ -106,6 +130,8 @@ class DailyFileSink {
   }
 }
 
+// =================== 颜色 ===================
+
 const COLORS = {
   RESET: '\x1b[0m',
   BRIGHT: '\x1b[1m',
@@ -119,9 +145,11 @@ const COLORS = {
   GRAY: '\x1b[90m',
 };
 
+// =================== Logger ===================
+
 class Logger {
   private logs: string[] = [];
-  private readonly MAX_LOGS = 1000; // Increased buffer size
+  private readonly MAX_LOGS = 500;
   private readonly fileSink = new DailyFileSink();
 
   private formatMessage(level: string, category: string, ...args: any[]): { raw: string, colored: string } {
@@ -148,6 +176,7 @@ class Logger {
       case 'ERROR': levelColor = COLORS.RED; break;
       case 'WARN': levelColor = COLORS.YELLOW; break;
       case 'INFO': levelColor = COLORS.GREEN; break;
+      case 'DEBUG': levelColor = COLORS.GRAY; break;
     }
 
     switch (category) {
@@ -162,28 +191,39 @@ class Logger {
     return { raw, colored };
   }
 
+  /**
+   * 根据 LOG_LEVEL 过滤：低于当前级别的日志不输出到 console / 文件
+   * 但始终缓存到内存 buffer（供 admin API 查看）
+   */
   private addLog(level: string, category: string, ...args: any[]) {
+    const numericLevel = LOG_LEVELS[level as LogLevelName] ?? LOG_LEVELS.INFO;
     const { raw, colored } = this.formatMessage(level, category, ...args);
-    
+
+    // 始终缓存到内存（供管理后台 /api/admin/logs 查看）
+    this.logs.unshift(raw);
+    if (this.logs.length > this.MAX_LOGS) {
+      this.logs.pop();
+    }
+
+    // 低于配置级别的日志不输出到 console 和文件，减少 Docker 日志占用
+    if (numericLevel < currentLogLevel) return;
+
     // Console output (colored)
     if (level === 'ERROR') console.error(colored);
     else if (level === 'WARN') console.warn(colored);
     else console.log(colored);
 
+    // File output (raw)
     this.fileSink.write(raw);
-
-    // Buffer (raw text for API/storage)
-    this.logs.unshift(raw);
-    if (this.logs.length > this.MAX_LOGS) {
-      this.logs.pop();
-    }
   }
 
+  // 基础日志方法
+  debug(...args: any[]) { this.addLog('DEBUG', 'APP', ...args); }
   info(...args: any[]) { this.addLog('INFO', 'APP', ...args); }
   warn(...args: any[]) { this.addLog('WARN', 'APP', ...args); }
   error(...args: any[]) { this.addLog('ERROR', 'APP', ...args); }
   
-  // Specialized loggers
+  // 专用日志方法
   request(...args: any[]) { this.addLog('INFO', 'API', ...args); }
   system(...args: any[]) { this.addLog('INFO', 'SYS', ...args); }
 

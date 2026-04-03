@@ -670,7 +670,7 @@ END $$;
       }
     }
 
-    logger.info(`[Sync] Upserting user ${payload.id}. HasSettings=${!!payload.settings} HasConfig=${!!payload.config}`);
+    logger.debug(`[Sync] Upserting user ${payload.id}. HasSettings=${!!payload.settings} HasConfig=${!!payload.config}`);
 
     let userObj;
     if (existingUser) {
@@ -1599,7 +1599,7 @@ END $$;
     try {
       logger.warn(`[Lock] Force releasing advisory lock name=${String(name)}`);
       await prisma.$queryRaw`SELECT pg_advisory_unlock_all()`;
-      logger.info(`[Lock] Successfully force released advisory lock name=${String(name)}`);
+      logger.debug(`[Lock] Successfully force released advisory lock name=${String(name)}`);
     } catch (e) {
       logger.error(`[Lock] forceReleaseAdvisoryLock failed name=${String(name)} err=${String((e as any)?.message || e)}`);
     }

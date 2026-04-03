@@ -28,6 +28,12 @@ export const logger = {
   },
   info: (message: string, ...args: any[]) => {
     console.log(`[${getLogTime()}] ${message}`, ...args);
+  },
+  debug: (message: string, ...args: any[]) => {
+    // debug 级别在生产环境静默，避免 Docker 日志增长
+    if (process.env.LOG_LEVEL?.toUpperCase() === 'DEBUG') {
+      console.log(`[${getLogTime()}] [DEBUG] ${message}`, ...args);
+    }
   }
 };
 

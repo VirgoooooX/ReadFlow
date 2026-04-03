@@ -399,7 +399,7 @@ export class DailyReportService {
         const config = this.getDailyReportConfig(userConfig);
 
         if (!config.enabled) {
-            logger.info(`[DailyReport] Daily report disabled for user ${userId}`);
+            logger.debug(`[DailyReport] Daily report disabled for user ${userId}`);
             return null;
         }
 
@@ -410,17 +410,17 @@ export class DailyReportService {
             return null;
         }
 
-        logger.info(`[DailyReport] Found ${sourceUrls.length} sources for groups: ${config.groupNames.join(', ') || '(default news)'}`);
+        logger.debug(`[DailyReport] Found ${sourceUrls.length} sources for groups: ${config.groupNames.join(', ') || '(default news)'}`);
 
         // 4. Fetch articles from the last 24 hours
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const articles = await this.fetchRecentArticles(sourceUrls, since, config.articleLimit);
         if (articles.length === 0) {
-            logger.info(`[DailyReport] No recent articles found for user ${userId}`);
+            logger.debug(`[DailyReport] No recent articles found for user ${userId}`);
             return null;
         }
 
-        logger.info(`[DailyReport] Fetched ${articles.length} articles for summarization`);
+        logger.debug(`[DailyReport] Fetched ${articles.length} articles for summarization`);
 
         // 5. Build prompt and call LLM
         const { systemPrompt, userPrompt } = this.buildPrompt(articles);
@@ -563,7 +563,7 @@ export class DailyReportService {
      * the user's scheduledTime and no auto report exists for today.
      */
     async scheduleAllUsers(): Promise<void> {
-        logger.info('[DailyReport] Checking all users for due report generation...');
+        logger.debug('[DailyReport] Checking all users for due report generation...');
         const lockName = 'daily_report_scheduler';
         const locked = await storageService.tryAcquireAdvisoryLock(lockName);
         if (!locked) return;
@@ -614,14 +614,14 @@ export class DailyReportService {
                         continue; // Already generated today (auto), skip
                     }
 
-                    logger.info(`[DailyReport] User ${user.uuid} is due for auto report (scheduled: ${config.scheduledTime})`);
+                    logger.debug(`[DailyReport] User ${user.uuid} is due for auto report (scheduled: ${config.scheduledTime})`);
                     await this.generateForUser(user.uuid, 'auto');
                 } catch (e) {
                     logger.error(`[DailyReport] Failed for user ${user.uuid}:`, e);
                 }
             }
 
-            logger.info('[DailyReport] Schedule check complete');
+            logger.debug('[DailyReport] Schedule check complete');
         } finally {
             await storageService.releaseAdvisoryLock(lockName);
         }

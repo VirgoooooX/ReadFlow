@@ -156,7 +156,7 @@ export class RSSParserService {
     fulltextTimeoutMs?: number
   ): Promise<Article[]> {
     try {
-      logger.info(`Fetching articles from: ${source.url}`);
+      logger.debug(`Fetching articles from: ${source.url}`);
 
       let actualUrl = source.url;
 
