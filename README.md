@@ -1,6 +1,6 @@
 # ReadFlow
 
-一款专注「深度阅读 + 英语学习」的移动端阅读器：RSS 订阅、沉浸式阅读、划词/翻译、词汇复习，以及可选的自建服务端（云同步、图片代理、管理后台）。
+一款专注「深度阅读 + 英语学习」的移动端阅读器：RSS 订阅、沉浸式阅读、划词/翻译、每日报告（LLM）、词汇复习，以及自建服务端（云同步、图片代理、管理后台、LLM 网关）。
 
 [![React Native](https://img.shields.io/badge/React%20Native-0.79.6-blue?logo=react&logoColor=white)](https://reactnative.dev/)
 [![Expo](https://img.shields.io/badge/Expo-53.0.0-black?logo=expo&logoColor=white)](https://expo.dev/)
@@ -9,9 +9,8 @@
 
 | 构件 | 路径 | 作用 |
 | --- | --- | --- |
-| App（React Native / Expo） | `./src` | 阅读、订阅、学习、离线存储、代理策略 |
-| Server（Node/Express + Prisma/Postgres） | `./readflow-server` | 云模式：登录/注册、配置与订阅同步、图片代理、管理后台 |
-| RSS 轻量代理（Go，可选） | `./server-go` | 极简代理：RSS 转发 + 图片代理（不含云同步/后台） |
+| App（React Native / Expo） | `./src` | 阅读、订阅、学习、离线存储、高性能渲染 |
+| Server（Node/Express + Prisma/Postgres） | `./readflow-server` | 云端核心：认证与同步、图片代理、管理后台、LLM 网关、定时刷新 |
 
 版本：`v6.1.1`（`app.json`） / `build 60101`（Android）
 
@@ -19,224 +18,158 @@
 
 ## 目录
 
-- [你能用它做什么](#你能用它做什么)
-- [架构一图看懂](#架构一图看懂)
-- [核心流程](#核心流程)
-- [快速开始（仅客户端）](#快速开始仅客户端)
-- [快速开始（云模式：自建服务端）](#快速开始云模式自建服务端)
-- [快速开始（极简代理：Go 可选）](#快速开始极简代理go-可选)
-- [配置速查](#配置速查)
+- [核心功能亮点](#核心功能亮点)
+- [架构演进](#架构演进)
+- [关键流程](#关键流程)
+- [快速开始](#快速开始)
 - [目录结构](#目录结构)
 - [常见问题](#常见问题)
 
-## 你能用它做什么
+## 核心功能亮点
 
-### 阅读体验
+### 深度阅读与学习
 
-- 极简 UI：压缩头部信息密度，阅读区域最大化
-- 文章解析：直连 RSS +（可选）抓取全文并用 Readability 做正文提取
-- 阅读进度：本地持久化，支持续读
+- **极简 UI**：针对阅读区域优化的界面，采用现代化的 Clean 设计语言。
+- **每日报告 (Daily Report)**：利用 LLM 自动生成全天订阅文章的聚合阅读报告，帮助快速捕捉核心价值。
+- **划词查词与翻译**：点击单词即出释义（支持词形还原），双击翻译句子，所有查询结果均在本地与云端同步缓存。
+- **高性能列表**：集成 `@shopify/flash-list`，在千级订阅源下依然保持丝滑滚动。
 
-### 学习引擎（LLM + 本地缓存）
+### 云端一体化 (ReadFlow Server)
 
-- 划词查词：单词点击触发释义查询（支持词形还原，结果入库缓存）
-- 双击翻译：句子级翻译（优先本地缓存，后备调用 LLM）
-- 词汇本：新增/复习/统计（并可与自建服务端同步）
+- **云配置同步**：订阅源、分组、过滤规则、阅读设置在所有端单调推进同步（基于 `serverCursor` 语义）。
+- **LLM 网关治理**：服务端统一调度 LLM 能力，支持突发+分钟级限流、并发队列管理与审计日志。
+- **公共发现大厅**：内置 RSS 发现功能，可浏览并一键订阅公共推荐的高质量源。
+- **图片代理与预热**：通过 `Sharp` 进行高性能图片缩放、格式转换（WebP）及防盗链域名代理。
+- **管理后台**：直观监控系统状态、用户活跃度及 LLM 消耗统计。
 
-### 联网与同步（按需启用）
+## 架构演进
 
-- 本地模式：所有数据落本机（SQLite + AsyncStorage）
-- 云模式：账号体系 + 订阅/分组/过滤/设置同步 + 词汇同步 + 图片代理 + Web 管理后台
-- 代理策略：对被墙/防盗链域名走代理（客户端与服务端都有配套能力）
-
-## 架构一图看懂
+项目已从“本地优先”进化为“云端赋能”架构，移除了极简代理，强化了服务端在重型任务（刷新、解析、LLM、代理）上的支撑。
 
 ```mermaid
-flowchart LR
-  subgraph App["Mobile App (Expo / RN)"]
-    UI["Screens + Components"]
-    NAV["Navigation"]
-    CTX["Contexts (Settings/Theme/Reading)"]
-    RTK["Redux Toolkit (articles/rss/vocabulary/settings)"]
+flowchart TB
+  subgraph App["Mobile App (Expo / RN 0.79.6)"]
+    direction TB
+    UI["Screens + Components (Clean UI)"]
+    RTK["Redux Toolkit (Articles / RSS / Vocab)"]
     DB["SQLite (expo-sqlite)"]
-    AS["AsyncStorage"]
+    HOOKS["Hooks (useReadingSettings / useRSS)"]
   end
 
-  subgraph Net["Networking"]
-    RSS["RSS Fetch (direct/proxy)"]
-    IMG["Image Proxy / Localize"]
-    LLM["LLM (Dictionary/Translation)"]
-  end
-
-  subgraph Server["Self-hosted Server (optional)"]
-    API["Express API"]
-    ADMIN["/admin UI"]
+  subgraph Cloud["ReadFlow Server (Node.js)"]
+    direction TB
+    API["Express API Gateway"]
+    SRV["Services (LLM / Sync / Image / RSS)"]
     PG["Postgres (Prisma)"]
-    CACHE["public/cache (image cache)"]
+    ADMIN["Admin Dashboard"]
   end
 
-  UI --> NAV
-  UI --> CTX
-  UI --> RTK
-  RTK --> DB
-  CTX --> AS
-  RSS --> DB
-  IMG --> DB
-  LLM --> DB
+  subgraph External["External Services"]
+    RSS["RSS Sources"]
+    LLM_API["LLM (OpenAI/Claude/DeepSeek)"]
+  end
 
-  App --> Net
-  Net --> Server
-  API --> PG
-  API --> CACHE
+  App <-->|HTTPS / Sync| API
+  API --> SRV
+  SRV --> PG
   ADMIN --> API
+  SRV --> RSS
+  SRV --> LLM_API
 ```
 
-## 核心流程
+## 关键流程
 
-### 1) RSS 拉取与入库（直连 / 代理）
+### 1) 云端同步（订阅/分组/过滤）
+
+系统采用单调递增的 `lastAckedArticleId` 与 `serverCursor` 确保数据一致性，避免覆盖式更新。
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant U as User
-  participant A as App
-  participant R as RSSService
-  participant L as LocalRSSService
-  participant P as ProxyRSSService
-  participant DB as SQLite
-
-  U->>A: 添加订阅源
-  A->>R: 创建/更新源
-  alt direct
-    R->>L: fetch + parse
-    L->>DB: 保存文章/源统计
-  else proxy
-    R->>P: fetch via /api/rss?url=
-    P->>L: 复用本地解析逻辑
-    L->>DB: 保存文章/源统计
-  end
-  A-->>U: 列表展示
-```
-
-### 2) 云配置同步（订阅/分组/过滤/设置）
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant A as App
-  participant C as ConfigSyncService
-  participant S as Server
+  participant A as Mobile App
+  participant S as ReadFlow Server
   participant P as Postgres
 
-  A->>C: pull（冷启动/手动）
-  C->>S: GET /api/rss/sync/config
-  S->>P: 读取用户 syncData
-  S-->>C: configSync payload
-  C-->>A: 应用到本地（sources/groups/rules/settings）
-
-  A->>C: push（手动/保存设置）
-  C->>S: POST /api/rss/sync/config
-  S->>P: 写入用户 syncData
-  S-->>C: ok
+  A->>S: GET /api/config/preferences (Pull)
+  S->>P: 读取归一化偏好 (白名单校验)
+  S-->>A: 返回 Merge 后的配置
+  A->>S: POST /api/rss/sync/config (Push)
+  S->>P: 单向推进 UserSourceCursor
 ```
 
-## 快速开始（仅客户端）
+### 2) LLM 审计与限流
 
-适合：不需要跨设备同步，不想部署服务端；RSS 直连为主。
+所有查词、翻译、报告生成均经过服务端网关。
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant A as App
+  participant G as LLM Gateway
+  participant Q as Global Queue
+  participant E as External LLM
+
+  A->>G: 请求查词/翻译
+  G->>G: 突发限流 & 并发上限检查
+  G->>Q: 进入优先级队列
+  Q->>E: 调用模型
+  E-->>G: 返回结果
+  G->>A: 结果 + 消耗审计
+```
+
+## 快速开始
+
+### 1. 启动移动端 (App)
+
+适合本地调试阅读与本地模式体验。
 
 ```bash
 npm install
 npm run start
 ```
 
-可用脚本（根目录 `package.json`）：
+### 2. 部署服务端 (readflow-server)
 
-- `npm run start`：启动 Expo
-- `npm run android` / `npm run ios`：本地原生运行（需要对应环境）
-- `npm run build:apk`：构建 APK（封装脚本，详见 `scripts/build-apk.js`）
+强烈建议启用服务端以获得完整功能（同步、报告、代理）。
 
-## 快速开始（云模式：自建服务端）
-
-适合：跨设备同步、图片代理、后台管理、统一刷新策略。
-
-### 方式 A：Docker 一键启动（推荐）
-
+#### 使用 Docker (推荐)
 ```bash
 cd readflow-server
 docker compose up -d --build
 ```
 
-启动后：
-
-- 健康检查：`GET http://localhost:3000/health`
-- 后台页面：`http://localhost:3000/admin`
-
-### 方式 B：本地开发启动
-
+#### 手动开发
 ```bash
 cd readflow-server
 npm install
-npm run db:up
-npm run db:migrate
-npm run dev
+npm run db:up      # 启动 DB
+npm run db:migrate # 初始化表
+npm run dev        # 启动后端
 ```
 
-## 快速开始（极简代理：Go 可选）
-
-适合：只想要 RSS/图片代理（不需要云同步/账号/后台）。
-
-```bash
-cd server-go
-go run .
-```
-
-默认端口 `3000`，接口：
-
-- `GET /api/rss?url=...`
-- `GET /api/image?url=...`
-- `GET /health`
-
-## 配置速查
-
-### App 侧（运行模式）
-
-- 本地模式：`CloudConfig.mode = local`（不使用服务端）
-- 云模式：`CloudConfig.mode = cloud` + `serverUrl`（使用自建服务端）
-- 服务端访问码（可选）：`serverAccessKey`（对应服务端 `SERVER_TOKEN`）
-
-### Server 侧（常用环境变量）
-
-以下变量在 `readflow-server/docker-compose.yml` 中已有示例：
-
-| 变量 | 说明 | 建议 |
-| --- | --- | --- |
-| `PORT` | 服务端端口 | 按需 |
-| `DATABASE_URL` | Postgres 连接串 | 必配（云模式） |
-| `ADMIN_PASSWORD` | 后台登录密码（`/admin`） | 必改 |
-| `SERVER_TOKEN` | 访问码：限制客户端注册/连接 | 公开部署建议设置 |
-| `JWT_SECRET` | JWT 签名密钥 | 公开部署必须设置强随机值 |
-| `APP_BASE_URL` | 服务端对外基址（用于拼接图片代理 URL） | 反代场景建议设置 |
+服务端地址默认：`http://localhost:3000`
 
 ## 目录结构
 
 ```text
 .
-├─ src/                 # App：界面/导航/状态/服务
-├─ readflow-server/      # 云模式服务端（Node/Express/Prisma）
-├─ server-go/            # 可选：极简 RSS/图片代理（Go）
-├─ android/              # RN Android 工程（Expo prebuild / run:android）
-├─ assets/               # 图标、启动图等资源
-└─ scripts/              # 构建脚本（APK 版本号/日志注入等）
+├── android/            # Android 原生配置
+├── assets/             # 静态资源 (Icon, Splash)
+├── readflow-server/    # 服务端核心 (Express, Prisma, Admin)
+│   ├── src/controllers/ # API 控制器
+│   ├── src/services/    # 核心业务 (LLM, RSS, Sync)
+│   └── public/          # 管理后台静态资源
+├── src/                # 移动端源码
+│   ├── components/      # UI 组件 (Clean UI)
+│   ├── contexts/        # 状态上下文
+│   ├── screens/         # 业务页面
+│   ├── services/        # 客户端 API 服务
+│   └── store/           # Redux 状态管理
+└── App.tsx             # 入口文件
 ```
 
 ## 常见问题
 
-### 1) 我需要部署服务端吗？
-
-不需要。只想本地阅读/学习时，直接运行 App 即可。需要跨设备同步/图片代理/后台管理时再启用云模式。
-
-### 2) 服务端部署到公网需要注意什么？
-
-- 修改 `ADMIN_PASSWORD`、设置强 `JWT_SECRET`
-- 需要访问码就设置 `SERVER_TOKEN`（客户端需要填写对应的 Access Key）
-- 建议用反向代理（HTTPS）并设置 `APP_BASE_URL`
+- **如何开启图片代理？** 在移动端“设置 - 阅读设置”中填入自建服务端的地址，并开启“图片代理”。
+- **如何生成每日报告？** 需在服务端配置有效的 LLM API Key，系统会自动通过 Cron 任务或手动触发生成。
+- **支持哪些 RSS 格式？** 支持标准 RSS 2.0, Atom, JSON Feed。
