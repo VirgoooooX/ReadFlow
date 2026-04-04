@@ -340,6 +340,18 @@ export class RSSParserService {
         }
       } catch { }
 
+      // Force fetch for xchuxing vote pages – RSS content is always insufficient
+      try {
+        const urlObj = new URL(url);
+        if (this.isXchuxingVoteUrl(urlObj)) {
+          const fullContent = await this.fetchFullContent(url, fulltextTimeoutMs);
+          if (fullContent) {
+            return preserveHtmlContent(fixRelativeImageUrls(fullContent, url), contentType);
+          }
+          return preserveHtmlContent(rawContent, contentType);
+        }
+      } catch { }
+
       const shouldFetch = rawContent.length < 500 ||
         rawContent.includes('阅读全文') ||
         rawContent.includes('Read more') ||
@@ -467,6 +479,16 @@ export class RSSParserService {
         if (metaDesc && metaDesc.trim()) {
           const escaped = this.escapeHtml(metaDesc.trim());
           return `<article><p>${escaped}</p></article>`;
+        }
+        return null;
+      }
+
+      if (this.isXchuxingVoteUrl(urlObj)) {
+        const extracted = this.extractXchuxingVoteContent(document as unknown as Document, html);
+        if (extracted) return extracted;
+        const voteMetaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+        if (voteMetaDesc.trim()) {
+          return `<article><p>${this.escapeHtml(voteMetaDesc.trim())}</p></article>`;
         }
         return null;
       }
@@ -623,6 +645,10 @@ export class RSSParserService {
     return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/video/');
   }
 
+  private isXchuxingVoteUrl(urlObj: URL): boolean {
+    return urlObj.hostname === 'www.xchuxing.com' && /^\/vote\/\d+/.test(urlObj.pathname);
+  }
+
   private extractXchuxingArticleContent(document: Document): string | null {
     const titleEl = document.querySelector('.acticle-bigtitle');
     if (!titleEl) return null;
@@ -653,6 +679,130 @@ export class RSSParserService {
     const escapedTitle = titleText ? this.escapeHtml(titleText) : '';
     const titleHtml = escapedTitle ? `<h1>${escapedTitle}</h1>` : '';
     return `<article>${titleHtml}${bodyHtml}</article>`;
+  }
+
+  /**
+   * Extract vote content from xchuxing.com /vote/ pages.
+   * Handles both text-only and image+text vote options.
+   */
+  private extractXchuxingVoteContent(document: Document, rawHtml: string): string | null {
+    // 1. Title: prefer <h2>, fallback to <title>
+    const h2 = document.querySelector('h2');
+    let title = h2 ? (h2.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    if (!title) {
+      const titleEl = document.querySelector('title');
+      const titleText = titleEl ? (titleEl.textContent || '').trim() : '';
+      title = titleText.replace(/_投票_新出行$/, '').trim();
+    }
+    if (!title) return null;
+
+    // 2. Description: look for text near <h2>, fallback to meta description
+    const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content')?.trim() || '';
+    let descriptionText = '';
+    if (h2) {
+      let sibling = h2.nextElementSibling;
+      while (sibling) {
+        const tag = sibling.tagName.toLowerCase();
+        if (tag === 'ul' || tag === 'ol') break;
+        const cls = ((sibling as any).getAttribute?.('class') || '').toLowerCase();
+        if (cls.includes('vote')) break;
+        const text = (sibling.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text.length > 10 && text.length < 500 && !text.includes('{{')) {
+          descriptionText = text;
+          break;
+        }
+        sibling = sibling.nextElementSibling;
+      }
+    }
+    const description = descriptionText || (metaDesc !== title ? metaDesc : '');
+
+    // 3. Extract vote options – try DOM first, then embedded scripts
+    const options: Array<{ text: string; imageUrl?: string }> = [];
+    this.extractVoteOptionsFromDom(document, options);
+    if (options.length === 0) {
+      this.extractVoteOptionsFromScripts(rawHtml, options);
+    }
+
+    // 4. Build structured HTML
+    const parts: string[] = ['<article>'];
+    parts.push(`<h1>${this.escapeHtml(title)}</h1>`);
+    if (description) {
+      parts.push(`<p>${this.escapeHtml(description)}</p>`);
+    }
+    if (options.length > 0) {
+      parts.push('<ul>');
+      for (const opt of options) {
+        if (opt.imageUrl) {
+          parts.push(`<li><img src="${opt.imageUrl}" alt="${this.escapeHtml(opt.text)}" /> ${this.escapeHtml(opt.text)}</li>`);
+        } else {
+          parts.push(`<li>${this.escapeHtml(opt.text)}</li>`);
+        }
+      }
+      parts.push('</ul>');
+    }
+    parts.push('</article>');
+    return parts.join('');
+  }
+
+  /** Try to extract vote options from rendered DOM elements. */
+  private extractVoteOptionsFromDom(
+    document: Document,
+    options: Array<{ text: string; imageUrl?: string }>
+  ): void {
+    const lists = document.querySelectorAll('ul, ol');
+    for (const list of Array.from(lists)) {
+      const items = list.querySelectorAll('li');
+      if (items.length < 2 || items.length > 15) continue;
+
+      const candidates: Array<{ text: string; imageUrl?: string }> = [];
+      let valid = true;
+      for (const li of Array.from(items)) {
+        const text = (li.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text.length > 100 || text.length === 0 || text.includes('{{') || /https?:\/\//.test(text)) {
+          valid = false;
+          break;
+        }
+        const img = li.querySelector('img');
+        const imgSrc = img
+          ? ((img.getAttribute('data-src') || img.getAttribute('src') || '').trim() || undefined)
+          : undefined;
+        candidates.push({ text, imageUrl: imgSrc });
+      }
+      if (valid && candidates.length >= 2) {
+        options.push(...candidates);
+        break;
+      }
+    }
+  }
+
+  /** Try to extract vote options from embedded script data (e.g. __NUXT__ payload). */
+  private extractVoteOptionsFromScripts(
+    rawHtml: string,
+    options: Array<{ text: string; imageUrl?: string }>
+  ): void {
+    try {
+      const patterns = [
+        /"vote_item"\s*:\s*(\[[\s\S]*?\])/,
+        /"voteList"\s*:\s*(\[[\s\S]*?\])/,
+        /"vote_items"\s*:\s*(\[[\s\S]*?\])/,
+      ];
+      for (const pattern of patterns) {
+        const match = rawHtml.match(pattern);
+        if (match) {
+          try {
+            const items = JSON.parse(match[1]);
+            for (const item of items) {
+              const text = item.name || item.title || item.content || item.text || '';
+              const img = item.image || item.img || item.cover || item.pic || '';
+              if (text) {
+                options.push({ text: String(text).trim(), imageUrl: img || undefined });
+              }
+            }
+            if (options.length > 0) return;
+          } catch { }
+        }
+      }
+    } catch { }
   }
 
   private escapeHtml(text: string): string {

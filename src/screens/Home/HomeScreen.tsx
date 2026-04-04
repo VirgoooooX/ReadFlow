@@ -911,7 +911,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, route }) => {
       navigation.setParams({ sourceId: null, sourceName: null } as any);
       return;
     }
-  }, [index, routes, sceneRefsMap, navigation, route, loadArticles]);
+  }, [index, routes, sceneRefsMap, navigation, route, loadArticles]));
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
