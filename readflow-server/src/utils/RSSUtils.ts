@@ -1,4 +1,5 @@
 import fetch, { RequestInit, Response, Headers } from 'node-fetch';
+import { logger as appLogger } from './Logger';
 
 // =================== 类型定义 ===================
 
@@ -21,19 +22,16 @@ const getLogTime = () => {
 
 export const logger = {
   error: (message: string, ...args: any[]) => {
-    console.error(`[${getLogTime()}] ${message}`, ...args);
+    appLogger.error(`[RSSUtils ${getLogTime()}] ${message}`, ...args);
   },
   warn: (message: string, ...args: any[]) => {
-    console.warn(`[${getLogTime()}] ${message}`, ...args);
+    appLogger.warn(`[RSSUtils ${getLogTime()}] ${message}`, ...args);
   },
   info: (message: string, ...args: any[]) => {
-    console.log(`[${getLogTime()}] ${message}`, ...args);
+    appLogger.info(`[RSSUtils ${getLogTime()}] ${message}`, ...args);
   },
   debug: (message: string, ...args: any[]) => {
-    // debug 级别在生产环境静默，避免 Docker 日志增长
-    if (process.env.LOG_LEVEL?.toUpperCase() === 'DEBUG') {
-      console.log(`[${getLogTime()}] [DEBUG] ${message}`, ...args);
-    }
+    appLogger.debug(`[RSSUtils ${getLogTime()}] ${message}`, ...args);
   }
 };
 

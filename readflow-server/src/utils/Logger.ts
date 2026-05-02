@@ -36,15 +36,32 @@ function resolveLogLevel(): number {
 
 const currentLogLevel = resolveLogLevel();
 
+function parsePositiveInt(value: unknown, fallback: number): number {
+  const parsed = parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseOptionalPositiveInt(value: unknown): number | null {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const parsed = parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+const requestLogsRaw = String(process.env.LOG_REQUESTS_ENABLED || '').trim().toLowerCase();
+const requestLogsEnabled = requestLogsRaw === '1' || requestLogsRaw === 'true';
+
 // =================== 文件日志 ===================
 
 class DailyFileSink {
   private readonly enabled: boolean;
   private readonly logDir: string;
   private readonly retentionDays: number;
+  private readonly maxDailyBytes: number | null;
   private stream: fs.WriteStream | null = null;
   private currentDateStamp: string | null = null;
   private lastPruneAtMs = 0;
+  private currentSizeBytes = 0;
+  private cappedForToday = false;
 
   constructor() {
     const enabledRaw = (process.env.LOG_FILE_ENABLED ?? process.env.LOG_TO_FILE ?? '1').trim();
@@ -52,6 +69,9 @@ class DailyFileSink {
     this.retentionDays = Math.max(
       1,
       parseInt(String(process.env.LOG_RETENTION_DAYS || '7'), 10) || 7
+    );
+    this.maxDailyBytes = parseOptionalPositiveInt(
+      process.env.LOG_DAILY_MAX_BYTES ?? process.env.LOG_MAX_DAILY_BYTES
     );
     this.logDir = (process.env.LOG_DIR && String(process.env.LOG_DIR).trim())
       ? String(process.env.LOG_DIR).trim()
@@ -76,8 +96,18 @@ class DailyFileSink {
     if (!this.enabled) return;
     this.rotateIfNeeded();
     this.pruneIfDue(false);
+    if (this.cappedForToday) return;
+
+    const lineWithNewline = line + '\n';
+    const lineBytes = Buffer.byteLength(lineWithNewline, 'utf8');
+    if (this.maxDailyBytes && this.currentSizeBytes + lineBytes > this.maxDailyBytes) {
+      this.writeCapNotice();
+      return;
+    }
+
     try {
-      this.stream?.write(line + '\n');
+      this.stream?.write(lineWithNewline);
+      this.currentSizeBytes += lineBytes;
     } catch {
     }
   }
@@ -93,11 +123,38 @@ class DailyFileSink {
     }
 
     this.currentDateStamp = today;
+    this.cappedForToday = false;
     const filePath = path.join(this.logDir, `app-${today}.log`);
     try {
+      this.currentSizeBytes = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+      if (this.maxDailyBytes && this.currentSizeBytes >= this.maxDailyBytes) {
+        this.cappedForToday = true;
+        this.stream = null;
+        return;
+      }
       this.stream = fs.createWriteStream(filePath, { flags: 'a' });
       this.stream.on('error', () => {});
     } catch {
+      this.stream = null;
+      this.currentSizeBytes = 0;
+    }
+  }
+
+  private writeCapNotice() {
+    if (!this.maxDailyBytes) return;
+    if (this.cappedForToday) return;
+    this.cappedForToday = true;
+    const notice = `${getTimestamp()} [WARN] [SYS] Daily log file limit reached (${this.maxDailyBytes} bytes); file logging is paused until tomorrow.`;
+    const noticeWithNewline = notice + '\n';
+    const noticeBytes = Buffer.byteLength(noticeWithNewline, 'utf8');
+    try {
+      if (this.stream && this.currentSizeBytes + noticeBytes <= this.maxDailyBytes) {
+        this.stream.write(noticeWithNewline);
+        this.currentSizeBytes += noticeBytes;
+      }
+      this.stream?.end();
+    } catch {
+    } finally {
       this.stream = null;
     }
   }
@@ -150,13 +207,17 @@ const COLORS = {
 class Logger {
   private logs: string[] = [];
   private readonly MAX_LOGS = 500;
+  private readonly MAX_MESSAGE_CHARS = parsePositiveInt(process.env.LOG_LINE_MAX_CHARS, 4000);
   private readonly fileSink = new DailyFileSink();
 
   private formatMessage(level: string, category: string, ...args: any[]): { raw: string, colored: string } {
-    const msg = args
+    const msgRaw = args
       .map(a => {
         if (a === null || a === undefined) return String(a);
         if (typeof a === 'string') return a;
+        if (a instanceof Error) {
+          return a.stack || a.message || String(a);
+        }
         if (typeof a === 'object') {
           try {
             return JSON.stringify(a);
@@ -167,6 +228,9 @@ class Logger {
         return String(a);
       })
       .join(' ');
+    const msg = msgRaw.length > this.MAX_MESSAGE_CHARS
+      ? `${msgRaw.slice(0, this.MAX_MESSAGE_CHARS)}...[Truncated ${msgRaw.length - this.MAX_MESSAGE_CHARS} chars]`
+      : msgRaw;
     const timestamp = getTimestamp();
     
     let levelColor = COLORS.WHITE;
@@ -193,20 +257,18 @@ class Logger {
 
   /**
    * 根据 LOG_LEVEL 过滤：低于当前级别的日志不输出到 console / 文件
-   * 但始终缓存到内存 buffer（供 admin API 查看）
+   * 同时不进入内存 buffer，避免高频 debug/info 日志在内存里继续膨胀
    */
   private addLog(level: string, category: string, ...args: any[]) {
     const numericLevel = LOG_LEVELS[level as LogLevelName] ?? LOG_LEVELS.INFO;
+    if (numericLevel < currentLogLevel) return;
+
     const { raw, colored } = this.formatMessage(level, category, ...args);
 
-    // 始终缓存到内存（供管理后台 /api/admin/logs 查看）
     this.logs.unshift(raw);
     if (this.logs.length > this.MAX_LOGS) {
       this.logs.pop();
     }
-
-    // 低于配置级别的日志不输出到 console 和文件，减少 Docker 日志占用
-    if (numericLevel < currentLogLevel) return;
 
     // Console output (colored)
     if (level === 'ERROR') console.error(colored);
@@ -224,7 +286,7 @@ class Logger {
   error(...args: any[]) { this.addLog('ERROR', 'APP', ...args); }
   
   // 专用日志方法
-  request(...args: any[]) { this.addLog('INFO', 'API', ...args); }
+  request(...args: any[]) { this.addLog(requestLogsEnabled ? 'INFO' : 'DEBUG', 'API', ...args); }
   system(...args: any[]) { this.addLog('INFO', 'SYS', ...args); }
 
   getLogs(limit = 100) {

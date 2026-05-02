@@ -16,8 +16,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"   # 单个日志文件最大 10MB
-        max-file: "3"     # 最多保留 3 个日志文件 (共 30MB 上限)
+        max-size: "10m"   # 云端 Docker 日志硬上限 10MB
+        max-file: "1"
     volumes:
       # 持久化数据
       - ./data:/app/data
@@ -35,8 +35,11 @@ services:
       - SHARP_CACHE_MEMORY_MB=${SHARP_CACHE_MEMORY_MB:-64}
       - SHARP_CONCURRENCY=${SHARP_CONCURRENCY:-2}
       - LOG_LEVEL=${LOG_LEVEL:-WARN}           # 日志级别: DEBUG / INFO / WARN / ERROR
-      - LOG_FILE_ENABLED=${LOG_FILE_ENABLED:-1} # 是否写应用日志文件
+      - LOG_FILE_ENABLED=${LOG_FILE_ENABLED:-0} # 云端默认不写重复文件日志，避免和 Docker 日志双份占用
       - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7} # 应用日志文件保留天数
+      - LOG_REQUESTS_ENABLED=${LOG_REQUESTS_ENABLED:-0} # 默认关闭高频请求明细，排查问题时再开启
+      - LOG_DAILY_MAX_BYTES=${LOG_DAILY_MAX_BYTES:-} # 可选兜底：设置后限制应用文件日志每天最大字节数
+      - LOG_LINE_MAX_CHARS=${LOG_LINE_MAX_CHARS:-4000} # 单条日志最大长度
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,7 +53,7 @@ services:
       driver: json-file
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "1"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
