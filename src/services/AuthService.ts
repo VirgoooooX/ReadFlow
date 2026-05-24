@@ -3,6 +3,8 @@ import AvatarStorageService from './AvatarStorageService';
 import { logger } from './rss/RSSUtils';
 import { SettingsService } from './SettingsService';
 import { cloudConfigService } from './CloudConfigService';
+import cacheEventEmitter from './CacheEventEmitter';
+import { databaseService } from '../database/DatabaseService';
 
 export interface User {
   id: string;
@@ -32,6 +34,23 @@ export interface AuthResponse {
   user?: User;
   token?: string;
   message?: string;
+}
+
+export interface LogoutOptions {
+  clearLocalData?: boolean;
+}
+
+export type TokenValidationResult = 'valid' | 'invalid' | 'unknown';
+
+export function parseTokenValidationResult(responseOk: boolean, data: any): TokenValidationResult {
+  if (!responseOk) return 'unknown';
+  if (data?.valid === true) return 'valid';
+  if (data?.valid === false) return 'invalid';
+  return 'unknown';
+}
+
+export function shouldLogoutForTokenValidation(result: TokenValidationResult): boolean {
+  return result === 'invalid';
 }
 
 interface CloudProfileResponse {
@@ -278,23 +297,19 @@ export class AuthService {
   /**
    * 用户登出
    */
-  public async logout(): Promise<void> {
+  public async logout(options: LogoutOptions = {}): Promise<void> {
     try {
       // 清除本地认证状态
       this.currentUser = null;
       this.authToken = null;
       await cloudConfigService.clearAuth();
 
-      // 清空本地数据库中的用户数据
-      const { databaseService } = require('../database/DatabaseService');
-      await databaseService.clearUserData();
-
-      // 清除用户设置
-      const { settingsService } = require('./SettingsService');
-      await settingsService.clearAllSettings();
+      if (options.clearLocalData === true) {
+        await databaseService.clearUserData();
+        await this.getSettingsService().clearAllSettings();
+      }
 
       // 发送事件通知相关组件和状态管理进行重置
-      const { default: cacheEventEmitter } = require('./CacheEventEmitter');
       cacheEventEmitter.clearAll();
       cacheEventEmitter.emit({ type: 'authLogout' });
 
@@ -367,20 +382,20 @@ export class AuthService {
   /**
    * 验证token是否有效
    */
-  private async validateToken(token: string): Promise<boolean> {
+  private async validateToken(token: string): Promise<TokenValidationResult> {
     try {
       const cloudConfig = await cloudConfigService.getConfig();
-      if (!cloudConfig.serverUrl) return false;
+      if (!cloudConfig.serverUrl) return 'unknown';
       return await this.performCloudValidate(token);
     } catch (error) {
       logger.error('验证token失败:', error);
-      return false;
+      return 'unknown';
     }
   }
 
-  private async validateTokenWithTimeout(token: string, timeoutMs: number): Promise<boolean> {
+  private async validateTokenWithTimeout(token: string, timeoutMs: number): Promise<TokenValidationResult> {
     const cloudConfig = await cloudConfigService.getConfig();
-    if (!cloudConfig.serverUrl) return false;
+    if (!cloudConfig.serverUrl) return 'unknown';
     try {
       const url = await this.getApiUrl('/api/auth/validate');
       const headers = await this.getHeaders();
@@ -393,14 +408,13 @@ export class AuthService {
           body: JSON.stringify({ token }),
           signal: controller.signal as any,
         } as any);
-        if (!res.ok) return false;
-        const data = await res.json();
-        return !!data.valid;
+        const data = await res.json().catch(() => undefined);
+        return parseTokenValidationResult(res.ok, data);
       } finally {
         clearTimeout(timer);
       }
     } catch {
-      return false;
+      return 'unknown';
     }
   }
 
@@ -418,13 +432,15 @@ export class AuthService {
         const lastValidatedAt = typeof cloudConfig.auth?.lastValidatedAt === 'number' ? cloudConfig.auth.lastValidatedAt : 0;
         if (lastValidatedAt && Date.now() - lastValidatedAt < 6 * 60 * 60 * 1000) return;
 
-        const ok = await this.validateTokenWithTimeout(token, 1500);
-        if (ok) {
+        const validationResult = await this.validateTokenWithTimeout(token, 1500);
+        if (validationResult === 'valid') {
           await cloudConfigService.updateConfig({ auth: { lastValidatedAt: Date.now() } });
           return;
         }
 
-        await this.logout();
+        if (shouldLogoutForTokenValidation(validationResult)) {
+          await this.logout();
+        }
       } finally {
         this.backgroundValidationInFlight = null;
       }
@@ -554,7 +570,7 @@ export class AuthService {
     }
   }
 
-  private async performCloudValidate(token: string): Promise<boolean> {
+  private async performCloudValidate(token: string): Promise<TokenValidationResult> {
     try {
       const url = await this.getApiUrl('/api/auth/validate');
       const headers = await this.getHeaders();
@@ -563,11 +579,10 @@ export class AuthService {
         headers: headers,
         body: JSON.stringify({ token })
       });
-      if (!res.ok) return false;
-      const data = await res.json();
-      return !!data.valid;
+      const data = await res.json().catch(() => undefined);
+      return parseTokenValidationResult(res.ok, data);
     } catch (e) {
-      return false;
+      return 'unknown';
     }
   }
 
