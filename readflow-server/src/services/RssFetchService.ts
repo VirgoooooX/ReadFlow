@@ -24,8 +24,6 @@ export class RssFetchService {
     public warmUpWorkerRunning = false;
     public WARMUP_PENDING_MAX = 2000;
     public warmUpDropped = 0;
-
-    private lockFailureCount: number = 0;
     private lastSuccessfulRefreshAt: number | null = null;
 
     private constructor() { }
@@ -274,76 +272,11 @@ export class RssFetchService {
             return;
         }
         this.refreshRunning = true;
-        const lockName = 'rss_auto_refresh';
-        let locked = false;
         let refreshSucceeded = false;
         const startTime = Date.now();
         try {
             logger.debug('[RSS Refresh] Starting refreshAllFeedsOnce...');
-            
-            // Try to acquire lock with exception handling
-            try {
-                locked = await storageService.tryAcquireAdvisoryLock(lockName);
-            } catch (error) {
-                // If lock acquisition throws, treat it as a failure
-                logger.error('[RSS Refresh] Exception during lock acquisition:', error);
-                locked = false;
-            }
-            
-            if (!locked) {
-                // Increment failure count
-                this.lockFailureCount++;
-                
-                // Calculate time since last success
-                const timeSinceLastSuccess = this.lastSuccessfulRefreshAt 
-                    ? Date.now() - this.lastSuccessfulRefreshAt 
-                    : Infinity;
-                
-                // Log warning with failure count and time since last success
-                logger.warn(
-                    `[RSS Refresh] Could not acquire advisory lock (failure #${this.lockFailureCount}, ` +
-                    `${timeSinceLastSuccess === Infinity ? 'never succeeded' : Math.round(timeSinceLastSuccess / 1000) + 's since last success'})`
-                );
-                
-                // Implement force release logic: if lockFailureCount >= 3 OR timeSinceLastSuccess > 5 minutes
-                const FORCE_RELEASE_FAILURE_THRESHOLD = 3;
-                const FORCE_RELEASE_TIME_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-                
-                if (this.lockFailureCount >= FORCE_RELEASE_FAILURE_THRESHOLD || timeSinceLastSuccess > FORCE_RELEASE_TIME_THRESHOLD_MS) {
-                    // Log ERROR when force release is triggered
-                    logger.error(
-                        `[RSS Refresh] Lock appears stuck (${this.lockFailureCount} consecutive failures, ` +
-                        `${timeSinceLastSuccess === Infinity ? 'never succeeded' : Math.round(timeSinceLastSuccess / 1000) + 's since last success'}). ` +
-                        `Attempting force release...`
-                    );
-                    
-                    // Call forceReleaseAdvisoryLock
-                    await storageService.forceReleaseAdvisoryLock(lockName);
-                    
-                    // Retry lock acquisition
-                    try {
-                        locked = await storageService.tryAcquireAdvisoryLock(lockName);
-                    } catch (retryError) {
-                        logger.error('[RSS Refresh] Exception during retry lock acquisition:', retryError);
-                        locked = false;
-                    }
-                    
-                    if (locked) {
-                        // Log INFO when lock acquired after force release
-                        logger.debug('[RSS Refresh] Successfully acquired lock after force release');
-                        // Reset lockFailureCount to 0 on successful lock acquisition
-                        this.lockFailureCount = 0;
-                    } else {
-                        logger.error('[RSS Refresh] Still cannot acquire lock after force release');
-                        return;
-                    }
-                } else {
-                    return;
-                }
-            } else {
-                // Reset lockFailureCount to 0 on successful lock acquisition
-                this.lockFailureCount = 0;
-            }
+
             const feeds = await storageService.getFeedsLight();
             if (!feeds || feeds.length === 0) {
                 logger.debug('[RSS Refresh] No feeds found to refresh');
@@ -446,10 +379,6 @@ export class RssFetchService {
             // Log at ERROR level and do not re-throw to ensure timer chain continues
             logger.error('[RSS Refresh] Unexpected error in refreshAllFeedsOnce:', error);
         } finally {
-            if (locked) {
-                await storageService.releaseAdvisoryLock(lockName);
-            }
-            
             // Update lastSuccessfulRefreshAt only if refresh completed without errors
             if (refreshSucceeded) {
                 this.lastSuccessfulRefreshAt = Date.now();

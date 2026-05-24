@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "3.0.11",
+  "version": "4.0.0",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -47,6 +47,7 @@
     "vitest": "^4.1.0"
   },
   "changelog": [
+    "fix: 优化日志系统配置以降低云端存储占用",
     "chore: 更新版本号至3.0.10并更新变更日志",
     "feat: implement HomeScreen with article list, auto-read tracking, and pagination support",
     "feat: implement RSS server backend with sync, storage, and LLM gateway services",
@@ -65,7 +66,6 @@
     "chore: 更新版本号至3.0.0并更新changelog",
     "feat: 新增RSS分组管理功能并优化UI交互",
     "feat: 将LLM能力迁移至服务端统一配置并完善云同步功能",
-    "feat: 改进云同步与配置管理",
-    "feat: 重构为纯云端应用并引入公共RSS源发现大厅"
+    "feat: 改进云同步与配置管理"
   ]
 }
