@@ -1,18 +1,21 @@
 # ReadFlow
 
-一款专注「深度阅读 + 英语学习」的移动端阅读器：RSS 订阅、沉浸式阅读、划词/翻译、每日报告（LLM）、词汇复习，以及自建服务端（云同步、图片代理、管理后台、LLM 网关）。
+ReadFlow 是一套「移动端阅读器 + 自建云端服务」产品：
+
+- **ReadFlow App**：面向 Android 的 Expo / React Native RSS 阅读客户端，提供订阅管理、沉浸式阅读、划词翻译、词汇复习、离线缓存和云同步。
+- **ReadFlow Server**：面向自托管部署的 Node.js / Express 服务端，负责 RSS 定时抓取、文章同步、图片代理、每日 AI 摘要、LLM 网关和管理后台。
 
 [![React Native](https://img.shields.io/badge/React%20Native-0.79.6-blue?logo=react&logoColor=white)](https://reactnative.dev/)
 [![Expo](https://img.shields.io/badge/Expo-53.0.0-black?logo=expo&logoColor=white)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
-| 构件 | 路径 | 作用 |
-| --- | --- | --- |
-| App（React Native / Expo） | `./src` | 阅读、订阅、学习、离线存储、高性能渲染 |
-| Server（Node/Express + Prisma/Postgres） | `./readflow-server` | 云端核心：认证与同步、图片代理、管理后台、LLM 网关、定时刷新 |
+| 产物 | 路径 | 发布方式 | 作用 |
+| --- | --- | --- | --- |
+| ReadFlow App（React Native / Expo） | `./src`, `./android` | `app-*` tag 触发 GitHub Actions 构建 APK，并上传到 GitHub Release | 阅读、订阅、学习、离线存储、高性能渲染 |
+| ReadFlow Server（Node/Express + Prisma/Postgres） | `./readflow-server` | 语义版本 tag 触发 GitHub Actions 构建 GHCR 镜像：`ghcr.io/virgooooox/readflowserver` | 云端核心：认证与同步、图片代理、管理后台、LLM 网关、定时刷新 |
 
-版本：`v6.1.1`（`app.json`） / `build 60101`（Android）
+当前客户端版本：`10.0.0` / Android `versionCode 100000`。当前服务端版本：`4.0.1`。
 
 ![ReadFlow Icon](./assets/icon.png)
 
@@ -138,6 +141,13 @@ cd readflow-server
 docker compose up -d --build
 ```
 
+生产镜像发布到 GitHub Container Registry：
+
+```bash
+docker pull ghcr.io/virgooooox/readflowserver:latest
+docker pull ghcr.io/virgooooox/readflowserver:4.0.1
+```
+
 #### 手动开发
 ```bash
 cd readflow-server
@@ -148,6 +158,12 @@ npm run dev        # 启动后端
 ```
 
 服务端地址默认：`http://localhost:3000`
+
+## 发布
+
+- **服务端镜像**：推送 `x.y.z` 或 `vx.y.z` tag 后，`.github/workflows/docker-release.yml` 会构建并推送 `linux/amd64`、`linux/arm64` 镜像到 GHCR。
+- **Android APK**：推送 `app-x.y.z` tag 后，`.github/workflows/android-release.yml` 会在 GitHub Actions 中构建 release APK，并把 APK 附加到对应 GitHub Release。
+- **本地构建脚本**：`scripts/build-apk.js` 保持本地构建入口；云端 APK 发布由 GitHub Actions 调用，不需要改本地脚本。
 
 ## 目录结构
 

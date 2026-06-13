@@ -98,8 +98,7 @@ async function main() {
   run('git', ['push', 'origin', serverTag]);
 
   console.log(`\n✅ Done!`);
-  console.log(`- GHCR image build triggered by tag: ${serverTag}`);
-  console.log(`- Image: ghcr.io/virgoooox/readflowserver:${serverTag}`);
+  console.log(`- Docker image build triggered by tag: ${serverTag}`);
 }
 
 main().catch(err => {

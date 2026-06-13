@@ -1,7 +1,7 @@
 {
   "name": "readflow-server",
   "version": "4.0.1",
-  "description": "RSS Parsing Server for ReadFlow",
+  "description": "ReadFlow Server: an Express/Prisma backend for RSS fetching, cloud sync, image proxying, admin operations, daily reports, and LLM gateway services.",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
