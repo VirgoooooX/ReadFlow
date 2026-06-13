@@ -35,6 +35,45 @@ export class RssFetchService {
         return RssFetchService.instance;
     }
 
+    private parsePositiveInt(value: unknown): number | null {
+        const parsed = parseInt(String(value || ''), 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    private getFeedRefreshTimeoutMs(settings: any): number {
+        const envTimeout = this.parsePositiveInt(process.env.RSS_REFRESH_FEED_TIMEOUT_MS);
+        if (envTimeout) return envTimeout;
+
+        const fetchTimeoutMs = typeof settings.rssFetchTimeoutMs === 'number' && Number.isFinite(settings.rssFetchTimeoutMs)
+            ? settings.rssFetchTimeoutMs
+            : 15_000;
+        const fulltextTimeoutMs = typeof settings.rssFulltextTimeoutMs === 'number' && Number.isFinite(settings.rssFulltextTimeoutMs)
+            ? settings.rssFulltextTimeoutMs
+            : 20_000;
+        const maxItems = typeof settings.rssMaxItemsPerFetch === 'number' && Number.isFinite(settings.rssMaxItemsPerFetch)
+            ? Math.max(1, settings.rssMaxItemsPerFetch)
+            : 20;
+
+        const expectedWorstCase = fetchTimeoutMs + (fulltextTimeoutMs * maxItems) + 30_000;
+        return Math.max(60_000, Math.min(15 * 60_000, expectedWorstCase));
+    }
+
+    private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+        if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            return await Promise.race([
+                promise,
+                new Promise<T>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
     public async runWarmUpWorker() {
         if (this.warmUpWorkerRunning) return;
         this.warmUpWorkerRunning = true;
@@ -290,6 +329,7 @@ export class RssFetchService {
             const globalCron = settings.rssDefaultRefreshCron;
             const refreshConcurrencyRaw = parseInt(String(process.env.RSS_REFRESH_CONCURRENCY || ''), 10);
             const refreshConcurrency = Number.isFinite(refreshConcurrencyRaw) && refreshConcurrencyRaw > 0 ? refreshConcurrencyRaw : 2;
+            const feedRefreshTimeoutMs = this.getFeedRefreshTimeoutMs(settings);
             const limit = pLimit(Math.max(1, Math.min(8, refreshConcurrency)));
 
             const tasks = feeds.map((feed) => limit(async () => {
@@ -336,15 +376,19 @@ export class RssFetchService {
                     };
 
                     const startedAtIso = new Date().toISOString();
-                    const articles = await rssParserService.fetchAndParseArticles(
-                        source,
-                        [],
-                        undefined,
-                        true,
-                        settings.imageQuality ?? 80,
-                        false,
-                        settings.rssFetchTimeoutMs,
-                        settings.rssFulltextTimeoutMs
+                    const articles = await this.withTimeout(
+                        rssParserService.fetchAndParseArticles(
+                            source,
+                            [],
+                            undefined,
+                            true,
+                            settings.imageQuality ?? 80,
+                            false,
+                            settings.rssFetchTimeoutMs,
+                            settings.rssFulltextTimeoutMs
+                        ),
+                        feedRefreshTimeoutMs,
+                        `[RSS Refresh] Feed refresh timed out after ${feedRefreshTimeoutMs}ms: ${feed.url}`
                     );
                     const result = await storageService.storeCanonicalArticlesForSource(feed.url, articles);
 

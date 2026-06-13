@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "RSS Parsing Server for ReadFlow",
   "main": "dist/server.js",
   "scripts": {
@@ -47,6 +47,8 @@
     "vitest": "^4.1.0"
   },
   "changelog": [
+    "fix: 为 RSS 自动刷新添加单源超时保护，避免调度链卡死",
+    "ci: 将 readflow-server 镜像发布迁移到 GitHub Container Registry",
     "fix: 优化日志系统配置以降低云端存储占用",
     "chore: 更新版本号至3.0.10并更新变更日志",
     "feat: implement HomeScreen with article list, auto-read tracking, and pagination support",

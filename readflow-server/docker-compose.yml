@@ -1,6 +1,6 @@
 services:
   readflow-server:
-    image: virgoooox/readflowserver:latest
+    image: ghcr.io/virgoooox/readflowserver:latest
     build:
       context: .
       args:

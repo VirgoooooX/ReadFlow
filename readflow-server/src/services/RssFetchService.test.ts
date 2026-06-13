@@ -73,6 +73,7 @@ import { rssFetchService } from './RssFetchService';
 describe('RssFetchService refresh locking', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.RSS_REFRESH_FEED_TIMEOUT_MS;
     rssFetchService.refreshRunning = false;
     rssFetchService.refreshingFeedIds.clear();
     (rssFetchService as any).lastSuccessfulRefreshAt = null;
@@ -90,6 +91,28 @@ describe('RssFetchService refresh locking', () => {
     expect(mocks.storageService.updateFeedRefreshState).toHaveBeenCalledWith(
       'feed-1',
       expect.objectContaining({ status: 'ok' })
+    );
+  });
+
+  it('times out a stuck feed refresh and releases the refresh loop', async () => {
+    process.env.RSS_REFRESH_FEED_TIMEOUT_MS = '25';
+    mocks.rssParserService.fetchAndParseArticles.mockImplementationOnce(
+      () => new Promise(() => undefined) as any
+    );
+
+    const result = await Promise.race([
+      rssFetchService.refreshAllFeedsOnce().then(() => 'completed'),
+      new Promise(resolve => setTimeout(() => resolve('stuck'), 120)),
+    ]);
+
+    expect(result).toBe('completed');
+    expect(rssFetchService.refreshRunning).toBe(false);
+    expect(mocks.storageService.updateFeedRefreshState).toHaveBeenCalledWith(
+      'feed-1',
+      expect.objectContaining({
+        status: 'error',
+        error: expect.stringContaining('timed out'),
+      })
     );
   });
 });
