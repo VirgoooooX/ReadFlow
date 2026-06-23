@@ -128,14 +128,16 @@ function _renderFeeds() {
             </button>
         </td>
         <td data-label="间隔(秒)" class="px-4 py-4 text-center align-middle">
-            <input type="number" value="${f.refreshIntervalSeconds ?? ''}"
-                class="w-20 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm"
-                onchange="updateFeedInterval('${id}', this.value)" placeholder="默认">
+            <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-xs border border-slate-200/60">
+                ${f.refreshIntervalSeconds ? `${f.refreshIntervalSeconds}s` : '<span class="text-slate-400">默认</span>'}
+            </span>
         </td>
         <td data-label="CRON" class="px-4 py-4 text-center align-middle">
-            <input type="text" value="${escapeHtml(f.refreshCron ?? '')}"
-                class="w-44 px-2 py-1 text-xs border border-slate-300 bg-white rounded text-center focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-sm font-mono"
-                onchange="updateFeedCron('${id}', this.value)" placeholder="Cron">
+            ${f.refreshCron ? `
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-xs font-medium border border-indigo-100/60">
+                ${escapeHtml(f.refreshCron)}
+            </span>
+            ` : '<span class="text-slate-400 font-mono text-xs">-</span>'}
         </td>
         <td data-label="最后更新" class="px-4 py-4 text-xs align-middle">
             <div class="text-slate-700 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
@@ -152,6 +154,9 @@ function _renderFeeds() {
             <div class="flex justify-end space-x-1">
                 <button onclick="refreshFeed('${id}')" class="text-slate-600 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition" title="立即刷新">
                     <i class="fa-solid fa-rotate"></i>
+                </button>
+                <button onclick="openEditFeedDialog('${id}')" class="text-slate-600 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 transition" title="编辑订阅源">
+                    <i class="fa-solid fa-pen"></i>
                 </button>
                 <button onclick="viewFeedArticles('${id}')" class="text-slate-600 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition" title="查看文章">
                     <i class="fa-solid fa-list-ul"></i>
@@ -496,6 +501,78 @@ window.clearFeedData = async function (id) {
     } else {
         const err = await res.json();
         showToast(err.error || '清理失败', 'error');
+    }
+}
+
+window.openEditFeedDialog = function (id) {
+    const feed = (feedsState.all || []).find(f => String(f.id) === String(id));
+    if (!feed) return showToast('未找到该订阅源', 'error');
+
+    document.getElementById('edit-feed-id').value = id;
+    document.getElementById('edit-feed-modal-subtitle').textContent = `ID: ${id}`;
+    document.getElementById('edit-feed-name').value = feed.name || '';
+    document.getElementById('edit-feed-url').value = feed.url || '';
+    document.getElementById('edit-feed-category').value = feed.category || '';
+    document.getElementById('edit-feed-interval').value = feed.refreshIntervalSeconds ?? '';
+    document.getElementById('edit-feed-cron').value = feed.refreshCron ?? '';
+    document.getElementById('edit-feed-description').value = feed.description || '';
+    document.getElementById('edit-feed-is-public').checked = feed.isPublic === true;
+
+    document.getElementById('edit-feed-overlay').classList.remove('hidden');
+}
+
+window.closeEditFeed = function () {
+    document.getElementById('edit-feed-overlay').classList.add('hidden');
+}
+
+window.onEditFeedOverlayClick = function (ev) {
+    if (ev.target.id === 'edit-feed-overlay') {
+        closeEditFeed();
+    }
+}
+
+window.saveEditFeed = async function () {
+    const id = document.getElementById('edit-feed-id').value;
+    const name = document.getElementById('edit-feed-name').value.trim();
+    const url = document.getElementById('edit-feed-url').value.trim();
+    const category = document.getElementById('edit-feed-category').value.trim();
+    const intervalRaw = document.getElementById('edit-feed-interval').value.trim();
+    const refreshIntervalSeconds = intervalRaw === '' ? null : parseInt(intervalRaw, 10);
+    const refreshCron = document.getElementById('edit-feed-cron').value.trim() || null;
+    const description = document.getElementById('edit-feed-description').value.trim();
+    const isPublic = document.getElementById('edit-feed-is-public').checked;
+
+    if (!name || !url) return showToast('请填写名称和地址', 'error');
+    if (refreshCron && !isLikelyValidCronExpression(refreshCron)) {
+        return showToast('Cron 表达式格式不正确（需5或6段，用空格分隔）', 'error');
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/feeds/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                url,
+                category,
+                refreshIntervalSeconds,
+                refreshCron,
+                description,
+                isPublic
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return showToast(err.error || '保存失败', 'error');
+        }
+
+        showToast('订阅源保存成功');
+        closeEditFeed();
+        loadFeeds();
+    } catch (e) {
+        console.error(e);
+        showToast('网络请求失败', 'error');
     }
 }
 

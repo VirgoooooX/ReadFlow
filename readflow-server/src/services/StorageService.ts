@@ -1387,28 +1387,46 @@ END $$;
 
   public async saveFeed(feed: Feed) {
     const normalizedUrl = this.normalizeUrl(feed.url);
-    await prisma.rSSSource.upsert({
-      where: { url: normalizedUrl },
-      update: {
-        name: feed.name,
-        category: feed.category,
-        description: feed.description === undefined ? undefined : (feed.description ?? null),
-        isPublic: (feed as any).isPublic ?? false,
-        lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
-        refreshIntervalSeconds: feed.refreshIntervalSeconds === undefined ? undefined : (feed.refreshIntervalSeconds ?? null),
-        refreshCron: feed.refreshCron === undefined ? undefined : (feed.refreshCron ?? null),
-      },
-      create: {
-        url: normalizedUrl,
-        name: feed.name,
-        category: feed.category || 'General',
-        description: feed.description || null,
-        isPublic: (feed as any).isPublic ?? false,
-        lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
-        refreshIntervalSeconds: feed.refreshIntervalSeconds ?? null,
-        refreshCron: feed.refreshCron ?? null,
-      }
-    });
+    const feedId = feed.id ? parseInt(feed.id) : NaN;
+
+    if (!isNaN(feedId)) {
+      await prisma.rSSSource.update({
+        where: { id: feedId },
+        data: {
+          url: normalizedUrl,
+          name: feed.name,
+          category: feed.category,
+          description: feed.description === undefined ? undefined : (feed.description ?? null),
+          isPublic: (feed as any).isPublic ?? false,
+          lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
+          refreshIntervalSeconds: feed.refreshIntervalSeconds === undefined ? undefined : (feed.refreshIntervalSeconds ?? null),
+          refreshCron: feed.refreshCron === undefined ? undefined : (feed.refreshCron ?? null),
+        }
+      });
+    } else {
+      await prisma.rSSSource.upsert({
+        where: { url: normalizedUrl },
+        update: {
+          name: feed.name,
+          category: feed.category,
+          description: feed.description === undefined ? undefined : (feed.description ?? null),
+          isPublic: (feed as any).isPublic ?? false,
+          lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
+          refreshIntervalSeconds: feed.refreshIntervalSeconds === undefined ? undefined : (feed.refreshIntervalSeconds ?? null),
+          refreshCron: feed.refreshCron === undefined ? undefined : (feed.refreshCron ?? null),
+        },
+        create: {
+          url: normalizedUrl,
+          name: feed.name,
+          category: feed.category || 'General',
+          description: feed.description || null,
+          isPublic: (feed as any).isPublic ?? false,
+          lastFetchAt: feed.lastRefreshAt ? new Date(feed.lastRefreshAt) : null,
+          refreshIntervalSeconds: feed.refreshIntervalSeconds ?? null,
+          refreshCron: feed.refreshCron ?? null,
+        }
+      });
+    }
   }
 
   public async cleanupArticles(): Promise<{

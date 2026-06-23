@@ -318,11 +318,11 @@
                                 oninput="applyFeedFilters()"
                                 class="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
                         </div>
-                        <select id="feeds-category-filter" onchange="applyFeedFilters()"
+                        <select id="feeds-category-filter" onchange="applyFeedFilters()" title="分类过滤" aria-label="分类过滤"
                             class="w-full sm:w-48 px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
                             <option value="">全部分类</option>
                         </select>
-                        <select id="feeds-public-filter" onchange="applyFeedFilters()"
+                        <select id="feeds-public-filter" onchange="applyFeedFilters()" title="可见性过滤" aria-label="可见性过滤"
                             class="w-full sm:w-40 px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
                             <option value="all">全部</option>
                             <option value="public">仅公开池</option>
@@ -344,7 +344,7 @@
                         </button>
                     </div>
                 </div>
-                <input id="feeds-import-file" type="file" class="hidden" accept=".csv,.xlsx,.xls"
+                <input id="feeds-import-file" type="file" class="hidden" accept=".csv,.xlsx,.xls" title="选择导入文件" aria-label="选择导入文件"
                     onchange="importFeedsFromFile(this.files && this.files[0]); this.value='';" />
                 <div id="feeds-bulk-bar"
                     class="hidden glass-card p-4 rounded-xl flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
@@ -391,49 +391,77 @@
 
                 <!-- Add Feed Panel -->
                 <div id="add-feed-panel"
-                    class="hidden glass-card p-6 rounded-xl border-l-4 border-l-blue-500 animate-slide-in-right">
-                    <h3 class="text-sm font-bold text-slate-800 mb-4">添加新 RSS 订阅源</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                        <div class="md:col-span-3">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">名称</label>
-                            <input type="text" id="feed-name" placeholder="例如: TechCrunch"
-                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    class="hidden glass-card p-6 rounded-2xl border-l-4 border-l-primary-500 bg-white/80 backdrop-blur-md shadow-xl animate-fade-in space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center">
+                            <i class="fa-solid fa-plus-circle text-primary-500 mr-2 text-lg"></i>
+                            添加新 RSS 订阅源
+                        </h3>
+                        <button onclick="document.getElementById('add-feed-panel').classList.add('hidden')"
+                            class="text-slate-400 hover:text-slate-600 transition" title="关闭面板" aria-label="关闭面板">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Left column: Basic Info -->
+                        <div class="space-y-4 md:col-span-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="feed-name" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">名称</label>
+                                    <input type="text" id="feed-name" placeholder="例如: TechCrunch"
+                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition">
+                                </div>
+                                <div>
+                                    <label for="feed-url" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">RSS 地址</label>
+                                    <input type="text" id="feed-url" placeholder="https://..."
+                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition font-mono">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="feed-category" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">分类</label>
+                                    <input type="text" id="feed-category" placeholder="Tech"
+                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition">
+                                </div>
+                                <div>
+                                    <label for="feed-description" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">源简介 (简短描述)</label>
+                                    <input type="text" id="feed-description" placeholder="专注于苹果新闻和应用推荐的中文博客..."
+                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition">
+                                </div>
+                            </div>
                         </div>
-                        <div class="md:col-span-4">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">RSS 地址</label>
-                            <input type="text" id="feed-url" placeholder="https://..."
-                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">分类</label>
-                            <input type="text" id="feed-category" placeholder="Tech"
-                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        </div>
-                        <div class="md:col-span-1">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">间隔(秒)</label>
-                            <input type="number" id="feed-interval" placeholder="900"
-                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Cron</label>
-                            <input type="text" id="feed-cron" placeholder="*/15 * * * *"
-                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
-                        </div>
-                        <div class="md:col-span-12">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">源简介 (简短描述)</label>
-                            <input type="text" id="feed-description" placeholder="例如: 专注于苹果新闻和应用推荐的中文博客..."
-                                class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        </div>
-                        <div class="md:col-span-1">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">公开</label>
-                            <input type="checkbox" id="feed-is-public"
-                                class="mt-2 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        </div>
-                        <div class="md:col-span-2">
-                            <button onclick="addFeed()"
-                                class="w-full bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium h-[38px] shadow-lg shadow-slate-800/20">
-                                确定添加
-                            </button>
+
+                        <!-- Right column: Crawl & Visibility -->
+                        <div class="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100/80 flex flex-col justify-between">
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label for="feed-interval" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">间隔 (秒)</label>
+                                        <input type="number" id="feed-interval" placeholder="900" title="间隔" aria-label="间隔"
+                                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm transition font-mono">
+                                    </div>
+                                    <div>
+                                        <label for="feed-cron" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Cron (可选)</label>
+                                        <input type="text" id="feed-cron" placeholder="*/15 * * * *" title="Cron 表达式" aria-label="Cron 表达式"
+                                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm transition font-mono">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between pt-2 border-t border-slate-100/50">
+                                    <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">设为公开源</span>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="feed-is-public" title="公开" aria-label="公开"
+                                            class="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer">
+                                        <label for="feed-is-public" class="text-xs font-semibold text-slate-500 ml-2 cursor-pointer">公开池</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="pt-4">
+                                <button onclick="addFeed()"
+                                    class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-900/20 transform hover:-translate-y-0.5 active:translate-y-0">
+                                    确定添加订阅源
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -446,7 +474,7 @@
                                 class="bg-slate-50/30 text-xs uppercase text-slate-600 font-bold border-b border-slate-100/50">
                                 <tr>
                                     <th class="px-4 py-4 whitespace-nowrap">
-                                        <input id="feeds-select-all" type="checkbox"
+                                        <input id="feeds-select-all" type="checkbox" title="全选所有订阅源" aria-label="全选所有订阅源"
                                             onchange="toggleSelectAllVisible(this.checked)"
                                             class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                                     </th>
@@ -548,27 +576,27 @@
                             <p class="text-xs text-slate-400 mb-4 ml-3">控制订阅源的自动刷新频率和抓取行为。</p>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
-                                    <input type="number" id="setting-refresh-interval" min="15"
+                                    <label for="setting-refresh-interval" class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
+                                    <input type="number" id="setting-refresh-interval" min="15" placeholder="例如: 900" title="默认刷新间隔 (秒)"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">全局默认 RSS 自动刷新间隔，单个源可独立覆盖。推荐 300–1800。</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">默认刷新 Cron</label>
-                                    <input type="text" id="setting-refresh-cron" placeholder="*/15 * * * *"
+                                    <label for="setting-refresh-cron" class="block text-sm font-medium text-slate-700 mb-2">默认刷新 Cron</label>
+                                    <input type="text" id="setting-refresh-cron" placeholder="*/15 * * * *" title="默认刷新 Cron"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">留空则用间隔秒数。示例: */15 * * * *（每15分钟）、0 8 * *
                                         *（每天8点）。</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">单次解析上限</label>
-                                    <input type="number" id="setting-max-articles" min="1"
+                                    <label for="setting-max-articles" class="block text-sm font-medium text-slate-700 mb-2">单次解析上限</label>
+                                    <input type="number" id="setting-max-articles" min="1" placeholder="例如: 20" title="单次解析上限"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">单次抓取最多解析条目数，防止异常源导致资源暴涨。推荐 20–100。</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">抓取超时 (毫秒)</label>
-                                    <input type="number" id="setting-fetch-timeout" min="1000"
+                                    <label for="setting-fetch-timeout" class="block text-sm font-medium text-slate-700 mb-2">抓取超时 (毫秒)</label>
+                                    <input type="number" id="setting-fetch-timeout" min="1000" placeholder="例如: 15000" title="抓取超时 (毫秒)"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">抓取 RSS 或全文时的网络超时，超时将记录失败。推荐 10000–20000。</p>
                                 </div>
@@ -586,14 +614,14 @@
                             <p class="text-xs text-slate-400 mb-4 ml-3">调节 App 端云同步接口的分页行为。</p>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">同步默认分页大小</label>
-                                    <input type="number" id="setting-sync-default-page" min="10"
+                                    <label for="setting-sync-default-page" class="block text-sm font-medium text-slate-700 mb-2">同步默认分页大小</label>
+                                    <input type="number" id="setting-sync-default-page" min="10" placeholder="例如: 100" title="同步默认分页大小"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">客户端未指定 limit 时的默认分页。推荐 50–200。</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">同步最大分页大小</label>
-                                    <input type="number" id="setting-max-blocks" min="1"
+                                    <label for="setting-max-blocks" class="block text-sm font-medium text-slate-700 mb-2">同步最大分页大小</label>
+                                    <input type="number" id="setting-max-blocks" min="1" placeholder="例如: 500" title="同步最大分页大小"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">单页最大返回文章数，超大值会导致内存峰值过高。推荐 200–500。</p>
                                 </div>
@@ -610,20 +638,20 @@
                             <p class="text-xs text-slate-400 mb-4 ml-3">自动清理老旧数据，控制数据库增长。</p>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">文章保留天数</label>
-                                    <input type="number" id="setting-retention-days" min="0"
+                                    <label for="setting-retention-days" class="block text-sm font-medium text-slate-700 mb-2">文章保留天数</label>
+                                    <input type="number" id="setting-retention-days" min="0" placeholder="例如: 30" title="文章保留天数"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">超过该天数的旧文章会被自动清理。0 = 永久保留。推荐 30–365。</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">每源库存上限</label>
-                                    <input type="number" id="setting-max-count-per-feed" min="0"
+                                    <label for="setting-max-count-per-feed" class="block text-sm font-medium text-slate-700 mb-2">每源库存上限</label>
+                                    <input type="number" id="setting-max-count-per-feed" min="0" placeholder="例如: 1000" title="每源库存上限"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">每源最多保留的最新文章数。0 = 不限制。推荐 500–5000。</p>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">清理频率 (小时)</label>
-                                    <input type="number" id="setting-cleanup-interval" min="1"
+                                    <label for="setting-cleanup-interval" class="block text-sm font-medium text-slate-700 mb-2">清理频率 (小时)</label>
+                                    <input type="number" id="setting-cleanup-interval" min="1" placeholder="例如: 24" title="清理频率 (小时)"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
                                     <p class="mt-2 text-xs text-slate-400">后台自动清理间隔。推荐 6–24。</p>
                                 </div>
@@ -641,9 +669,9 @@
                             <p class="text-xs text-slate-400 mb-4 ml-3">图片代理的转码与压缩参数。</p>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">图片压缩质量 (1-100)</label>
+                                    <label for="setting-quality" class="block text-sm font-medium text-slate-700 mb-2">图片压缩质量 (1-100)</label>
                                     <div class="relative">
-                                        <input type="number" id="setting-quality" min="1" max="100"
+                                        <input type="number" id="setting-quality" min="1" max="100" placeholder="例如: 80" title="图片压缩质量"
                                             class="w-full pl-4 pr-12 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 transition font-mono">
                                         <div
                                             class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-sm">
@@ -725,23 +753,23 @@
 
                             <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">翻译 (translation)</label>
-                                    <select id="llm-binding-translation"
+                                    <label for="llm-binding-translation" class="block text-sm font-medium text-slate-700 mb-2">翻译 (translation)</label>
+                                    <select id="llm-binding-translation" title="翻译模型绑定"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">查词 (dictionary)</label>
-                                    <select id="llm-binding-dictionary"
+                                    <label for="llm-binding-dictionary" class="block text-sm font-medium text-slate-700 mb-2">查词 (dictionary)</label>
+                                    <select id="llm-binding-dictionary" title="查词模型绑定"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">标题翻译 (titleTranslation)</label>
-                                    <select id="llm-binding-titleTranslation"
+                                    <label for="llm-binding-titleTranslation" class="block text-sm font-medium text-slate-700 mb-2">标题翻译 (titleTranslation)</label>
+                                    <select id="llm-binding-titleTranslation" title="标题翻译模型绑定"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">AI 日报 (dailyReport)</label>
-                                    <select id="llm-binding-dailyReport"
+                                    <label for="llm-binding-dailyReport" class="block text-sm font-medium text-slate-700 mb-2">AI 日报 (dailyReport)</label>
+                                    <select id="llm-binding-dailyReport" title="AI日报模型绑定"
                                         class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
                                 </div>
                             </div>
@@ -750,7 +778,7 @@
                                 <div class="flex items-center justify-between mb-3">
                                     <div class="text-sm font-semibold text-slate-800">LLM 使用统计</div>
                                     <div class="flex items-center gap-2">
-                                        <select id="llm-usage-days"
+                                        <select id="llm-usage-days" title="展示天数" aria-label="展示天数"
                                             class="px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition text-sm">
                                             <option value="1">近 1 天</option>
                                             <option value="7" selected>近 7 天</option>
@@ -807,7 +835,7 @@
                                     </div>
                                     <div class="flex items-end gap-3">
                                         <div class="flex-1">
-                                            <select id="prune-articles-days"
+                                            <select id="prune-articles-days" title="清理文章天数范围" aria-label="清理文章天数范围"
                                                 class="w-full px-3 py-2 bg-white border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
                                                 <option value="30">30 天</option>
                                                 <option value="60">60 天</option>
@@ -834,7 +862,7 @@
                                     </div>
                                     <div class="flex items-end gap-3">
                                         <div class="flex-1">
-                                            <select id="prune-images-days"
+                                            <select id="prune-images-days" title="清理图片天数范围" aria-label="清理图片天数范围"
                                                 class="w-full px-3 py-2 bg-white border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
                                                 <option value="30">30 天</option>
                                                 <option value="60">60 天</option>
@@ -986,7 +1014,7 @@
                         </div>
                     </div>
                 </div>
-                <button onclick="closeArticles()"
+                <button onclick="closeArticles()" title="关闭" aria-label="关闭文章列表"
                     class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
@@ -1014,6 +1042,83 @@
                     class="bg-slate-800 text-white px-6 py-2.5 rounded-xl hover:bg-slate-700 transition text-sm font-bold shadow-lg shadow-slate-800/20 disabled:opacity-40 disabled:cursor-not-allowed">
                     加载更多
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Feed Modal -->
+    <div id="edit-feed-overlay"
+        class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+        onclick="onEditFeedOverlayClick(event)">
+        <div class="glass-card bg-white/95 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-fade-in"
+            onclick="event.stopPropagation()">
+            <div
+                class="px-8 py-6 border-b border-slate-100/50 flex justify-between items-center bg-gradient-to-r from-slate-50/50 to-white/50">
+                <div class="flex items-center">
+                    <div
+                        class="w-12 h-12 rounded-full bg-indigo-100/50 text-indigo-600 flex items-center justify-center text-xl mr-4">
+                        <i class="fa-solid fa-rss"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800" id="edit-feed-modal-title">编辑订阅源</h3>
+                        <p class="text-xs text-slate-400 font-mono mt-0.5" id="edit-feed-modal-subtitle">ID</p>
+                    </div>
+                </div>
+                <button onclick="closeEditFeed()"
+                    class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100/50 text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 transition"
+                    aria-label="关闭编辑">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-8 overflow-y-auto max-h-[70vh] space-y-6">
+                <input type="hidden" id="edit-feed-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">名称</label>
+                        <input type="text" id="edit-feed-name" placeholder="例如: TechCrunch"
+                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">RSS 地址</label>
+                        <input type="text" id="edit-feed-url" placeholder="https://..."
+                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">分类</label>
+                        <input type="text" id="edit-feed-category" placeholder="Tech"
+                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">间隔(秒)</label>
+                        <input type="number" id="edit-feed-interval" placeholder="900"
+                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Cron 表达式 (可选)</label>
+                        <input type="text" id="edit-feed-cron" placeholder="*/15 * * * *"
+                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">源简介 (简短描述)</label>
+                        <input type="text" id="edit-feed-description" placeholder="专注于苹果新闻和应用推荐的中文博客..."
+                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="edit-feed-is-public"
+                            class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-2">
+                        <label for="edit-feed-is-public" class="text-xs font-semibold text-slate-600 cursor-pointer">公开池源</label>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100/50">
+                    <button onclick="closeEditFeed()"
+                        class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 text-sm transition">
+                        取消
+                    </button>
+                    <button onclick="saveEditFeed()"
+                        class="bg-slate-800 text-white px-5 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium shadow-md shadow-slate-800/20">
+                        保存修改
+                    </button>
+                </div>
             </div>
         </div>
     </div>
