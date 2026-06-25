@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -31,6 +31,15 @@ jobs:
           # 提取 package.json 中的 changelog 数组
           CHANGELOG=$(jq -c '.changelog' readflow-server/package.json)
           echo "CHANGELOG=$CHANGELOG" >> $GITHUB_OUTPUT
+          
+          # 提取并格式化为 markdown 格式用于 GitHub Release
+          echo "CHANGELOG_MD<<EOF" >> $GITHUB_OUTPUT
+          if jq -e '.changelog | type == "array"' readflow-server/package.json >/dev/null; then
+            jq -r '.changelog | map("- " + .) | join("\n")' readflow-server/package.json >> $GITHUB_OUTPUT
+          else
+            echo "No changelog provided." >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Set image metadata
         id: image
@@ -65,3 +74,18 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: ReadFlow Server v${{ steps.get_version.outputs.VERSION }}
+          body: |
+            ## Server Release v${{ steps.get_version.outputs.VERSION }}
+            
+            ### Changelog
+            ${{ steps.get_changelog.outputs.CHANGELOG_MD }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

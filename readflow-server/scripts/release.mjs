@@ -69,10 +69,26 @@ async function main() {
   nextVersion = newPkg.version;
   console.log(`Next version: ${nextVersion}`);
 
-  // 3. 更新 Changelog (从 git log 提取最近 20 条)
+  // 3. 更新 Changelog (获取两个版本之间的 commit 说明)
   console.log('📝 Updating changelog...');
-  const gitLog = capture('git', ['log', '-n', '20', '--pretty=format:%s', '--', '.']);
-  if (gitLog.ok) {
+  let gitLog;
+  const tagExists = capture('git', ['tag', '-l', currentVersion]).stdout.trim() !== '';
+  if (tagExists) {
+    console.log(`Getting commits between tag ${currentVersion} and HEAD...`);
+    gitLog = capture('git', ['log', `${currentVersion}..HEAD`, '--pretty=format:%s', '--', '.']);
+  } else {
+    const closestTagResult = capture('git', ['describe', '--tags', '--abbrev=0']);
+    if (closestTagResult.ok && closestTagResult.stdout.trim()) {
+      const closestTag = closestTagResult.stdout.trim();
+      console.log(`Tag ${currentVersion} not found in Git. Getting commits between tag ${closestTag} and HEAD...`);
+      gitLog = capture('git', ['log', `${closestTag}..HEAD`, '--pretty=format:%s', '--', '.']);
+    } else {
+      console.log('No git tags found. Getting last 20 commits...');
+      gitLog = capture('git', ['log', '-n', '20', '--pretty=format:%s', '--', '.']);
+    }
+  }
+
+  if (gitLog && gitLog.ok) {
     const lines = gitLog.stdout.split('\n').filter(Boolean);
     newPkg.changelog = lines;
     fs.writeFileSync(packageJsonPath, JSON.stringify(newPkg, null, 2) + '\n');

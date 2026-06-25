@@ -1,6 +1,6 @@
 {
   "name": "readflow-server",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "description": "ReadFlow Server: an Express/Prisma backend for RSS fetching, cloud sync, image proxying, admin operations, daily reports, and LLM gateway services.",
   "main": "dist/server.js",
   "scripts": {
@@ -46,26 +46,5 @@
     "typescript": "^5.3.3",
     "vitest": "^4.1.0"
   },
-  "changelog": [
-    "feat: optimize dongqiudi content parser and fetch comments",
-    "feat: add edit feed button and optimize subscription source management layout",
-    "chore: publish app release and product metadata",
-    "fix: keep RSS auto refresh scheduling alive",
-    "feat: implement AuthService to manage user authentication, session state, and cloud configuration syncing",
-    "feat: implement authentication service and backend storage/fetching utilities",
-    "fix: 优化日志系统配置以降低云端存储占用",
-    "docs: 更新README以反映架构演进和功能增强",
-    "chore: 更新版本号至3.0.10并更新变更日志",
-    "feat: implement HomeScreen with article list, auto-read tracking, and pagination support",
-    "feat: implement RSS server backend with sync, storage, and LLM gateway services",
-    "fix(首页): 修复后台恢复和事件导致的滚动位置重置问题",
-    "fix(HomeScreen): 修复应用后台恢复和标记已读事件导致的滚动位置重置问题",
-    "chore: 更新版本号至3.0.8并清理变更日志",
-    "chore: 删除已弃用的RSS获取服务测试文件",
-    "chore: 更新版本号至3.0.7并同步更新变更日志",
-    "fix(RssFetchService): 修复RSS刷新计时器因锁获取失败而停止的问题",
-    "chore: 更新版本号至3.0.6并同步更新变更日志",
-    "feat: 添加获取原始文章列表的每日报告接口",
-    "chore: 更新版本号至3.0.5并同步更新变更日志"
-  ]
+  "changelog": []
 }
