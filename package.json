@@ -1,6 +1,6 @@
 {
   "name": "readflow",
-  "version": "10.0.3",
+  "version": "10.0.4",
   "description": "ReadFlow mobile app: an Expo/React Native RSS reader for deep reading, cloud sync, AI summaries, translation, vocabulary review, and offline-first reading.",
   "main": "index.ts",
   "scripts": {

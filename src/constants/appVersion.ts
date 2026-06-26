@@ -2,11 +2,11 @@
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '10.0.3',
-  buildNumber: 100003,
+  version: '10.0.4',
+  buildNumber: 100004,
   updateTime: '2026-06-26',
   changelog: [
-    'ci: implement automated Android APK build and release pipeline via GitHub Actions',
+    'feat: implement admin dashboard, initialize Prisma schema, and add backend controllers for system management',
   ],
 };
 
