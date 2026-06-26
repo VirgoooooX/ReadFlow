@@ -962,10 +962,10 @@ export class RSSParserService {
       const collapsedComments = topComments.slice(3);
       
       const htmlParts: string[] = [];
-      htmlParts.push('<hr style="margin: 30px 0; border: none; border-top: 1px dashed var(--color-table-border);" />');
-      htmlParts.push('<div class="dongqiudi-comments" style="margin-top: 20px; font-family: -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: var(--color-text);">');
-      htmlParts.push('  <h3 style="font-size: 1.1em; font-weight: bold; margin-bottom: 15px; color: var(--color-text); border-left: 4px solid var(--color-link); padding-left: 8px;">💬 热门评论</h3>');
-      htmlParts.push('  <div style="display: flex; flex-direction: column; gap: 16px;">');
+      htmlParts.push('<hr style="margin: 24px 0; border: none; border-top: 1px dashed var(--color-table-border);" />');
+      htmlParts.push('<div class="dongqiudi-comments" style="margin-top: 16px; font-family: -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: var(--color-text);">');
+      htmlParts.push('  <h3 style="font-size: 1.05em; font-weight: bold; margin-bottom: 12px; color: var(--color-text); border-left: 4px solid var(--color-link); padding-left: 8px;">💬 热门评论</h3>');
+      htmlParts.push('  <div style="display: flex; flex-direction: column; gap: 12px;">');
       
       const renderComment = (comment: any) => {
         const userId = String(comment.user_id);
@@ -976,16 +976,16 @@ export class RSSParserService {
         const createdAt = comment.created_at || '';
         const text = (comment.content || '').replace(/\n/g, '<br />');
         
-        return `    <div style="border-bottom: 1px solid var(--color-table-border); padding-bottom: 12px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        return `    <div style="border-bottom: 1px solid var(--color-table-border); padding-bottom: 10px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <img src="${avatar}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />
-          <span style="font-weight: 600; font-size: 0.9em; color: var(--color-text);">${username}</span>
+          <img src="${avatar}" style="width: 24px !important; height: 24px !important; border-radius: 50% !important; object-fit: cover !important; display: block !important; margin: 0 !important;" />
+          <span style="font-weight: 600; font-size: 0.9em; color: var(--color-text); line-height: 24px; display: inline-block;">${username}</span>
         </div>
         <span style="font-size: 0.8em; color: var(--color-secondary); background-color: var(--color-code-bg); padding: 2px 6px; border-radius: 10px;">👍 ${upCount}</span>
       </div>
-      <div style="font-size: 0.9em; line-height: 1.5; color: var(--color-text); padding-left: 32px; word-break: break-word;">${text}</div>
-      <div style="font-size: 0.75em; color: var(--color-caption); padding-left: 32px; margin-top: 4px;">${createdAt}</div>
+      <div style="font-size: 0.9em; line-height: 1.4; color: var(--color-text); padding-left: 32px; word-break: break-word;">${text}</div>
+      <div style="font-size: 0.75em; color: var(--color-caption); padding-left: 32px; margin-top: 2px;">${createdAt}</div>
     </div>`;
       };
 
@@ -996,35 +996,16 @@ export class RSSParserService {
       
       // Render collapsed ones if any
       if (collapsedComments.length > 0) {
-        htmlParts.push(`    <div id="more-comments" style="display: none; flex-direction: column; gap: 16px;">`);
+        htmlParts.push(`    <div id="more-comments" style="display: none; flex-direction: column; gap: 12px;">`);
         for (const comment of collapsedComments) {
           htmlParts.push(renderComment(comment));
         }
         htmlParts.push(`    </div>`);
         
-        // Add toggle button and script
-        htmlParts.push(`    <button id="toggle-comments-btn" onclick="toggleMoreComments()" style="width: 100%; padding: 12px; margin-top: 10px; background: none; border: 1px solid var(--color-table-border); border-radius: 8px; font-size: 0.9em; color: var(--color-link); cursor: pointer; text-align: center; font-weight: 600; outline: none; -webkit-tap-highlight-color: transparent;">
+        // Add toggle button
+        htmlParts.push(`    <button id="toggle-comments-btn" data-count="${collapsedComments.length}" style="width: 100%; padding: 10px; margin-top: 8px; background: none; border: 1px solid var(--color-table-border); border-radius: 8px; font-size: 0.85em; color: var(--color-link); cursor: pointer; text-align: center; font-weight: 600; outline: none; -webkit-tap-highlight-color: transparent;">
       展开更多评论 (${collapsedComments.length}条)
-    </button>
-    
-    <script>
-      function toggleMoreComments() {
-        var moreDiv = document.getElementById('more-comments');
-        var btn = document.getElementById('toggle-comments-btn');
-        if (!moreDiv || !btn) return;
-        if (moreDiv.style.display === 'none') {
-          moreDiv.style.display = 'flex';
-          btn.innerText = '收起评论';
-        } else {
-          moreDiv.style.display = 'none';
-          btn.innerText = '展开更多评论 (${collapsedComments.length}条)';
-          var container = document.querySelector('.dongqiudi-comments');
-          if (container) {
-            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }
-      }
-    </script>`);
+    </button>`);
       }
       
       htmlParts.push('  </div>');

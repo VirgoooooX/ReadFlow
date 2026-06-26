@@ -1381,8 +1381,8 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
       }
     
       document.addEventListener('click', function(e) {
-        // 【修改】添加防误触检查：如果是拖拽操作，或者是链接点击，直接返回
-        if (isDragging || e.target.closest('a')) return;
+        // 【修改】添加防误触检查：如果是拖拽操作、链接点击，或者在评论区内点击，直接返回（防止查词/翻译冲突）
+        if (isDragging || e.target.closest('a') || e.target.closest('.dongqiudi-comments')) return;
         const result = getContextAtPoint(e.clientX, e.clientY);
         if (!result) return;
 
@@ -1966,6 +1966,31 @@ export const generateArticleHtml = (options: HtmlTemplateOptions): string => {
                 type: 'imageClick',
                 url: getBestImageUrl(e.target) || e.target.src
               }));
+              return;
+            }
+
+            // 【新增】处理懂球帝评论的展开/收起按钮点击事件
+            const toggleBtn = e.target.closest('#toggle-comments-btn');
+            if (toggleBtn) {
+              e.stopPropagation();
+              e.preventDefault();
+              
+              const moreDiv = document.getElementById('more-comments');
+              if (moreDiv) {
+                const isCollapsed = moreDiv.style.display === 'none' || !moreDiv.style.display;
+                if (isCollapsed) {
+                  moreDiv.style.display = 'flex';
+                  toggleBtn.innerText = '收起评论';
+                } else {
+                  moreDiv.style.display = 'none';
+                  const count = toggleBtn.getAttribute('data-count') || '0';
+                  toggleBtn.innerText = '展开更多评论 (' + count + '条)';
+                  const container = document.querySelector('.dongqiudi-comments');
+                  if (container) {
+                    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }
+              }
             }
           });
         }
