@@ -54,31 +54,63 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Get version from tag
+      - name: Get version from tag and detect combined release
         id: get_version
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG#app-}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          APP_VERSION=${TAG#app-}
+          APP_VERSION=${APP_VERSION#v}
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
+          
+          # 检测当前 commit 上的所有 tags，寻找符合 Server 格式的 tag
+          SERVER_TAG=$(git tag --points-at HEAD | grep -E '^(v)?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+          if [ -n "$SERVER_TAG" ]; then
+            SERVER_VERSION=${SERVER_TAG#v}
+            echo "TAG_NAME=$SERVER_TAG" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=ReadFlow App v$APP_VERSION & Server v$SERVER_VERSION" >> $GITHUB_OUTPUT
+            echo "IS_COMBINED=true" >> $GITHUB_OUTPUT
+          else
+            echo "TAG_NAME=$TAG" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=ReadFlow App v$APP_VERSION" >> $GITHUB_OUTPUT
+            echo "IS_COMBINED=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build APK
         run: |
-          node scripts/build-apk.js --version ${{ steps.get_version.outputs.VERSION }} --auto-generate --fast
+          node scripts/build-apk.js --version ${{ steps.get_version.outputs.APP_VERSION }} --auto-generate --fast
         env:
           CI: true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ReadFlow-APK-${{ steps.get_version.outputs.VERSION }}
+          name: ReadFlow-APK-${{ steps.get_version.outputs.APP_VERSION }}
           path: android/app/build/outputs/apk/release/*.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ steps.get_version.outputs.TAG_NAME }}
+          name: ${{ steps.get_version.outputs.RELEASE_NAME }}
           files: android/app/build/outputs/apk/release/*.apk
           generate_release_notes: true
+          body: |
+            🎉 感谢使用 ReadFlow！本次版本发布包含了多项性能优化和新功能。
+
+            ### 📦 安装包下载指南 (Download Guide)
+
+            为了获得最佳性能，建议根据你手机的 CPU 架构选择对应的精简安装包下载。如果不确定，选择 **universal** 通用包即可。
+
+            | 安装包名称 (Artifact) | 适用架构 (Architecture) | 适用设备说明 (Device Compatibility) |
+            | --- | --- | --- |
+            | `ReadFlow-${{ steps.get_version.outputs.VERSION }}-arm64-v8a.apk` | `arm64-v8a` | **推荐**。现代主流安卓手机（近 8 年内的大部分机型） |
+            | `ReadFlow-${{ steps.get_version.outputs.VERSION }}-armeabi-v7a.apk` | `armeabi-v7a` | 老旧或低阶安卓设备（早期 32 位手机） |
+            | `ReadFlow-${{ steps.get_version.outputs.VERSION }}-universal.apk` | `universal` | **通用包**。兼容所有设备，但文件体积较胖。 |
+            | `ReadFlow-${{ steps.get_version.outputs.VERSION }}-x86_64.apk` | `x86_64` | 64位安卓模拟器（如雷电、蓝叠电脑模拟器） |
+            | `ReadFlow-${{ steps.get_version.outputs.VERSION }}-x86.apk` | `x86` | 32位安卓模拟器 |
+
+            ---
           draft: false
           prerelease: false
         env:

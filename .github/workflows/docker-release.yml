@@ -21,9 +21,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get tag version
+      - name: Get tag version and detect combined release
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          SERVER_VERSION=${TAG#v}
+          echo "VERSION=$TAG" >> $GITHUB_OUTPUT
+          
+          # 检测当前 commit 上的所有 tags，寻找符合 App 格式的 tag
+          APP_TAG=$(git tag --points-at HEAD | grep -E '^app-' | head -n 1)
+          if [ -n "$APP_TAG" ]; then
+            APP_VERSION=${APP_TAG#app-}
+            APP_VERSION=${APP_VERSION#v}
+            echo "RELEASE_NAME=ReadFlow App v$APP_VERSION & Server v$SERVER_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "RELEASE_NAME=ReadFlow Server v$SERVER_VERSION" >> $GITHUB_OUTPUT
+          fi
 
       - name: Get changelog
         id: get_changelog
@@ -79,11 +92,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: ReadFlow Server v${{ steps.get_version.outputs.VERSION }}
+          name: ${{ steps.get_version.outputs.RELEASE_NAME }}
           body: |
-            ## Server Release v${{ steps.get_version.outputs.VERSION }}
+            ## Release ${{ steps.get_version.outputs.RELEASE_NAME }}
             
-            ### Changelog
+            ### Changelog (Server)
             ${{ steps.get_changelog.outputs.CHANGELOG_MD }}
           draft: false
           prerelease: false

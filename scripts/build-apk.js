@@ -539,19 +539,43 @@ export const APP_INFO = {
     env: commonEnv
   });
 
-  // 重命名 APK
-  const apkName = `ReadFlow-${version}${targetArch !== 'all' ? '-' + targetArch : ''}.apk`;
-  const originalApkPath = path.join(projectRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
-  const newApkPath = path.join(projectRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release', apkName);
+  // 重命名 APK (支持单包和分包模式)
+  console.log('\n📦 正在整理与重命名编译出的 APK...');
+  const releaseDir = path.join(projectRoot, 'android', 'app', 'build', 'outputs', 'apk', 'release');
+  let renamedApks = [];
+  
+  if (fs.existsSync(releaseDir)) {
+    const files = fs.readdirSync(releaseDir);
+    files.forEach(file => {
+      if (file.endsWith('.apk') && (file.startsWith('app-') || file.startsWith('ReadFlow-'))) {
+        if (file.startsWith('ReadFlow-')) {
+          const stats = fs.statSync(path.join(releaseDir, file));
+          renamedApks.push({ name: file, path: path.join(releaseDir, file), size: stats.size });
+          return;
+        }
 
-  if (fs.existsSync(originalApkPath)) {
-    fs.renameSync(originalApkPath, newApkPath);
-    console.log(`\n📦 APK 已重命名: ${apkName}`);
-  }
+        let newName = '';
+        if (file === 'app-release.apk') {
+          newName = `ReadFlow-${version}.apk`;
+        } else if (file.startsWith('app-') && file.endsWith('-release.apk')) {
+          const arch = file.substring(4, file.length - 12);
+          newName = `ReadFlow-${version}-${arch}.apk`;
+        }
 
-  if (fs.existsSync(newApkPath)) {
-    const stats = fs.statSync(newApkPath);
-    console.log(`📊 APK 大小: ${formatFileSize(stats.size)}`);
+        if (newName) {
+          const oldPath = path.join(releaseDir, file);
+          const newPath = path.join(releaseDir, newName);
+          try {
+            fs.renameSync(oldPath, newPath);
+            const stats = fs.statSync(newPath);
+            console.log(`  - 重命名: ${file} -> ${newName} (${formatFileSize(stats.size)})`);
+            renamedApks.push({ name: newName, path: newPath, size: stats.size });
+          } catch (e) {
+            console.error(`  - 重命名 ${file} 失败:`, e.message);
+          }
+        }
+      }
+    });
   }
 
   const buildDuration = Date.now() - buildStartTime;
@@ -559,15 +583,20 @@ export const APP_INFO = {
   console.log('\n' + '='.repeat(50));
   console.log('✨ APK 构建成功！');
   console.log('='.repeat(50));
-  console.log(`📍 位置: ${newApkPath}`);
+  if (renamedApks.length > 0) {
+    renamedApks.forEach(apk => {
+      console.log(`📍 产物: ${apk.name} (${formatFileSize(apk.size)})`);
+    });
+  } else {
+    console.log('⚠️  未找到生成的 APK 产物文件！');
+  }
   console.log(`⏱️  构建耗时: ${formatDuration(buildDuration)}`);
   console.log('='.repeat(50) + '\n');
 
   if (openAfterBuild) {
-    const apkDir = path.dirname(newApkPath);
     try {
       const explorer = isWindows ? 'explorer' : 'open';
-      execSync(`${explorer} "${apkDir}"`, { stdio: 'ignore' });
+      execSync(`${explorer} "${releaseDir}"`, { stdio: 'ignore' });
       console.log('📂 已打开 APK 所在目录');
     } catch (e) { }
   }
