@@ -31,14 +31,49 @@ function _updateSelectAllCheckbox() {
 
 function _rebuildCategoryFilterOptions() {
     const el = document.getElementById('feeds-category-filter');
-    if (!el) return;
-    const current = String(el.value || '');
-    const categories = Array.from(new Set((feedsState.all || []).map(f => String(f.category || 'General'))))
+    const sideList = document.getElementById('feeds-categories-list');
+    if (!feedsState.all) feedsState.all = [];
+
+    const categories = Array.from(new Set(feedsState.all.map(f => String(f.category || 'General'))))
         .map(v => v.trim())
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, 'zh-CN'));
-    el.innerHTML = `<option value="">全部分类</option>` + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    el.value = current;
+
+    if (el) {
+        const current = String(el.value || '');
+        el.innerHTML = `<option value="">全部分类</option>` + categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        el.value = current;
+    }
+
+    if (sideList) {
+        const current = el ? el.value : '';
+        const countMap = {};
+        feedsState.all.forEach(f => {
+            const cat = String(f.category || 'General');
+            countMap[cat] = (countMap[cat] || 0) + 1;
+        });
+        
+        const totalCount = feedsState.all.length;
+        
+        let html = `
+            <button onclick="setCategoryFilter('')" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold rounded-lg transition ${current === '' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+                <span>全部订阅源</span>
+                <span class="bg-slate-950 text-slate-400 px-1.5 py-0.5 rounded text-[10px]">${totalCount}</span>
+            </button>
+        `;
+        
+        categories.forEach(c => {
+            const count = countMap[c] || 0;
+            html += `
+                <button onclick="setCategoryFilter(decodeURIComponent('${encodeURIComponent(c)}'))" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold rounded-lg transition ${current === c ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}">
+                    <span class="truncate pr-2">${escapeHtml(c)}</span>
+                    <span class="bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded text-[10px]">${count}</span>
+                </button>
+            `;
+        });
+        
+        sideList.innerHTML = html;
+    }
 }
 
 function _renderFeeds() {
@@ -49,13 +84,13 @@ function _renderFeeds() {
     if (!feeds || feeds.length === 0) {
         tbody.innerHTML = `
         <tr>
-            <td colspan="100%" class="px-6 py-16 text-center bg-slate-50/30">
+            <td colspan="100%" class="px-6 py-16 text-center bg-slate-900/10">
                 <div class="flex flex-col items-center justify-center">
-                    <div class="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-slate-400 mb-4 shadow-sm border border-slate-200">
-                        <i class="fa-solid fa-satellite-dish text-2xl"></i>
+                    <div class="w-12 h-12 rounded-2xl bg-slate-950/60 flex items-center justify-center text-slate-500 mb-4 border border-white/5">
+                        <i class="fa-solid fa-satellite-dish text-xl"></i>
                     </div>
-                    <p class="text-sm font-bold text-slate-600">暂无内容</p>
-                    <p class="text-xs mt-1 text-slate-400">还没有添加任何订阅源</p>
+                    <p class="text-sm font-bold text-slate-400">暂无内容</p>
+                    <p class="text-xs mt-1 text-slate-500">此分类下没有订阅源</p>
                 </div>
             </td>
         </tr>
@@ -67,36 +102,36 @@ function _renderFeeds() {
 
     const selectedIds = feedsState.selected || new Set();
     tbody.innerHTML = feeds.map(f => {
-        const statusColor = f.lastRefreshStatus === 'ok' ? 'text-emerald-700' : (f.lastRefreshStatus === 'error' ? 'text-red-700' : 'text-slate-600');
-        const statusBg = f.lastRefreshStatus === 'ok' ? 'bg-emerald-100' : (f.lastRefreshStatus === 'error' ? 'bg-red-100' : 'bg-slate-100');
-        const statusText = f.lastRefreshStatus === 'ok' ? '正常' : (f.lastRefreshStatus === 'error' ? '错误' : '未知');
+        const isOk = f.lastRefreshStatus === 'ok';
+        const isError = f.lastRefreshStatus === 'error';
+        const statusColor = isOk ? 'text-emerald-500' : (isError ? 'text-red-500' : 'text-slate-500');
+        const statusBg = isOk ? 'bg-emerald-500/10' : (isError ? 'bg-red-500/10' : 'bg-slate-500/10');
+        const statusText = isOk ? '正常' : (isError ? '错误' : '待检查');
         const id = String(f.id);
         const checked = selectedIds.has(id) ? 'checked' : '';
         const category = String(f.category || 'General');
         const categoryEncoded = encodeURIComponent(category);
-        const desc = String(f.description || '');
-        const descEsc = escapeHtml(desc);
-        const descTitleEsc = escapeHtml(desc ? `简介: ${desc}\n(点击可修改)` : '点击可编辑简介');
+        const lastCheck = f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-';
+        
         return `
-    <tr class="hover:bg-white/60 transition group border-b border-slate-200/60 last:border-0">
+    <tr class="hover:bg-white/5 transition group border-b border-white/5 last:border-0">
         <td class="px-4 py-4 align-middle">
-            <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            <input type="checkbox" class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 ${checked} onchange="toggleFeedSelect('${id}', this.checked)">
         </td>
         <td data-label="源名称" class="px-4 py-4 align-middle">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-600 text-sm border border-slate-200 shrink-0">
+                <div class="w-8 h-8 rounded bg-slate-950 flex items-center justify-center text-slate-400 text-xs border border-white/5 shrink-0">
                     <i class="fa-solid fa-rss"></i>
                 </div>
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                        <div class="font-bold text-slate-800 truncate min-w-0 flex-1 cursor-pointer"
-                             onclick="promptUpdateDescription('${id}', '${descEsc}')"
-                             title="${descTitleEsc}">
+                        <div class="font-bold text-white truncate min-w-0 flex-1 cursor-pointer hover:text-indigo-400"
+                             onclick="openFeedDrawer('${id}')">
                              ${escapeHtml(f.name || 'Unnamed')}
                         </div>
                         <button onclick="setCategoryFilter(decodeURIComponent('${categoryEncoded}'))"
-                            class="text-[10px] text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded hover:bg-slate-200 transition whitespace-nowrap shrink-0">
+                            class="text-[9px] text-slate-400 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-white/5 hover:bg-white/5 transition whitespace-nowrap shrink-0">
                             ${escapeHtml(category)}
                         </button>
                     </div>
@@ -106,70 +141,26 @@ function _renderFeeds() {
         <td data-label="源地址" class="px-4 py-4 align-middle">
             <div class="flex items-center gap-2 min-w-0">
                 <a href="${escapeHtml(f.url)}" target="_blank" rel="noreferrer noopener"
-                    class="text-blue-600 hover:text-blue-800 hover:underline text-xs font-mono truncate min-w-0 flex-1"
+                    class="text-slate-400 hover:text-indigo-400 hover:underline text-xs font-mono truncate min-w-0 flex-1"
                     title="${escapeHtml(f.url)}">
                     ${escapeHtml(f.url)}
                 </a>
                 <button onclick="toggleFeedPublic('${id}', ${!f.isPublic})"
-                    class="px-2 py-0.5 text-[10px] font-bold rounded-full border ${f.isPublic ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-400'} hover:bg-slate-100 transition whitespace-nowrap shrink-0"
+                    class="px-2 py-0.5 text-[9px] font-bold rounded border ${f.isPublic ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-slate-800 bg-slate-950 text-slate-500'} hover:bg-white/5 transition whitespace-nowrap shrink-0"
                     title="${f.isPublic ? '点击设为私有' : '点击设为公开'}">
                     ${f.isPublic ? '公开池' : '私有'}
                 </button>
             </div>
         </td>
-        <td data-label="文章数" class="px-4 py-4 text-center align-middle">
-            <button onclick="viewFeedArticles('${id}')" class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition" title="查看文章列表">
-                ${f.articleCount ?? 0}
-            </button>
-        </td>
-        <td data-label="订阅用户" class="px-4 py-4 text-center align-middle">
-            <button onclick="viewFeedSubscribers('${id}')" class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition" title="查看订阅用户">
-                ${f.subscriberCount ?? 0}
-            </button>
-        </td>
-        <td data-label="间隔(秒)" class="px-4 py-4 text-center align-middle">
-            <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-xs border border-slate-200/60">
-                ${f.refreshIntervalSeconds ? `${f.refreshIntervalSeconds}s` : '<span class="text-slate-400">默认</span>'}
-            </span>
-        </td>
-        <td data-label="CRON" class="px-4 py-4 text-center align-middle">
-            ${f.refreshCron ? `
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-xs font-medium border border-indigo-100/60">
-                ${escapeHtml(f.refreshCron)}
-            </span>
-            ` : '<span class="text-slate-400 font-mono text-xs">-</span>'}
-        </td>
-        <td data-label="最后更新" class="px-4 py-4 text-xs align-middle">
-            <div class="text-slate-700 font-medium">${f.lastRefreshAt ? new Date(f.lastRefreshAt).toLocaleString() : '-'}</div>
-            <div class="text-slate-500 text-[10px] mt-0.5 scale-90 origin-left">Last check</div>
-        </td>
-        <td data-label="状态" class="px-4 py-4 text-center align-middle">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusBg} ${statusColor} border border-black/5 whitespace-nowrap min-w-[52px] justify-center">
-                <span class="w-1.5 h-1.5 rounded-full bg-current mr-1.5 flex-shrink-0"></span>
+        <td data-label="状态" class="px-4 py-4 text-center align-middle whitespace-nowrap">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusBg} ${statusColor} border border-white/5 min-w-[56px] justify-center" title="最后检查: ${lastCheck}">
+                <span class="w-1.5 h-1.5 rounded-full bg-current mr-1.5 flex-shrink-0 animate-pulse"></span>
                 ${statusText}
             </span>
-            ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-500 ml-1 cursor-help" title="${escapeHtml(f.lastRefreshError)}"></i>` : ''}
+            ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-400 ml-1 cursor-help text-xs" title="${escapeHtml(f.lastRefreshError)}"></i>` : ''}
         </td>
-        <td data-label="操作" class="px-4 py-4 text-right align-middle">
+        <td data-label="操作" class="px-4 py-4 text-right align-middle whitespace-nowrap">
             <div class="flex justify-end space-x-1">
-                <button onclick="refreshFeed('${id}')" class="text-slate-600 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition" title="立即刷新">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
-                <button onclick="openEditFeedDialog('${id}')" class="text-slate-600 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 transition" title="编辑订阅源">
-                    <i class="fa-solid fa-pen"></i>
-                </button>
-                <button onclick="viewFeedArticles('${id}')" class="text-slate-600 hover:text-purple-600 p-2 rounded-lg hover:bg-purple-50 transition" title="查看文章">
-                    <i class="fa-solid fa-list-ul"></i>
-                </button>
-                <button onclick="clearFeedData('${id}')" class="text-slate-600 hover:text-orange-600 p-2 rounded-lg hover:bg-orange-50 transition" title="清空数据">
-                    <i class="fa-solid fa-eraser"></i>
-                </button>
-                <button onclick="deleteFeed('${id}')" class="text-slate-600 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition" title="删除订阅源">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </div>
-        </td>
-    </tr>
 `}).join('');
 
     _setBulkBarVisible();
@@ -842,32 +833,152 @@ window.exportFeeds = async function (format) {
     }
 }
 
-// Articles Modal
-window.viewFeedArticles = async function (id) {
-    const feedsRes = await fetch(`${API_BASE}/feeds`);
-    const feeds = await feedsRes.json();
-    const feed = (feeds || []).find(f => f.id === id);
+// Drawer Slide-out Workspace Controls
+window.openFeedDrawer = async function (id, defaultTab = 'config') {
+    const feed = (feedsState.all || []).find(f => String(f.id) === String(id));
+    if (!feed) return showToast('未找到该订阅源', 'error');
 
-    articlesState.feedId = id;
-    articlesState.feedName = feed?.name || 'Unknown Feed';
-    articlesState.feedUrl = feed?.url || '';
-    articlesState.total = 0;
-    articlesState.offset = 0;
-    articlesState.loading = false;
+    document.getElementById('drawer-feed-id').value = id;
+    document.getElementById('drawer-title').textContent = feed.name || '订阅源详情';
+    document.getElementById('drawer-subtitle').textContent = feed.url || '';
+    
+    document.getElementById('drawer-feed-name').value = feed.name || '';
+    document.getElementById('drawer-feed-url').value = feed.url || '';
+    document.getElementById('drawer-feed-category').value = feed.category || '';
+    document.getElementById('drawer-feed-interval').value = feed.refreshIntervalSeconds ?? '';
+    document.getElementById('drawer-feed-cron').value = feed.refreshCron ?? '';
+    document.getElementById('drawer-feed-description').value = feed.description || '';
+    document.getElementById('drawer-feed-is-public').checked = feed.isPublic === true;
 
-    document.getElementById('articles-title').textContent = articlesState.feedName;
-    document.getElementById('articles-subtitle').textContent = articlesState.feedUrl;
-    document.getElementById('articles-list').innerHTML = '';
-    document.getElementById('articles-load-more').disabled = false;
-    document.getElementById('articles-empty').classList.add('hidden');
-    document.getElementById('articles-count-badge').textContent = '';
+    // Switch tab
+    switchDrawerTab(defaultTab);
 
-    document.getElementById('articles-overlay').classList.remove('hidden');
-    await loadMoreArticles(true);
-}
+    // Slide open drawer
+    document.getElementById('detail-drawer').classList.add('open');
+};
 
-window.closeArticles = () => document.getElementById('articles-overlay').classList.add('hidden');
-window.onArticlesOverlayClick = (ev) => { if (ev.target.id === 'articles-overlay') closeArticles(); };
+window.closeDrawer = function () {
+    document.getElementById('detail-drawer').classList.remove('open');
+};
+
+window.switchDrawerTab = async function (tabName) {
+    const configBtn = document.getElementById('drawer-tab-config');
+    const articlesBtn = document.getElementById('drawer-tab-articles');
+    const configContent = document.getElementById('drawer-content-config');
+    const articlesContent = document.getElementById('drawer-content-articles');
+
+    if (tabName === 'config') {
+        configBtn.className = 'flex-1 py-3 text-center text-xs font-bold border-b-2 border-indigo-500 text-indigo-400 transition';
+        articlesBtn.className = 'flex-1 py-3 text-center text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-300 transition';
+        configContent.classList.remove('hidden');
+        articlesContent.classList.add('hidden');
+    } else {
+        configBtn.className = 'flex-1 py-3 text-center text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-300 transition';
+        articlesBtn.className = 'flex-1 py-3 text-center text-xs font-bold border-b-2 border-indigo-500 text-indigo-400 transition';
+        configContent.classList.add('hidden');
+        articlesContent.classList.remove('hidden');
+
+        // Load articles if requested
+        const id = document.getElementById('drawer-feed-id').value;
+        if (id) {
+            articlesState.feedId = id;
+            articlesState.feedName = document.getElementById('drawer-feed-name').value;
+            articlesState.feedUrl = document.getElementById('drawer-feed-url').value;
+            articlesState.total = 0;
+            articlesState.offset = 0;
+            articlesState.loading = false;
+            document.getElementById('drawer-articles-list').innerHTML = '';
+            document.getElementById('drawer-articles-load-more').disabled = false;
+            document.getElementById('drawer-articles-empty').classList.add('hidden');
+
+            await drawerLoadMoreArticles(true);
+        }
+    }
+};
+
+window.saveDrawerFeed = async function () {
+    const id = document.getElementById('drawer-feed-id').value;
+    const name = document.getElementById('drawer-feed-name').value.trim();
+    const url = document.getElementById('drawer-feed-url').value.trim();
+    const category = document.getElementById('drawer-feed-category').value.trim();
+    const intervalRaw = document.getElementById('drawer-feed-interval').value.trim();
+    const refreshIntervalSeconds = intervalRaw === '' ? null : parseInt(intervalRaw, 10);
+    const refreshCron = document.getElementById('drawer-feed-cron').value.trim() || null;
+    const description = document.getElementById('drawer-feed-description').value.trim();
+    const isPublic = document.getElementById('drawer-feed-is-public').checked;
+
+    if (!name || !url) return showToast('请填写名称和地址', 'error');
+    if (refreshCron && !isLikelyValidCronExpression(refreshCron)) {
+        return showToast('Cron 表达式格式不正确（需5或6段，用空格分隔）', 'error');
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/feeds/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, url, category, refreshIntervalSeconds, refreshCron, description, isPublic })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return showToast(err.error || '保存失败', 'error');
+        }
+
+        showToast('订阅源修改已保存');
+        loadFeeds();
+    } catch (e) {
+        console.error(e);
+        showToast('保存时网络请求失败', 'error');
+    }
+};
+
+window.drawerRefreshFeed = async function () {
+    const id = document.getElementById('drawer-feed-id').value;
+    if (!id) return;
+    showToast('已触发后台刷新...', 'info');
+    await fetch(`${API_BASE}/feeds/${id}/refresh`, { method: 'POST' });
+    setTimeout(loadFeeds, 1000);
+};
+
+window.drawerClearFeedData = async function () {
+    const id = document.getElementById('drawer-feed-id').value;
+    if (!id) return;
+    if (!confirm('确定清空该源的所有文章吗？')) return;
+    const res = await fetch(`${API_BASE}/feeds/${id}/data/clear`, { method: 'POST' });
+    if (res.ok) {
+        showToast('数据已清空');
+        if (document.getElementById('drawer-content-articles').classList.contains('hidden') === false) {
+            switchDrawerTab('articles');
+        }
+    } else {
+        const err = await res.json();
+        showToast(err.error || '清理失败', 'error');
+    }
+};
+
+window.drawerDeleteFeed = async function () {
+    const id = document.getElementById('drawer-feed-id').value;
+    if (!id) return;
+    if (!confirm('删除该订阅源前需要先清空该源的文章数据。\n\n是否先清空数据并继续删除？')) return;
+    
+    showToast('正在删除...', 'info');
+    const clearRes = await fetch(`${API_BASE}/feeds/${id}/data/clear`, { method: 'POST' });
+    if (!clearRes.ok) {
+        const err = await clearRes.json();
+        showToast(err.error || '清理失败', 'error');
+        return;
+    }
+    
+    const res = await fetch(`${API_BASE}/feeds/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+        closeDrawer();
+        loadFeeds();
+        showToast('订阅源已成功删除');
+    } else {
+        const err = await res.json();
+        showToast(err.error || '删除失败', 'error');
+    }
+};
 
 function _formatRelativeTime(dateStr) {
     if (!dateStr) return '';
@@ -881,10 +992,17 @@ function _formatRelativeTime(dateStr) {
     return date.toLocaleDateString();
 }
 
-window.loadMoreArticles = async function (reset = false) {
+window.toggleArticlePreview = function (elementId) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.classList.toggle('hidden');
+    }
+};
+
+window.drawerLoadMoreArticles = async function (reset = false) {
     if (!articlesState.feedId || articlesState.loading) return;
     articlesState.loading = true;
-    const btn = document.getElementById('articles-load-more');
+    const btn = document.getElementById('drawer-articles-load-more');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>加载中...';
 
@@ -893,53 +1011,66 @@ window.loadMoreArticles = async function (reset = false) {
         const data = await res.json();
         const items = data.articles || [];
 
-        if (reset) document.getElementById('articles-list').innerHTML = '';
+        if (reset) document.getElementById('drawer-articles-list').innerHTML = '';
 
-        const container = document.getElementById('articles-list');
+        const container = document.getElementById('drawer-articles-list');
 
         if (reset && items.length === 0) {
-            document.getElementById('articles-empty').classList.remove('hidden');
+            document.getElementById('drawer-articles-empty').classList.remove('hidden');
             btn.disabled = true;
             btn.textContent = '暂无文章';
             articlesState.loading = false;
             return;
         }
-        document.getElementById('articles-empty').classList.add('hidden');
+        document.getElementById('drawer-articles-empty').classList.add('hidden');
 
         const html = items.map((a, idx) => {
             const timeStr = a.publishedAt ? new Date(a.publishedAt).toLocaleString() : '';
             const relativeTime = _formatRelativeTime(a.publishedAt);
             const globalIdx = articlesState.offset + idx + 1;
+            const contentId = `art-content-${a.id}`;
+            const summary = a.summary || '';
+            const content = a.content || '';
 
             return `
-            <div class="bg-white rounded-xl border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all duration-200 group">
-                <a href="${a.url}" target="_blank" rel="noreferrer noopener" class="flex items-stretch p-4 no-underline">
-                    <!-- Left: Text Content -->
-                    <div class="flex-1 min-w-0 pr-4">
-                        <div class="flex items-center space-x-2 mb-2">
-                            <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">#${globalIdx}</span>
-                            ${relativeTime ? `<span class="text-[11px] text-slate-400 font-medium">${relativeTime}</span>` : ''}
+            <div class="bg-slate-950/40 rounded-xl border border-white/5 hover:border-indigo-500/30 transition-all duration-200 p-4 space-y-3 cursor-pointer"
+                 onclick="toggleArticlePreview('${contentId}')">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center space-x-2 mb-1.5">
+                            <span class="text-[9px] font-bold text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded">#${globalIdx}</span>
+                            ${relativeTime ? `<span class="text-[10px] text-slate-400 font-medium">${relativeTime}</span>` : ''}
                         </div>
-                        <h4 class="text-sm font-bold text-slate-800 leading-snug line-clamp-2 group-hover:text-blue-700 transition-colors mb-1.5">${escapeHtml(a.title)}</h4>
-                        <div class="flex items-center space-x-3 text-[11px] text-slate-400">
-                            ${timeStr ? `<span><i class="fa-regular fa-clock mr-1"></i>${timeStr}</span>` : ''}
-                            <span class="truncate max-w-[200px] font-mono">${new URL(a.url).hostname}</span>
-                        </div>
+                        <h4 class="text-xs font-bold text-white leading-snug line-clamp-2 hover:text-indigo-400 transition-colors">${escapeHtml(a.title)}</h4>
                     </div>
-                    <!-- Right: Cover Image -->
                     ${a.imageUrl ? `
-                    <div class="flex-shrink-0 w-28 h-20 rounded-lg bg-slate-100 bg-cover bg-center border border-slate-200 overflow-hidden"
+                    <div class="flex-shrink-0 w-16 h-12 rounded-lg bg-slate-900 bg-cover bg-center border border-white/5"
                          style="background-image:url('${a.imageUrl}')">
                     </div>` : ''}
-                </a>
+                </div>
+                <div class="flex items-center justify-between text-[9px] text-slate-500 pt-1">
+                    <span><i class="fa-regular fa-clock mr-1"></i>${timeStr}</span>
+                    <span class="truncate max-w-[120px] font-mono">${escapeHtml(new URL(a.url).hostname)}</span>
+                </div>
+                
+                <!-- Expandable preview container -->
+                <div id="${contentId}" class="hidden border-t border-white/5 pt-3 mt-3 text-xs text-slate-300 space-y-3 cursor-auto" onclick="event.stopPropagation()">
+                    ${summary ? `<div class="bg-slate-950/60 p-3 rounded-lg border border-white/5 italic text-slate-400 leading-relaxed">${escapeHtml(summary)}</div>` : ''}
+                    <div class="prose prose-sm prose-invert max-h-96 overflow-y-auto custom-scrollbar leading-relaxed font-sans text-slate-300">
+                        ${content || '暂无正文内容'}
+                    </div>
+                    <div class="pt-2 flex justify-end">
+                        <a href="${a.url}" target="_blank" rel="noreferrer noopener" class="text-[10px] text-indigo-400 hover:underline flex items-center font-bold">
+                            查看原始网页 <i class="fa-solid fa-up-right-from-square ml-1"></i>
+                        </a>
+                    </div>
+                </div>
             </div>`;
         }).join('');
         container.insertAdjacentHTML('beforeend', html);
 
         articlesState.total = data.total ?? 0;
         articlesState.offset += items.length;
-        document.getElementById('articles-progress').textContent = `${articlesState.offset} / ${articlesState.total} 已加载`;
-        document.getElementById('articles-count-badge').textContent = `${articlesState.total} 篇`;
 
         if ((articlesState.total > 0 && articlesState.offset >= articlesState.total) || items.length === 0) {
             btn.disabled = true;
@@ -955,5 +1086,11 @@ window.loadMoreArticles = async function (reset = false) {
     } finally {
         articlesState.loading = false;
     }
-}
+};
+
+// compatibility bridges for other files
+window.viewFeedArticles = function (id) {
+    openFeedDrawer(id, 'articles');
+};
+
 

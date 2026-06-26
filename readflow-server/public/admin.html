@@ -56,7 +56,7 @@
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231e293b'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='system-ui,sans-serif' font-weight='800' font-size='16' fill='white'%3ERF%3C/text%3E%3C/svg%3E">
 </head>
 
-<body class="bg-slate-100 text-slate-900 h-screen flex overflow-hidden">
+<body class="h-screen flex overflow-hidden">
 
     <a href="#content-area"
         class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:text-slate-900 focus:shadow">
@@ -138,52 +138,58 @@
 
         <!-- Header -->
         <header
-            class="h-16 glass border-b border-white/50 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+            class="h-16 glass border-b border-white/5 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
             <div class="flex items-center">
-                <button id="sidebar-toggle" class="md:hidden text-slate-600 hover:text-slate-700 mr-4"
+                <button id="sidebar-toggle" class="md:hidden text-slate-400 hover:text-white mr-4"
                     aria-label="切换侧边栏" aria-expanded="false">
                     <i class="fa-solid fa-bars text-xl"></i>
                 </button>
-                <h1 id="page-title" class="text-xl font-bold text-slate-800 tracking-tight">仪表盘</h1>
-                <div class="hidden md:flex items-center ml-4 text-sm text-slate-400">
+                <h1 id="page-title" class="text-xl font-bold text-white tracking-tight">仪表盘</h1>
+                <div class="hidden md:flex items-center ml-4 text-sm text-slate-500">
                     <span class="mx-2">/</span>
-                    <span id="page-breadcrumb" class="font-medium text-slate-600">Overview</span>
+                    <span id="page-breadcrumb" class="font-medium text-slate-400">Overview</span>
                 </div>
             </div>
 
             <div class="flex items-center space-x-4 relative">
                 <div
-                    class="hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-50/80 backdrop-blur-sm text-emerald-600 border border-emerald-100 text-xs font-medium shadow-sm">
+                    class="hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-500/10 backdrop-blur-sm text-emerald-400 border border-emerald-500/20 text-xs font-medium shadow-sm">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
                     <span id="header-status">系统正常</span>
                 </div>
 
-                <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-white/60 backdrop-blur-sm text-slate-700 border border-white/80 text-xs font-medium shadow-sm"
+                <div class="hidden md:flex items-center px-3 py-1 rounded-full bg-white/5 backdrop-blur-sm text-slate-300 border border-white/10 text-xs font-medium shadow-sm"
                     id="server-meta-badge">
-                    <i class="fa-solid fa-server mr-2 text-slate-600"></i>
+                    <i class="fa-solid fa-server mr-2 text-slate-400"></i>
                     <span id="server-meta-text">Server</span>
                     <button id="server-changelog-toggle"
-                        class="ml-2 px-2 py-0.5 rounded-full bg-slate-100/80 hover:bg-slate-200/80 text-slate-600 transition">更新</button>
+                        class="ml-2 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 transition">更新</button>
                 </div>
+
+                <button id="theme-toggle"
+                    class="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition flex items-center justify-center"
+                    title="切换主题" aria-label="切换主题">
+                    <i id="theme-toggle-icon" class="fa-solid fa-moon"></i>
+                </button>
 
                 <div id="server-changelog-panel"
                     class="hidden absolute right-0 top-12 w-96 max-w-[90vw] glass-card rounded-2xl overflow-hidden shadow-xl">
-                    <div class="px-5 py-4 border-b border-slate-100/50 flex items-center justify-between bg-slate-50">
+                    <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-slate-900/40">
                         <div class="flex items-center">
-                            <i class="fa-solid fa-circle-info text-blue-500 mr-2"></i>
+                            <i class="fa-solid fa-circle-info text-blue-400 mr-2"></i>
                             <div>
-                                <div class="font-bold text-slate-800">服务端版本</div>
-                                <div class="text-xs text-slate-600" id="server-meta-subtitle"></div>
+                                <div class="font-bold text-white">服务端版本</div>
+                                <div class="text-xs text-slate-400" id="server-meta-subtitle"></div>
                             </div>
                         </div>
-                        <button id="server-changelog-close" class="p-2 text-slate-400 hover:text-slate-600 transition"
+                        <button id="server-changelog-close" class="p-2 text-slate-400 hover:text-white transition"
                             aria-label="关闭更新面板">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
                     <div class="p-5">
-                        <ul id="server-changelog-list" class="space-y-2 text-sm text-slate-700"></ul>
-                        <div id="server-changelog-empty" class="text-sm text-slate-600 hidden">暂无更新日志</div>
+                        <ul id="server-changelog-list" class="space-y-2 text-sm text-slate-300"></ul>
+                        <div id="server-changelog-empty" class="text-sm text-slate-500 hidden">暂无更新日志</div>
                     </div>
                 </div>
 
@@ -197,8 +203,8 @@
             <div id="view-dashboard" class="space-y-8 animate-fade-in">
                 <!-- Welcome Section -->
                 <div>
-                    <h2 class="text-2xl font-bold text-slate-800">欢迎回来, 管理员</h2>
-                    <p class="text-slate-600 mt-1">这是系统当前的运行概况与统计数据。</p>
+                    <h2 class="text-2xl font-bold text-white">欢迎回来, 管理员</h2>
+                    <p class="text-slate-400 mt-1">这是系统当前的运行概况与统计数据。</p>
                 </div>
 
                 <!-- Stats Grid -->
@@ -213,47 +219,47 @@
                 <!-- Quick Actions & Status -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <!-- Quick Maintenance -->
-                    <div class="lg:col-span-2 glass-card rounded-2xl overflow-hidden">
+                    <div class="lg:col-span-2 glass-card rounded-2xl overflow-hidden bg-slate-900/50 border border-white/5">
                         <div
-                            class="px-6 py-5 border-b border-slate-100/50 flex justify-between items-center bg-white/30">
-                            <h3 class="font-bold text-slate-800 flex items-center">
-                                <i class="fa-solid fa-screwdriver-wrench text-blue-500 mr-2"></i> 系统维护
+                            class="px-6 py-5 border-b border-white/5 flex justify-between items-center bg-slate-900/20">
+                            <h3 class="font-bold text-white flex items-center">
+                                <i class="fa-solid fa-screwdriver-wrench text-indigo-400 mr-2"></i> 系统维护
                             </h3>
                         </div>
                         <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button onclick="clearCache()"
-                                class="group flex items-start p-4 rounded-xl border border-white/60 bg-slate-50 hover:bg-blue-50/80 hover:border-blue-200/50 transition duration-200 text-left shadow-sm">
+                                class="group flex items-start p-4 rounded-xl border border-white/5 bg-slate-950/40 hover:bg-slate-900/60 hover:border-indigo-500/30 transition duration-200 text-left shadow-sm">
                                 <div
-                                    class="w-10 h-10 rounded-lg bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
+                                    class="w-10 h-10 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-semibold text-slate-800 group-hover:text-blue-700">清除图片缓存</h4>
-                                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">删除本地存储的所有缩略图与原图缓存，释放磁盘空间。</p>
+                                    <h4 class="font-semibold text-slate-200 group-hover:text-indigo-400">清除图片缓存</h4>
+                                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">删除本地存储的所有缩略图与原图缓存，释放磁盘空间。</p>
                                 </div>
                             </button>
 
                             <button onclick="clearArticles()"
-                                class="group flex items-start p-4 rounded-xl border border-white/60 bg-slate-50 hover:bg-blue-50/80 hover:border-blue-200/50 transition duration-200 text-left shadow-sm">
+                                class="group flex items-start p-4 rounded-xl border border-white/5 bg-slate-950/40 hover:bg-slate-900/60 hover:border-indigo-500/30 transition duration-200 text-left shadow-sm">
                                 <div
-                                    class="w-10 h-10 rounded-lg bg-indigo-100/80 text-indigo-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
+                                    class="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
                                     <i class="fa-solid fa-file-circle-xmark"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-semibold text-slate-800 group-hover:text-blue-700">清除文章缓存</h4>
-                                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">重置所有订阅源的文章抓取记录，下次抓取将重新同步。</p>
+                                    <h4 class="font-semibold text-slate-200 group-hover:text-indigo-400">清除文章缓存</h4>
+                                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">重置所有订阅源的文章抓取记录，下次抓取将重新同步。</p>
                                 </div>
                             </button>
 
                             <button onclick="clearData()"
-                                class="group flex items-start p-4 rounded-xl border border-white/60 bg-slate-50 hover:bg-red-50/80 hover:border-red-200/50 transition duration-200 text-left col-span-1 sm:col-span-2 shadow-sm">
+                                class="group flex items-start p-4 rounded-xl border border-white/5 bg-slate-950/40 hover:bg-red-950/40 hover:border-red-500/30 transition duration-200 text-left col-span-1 sm:col-span-2 shadow-sm">
                                 <div
-                                    class="w-10 h-10 rounded-lg bg-red-100/80 text-red-600 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
+                                    class="w-10 h-10 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center shrink-0 mr-4 group-hover:scale-110 transition shadow-sm">
                                     <i class="fa-solid fa-radiation"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-semibold text-slate-800 group-hover:text-red-700">工厂重置 (Danger)</h4>
-                                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    <h4 class="font-semibold text-slate-200 group-hover:text-red-400">工厂重置 (Danger)</h4>
+                                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">
                                         清空所有用户、订阅源及历史数据。此操作不可撤销，请谨慎使用。</p>
                                 </div>
                             </button>
@@ -261,19 +267,19 @@
                     </div>
 
                     <!-- Server Info -->
-                    <div class="glass-card rounded-2xl overflow-hidden">
-                        <div class="px-6 py-5 border-b border-slate-100/50 bg-white/30">
-                            <h3 class="font-bold text-slate-800 flex items-center">
-                                <i class="fa-solid fa-server text-purple-500 mr-2"></i> 服务状态
+                    <div class="glass-card rounded-2xl overflow-hidden bg-slate-900/50 border border-white/5">
+                        <div class="px-6 py-5 border-b border-white/5 bg-slate-900/20">
+                            <h3 class="font-bold text-white flex items-center">
+                                <i class="fa-solid fa-server text-purple-400 mr-2"></i> 服务状态
                             </h3>
                         </div>
                         <div class="p-6 space-y-6">
                             <div>
                                 <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-slate-600">API 响应状态</span>
-                                    <span class="text-emerald-600 font-bold">正常</span>
+                                    <span class="text-slate-400">API 响应状态</span>
+                                    <span class="text-emerald-400 font-bold">正常</span>
                                 </div>
-                                <div class="w-full bg-slate-100/50 rounded-full h-2">
+                                <div class="w-full bg-white/5 rounded-full h-2">
                                     <div
                                         class="bg-gradient-to-r from-emerald-400 to-emerald-500 h-2 rounded-full w-full shadow-[0_0_10px_rgba(16,185,129,0.4)]">
                                     </div>
@@ -281,22 +287,22 @@
                             </div>
                             <div>
                                 <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-slate-600">内存占用</span>
-                                    <span class="text-blue-600 font-bold" id="status-memory">-</span>
+                                    <span class="text-slate-400">内存占用</span>
+                                    <span class="text-indigo-400 font-bold" id="status-memory">-</span>
                                 </div>
-                                <div class="w-full bg-slate-100/50 rounded-full h-2">
+                                <div class="w-full bg-white/5 rounded-full h-2">
                                     <div class="bg-gradient-to-r from-blue-400 to-blue-500 h-2 rounded-full w-[0%] transition-all duration-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]"
                                         id="status-memory-bar"></div>
                                 </div>
                             </div>
-                            <div class="pt-4 border-t border-slate-100/50">
+                            <div class="pt-4 border-t border-white/5">
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-slate-600">运行时间</span>
-                                    <span class="font-mono text-slate-700" id="status-uptime">-</span>
+                                    <span class="text-slate-400">运行时间</span>
+                                    <span class="font-mono text-slate-200" id="status-uptime">-</span>
                                 </div>
                                 <div class="flex items-center justify-between text-sm mt-2">
-                                    <span class="text-slate-600">版本</span>
-                                    <span class="font-mono text-slate-700 bg-slate-100/50 px-2 rounded"
+                                    <span class="text-slate-400">版本</span>
+                                    <span class="font-mono text-slate-200 bg-white/5 px-2 rounded"
                                         id="status-version">-</span>
                                 </div>
                             </div>
@@ -308,52 +314,51 @@
             <!-- VIEW: FEEDS -->
             <div id="view-feeds" class="hidden space-y-6 animate-fade-in">
                 <!-- Toolbar -->
-                <div
-                    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-card p-4 rounded-xl">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 glass-card p-4 rounded-xl">
                     <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                         <div class="relative w-full sm:w-64">
-                            <i
-                                class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                             <input id="feeds-search" type="text" placeholder="搜索订阅源..."
                                 oninput="applyFeedFilters()"
-                                class="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                                class="w-full pl-9 pr-4 py-2 bg-slate-900/30 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition">
                         </div>
                         <select id="feeds-category-filter" onchange="applyFeedFilters()" title="分类过滤" aria-label="分类过滤"
-                            class="w-full sm:w-48 px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                            class="w-full sm:w-48 px-3 py-2 bg-slate-900/30 border border-white/10 rounded-lg text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition">
                             <option value="">全部分类</option>
                         </select>
                         <select id="feeds-public-filter" onchange="applyFeedFilters()" title="可见性过滤" aria-label="可见性过滤"
-                            class="w-full sm:w-40 px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
-                            <option value="all">全部</option>
+                            class="w-full sm:w-40 px-3 py-2 bg-slate-900/30 border border-white/10 rounded-lg text-sm text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition">
+                            <option value="all">全部可见性</option>
                             <option value="public">仅公开池</option>
                             <option value="private">仅私有</option>
                         </select>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="exportFeeds('csv')"
-                            class="bg-white/70 hover:bg-white text-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/10 border border-white/60 flex items-center transform hover:-translate-y-0.5">
+                            class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition border border-white/5 flex items-center transform hover:-translate-y-0.5">
                             <i class="fa-solid fa-download mr-2"></i> 导出CSV
                         </button>
                         <button onclick="openImportFeedsDialog()"
-                            class="bg-white/70 hover:bg-white text-slate-800 px-4 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/10 border border-white/60 flex items-center transform hover:-translate-y-0.5">
+                            class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition border border-white/5 flex items-center transform hover:-translate-y-0.5">
                             <i class="fa-solid fa-file-import mr-2"></i> 导入CSV/Excel
                         </button>
                         <button onclick="document.getElementById('add-feed-panel').classList.toggle('hidden')"
-                            class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-800/20 flex items-center transform hover:-translate-y-0.5">
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20 flex items-center transform hover:-translate-y-0.5">
                             <i class="fa-solid fa-plus mr-2"></i> 添加新源
                         </button>
                     </div>
                 </div>
                 <input id="feeds-import-file" type="file" class="hidden" accept=".csv,.xlsx,.xls" title="选择导入文件" aria-label="选择导入文件"
                     onchange="importFeedsFromFile(this.files && this.files[0]); this.value='';" />
+                
                 <div id="feeds-bulk-bar"
                     class="hidden glass-card p-4 rounded-xl flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
                     <div class="flex items-center gap-3">
-                        <div class="text-sm font-bold text-slate-800">
+                        <div class="text-sm font-bold text-white">
                             已选 <span id="feeds-bulk-count">0</span> 项
                         </div>
                         <button onclick="clearFeedSelection()"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition border border-white/5">
                             清空选择
                         </button>
                     </div>
@@ -376,7 +381,7 @@
                         </button>
                         <div class="flex items-center gap-2">
                             <input id="feeds-bulk-category" type="text" placeholder="新分类"
-                                class="w-40 px-3 py-1.5 bg-white/70 border border-slate-200/60 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition">
+                                class="w-40 px-3 py-1.5 bg-slate-900 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition">
                             <button onclick="bulkUpdateCategory()"
                                 class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition">
                                 改分类
@@ -391,14 +396,14 @@
 
                 <!-- Add Feed Panel -->
                 <div id="add-feed-panel"
-                    class="hidden glass-card p-6 rounded-2xl border-l-4 border-l-primary-500 bg-white/80 backdrop-blur-md shadow-xl animate-fade-in space-y-6">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <h3 class="text-sm font-bold text-slate-800 flex items-center">
-                            <i class="fa-solid fa-plus-circle text-primary-500 mr-2 text-lg"></i>
+                    class="hidden glass-card p-6 rounded-2xl border-l-4 border-l-indigo-500 bg-slate-900/60 backdrop-blur-md shadow-xl animate-fade-in space-y-6">
+                    <div class="flex items-center justify-between border-b border-white/5 pb-3">
+                        <h3 class="text-sm font-bold text-white flex items-center">
+                            <i class="fa-solid fa-plus-circle text-indigo-400 mr-2 text-lg"></i>
                             添加新 RSS 订阅源
                         </h3>
                         <button onclick="document.getElementById('add-feed-panel').classList.add('hidden')"
-                            class="text-slate-400 hover:text-slate-600 transition" title="关闭面板" aria-label="关闭面板">
+                            class="text-slate-400 hover:text-white transition" title="关闭面板" aria-label="关闭面板">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -408,57 +413,57 @@
                         <div class="space-y-4 md:col-span-2">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label for="feed-name" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">名称</label>
+                                    <label for="feed-name" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">名称</label>
                                     <input type="text" id="feed-name" placeholder="例如: TechCrunch"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition">
+                                        class="w-full px-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                                 </div>
                                 <div>
-                                    <label for="feed-url" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">RSS 地址</label>
+                                    <label for="feed-url" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">RSS 地址</label>
                                     <input type="text" id="feed-url" placeholder="https://..."
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition font-mono">
+                                        class="w-full px-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition font-mono">
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label for="feed-category" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">分类</label>
+                                    <label for="feed-category" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">分类</label>
                                     <input type="text" id="feed-category" placeholder="Tech"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition">
+                                        class="w-full px-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                                 </div>
                                 <div>
-                                    <label for="feed-description" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">源简介 (简短描述)</label>
-                                    <input type="text" id="feed-description" placeholder="专注于苹果新闻和应用推荐的中文博客..."
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white text-sm transition">
+                                    <label for="feed-description" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">源简介 (简短描述)</label>
+                                    <input type="text" id="feed-description" placeholder="关于该订阅源的描述..."
+                                        class="w-full px-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                                 </div>
                             </div>
                         </div>
 
                         <!-- Right column: Crawl & Visibility -->
-                        <div class="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100/80 flex flex-col justify-between">
+                        <div class="space-y-4 bg-slate-950/40 p-4 rounded-xl border border-white/5 flex flex-col justify-between">
                             <div class="space-y-4">
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label for="feed-interval" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">间隔 (秒)</label>
+                                        <label for="feed-interval" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">间隔 (秒)</label>
                                         <input type="number" id="feed-interval" placeholder="900" title="间隔" aria-label="间隔"
-                                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm transition font-mono">
+                                            class="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition font-mono">
                                     </div>
                                     <div>
-                                        <label for="feed-cron" class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Cron (可选)</label>
+                                        <label for="feed-cron" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cron (可选)</label>
                                         <input type="text" id="feed-cron" placeholder="*/15 * * * *" title="Cron 表达式" aria-label="Cron 表达式"
-                                            class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm transition font-mono">
+                                            class="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition font-mono">
                                     </div>
                                 </div>
-                                <div class="flex items-center justify-between pt-2 border-t border-slate-100/50">
-                                    <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">设为公开源</span>
+                                <div class="flex items-center justify-between pt-2 border-t border-white/5">
+                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">设为公开源</span>
                                     <div class="flex items-center">
                                         <input type="checkbox" id="feed-is-public" title="公开" aria-label="公开"
-                                            class="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer">
-                                        <label for="feed-is-public" class="text-xs font-semibold text-slate-500 ml-2 cursor-pointer">公开池</label>
+                                            class="h-5 w-5 rounded border-white/10 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                        <label for="feed-is-public" class="text-xs font-semibold text-slate-400 ml-2 cursor-pointer">公开池</label>
                                     </div>
                                 </div>
                             </div>
                             <div class="pt-4">
                                 <button onclick="addFeed()"
-                                    class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-slate-900/20 transform hover:-translate-y-0.5 active:translate-y-0">
+                                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20 transform hover:-translate-y-0.5 active:translate-y-0">
                                     确定添加订阅源
                                 </button>
                             </div>
@@ -466,34 +471,33 @@
                     </div>
                 </div>
 
-                <!-- Table -->
-                <div class="glass-card rounded-xl overflow-hidden">
-                    <div class="overflow-x-scroll overflow-y-auto max-h-[70vh]">
-                        <table class="responsive-table w-full text-left border-collapse table-auto">
-                            <thead
-                                class="bg-slate-50/30 text-xs uppercase text-slate-600 font-bold border-b border-slate-100/50">
-                                <tr>
-                                    <th class="px-4 py-4 whitespace-nowrap">
-                                        <input id="feeds-select-all" type="checkbox" title="全选所有订阅源" aria-label="全选所有订阅源"
-                                            onchange="toggleSelectAllVisible(this.checked)"
-                                            class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                                    </th>
-                                    <th class="px-4 py-4">源名称 / 分类</th>
-                                    <th class="px-4 py-4">源地址</th>
-                                    <th class="px-4 py-4 text-center whitespace-nowrap">文章数</th>
-                                    <th class="px-4 py-4 text-center whitespace-nowrap">订阅用户</th>
-                                    <th class="px-4 py-4 text-center whitespace-nowrap">间隔(秒)</th>
-                                    <th class="px-4 py-4 text-center whitespace-nowrap">Cron</th>
-                                    <th class="px-4 py-4 whitespace-nowrap">最后更新</th>
-                                    <th class="px-4 py-4 text-center whitespace-nowrap">状态</th>
-                                    <th class="px-4 py-4 text-right whitespace-nowrap">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="feeds-list"
-                                class="divide-y divide-slate-100/50 text-sm text-slate-600 bg-slate-50">
-                                <!-- JS Injection -->
-                            </tbody>
-                        </table>
+                <!-- Three-column Split Layout Container -->
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+                    <!-- Hidden Categories List to prevent JavaScript errors -->
+                    <div id="feeds-categories-list" class="hidden"></div>
+
+                    <!-- Middle Feed List Pane (Now Full Width) -->
+                    <div class="lg:col-span-4 glass-card rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto max-h-[70vh] custom-scrollbar">
+                            <table class="responsive-table w-full text-left border-collapse table-auto">
+                                <thead class="bg-slate-900/50 text-xs uppercase text-slate-400 font-bold border-b border-white/5">
+                                    <tr>
+                                        <th class="px-4 py-4 w-10">
+                                            <input id="feeds-select-all" type="checkbox" title="全选所有订阅源" aria-label="全选所有订阅源"
+                                                onchange="toggleSelectAllVisible(this.checked)"
+                                                class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
+                                        </th>
+                                        <th class="px-4 py-4">源名称 / 分类</th>
+                                        <th class="px-4 py-4">源地址</th>
+                                        <th class="px-4 py-4 text-center whitespace-nowrap">健康度</th>
+                                        <th class="px-4 py-4 text-right whitespace-nowrap w-24">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="feeds-list" class="divide-y divide-white/5 text-sm text-slate-300 bg-slate-900/10">
+                                    <!-- JS Injection -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -502,477 +506,336 @@
             <div id="view-users" class="hidden space-y-6 animate-fade-in">
                 <div class="flex justify-between items-end glass-card p-6 rounded-xl">
                     <div class="flex-1 max-w-lg">
-                        <label
-                            class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">快速添加用户</label>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">快速添加用户</label>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                             <input type="text" id="user-name" placeholder="用户名"
-                                class="w-full px-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition">
+                                class="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                             <input type="email" id="user-email" placeholder="邮箱"
-                                class="w-full px-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition">
+                                class="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                             <input type="password" id="user-password" placeholder="密码"
-                                class="w-full px-4 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition">
+                                class="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                             <button onclick="addUser()"
-                                class="bg-slate-800 text-white px-5 py-2.5 rounded-xl hover:bg-slate-700 transition flex items-center text-sm font-bold shadow-lg shadow-slate-800/20 transform hover:-translate-y-0.5">
-                                <i class="fa-solid fa-plus mr-2"></i>添加
+                                class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition flex items-center text-sm font-bold shadow-lg shadow-indigo-500/20 transform hover:-translate-y-0.5 shrink-0 justify-center">
+                                <i class="fa-solid fa-plus mr-2"></i>添加用户
                             </button>
                         </div>
-                        <p class="mt-2 text-xs text-slate-400">将调用 /api/auth/register 创建可登录账号（使用当前管理员登录态）。</p>
                     </div>
                 </div>
 
-                <div class="glass-card rounded-xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="responsive-table w-full text-left text-sm text-slate-600">
-                            <thead
-                                class="bg-slate-50/30 text-xs uppercase text-slate-600 font-bold border-b border-slate-100/50">
-                                <tr>
-                                    <th class="px-6 py-4">用户</th>
-                                    <th class="px-6 py-4">联系方式</th>
-                                    <th class="px-6 py-4">注册时间</th>
-                                    <th class="px-6 py-4">最后活跃</th>
-                                    <th class="px-6 py-4 text-center">订阅源</th>
-                                    <th class="px-6 py-4 text-right">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-list" class="divide-y divide-slate-100/50 bg-slate-50">
-                                <!-- JS Injection -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div id="users-deck" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Cards injected here dynamically -->
                 </div>
             </div>
 
             <!-- VIEW: SETTINGS -->
-            <div id="view-settings" class="hidden max-w-5xl mx-auto animate-fade-in">
-                <!-- ... existing settings content ... -->
-                <div class="glass-card rounded-2xl overflow-hidden">
-                    <div class="px-8 py-6 border-b border-slate-100/50 bg-slate-50">
-                        <h2 class="text-lg font-bold text-slate-800">全局参数配置</h2>
-                        <p class="text-sm text-slate-600 mt-1">调整服务器的核心运行参数。修改后请点击底部「保存」按钮生效。</p>
-                    </div>
-                    <div class="p-8 space-y-10">
-
-                        <!-- ① 安全设置 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center">
-                                <span class="w-1 h-4 bg-red-500 rounded mr-2"></span> 安全设置
-                            </h3>
-                            <div class="max-w-md">
-                                <label class="block text-sm font-medium text-slate-700 mb-2">管理员密码</label>
-                                <input type="text" id="setting-password" placeholder="admin"
-                                    class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 transition font-mono">
-                                <p class="mt-2 text-xs text-slate-400">修改后下次登录生效。默认密码: admin</p>
-                            </div>
-                        </div>
-
-                        <hr class="border-slate-100/50">
-
-                        <!-- ② RSS 抓取策略 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span class="w-1 h-4 bg-gradient-to-b from-blue-500 to-indigo-500 rounded mr-2"></span>
-                                RSS 抓取策略
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">控制订阅源的自动刷新频率和抓取行为。</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="setting-refresh-interval" class="block text-sm font-medium text-slate-700 mb-2">默认刷新间隔 (秒)</label>
-                                    <input type="number" id="setting-refresh-interval" min="15" placeholder="例如: 900" title="默认刷新间隔 (秒)"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">全局默认 RSS 自动刷新间隔，单个源可独立覆盖。推荐 300–1800。</p>
-                                </div>
-                                <div>
-                                    <label for="setting-refresh-cron" class="block text-sm font-medium text-slate-700 mb-2">默认刷新 Cron</label>
-                                    <input type="text" id="setting-refresh-cron" placeholder="*/15 * * * *" title="默认刷新 Cron"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">留空则用间隔秒数。示例: */15 * * * *（每15分钟）、0 8 * *
-                                        *（每天8点）。</p>
-                                </div>
-                                <div>
-                                    <label for="setting-max-articles" class="block text-sm font-medium text-slate-700 mb-2">单次解析上限</label>
-                                    <input type="number" id="setting-max-articles" min="1" placeholder="例如: 20" title="单次解析上限"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">单次抓取最多解析条目数，防止异常源导致资源暴涨。推荐 20–100。</p>
-                                </div>
-                                <div>
-                                    <label for="setting-fetch-timeout" class="block text-sm font-medium text-slate-700 mb-2">抓取超时 (毫秒)</label>
-                                    <input type="number" id="setting-fetch-timeout" min="1000" placeholder="例如: 15000" title="抓取超时 (毫秒)"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">抓取 RSS 或全文时的网络超时，超时将记录失败。推荐 10000–20000。</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="border-slate-100/50">
-
-                        <!-- ③ 客户端同步 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span class="w-1 h-4 bg-gradient-to-b from-cyan-500 to-blue-500 rounded mr-2"></span>
-                                客户端同步
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">调节 App 端云同步接口的分页行为。</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="setting-sync-default-page" class="block text-sm font-medium text-slate-700 mb-2">同步默认分页大小</label>
-                                    <input type="number" id="setting-sync-default-page" min="10" placeholder="例如: 100" title="同步默认分页大小"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">客户端未指定 limit 时的默认分页。推荐 50–200。</p>
-                                </div>
-                                <div>
-                                    <label for="setting-max-blocks" class="block text-sm font-medium text-slate-700 mb-2">同步最大分页大小</label>
-                                    <input type="number" id="setting-max-blocks" min="1" placeholder="例如: 500" title="同步最大分页大小"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">单页最大返回文章数，超大值会导致内存峰值过高。推荐 200–500。</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="border-slate-100/50">
-
-                        <!-- ④ 数据治理 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span class="w-1 h-4 bg-emerald-500 rounded mr-2"></span> 数据治理
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">自动清理老旧数据，控制数据库增长。</p>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div>
-                                    <label for="setting-retention-days" class="block text-sm font-medium text-slate-700 mb-2">文章保留天数</label>
-                                    <input type="number" id="setting-retention-days" min="0" placeholder="例如: 30" title="文章保留天数"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">超过该天数的旧文章会被自动清理。0 = 永久保留。推荐 30–365。</p>
-                                </div>
-                                <div>
-                                    <label for="setting-max-count-per-feed" class="block text-sm font-medium text-slate-700 mb-2">每源库存上限</label>
-                                    <input type="number" id="setting-max-count-per-feed" min="0" placeholder="例如: 1000" title="每源库存上限"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">每源最多保留的最新文章数。0 = 不限制。推荐 500–5000。</p>
-                                </div>
-                                <div>
-                                    <label for="setting-cleanup-interval" class="block text-sm font-medium text-slate-700 mb-2">清理频率 (小时)</label>
-                                    <input type="number" id="setting-cleanup-interval" min="1" placeholder="例如: 24" title="清理频率 (小时)"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition font-mono">
-                                    <p class="mt-2 text-xs text-slate-400">后台自动清理间隔。推荐 6–24。</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="border-slate-100/50">
-
-                        <!-- ⑤ 媒体处理 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span class="w-1 h-4 bg-gradient-to-b from-pink-500 to-rose-500 rounded mr-2"></span>
-                                媒体处理
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">图片代理的转码与压缩参数。</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="setting-quality" class="block text-sm font-medium text-slate-700 mb-2">图片压缩质量 (1-100)</label>
-                                    <div class="relative">
-                                        <input type="number" id="setting-quality" min="1" max="100" placeholder="例如: 80" title="图片压缩质量"
-                                            class="w-full pl-4 pr-12 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 transition font-mono">
-                                        <div
-                                            class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-sm">
-                                            %</div>
-                                    </div>
-                                    <p class="mt-2 text-xs text-slate-400">推荐 70–80（省流）、80–90（清晰）、100（不压缩）。</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2"
-                                        for="setting-image-transcode-enabled">图片转码开关</label>
-                                    <div
-                                        class="flex items-start gap-3 rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3">
-                                        <input type="checkbox" id="setting-image-transcode-enabled"
-                                            class="mt-1 h-4 w-4 rounded border-slate-300 text-pink-600 focus:ring-pink-500">
-                                        <div class="min-w-0">
-                                            <div class="text-sm font-semibold text-slate-800">启用图片转码</div>
-                                            <p class="mt-1 text-xs text-slate-400">关闭后 /api/image 走 raw，不触发 WebP 转码与压缩。
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="border-slate-100/50">
-
-                        <!-- ⑥ AI 配置 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span
-                                    class="w-1 h-4 bg-gradient-to-b from-purple-500 to-indigo-500 rounded mr-2"></span>
-                                AI 配置
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">LLM 日报生成参数。</p>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-2">日报生成 System Prompt</label>
-                                <textarea id="setting-system-prompt" rows="12" placeholder="留空则使用系统默认 Prompt..."
-                                    class="w-full px-4 py-3 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition font-mono text-xs leading-relaxed"></textarea>
-                                <p class="mt-2 text-xs text-slate-400">用于指导 LLM 生成日报的系统提示词。支持 Markdown。清空并保存可恢复默认值。</p>
-                            </div>
-                        </div>
-
-                        <hr class="border-slate-100/50">
-
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span class="w-1 h-4 bg-gradient-to-b from-fuchsia-500 to-purple-600 rounded mr-2"></span>
-                                LLM 配置
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">配置全局 LLM profiles，并为查词/翻译/标题翻译/日报分别绑定。</p>
-
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="text-sm font-semibold text-slate-800">Profiles</div>
-                                <button id="llm-add-profile"
-                                    class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-bold shadow-sm">
-                                    新增 Profile
+            <div id="view-settings" class="hidden space-y-6 animate-fade-in">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+                    <!-- Configuration Form (Full Width) -->
+                    <div class="lg:col-span-5 space-y-6">
+                        <div class="glass-card rounded-2xl overflow-hidden">
+                            <!-- Settings Navigation -->
+                            <div class="flex border-b border-white/5 bg-slate-900/40" id="settings-tab-nav">
+                                <button onclick="switchSettingsTab('security')" class="settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-indigo-500 text-indigo-400">
+                                    安全设置
+                                </button>
+                                <button onclick="switchSettingsTab('rss')" class="settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-transparent text-slate-400 hover:text-slate-300">
+                                    RSS抓取
+                                </button>
+                                <button onclick="switchSettingsTab('sync')" class="settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-transparent text-slate-400 hover:text-slate-300">
+                                    客户端同步
+                                </button>
+                                <button onclick="switchSettingsTab('governance')" class="settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-transparent text-slate-400 hover:text-slate-300">
+                                    数据管理
+                                </button>
+                                <button onclick="switchSettingsTab('llm')" class="settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-transparent text-slate-400 hover:text-slate-300">
+                                    AI/LLM
                                 </button>
                             </div>
-
-                            <div class="overflow-x-auto rounded-xl border border-slate-200/60 bg-white/40">
-                                <table class="w-full text-sm">
-                                    <thead class="bg-slate-50 text-slate-600">
-                                        <tr>
-                                            <th class="px-4 py-3 text-left">启用</th>
-                                            <th class="px-4 py-3 text-left">名称</th>
-                                            <th class="px-4 py-3 text-left">Provider</th>
-                                            <th class="px-4 py-3 text-left">Base URL</th>
-                                            <th class="px-4 py-3 text-left">Model</th>
-                                            <th class="px-4 py-3 text-left">API Key</th>
-                                            <th class="px-4 py-3 text-left">Temp</th>
-                                            <th class="px-4 py-3 text-left">MaxTokens</th>
-                                            <th class="px-4 py-3 text-left">TopP</th>
-                                            <th class="px-4 py-3 text-right">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="llm-profiles-body" class="divide-y divide-slate-100/60 bg-slate-50/40"></tbody>
-                                </table>
-                            </div>
-
-                            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label for="llm-binding-translation" class="block text-sm font-medium text-slate-700 mb-2">翻译 (translation)</label>
-                                    <select id="llm-binding-translation" title="翻译模型绑定"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
-                                </div>
-                                <div>
-                                    <label for="llm-binding-dictionary" class="block text-sm font-medium text-slate-700 mb-2">查词 (dictionary)</label>
-                                    <select id="llm-binding-dictionary" title="查词模型绑定"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
-                                </div>
-                                <div>
-                                    <label for="llm-binding-titleTranslation" class="block text-sm font-medium text-slate-700 mb-2">标题翻译 (titleTranslation)</label>
-                                    <select id="llm-binding-titleTranslation" title="标题翻译模型绑定"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
-                                </div>
-                                <div>
-                                    <label for="llm-binding-dailyReport" class="block text-sm font-medium text-slate-700 mb-2">AI 日报 (dailyReport)</label>
-                                    <select id="llm-binding-dailyReport" title="AI日报模型绑定"
-                                        class="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition"></select>
-                                </div>
-                            </div>
-
-                            <div class="mt-8">
-                                <div class="flex items-center justify-between mb-3">
-                                    <div class="text-sm font-semibold text-slate-800">LLM 使用统计</div>
-                                    <div class="flex items-center gap-2">
-                                        <select id="llm-usage-days" title="展示天数" aria-label="展示天数"
-                                            class="px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition text-sm">
-                                            <option value="1">近 1 天</option>
-                                            <option value="7" selected>近 7 天</option>
-                                            <option value="30">近 30 天</option>
-                                        </select>
-                                        <button id="llm-usage-refresh"
-                                            class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-bold shadow-sm">
-                                            刷新
-                                        </button>
+                            
+                            <!-- Settings Sections -->
+                            <div class="p-6 space-y-6">
+                                <!-- SECTION: SECURITY -->
+                                <div id="setting-sec-security" class="settings-sec space-y-4">
+                                    <div>
+                                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">超级管理员密码</h4>
+                                        <input type="text" id="setting-password" placeholder="admin"
+                                            class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                                        <p class="text-[10px] text-slate-500 mt-1">更新管理员密码。默认口令: admin</p>
                                     </div>
                                 </div>
-                                <div id="llm-usage-summary" class="text-xs text-slate-500 mb-3"></div>
-                                <div class="overflow-x-auto rounded-xl border border-slate-200/60 bg-white/40">
-                                    <table class="w-full text-sm">
-                                        <thead class="bg-slate-50 text-slate-600">
-                                            <tr>
-                                                <th class="px-4 py-3 text-left">日期</th>
-                                                <th class="px-4 py-3 text-left">功能</th>
-                                                <th class="px-4 py-3 text-right">请求</th>
-                                                <th class="px-4 py-3 text-right">成功</th>
-                                                <th class="px-4 py-3 text-right">限流</th>
-                                                <th class="px-4 py-3 text-right">缓存</th>
-                                                <th class="px-4 py-3 text-right">均值(ms)</th>
-                                                <th class="px-4 py-3 text-right">P95(ms)</th>
-                                                <th class="px-4 py-3 text-right">Tokens</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="llm-usage-body" class="divide-y divide-slate-100/60 bg-slate-50/40"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
 
-                        <hr class="border-slate-100/50">
-
-                        <!-- ⑦ 维护工具 -->
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center">
-                                <span class="w-1 h-4 bg-gradient-to-b from-orange-500 to-amber-500 rounded mr-2"></span>
-                                维护工具
-                            </h3>
-                            <p class="text-xs text-slate-400 mb-4 ml-3">一次性手动清理操作，不影响自动清理策略。</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div class="p-5 rounded-xl border border-slate-200/60 bg-slate-50/30">
-                                    <div class="flex items-center mb-3">
-                                        <div
-                                            class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 mr-3">
-                                            <i class="fa-solid fa-newspaper text-sm"></i>
+                                <!-- SECTION: RSS -->
+                                <div id="setting-sec-rss" class="settings-sec hidden space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">默认刷新间隔 (秒)</label>
+                                            <input type="number" id="setting-refresh-interval" min="15" placeholder="900"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
                                         </div>
                                         <div>
-                                            <div class="text-sm font-bold text-slate-800">文章清理</div>
-                                            <p class="text-[11px] text-slate-400">永久删除超过指定天数的旧文章</p>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">默认刷新 Cron</label>
+                                            <input type="text" id="setting-refresh-cron" placeholder="*/15 * * * *"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
                                         </div>
                                     </div>
-                                    <div class="flex items-end gap-3">
-                                        <div class="flex-1">
-                                            <select id="prune-articles-days" title="清理文章天数范围" aria-label="清理文章天数范围"
-                                                class="w-full px-3 py-2 bg-white border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
-                                                <option value="30">30 天</option>
-                                                <option value="60">60 天</option>
-                                                <option value="90">90 天</option>
-                                                <option value="180">180 天</option>
-                                            </select>
-                                        </div>
-                                        <button onclick="pruneArticles()"
-                                            class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-bold shadow-sm whitespace-nowrap">
-                                            执行清理
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="p-5 rounded-xl border border-slate-200/60 bg-slate-50/30">
-                                    <div class="flex items-center mb-3">
-                                        <div
-                                            class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 mr-3">
-                                            <i class="fa-solid fa-images text-sm"></i>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">单次解析上限</label>
+                                            <input type="number" id="setting-max-articles" min="1" placeholder="20"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
                                         </div>
                                         <div>
-                                            <div class="text-sm font-bold text-slate-800">图片缓存清理</div>
-                                            <p class="text-[11px] text-slate-400">删除指定天数前未修改的缓存图片</p>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">抓取超时 (毫秒)</label>
+                                            <input type="number" id="setting-fetch-timeout" min="1000" placeholder="15000"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
                                         </div>
                                     </div>
-                                    <div class="flex items-end gap-3">
-                                        <div class="flex-1">
-                                            <select id="prune-images-days" title="清理图片天数范围" aria-label="清理图片天数范围"
-                                                class="w-full px-3 py-2 bg-white border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
-                                                <option value="30">30 天</option>
-                                                <option value="60">60 天</option>
-                                                <option value="90">90 天</option>
-                                            </select>
+                                </div>
+
+                                <!-- SECTION: SYNC -->
+                                <div id="setting-sec-sync" class="settings-sec hidden space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">同步默认分页大小</label>
+                                            <input type="number" id="setting-sync-default-page" min="10" placeholder="200"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
                                         </div>
-                                        <button onclick="pruneImages()"
-                                            class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-bold shadow-sm whitespace-nowrap">
-                                            执行清理
-                                        </button>
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">同步最大分页大小</label>
+                                            <input type="number" id="setting-max-blocks" min="1" placeholder="500"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 pt-2">
+                                        <input type="checkbox" id="setting-image-transcode-enabled" class="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500">
+                                        <label for="setting-image-transcode-enabled" class="text-xs font-bold text-slate-300 cursor-pointer">启用缓存图片转码 (WebP/Sharp优化)</label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">转码压缩质量 (1-100)</label>
+                                        <input type="number" id="setting-quality" min="1" max="100" placeholder="80"
+                                            class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                                    </div>
+                                </div>
+
+                                <!-- SECTION: GOVERNANCE -->
+                                <div id="setting-sec-governance" class="settings-sec hidden space-y-4">
+                                    <div class="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">文章保留天数</label>
+                                            <input type="number" id="setting-retention-days" placeholder="0"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">单源上限条目数</label>
+                                            <input type="number" id="setting-max-count-per-feed" placeholder="0"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">自动裁剪周期 (时)</label>
+                                            <input type="number" id="setting-cleanup-interval" placeholder="24"
+                                                class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                                        </div>
+                                    </div>
+                                    <p class="text-[10px] text-slate-500">数值设为 0 表示关闭自动清理（永久保留数据）。</p>
+                                    
+                                    <div class="pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                                        <div class="p-3 bg-slate-950/40 rounded-xl border border-white/5 space-y-2">
+                                            <label for="prune-articles-days" class="text-[10px] font-bold text-slate-400 uppercase block">文章手动清理</label>
+                                            <div class="flex gap-2">
+                                                <select id="prune-articles-days" title="清理文章天数" aria-label="清理文章天数" class="bg-slate-950 border border-white/10 text-slate-300 rounded px-2 py-1 text-xs focus:outline-none flex-1">
+                                                    <option value="30">30 天前</option>
+                                                    <option value="60">60 天前</option>
+                                                    <option value="90">90 天前</option>
+                                                </select>
+                                                <button onclick="pruneArticles()" class="bg-slate-800 hover:bg-slate-700 text-xs text-white px-3 py-1 rounded font-bold transition border border-white/5">执行清理</button>
+                                            </div>
+                                        </div>
+                                        <div class="p-3 bg-slate-950/40 rounded-xl border border-white/5 space-y-2">
+                                            <label for="prune-images-days" class="text-[10px] font-bold text-slate-400 uppercase block">图片手动清理</label>
+                                            <div class="flex gap-2">
+                                                <select id="prune-images-days" title="清理图片天数" aria-label="清理图片天数" class="bg-slate-950 border border-white/10 text-slate-300 rounded px-2 py-1 text-xs focus:outline-none flex-1">
+                                                    <option value="30">30 天前</option>
+                                                    <option value="60">60 天前</option>
+                                                    <option value="90">90 天前</option>
+                                                </select>
+                                                <button onclick="pruneImages()" class="bg-slate-800 hover:bg-slate-700 text-xs text-white px-3 py-1 rounded font-bold transition border border-white/5">执行清理</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- SECTION: LLM -->
+                                <div id="setting-sec-llm" class="settings-sec hidden space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">日报全局 System Prompt</label>
+                                        <textarea id="setting-system-prompt" rows="3" class="form-input-baseline w-full px-3 py-2 text-sm focus:outline-none resize-none" placeholder="你是一个日报生成助手..."></textarea>
+                                    </div>
+
+                                    <!-- Bindings -->
+                                    <div class="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                                        <div>
+                                            <label for="llm-binding-translation" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">正文翻译模型</label>
+                                            <select id="llm-binding-translation" title="正文翻译模型" aria-label="正文翻译模型" class="bg-slate-950 border border-white/10 text-slate-300 rounded-lg px-3 py-2 text-xs w-full focus:outline-none"></select>
+                                        </div>
+                                        <div>
+                                            <label for="llm-binding-dictionary" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">单词解析模型</label>
+                                            <select id="llm-binding-dictionary" title="单词解析模型" aria-label="单词解析模型" class="bg-slate-950 border border-white/10 text-slate-300 rounded-lg px-3 py-2 text-xs w-full focus:outline-none"></select>
+                                        </div>
+                                        <div>
+                                            <label for="llm-binding-titleTranslation" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">标题过滤模型</label>
+                                            <select id="llm-binding-titleTranslation" title="标题过滤模型" aria-label="标题过滤模型" class="bg-slate-950 border border-white/10 text-slate-300 rounded-lg px-3 py-2 text-xs w-full focus:outline-none"></select>
+                                        </div>
+                                        <div>
+                                            <label for="llm-binding-dailyReport" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">每日报告模型</label>
+                                            <select id="llm-binding-dailyReport" title="每日报告模型" aria-label="每日报告模型" class="bg-slate-950 border border-white/10 text-slate-300 rounded-lg px-3 py-2 text-xs w-full focus:outline-none"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Profiles list -->
+                                    <div class="border-t border-white/5 pt-4">
+                                        <div class="flex justify-between items-center mb-3">
+                                            <span class="text-xs font-bold text-white">LLM API Engine 节点配置</span>
+                                            <button id="llm-add-profile" class="text-xs bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 px-3 py-1.5 rounded-lg border border-indigo-500/30 transition font-bold">
+                                                新增接口
+                                            </button>
+                                        </div>
+                                        <div class="overflow-x-auto bg-slate-950/40 rounded-xl border border-white/5 custom-scrollbar">
+                                            <table class="w-full text-left text-xs text-slate-400 table-auto min-w-[900px]">
+                                                <thead class="bg-slate-900/50 text-slate-300 font-bold border-b border-white/5">
+                                                    <tr>
+                                                        <th class="px-4 py-3 w-12 text-center">启用</th>
+                                                        <th class="px-4 py-3 w-36">节点名称</th>
+                                                        <th class="px-4 py-3 w-36">供应商</th>
+                                                        <th class="px-4 py-3 w-64">Base URL</th>
+                                                        <th class="px-4 py-3 w-40">模型名称</th>
+                                                        <th class="px-4 py-3 w-52">API Key 凭据</th>
+                                                        <th class="px-4 py-3 w-16">Temp</th>
+                                                        <th class="px-4 py-3 w-16">Tokens</th>
+                                                        <th class="px-4 py-3 w-16">Top P</th>
+                                                        <th class="px-4 py-3 text-right">操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="llm-profiles-body" class="divide-y divide-white/5 bg-slate-900/10"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- LLM Telemetry -->
+                                    <div class="border-t border-white/5 pt-4 space-y-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-xs font-bold text-white">模型接口遥测指标</span>
+                                            <div class="flex items-center space-x-2">
+                                                <select id="llm-usage-days" title="遥测接口统计天数" aria-label="遥测接口统计天数" class="bg-slate-950 border border-white/10 text-slate-300 rounded px-2 py-1 text-xs focus:outline-none">
+                                                    <option value="7">近 7 天</option>
+                                                    <option value="30">近 30 天</option>
+                                                    <option value="90">近 90 天</option>
+                                                </select>
+                                                <button id="llm-usage-refresh" title="刷新统计数据" aria-label="刷新统计数据" class="text-slate-400 hover:text-white p-1">
+                                                    <i class="fa-solid fa-rotate-right text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="text-[11px] text-indigo-400 font-semibold" id="llm-usage-summary">近 7 天：正在加载统计数据...</div>
+                                        <div class="overflow-x-auto bg-slate-950/40 rounded-xl border border-white/5 max-h-56 custom-scrollbar">
+                                            <table class="w-full text-left text-xs text-slate-400 min-w-[700px]">
+                                                <thead class="bg-slate-900/50 text-slate-300 font-bold border-b border-white/5">
+                                                    <tr>
+                                                        <th class="px-4 py-3">日期</th>
+                                                        <th class="px-4 py-3">功能分类</th>
+                                                        <th class="px-4 py-3 text-right">请求</th>
+                                                        <th class="px-4 py-3 text-right">成功</th>
+                                                        <th class="px-4 py-3 text-right">限流</th>
+                                                        <th class="px-4 py-3 text-right">缓存</th>
+                                                        <th class="px-4 py-3 text-right">均值(ms)</th>
+                                                        <th class="px-4 py-3 text-right">P95(ms)</th>
+                                                        <th class="px-4 py-3 text-right">Tokens</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="llm-usage-body" class="divide-y divide-white/5 bg-slate-900/10"></tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Save Button -->
-                        <div class="pt-6 border-t border-slate-100/50 flex justify-end">
-                            <button onclick="saveSettings()"
-                                class="bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-700 shadow-lg shadow-slate-900/20 transition flex items-center font-bold transform hover:-translate-y-0.5">
-                                <i class="fa-solid fa-save mr-2"></i>保存所有更改
-                            </button>
+                            
+                            <!-- Save Actions -->
+                            <div class="px-6 py-4 bg-slate-900/20 border-t border-white/5 flex justify-between items-center">
+                                <span class="text-xs text-slate-500 font-medium">配置将立即应用于所有订阅源及接口</span>
+                                <button onclick="saveSettings()"
+                                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition shadow-md shadow-indigo-500/20 flex items-center transform hover:-translate-y-0.5">
+                                    <i class="fa-solid fa-save mr-1.5"></i> 保存全部配置
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <!-- Hidden Logs Container to prevent JavaScript errors -->
+                <div id="settings-logs-container" class="hidden"></div>
             </div>
 
             <!-- VIEW: LOGS -->
             <div id="view-logs" class="hidden space-y-6 animate-fade-in">
-                <div
-                    class="glass-card p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                <div class="glass-card p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
                     <div class="flex items-center space-x-4 w-full sm:w-auto">
-                        <h2 class="font-bold text-slate-700 whitespace-nowrap">系统实时日志</h2>
-                        <div class="flex bg-slate-100 p-1 rounded-lg">
+                        <h2 class="font-bold text-white text-sm whitespace-nowrap">系统实时控制台日志</h2>
+                        <div class="flex bg-slate-950 p-1 rounded-lg border border-white/5">
                             <button onclick="filterLogs('ALL')"
-                                class="log-filter-btn active px-3 py-1 text-xs font-bold rounded-md text-slate-700 bg-white shadow-sm transition"
+                                class="log-filter-btn active px-3 py-1 text-xs font-bold rounded-md text-slate-300 bg-slate-800 shadow-sm transition"
                                 data-level="ALL">全部</button>
                             <button onclick="filterLogs('ERROR')"
-                                class="log-filter-btn px-3 py-1 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition"
+                                class="log-filter-btn px-3 py-1 text-xs font-bold rounded-md text-slate-500 hover:text-slate-300 transition"
                                 data-level="ERROR">ERROR</button>
                             <button onclick="filterLogs('WARN')"
-                                class="log-filter-btn px-3 py-1 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition"
+                                class="log-filter-btn px-3 py-1 text-xs font-bold rounded-md text-slate-500 hover:text-slate-300 transition"
                                 data-level="WARN">WARN</button>
                             <button onclick="filterLogs('INFO')"
-                                class="log-filter-btn px-3 py-1 text-xs font-bold rounded-md text-slate-500 hover:text-slate-700 transition"
+                                class="log-filter-btn px-3 py-1 text-xs font-bold rounded-md text-slate-500 hover:text-slate-300 transition"
                                 data-level="INFO">INFO</button>
                         </div>
                     </div>
 
                     <div class="flex items-center space-x-3 w-full sm:w-auto">
                         <div class="relative flex-1 sm:w-64">
-                            <i
-                                class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
                             <input type="text" id="log-search-input" onkeyup="searchLogs(this.value)"
                                 placeholder="搜索日志关键字..."
-                                class="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm">
+                                class="w-full pl-9 pr-4 py-2 text-sm border border-white/10 rounded-lg bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm">
                         </div>
                         <button onclick="downloadLogs()"
-                            class="text-slate-600 hover:text-slate-800 px-3 py-2 rounded-lg hover:bg-slate-100 transition text-sm font-medium border border-slate-200 bg-white shadow-sm"
+                            class="text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-white/5 transition text-sm font-medium border border-white/10 bg-slate-900/40 shadow-sm"
                             title="下载当前日志">
                             <i class="fa-solid fa-download"></i>
                         </button>
                         <button onclick="loadLogs()"
-                            class="text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50 transition text-sm font-medium border border-blue-200 bg-blue-50/50 shadow-sm"
+                            class="text-indigo-400 hover:text-indigo-300 px-3 py-2 rounded-lg hover:bg-white/5 transition text-sm font-medium border border-indigo-500/20 bg-indigo-500/10 shadow-sm"
                             title="刷新日志">
                             <i class="fa-solid fa-rotate"></i>
                         </button>
                     </div>
                 </div>
-                <div class="glass-card rounded-xl overflow-hidden bg-slate-900 text-slate-300 font-mono text-xs p-4 h-[600px] overflow-y-auto"
-                    id="logs-container">
+                <div class="console-window p-4 h-[600px] overflow-y-auto custom-scrollbar" id="logs-container">
                     <!-- Logs injected here -->
                 </div>
             </div>
 
-
-
-
             <!-- VIEW: IMAGES -->
             <div id="view-images" class="hidden space-y-6 animate-fade-in">
                 <div class="flex justify-between items-center glass-card p-4 rounded-xl">
-                    <h2 class="font-bold text-slate-700 pl-2">已缓存图片列表</h2>
+                    <h2 class="font-bold text-slate-300 pl-2">图片缓存预览画廊 (Grid Media Gallery)</h2>
                     <div class="flex space-x-3">
                         <button onclick="loadImages()"
-                            class="text-slate-600 hover:text-blue-600 px-4 py-2 rounded-lg hover:bg-slate-50/50 transition text-sm font-medium border border-slate-200/60 bg-white/50">
-                            <i class="fa-solid fa-rotate mr-2"></i>刷新
+                            class="text-slate-300 hover:text-white px-4 py-2 rounded-lg hover:bg-white/5 transition text-sm font-medium border border-white/10 bg-slate-900/30">
+                            <i class="fa-solid fa-rotate mr-2"></i>刷新数据
                         </button>
                         <button onclick="clearCache()"
-                            class="text-red-600 hover:text-red-700 px-4 py-2 rounded-lg hover:bg-red-50/50 transition text-sm font-medium border border-red-200/60 bg-white/50">
+                            class="text-red-400 hover:text-red-300 px-4 py-2 rounded-lg hover:bg-white/5 transition text-sm font-medium border border-white/10 bg-slate-900/30">
                             <i class="fa-solid fa-trash mr-2"></i>全部清空
                         </button>
                     </div>
                 </div>
 
-                <div class="glass-card rounded-xl overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="responsive-table w-full text-left text-sm text-slate-600">
-                            <thead
-                                class="bg-slate-50/30 text-xs uppercase text-slate-600 font-bold border-b border-slate-100/50">
-                                <tr>
-                                    <th class="px-6 py-4">文件名 / 预览链接</th>
-                                    <th class="px-6 py-4">大小</th>
-                                    <th class="px-6 py-4">生成时间</th>
-                                    <th class="px-6 py-4 text-right">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="images-list" class="divide-y divide-slate-100/50 bg-slate-50">
-                                <!-- JS Injection -->
-                            </tbody>
-                        </table>
-                    </div>
+                <div id="images-gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <!-- Masonry previews here -->
                 </div>
             </div>
 
@@ -989,182 +852,107 @@
         </div>
     </div>
 
-    <!-- Feed Articles Modal -->
-    <div id="articles-overlay"
-        class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
-        onclick="onArticlesOverlayClick(event)">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden animate-fade-in"
-            onclick="event.stopPropagation()">
-            <!-- Header -->
-            <div class="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0">
-                <div class="flex items-center space-x-4">
-                    <div
-                        class="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-white shadow-lg shadow-slate-800/20">
-                        <i class="fa-solid fa-newspaper text-lg"></i>
-                    </div>
-                    <div>
-                        <div class="flex items-center space-x-2">
-                            <h3 class="text-lg font-bold text-slate-800" id="articles-title">文章列表</h3>
-                            <span id="articles-count-badge"
-                                class="text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full"></span>
-                        </div>
-                        <div class="flex items-center text-xs text-slate-400 mt-0.5 space-x-1.5">
-                            <i class="fa-solid fa-rss text-[10px]"></i>
-                            <span id="articles-subtitle" class="truncate max-w-sm font-mono">...</span>
-                        </div>
-                    </div>
-                </div>
-                <button onclick="closeArticles()" title="关闭" aria-label="关闭文章列表"
-                    class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
+    <!-- Sliding Details Sheet Panel (Feeds View detail & article viewer) -->
+    <aside id="detail-drawer" class="detail-pane">
+        <!-- Drawer Header -->
+        <div class="detail-pane-header flex justify-between items-center">
+            <div class="min-w-0">
+                <h3 id="drawer-title" class="text-base font-bold text-white truncate">订阅源</h3>
+                <p id="drawer-subtitle" class="text-[10px] text-slate-400 font-mono truncate mt-0.5">加载中...</p>
             </div>
-
-            <!-- Articles List (Card-based) -->
-            <div class="flex-1 overflow-y-auto p-6 space-y-0 bg-slate-50/50" id="articles-list-container">
-                <div id="articles-list" class="space-y-3">
-                    <!-- JS injects cards here -->
-                </div>
-                <div id="articles-empty" class="hidden py-20 text-center">
-                    <div
-                        class="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-slate-300 mb-4 shadow-sm border border-slate-200 mx-auto">
-                        <i class="fa-regular fa-newspaper text-2xl"></i>
-                    </div>
-                    <p class="text-sm font-bold text-slate-500">暂无文章</p>
-                    <p class="text-xs mt-1 text-slate-400">该订阅源尚未抓取到任何文章</p>
-                </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="px-8 py-4 border-t border-slate-100 bg-white flex justify-between items-center flex-shrink-0">
-                <div class="text-xs font-medium text-slate-500" id="articles-progress">0 / 0 已加载</div>
-                <button id="articles-load-more" onclick="loadMoreArticles()"
-                    class="bg-slate-800 text-white px-6 py-2.5 rounded-xl hover:bg-slate-700 transition text-sm font-bold shadow-lg shadow-slate-800/20 disabled:opacity-40 disabled:cursor-not-allowed">
-                    加载更多
-                </button>
-            </div>
+            <button onclick="closeDrawer()" aria-label="关闭详情" class="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
-    </div>
 
-    <!-- Edit Feed Modal -->
-    <div id="edit-feed-overlay"
-        class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-        onclick="onEditFeedOverlayClick(event)">
-        <div class="glass-card bg-white/95 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-fade-in"
-            onclick="event.stopPropagation()">
-            <div
-                class="px-8 py-6 border-b border-slate-100/50 flex justify-between items-center bg-gradient-to-r from-slate-50/50 to-white/50">
-                <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 rounded-full bg-indigo-100/50 text-indigo-600 flex items-center justify-center text-xl mr-4">
-                        <i class="fa-solid fa-rss"></i>
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-white/10 bg-slate-900/40 shrink-0">
+            <button id="drawer-tab-config" onclick="switchDrawerTab('config')" class="flex-1 py-3 text-center text-xs font-bold border-b-2 border-indigo-500 text-indigo-400 transition">
+                属性配置
+            </button>
+            <button id="drawer-tab-articles" onclick="switchDrawerTab('articles')" class="flex-1 py-3 text-center text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-300 transition">
+                实时文章
+            </button>
+        </div>
+
+        <!-- Drawer Content -->
+        <div class="detail-pane-content flex-1 custom-scrollbar">
+            <!-- TAB: CONFIG -->
+            <div id="drawer-content-config" class="space-y-5">
+                <input type="hidden" id="drawer-feed-id">
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="drawer-feed-name" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">订阅源名称</label>
+                        <input type="text" id="drawer-feed-name" class="form-input-baseline w-full px-3 py-2 text-sm focus:outline-none">
                     </div>
                     <div>
-                        <h3 class="text-xl font-bold text-slate-800" id="edit-feed-modal-title">编辑订阅源</h3>
-                        <p class="text-xs text-slate-400 font-mono mt-0.5" id="edit-feed-modal-subtitle">ID</p>
-                    </div>
-                </div>
-                <button onclick="closeEditFeed()"
-                    class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100/50 text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 transition"
-                    aria-label="关闭编辑">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div class="p-8 overflow-y-auto max-h-[70vh] space-y-6">
-                <input type="hidden" id="edit-feed-id">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">名称</label>
-                        <input type="text" id="edit-feed-name" placeholder="例如: TechCrunch"
-                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <label for="drawer-feed-url" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">RSS 源地址 (URL)</label>
+                        <input type="text" id="drawer-feed-url" class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">RSS 地址</label>
-                        <input type="text" id="edit-feed-url" placeholder="https://..."
-                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
+                        <label for="drawer-feed-category" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">归属分类</label>
+                        <input type="text" id="drawer-feed-category" class="form-input-baseline w-full px-3 py-2 text-sm focus:outline-none">
                     </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="drawer-feed-interval" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">默认间隔 (秒)</label>
+                            <input type="number" id="drawer-feed-interval" class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="drawer-feed-cron" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cron 刷新策略</label>
+                            <input type="text" id="drawer-feed-cron" class="form-input-baseline w-full px-3 py-2 text-sm font-mono focus:outline-none">
+                        </div>
+                    </div>
+
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">分类</label>
-                        <input type="text" id="edit-feed-category" placeholder="Tech"
-                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <label for="drawer-feed-description" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">简介与描述</label>
+                        <textarea id="drawer-feed-description" rows="3" class="form-input-baseline w-full px-3 py-2 text-sm focus:outline-none resize-none" placeholder="输入关于订阅源的背景介绍..."></textarea>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">间隔(秒)</label>
-                        <input type="number" id="edit-feed-interval" placeholder="900"
-                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Cron 表达式 (可选)</label>
-                        <input type="text" id="edit-feed-cron" placeholder="*/15 * * * *"
-                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">源简介 (简短描述)</label>
-                        <input type="text" id="edit-feed-description" placeholder="专注于苹果新闻和应用推荐的中文博客..."
-                            class="w-full px-3 py-2 bg-slate-50/50 border border-slate-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                    </div>
+
                     <div class="flex items-center">
-                        <input type="checkbox" id="edit-feed-is-public"
-                            class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-2">
-                        <label for="edit-feed-is-public" class="text-xs font-semibold text-slate-600 cursor-pointer">公开池源</label>
+                        <input type="checkbox" id="drawer-feed-is-public" class="h-4 w-4 rounded border-white/10 bg-slate-950 text-indigo-600 focus:ring-indigo-500 mr-2">
+                        <label for="drawer-feed-is-public" class="text-xs font-bold text-slate-400 cursor-pointer select-none">公开共享（所有人可见）</label>
                     </div>
                 </div>
-                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100/50">
-                    <button onclick="closeEditFeed()"
-                        class="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 text-sm transition">
-                        取消
-                    </button>
-                    <button onclick="saveEditFeed()"
-                        class="bg-slate-800 text-white px-5 py-2 rounded-lg hover:bg-slate-700 transition text-sm font-medium shadow-md shadow-slate-800/20">
-                        保存修改
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- User Details Modal -->
-    <div id="user-settings-overlay"
-        class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-        onclick="onUserSettingsOverlayClick(event)">
-        <div class="glass-card bg-white/95 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden animate-fade-in"
-            onclick="event.stopPropagation()">
-            <div
-                class="px-8 py-6 border-b border-slate-100/50 flex justify-between items-center bg-gradient-to-r from-slate-50/50 to-white/50">
-                <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 rounded-full bg-blue-100/50 text-blue-600 flex items-center justify-center text-xl mr-4">
-                        <i class="fa-solid fa-user"></i>
+                <!-- Drawer Footer Actions -->
+                <div class="pt-5 border-t border-white/10 flex flex-wrap gap-2 justify-between items-center">
+                    <div class="flex gap-2">
+                        <button onclick="saveDrawerFeed()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-4 rounded-lg transition">保存修改</button>
+                        <button onclick="drawerRefreshFeed()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs py-2 px-3 rounded-lg transition border border-white/5" title="立即刷新源"><i class="fa-solid fa-sync text-[10px] mr-1.5"></i>刷新源</button>
                     </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-800" id="user-settings-title">User</h3>
-                        <p class="text-xs text-slate-400 font-mono mt-0.5" id="user-settings-subtitle">ID</p>
+                    <div class="flex gap-2">
+                        <button onclick="drawerClearFeedData()" class="bg-amber-600/10 hover:bg-amber-600/20 text-amber-400 font-bold text-xs py-2 px-3 rounded-lg transition border border-amber-500/20" title="清空文章缓存">清空缓存</button>
+                        <button onclick="drawerDeleteFeed()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition">删除源</button>
                     </div>
                 </div>
-                <button onclick="closeUserSettings()"
-                    class="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100/50 text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 transition"
-                    aria-label="关闭用户设置">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
             </div>
-            <div class="p-8 overflow-y-auto max-h-[70vh] space-y-8">
-                <div>
-                    <h4
-                        class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100/50 pb-2">
-                        基础信息</h4>
-                    <div id="user-settings-meta" class="grid grid-cols-2 gap-4"></div>
-                </div>
-                <div>
-                    <h4
-                        class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100/50 pb-2">
-                        配置数据 (JSON)</h4>
-                    <div class="bg-slate-900/90 rounded-xl p-5 overflow-x-auto shadow-inner">
-                        <pre id="user-settings-json" class="text-xs text-emerald-400 font-mono leading-relaxed"></pre>
+
+            <!-- TAB: ARTICLES -->
+            <div id="drawer-content-articles" class="space-y-4 hidden">
+                <!-- Empty State -->
+                <div id="drawer-articles-empty" class="hidden py-16 text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-950/60 flex items-center justify-center text-slate-500 mb-4 border border-white/5 mx-auto">
+                        <i class="fa-solid fa-newspaper text-xl"></i>
                     </div>
+                    <p class="text-sm font-bold text-slate-400">暂无文章</p>
+                    <p class="text-xs mt-1 text-slate-500">该源目前没有任何缓存的文章</p>
+                </div>
+                
+                <!-- List -->
+                <div id="drawer-articles-list" class="space-y-3"></div>
+                
+                <!-- Load More Button -->
+                <div class="pt-2">
+                    <button id="drawer-articles-load-more" onclick="drawerLoadMoreArticles()" class="w-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-white/5 py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center">
+                        加载更多
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
+    </aside>
 
     <div id="relations-overlay"
         class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
@@ -1208,7 +996,7 @@
                     <i class="fa-solid fa-shield-halved text-white text-2xl"></i>
                 </div>
                 <h2 id="login-title" class="text-2xl font-bold text-slate-800">管理员登录</h2>
-                <p class="text-slate-600 mt-2 leading-relaxed">请输入管理员密码以继续访问控制台。</p>
+                <p class="text-slate-700 mt-2 leading-relaxed">请输入管理员密码以继续访问控制台。</p>
             </div>
 
             <form id="login-form" class="space-y-6">
@@ -1219,7 +1007,7 @@
                     </div>
                     <div class="relative">
                         <input type="password" id="login-password" autocomplete="current-password"
-                            class="w-full pl-4 pr-12 py-3 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none transition"
+                            class="w-full pl-4 pr-12 py-3 bg-slate-50/50 border border-slate-200/60 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none transition text-slate-800"
                             placeholder="••••••••" required aria-describedby="login-help login-error"
                             aria-invalid="false">
                         <button type="button" id="login-password-toggle"
@@ -1228,7 +1016,7 @@
                             <i id="login-password-toggle-icon" class="fa-regular fa-eye"></i>
                         </button>
                     </div>
-                    <p id="login-help" class="mt-2 text-xs text-slate-600">提示：验证失败时不会保存你的输入。</p>
+                    <p id="login-help" class="mt-2 text-xs text-slate-700">提示：验证失败时不会保存你的输入。</p>
                     <p id="login-error" class="mt-2 text-sm text-red-600 hidden" role="status" aria-live="polite"></p>
                 </div>
                 <button type="submit" id="login-submit"

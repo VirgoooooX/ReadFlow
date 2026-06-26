@@ -349,15 +349,15 @@ function renderLlmUsage(rangeDays, rows) {
         const tokens = Number(r.tokens || 0);
         return `
             <tr>
-                <td class="px-4 py-3 text-left font-mono text-xs text-slate-700">${day}</td>
-                <td class="px-4 py-3 text-left text-slate-800">${feature}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${requests}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${ok}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${rateLimited}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${cacheHits}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${avgMs}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${p95Ms}</td>
-                <td class="px-4 py-3 text-right font-mono text-xs text-slate-700">${tokens}</td>
+                <td class="px-4 py-3 text-left font-mono text-xs text-slate-300">${day}</td>
+                <td class="px-4 py-3 text-left text-slate-200">${feature}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${requests}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${ok}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${rateLimited}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${cacheHits}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${avgMs}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${p95Ms}</td>
+                <td class="px-4 py-3 text-right font-mono text-xs text-slate-300">${tokens}</td>
             </tr>
         `;
     }).join('');
@@ -387,3 +387,27 @@ function attachLlmUsageEvents() {
         });
     }
 }
+
+window.switchSettingsTab = function (secName) {
+    // Toggle active classes on tab buttons
+    const buttons = document.querySelectorAll('.settings-tab-btn');
+    buttons.forEach(btn => {
+        const clickAttr = btn.getAttribute('onclick') || '';
+        if (clickAttr.includes(`'${secName}'`) || clickAttr.includes(`"${secName}"`)) {
+            btn.className = 'settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-indigo-500 text-indigo-400';
+        } else {
+            btn.className = 'settings-tab-btn flex-1 py-3 text-xs font-bold text-center border-b-2 border-transparent text-slate-400 hover:text-slate-300';
+        }
+    });
+
+    // Toggle hidden classes on form sections
+    const sections = document.querySelectorAll('.settings-sec');
+    sections.forEach(sec => {
+        if (sec.id === `setting-sec-${secName}`) {
+            sec.classList.remove('hidden');
+        } else {
+            sec.classList.add('hidden');
+        }
+    });
+};
+

@@ -46,9 +46,16 @@ function downloadLogs() {
 }
 
 function renderLogs() {
-    const container = document.getElementById('logs-container');
+    const containers = [
+        document.getElementById('logs-container'),
+        document.getElementById('settings-logs-container')
+    ].filter(Boolean);
+    if (containers.length === 0) return;
+
     if (_allLogs.length === 0) {
-        container.innerHTML = '<div class="text-slate-500 italic p-4 text-center mt-10">暂无日志数据</div>';
+        containers.forEach(container => {
+            container.innerHTML = '<div class="text-slate-500 italic p-4 text-center mt-10">暂无日志数据</div>';
+        });
         return;
     }
 
@@ -65,11 +72,13 @@ function renderLogs() {
     }
 
     if (filtered.length === 0) {
-        container.innerHTML = '<div class="text-slate-500 italic p-4 text-center mt-10">无匹配的日志记录</div>';
+        containers.forEach(container => {
+            container.innerHTML = '<div class="text-slate-500 italic p-4 text-center mt-10">无匹配的日志记录</div>';
+        });
         return;
     }
 
-    container.innerHTML = filtered.map(line => {
+    const html = filtered.map(line => {
         let colorClass = 'text-slate-300';
         if (line.includes('[ERROR]')) colorClass = 'text-red-400 font-bold';
         else if (line.includes('[WARN]')) colorClass = 'text-yellow-400';
@@ -77,7 +86,7 @@ function renderLogs() {
 
         let resultHtml = '';
         if (_currentLogSearch) {
-            const regex = new RegExp(`(${_currentLogSearch.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'gi');
+            const regex = new RegExp(`(${_currentLogSearch.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')})`, 'gi');
             const parts = line.split(regex);
             resultHtml = parts.map(part => {
                 if (part.toLowerCase() === _currentLogSearch) {
@@ -92,5 +101,9 @@ function renderLogs() {
 
         return `<div class="${colorClass} mb-1 whitespace-pre-wrap font-mono leading-relaxed">${resultHtml}</div>`;
     }).join('');
-    container.scrollTop = container.scrollHeight;
+
+    containers.forEach(container => {
+        container.innerHTML = html;
+        container.scrollTop = container.scrollHeight;
+    });
 }

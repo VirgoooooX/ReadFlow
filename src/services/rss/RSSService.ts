@@ -507,6 +507,7 @@ export class RSSService {
       `;
       const results = await this.databaseService.executeQuery(query);
       return results.map(row => ({
+        uuid: row.uuid,
         url: row.url,
         name: row.title,
         description: row.description,
@@ -526,9 +527,6 @@ export class RSSService {
     }
   }
 
-  /**
-   * 导入同步的源
-   */
   public async importSourcesFromSync(sources: any[]): Promise<void> {
     try {
       await this.databaseService.beginTransaction();
@@ -549,11 +547,22 @@ export class RSSService {
           groupId = groupMap.get(source.groupName);
         }
 
-        // 检查是否存在 (by URL)
-        const existing = await this.databaseService.executeQuery(
-          'SELECT id, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency FROM rss_sources WHERE url = ?',
-          [source.url]
-        );
+        // 检查是否存在 (先 by UUID, 后 by URL)
+        let existing: any[] = [];
+        if (source.uuid) {
+          existing = await this.databaseService.executeQuery(
+            'SELECT id, url, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency, uuid FROM rss_sources WHERE uuid = ?',
+            [source.uuid]
+          );
+        }
+
+        // 如果按 UUID 没找到，尝试按 URL 找已存在的源
+        if (existing.length === 0 && source.url) {
+          existing = await this.databaseService.executeQuery(
+            'SELECT id, url, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency, uuid FROM rss_sources WHERE url = ?',
+            [source.url]
+          );
+        }
 
         if (existing.length > 0) {
           // Update
@@ -585,15 +594,17 @@ export class RSSService {
             typeof source.updateFrequency === 'number'
               ? source.updateFrequency
               : (typeof row.update_frequency === 'number' ? row.update_frequency : 3600);
+          const nextUrl = typeof source.url === 'string' ? source.url : row.url;
+          const nextUuid = source.uuid || row.uuid; // Keep existing or write newly assigned UUID
 
           await this.databaseService.executeStatement(
             `UPDATE rss_sources SET 
-              title = ?, description = ?, category = ?, content_type = ?, 
+              url = ?, uuid = ?, title = ?, description = ?, category = ?, content_type = ?, 
               source_mode = ?, is_active = ?, fetch_limit = ?, retention_limit = ?, 
               group_id = ?, sort_order = ?, update_frequency = ?
              WHERE id = ?`,
             [
-              nextTitle, nextDescription, nextCategory, nextContentType,
+              nextUrl, nextUuid, nextTitle, nextDescription, nextCategory, nextContentType,
               nextSourceMode, isActive ? 1 : 0,
               nextFetchLimit,
               nextRetentionLimit,
@@ -603,12 +614,17 @@ export class RSSService {
           );
         } else {
           // Insert
+          const nextUuid = source.uuid || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
           await this.databaseService.executeStatement(
             `INSERT INTO rss_sources 
-              (url, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency, last_updated)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (url, uuid, title, description, category, content_type, source_mode, is_active, fetch_limit, retention_limit, group_id, sort_order, update_frequency, last_updated)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              source.url, source.name, source.description, source.category,
+              source.url, nextUuid, source.name, source.description, source.category,
               source.contentType, source.sourceMode, isActive ? 1 : 0,
               source.fetchLimit ?? source.maxArticles ?? 50,
               source.retentionLimit ?? source.maxArticles ?? 100,

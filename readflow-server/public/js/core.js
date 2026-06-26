@@ -217,6 +217,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Theme Init ---
+    const currentTheme = localStorage.getItem('admin-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    updateThemeUI(currentTheme);
+
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const nowTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', nowTheme);
+            localStorage.setItem('admin-theme', nowTheme);
+            updateThemeUI(nowTheme);
+        });
+    }
+
     loadServerMeta().catch(() => { });
 
     // Init Views
@@ -293,6 +309,16 @@ function escapeHtml(input) {
     return div.innerHTML;
 }
 
+function updateThemeUI(theme) {
+    const icon = document.getElementById('theme-toggle-icon');
+    if (!icon) return;
+    if (theme === 'light') {
+        icon.className = 'fa-solid fa-sun text-sm';
+    } else {
+        icon.className = 'fa-solid fa-moon text-sm';
+    }
+}
+
 // --- UI/Navigation Logic ---
 
 function showTab(tabId) {
@@ -334,7 +360,10 @@ function showTab(tabId) {
     if (view) {
         view.classList.remove('hidden');
         // Lazy load data
-        if (tabId === 'settings' && typeof loadSettings === 'function') loadSettings();
+        if (tabId === 'settings' && typeof loadSettings === 'function') {
+            loadSettings();
+            if (typeof loadLogs === 'function') loadLogs();
+        }
         if (tabId === 'users' && typeof loadUsers === 'function') loadUsers();
         if (tabId === 'feeds' && typeof loadFeeds === 'function') loadFeeds();
         if (tabId === 'images' && typeof loadImages === 'function') loadImages();

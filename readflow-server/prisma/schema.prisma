@@ -93,6 +93,7 @@ model UserRSSFilterRule {
 
 model RSSSource {
   id          Int     @id @default(autoincrement())
+  uuid        String  @unique @default(uuid())
   url         String  @unique
   name        String
   category    String  @default("General")

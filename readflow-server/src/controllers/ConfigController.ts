@@ -203,7 +203,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const { url, name, category, description, groupId, groupName, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency } = req.body;
+            const { uuid, url, name, category, description, groupId, groupName, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency } = req.body;
             let effectiveGroupId =
                 typeof groupId === 'number'
                     ? groupId
@@ -218,13 +218,31 @@ export class ConfigController {
                 effectiveGroupId = group.id;
             }
 
-            // Find or create global source first
-            let source = await prisma.rSSSource.findUnique({ where: { url } });
+            // Find or create global source first (match by UUID first, fallback to URL)
+            const cleanUuid = uuid ? String(uuid).trim() : '';
+            const cleanUrl = url ? String(url).trim() : '';
+            if (!cleanUrl) return res.status(400).json({ success: false, message: 'URL is required' });
+
+            let source = null;
+            if (cleanUuid) {
+                source = await prisma.rSSSource.findUnique({ where: { uuid: cleanUuid } });
+            }
+            if (!source) {
+                source = await prisma.rSSSource.findUnique({ where: { url: cleanUrl } });
+                if (source && cleanUuid && !source.uuid) {
+                    source = await prisma.rSSSource.update({
+                        where: { id: source.id },
+                        data: { uuid: cleanUuid }
+                    });
+                }
+            }
+
             if (!source) {
                 const desc = typeof description === 'string' ? description.trim() : '';
                 source = await prisma.rSSSource.create({
                     data: {
-                        url,
+                        uuid: cleanUuid || undefined,
+                        url: cleanUrl,
                         name: name || 'Unknown',
                         category: category || 'General',
                         description: desc || null,
@@ -232,8 +250,17 @@ export class ConfigController {
                 });
             } else {
                 const desc = typeof description === 'string' ? description.trim() : '';
-                if (desc && !String((source as any).description || '').trim()) {
-                    await prisma.rSSSource.update({ where: { id: source.id }, data: { description: desc } });
+                const nextDesc = (desc && !String((source as any).description || '').trim()) ? desc : undefined;
+                const nextUrl = (source.url !== cleanUrl) ? cleanUrl : undefined;
+                
+                if (nextDesc || nextUrl) {
+                    source = await prisma.rSSSource.update({
+                        where: { id: source.id },
+                        data: {
+                            ...(nextDesc ? { description: nextDesc } : {}),
+                            ...(nextUrl ? { url: nextUrl } : {})
+                        }
+                    });
                 }
             }
 
@@ -412,7 +439,7 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const sources = req.body; // Array of { url, name, category, description, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency, groupId?, groupName? }
+            const sources = req.body; // Array of { uuid?, url, name, category, description, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency, groupId?, groupName? }
 
             if (!Array.isArray(sources)) return res.status(400).json({ success: false, message: 'Body must be an array' });
 
@@ -424,6 +451,7 @@ export class ConfigController {
 
             const results = [];
             for (const s of sources) {
+                const uuid = s?.uuid ? String(s.uuid).trim() : '';
                 const url = s?.url ? String(s.url).trim() : '';
                 if (!url) continue;
                 let effectiveGroupId =
@@ -446,11 +474,26 @@ export class ConfigController {
                     }
                 }
 
-                let source = await prisma.rSSSource.findUnique({ where: { url } });
+                // Match by UUID first, fallback to URL
+                let source = null;
+                if (uuid) {
+                    source = await prisma.rSSSource.findUnique({ where: { uuid } });
+                }
+                if (!source) {
+                    source = await prisma.rSSSource.findUnique({ where: { url } });
+                    if (source && uuid && !source.uuid) {
+                        source = await prisma.rSSSource.update({
+                            where: { id: source.id },
+                            data: { uuid }
+                        });
+                    }
+                }
+
                 if (!source) {
                     const desc = typeof s?.description === 'string' ? String(s.description).trim() : '';
                     source = await prisma.rSSSource.create({
                         data: {
+                            uuid: uuid || undefined,
                             url,
                             name: s.name || 'Unknown',
                             category: s.category || 'General',
@@ -459,8 +502,17 @@ export class ConfigController {
                     });
                 } else {
                     const desc = typeof s?.description === 'string' ? String(s.description).trim() : '';
-                    if (desc && !String((source as any).description || '').trim()) {
-                        await prisma.rSSSource.update({ where: { id: source.id }, data: { description: desc } });
+                    const nextDesc = (desc && !String((source as any).description || '').trim()) ? desc : undefined;
+                    const nextUrl = (source.url !== url) ? url : undefined;
+                    
+                    if (nextDesc || nextUrl) {
+                        source = await prisma.rSSSource.update({
+                            where: { id: source.id },
+                            data: {
+                                ...(nextDesc ? { description: nextDesc } : {}),
+                                ...(nextUrl ? { url: nextUrl } : {})
+                            }
+                        });
                     }
                 }
                 const uf = await (prisma as any).userFeed.upsert({
@@ -493,6 +545,23 @@ export class ConfigController {
                     }
                 });
                 results.push(uf);
+            }
+
+            // Sync deletion: remove any UserFeed that is not in the pushed batch
+            const processedSourceIds = results.map(uf => uf.sourceId);
+            if (processedSourceIds.length > 0) {
+                await (prisma as any).userFeed.deleteMany({
+                    where: {
+                        userId: userUuid,
+                        sourceId: { notIn: processedSourceIds }
+                    }
+                });
+            } else {
+                await (prisma as any).userFeed.deleteMany({
+                    where: {
+                        userId: userUuid
+                    }
+                });
             }
 
             res.json({ success: true, count: results.length });

@@ -1,82 +1,176 @@
 // 5. Users
+let _loadedUsers = [];
+
 async function loadUsers() {
-    const tbody = document.getElementById('users-list');
+    const deck = document.getElementById('users-deck');
+    if (!deck) return;
     const userSkeleton = `
-    <tr class="animate-pulse border-b border-slate-100">
-        <td class="px-6 py-4"><div class="flex items-center"><div class="w-9 h-9 rounded-full bg-slate-200 mr-3"></div><div><div class="h-4 w-24 bg-slate-200 rounded mb-2"></div><div class="h-3 w-16 bg-slate-100 rounded"></div></div></div></td>
-        <td class="px-6 py-4"><div class="h-4 w-32 bg-slate-200 rounded"></div></td>
-        <td class="px-6 py-4"><div class="h-4 w-20 bg-slate-200 rounded"></div></td>
-        <td class="px-6 py-4"><div class="h-5 w-24 bg-slate-200 rounded"></div></td>
-        <td class="px-6 py-4"><div class="h-6 w-12 bg-slate-200 rounded-full mx-auto"></div></td>
-        <td class="px-6 py-4"><div class="flex justify-end space-x-2"><div class="w-12 h-8 rounded-lg bg-slate-200"></div><div class="w-12 h-8 rounded-lg bg-slate-200"></div></div></td>
-    </tr>
+    <div class="animate-pulse glass-card p-6 rounded-2xl h-44"></div>
     `;
-    if (!tbody.innerHTML.trim() || tbody.innerHTML.includes('animate-pulse')) {
-        tbody.innerHTML = userSkeleton.repeat(5);
+    if (!deck.innerHTML.trim() || deck.innerHTML.includes('animate-pulse')) {
+        deck.innerHTML = userSkeleton.repeat(3);
     }
 
-    const res = await fetch(`${API_BASE}/users`);
-    const users = await res.json();
+    try {
+        const res = await fetch(`${API_BASE}/users`);
+        const users = await res.json();
+        _loadedUsers = Array.isArray(users) ? users : [];
 
-    if (!users || users.length === 0) {
-        tbody.innerHTML = `
-        <tr>
-            <td colspan="100%" class="px-6 py-16 text-center bg-slate-50/30">
-                <div class="flex flex-col items-center justify-center">
-                    <div class="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-slate-400 mb-4 shadow-sm border border-slate-200">
-                        <i class="fa-solid fa-users-slash text-2xl"></i>
+        if (_loadedUsers.length === 0) {
+            deck.innerHTML = `
+            <div class="col-span-full py-16 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-slate-950/60 flex items-center justify-center text-slate-500 mb-4 border border-white/5 mx-auto">
+                    <i class="fa-solid fa-users-slash text-xl"></i>
+                </div>
+                <p class="text-sm font-bold text-slate-400">暂无用户</p>
+                <p class="text-xs mt-1 text-slate-500">当前系统还没有注册任何用户</p>
+            </div>
+            `;
+            return;
+        }
+
+        deck.innerHTML = _loadedUsers.map(u => `
+        <div class="glass-card p-6 rounded-2xl flex flex-col space-y-4 border border-white/5" data-user-id="${u.id}">
+            <!-- Header -->
+            <div class="flex items-start justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-base font-bold shadow-md shadow-indigo-500/10">
+                        ${u.username ? u.username.charAt(0).toUpperCase() : 'U'}
                     </div>
-                    <p class="text-sm font-bold text-slate-600">暂无用户</p>
-                    <p class="text-xs mt-1 text-slate-400">当前系统还没有注册任何用户</p>
+                    <div>
+                        <h4 class="font-bold text-white text-sm">${escapeHtml(u.username)}</h4>
+                        <p class="text-[10px] text-slate-500 font-mono mt-0.5">ID: ${u.id.substring(0, 8)}...</p>
+                    </div>
                 </div>
-            </td>
-        </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = users.map(u => `
-    <tr class="hover:bg-white/60 transition border-b border-slate-200/60 last:border-0">
-        <td data-label="用户" class="px-6 py-4">
-            <div class="flex items-center">
-                <div class="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-sm shadow-sm mr-3">
-                    ${u.username ? u.username.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div>
-                    <div class="font-bold text-slate-800 text-sm">${u.username}</div>
-                    <div class="text-xs text-slate-500 font-mono mt-0.5 font-medium">${u.id.substring(0, 8)}...</div>
+                
+                <div class="flex space-x-1">
+                    <button onclick="toggleUserConfig('${u.id}')" title="配置 JSON" class="text-slate-400 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-white/5 transition">
+                        <i class="fa-solid fa-code text-xs"></i>
+                    </button>
+                    <button onclick="deleteUser('${u.id}')" title="删除用户" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-white/5 transition">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
                 </div>
             </div>
-        </td>
-        <td data-label="联系方式" class="px-6 py-4 text-sm text-slate-700 font-medium">${u.email || '<span class="text-slate-400 italic">No Email</span>'}</td>
-        <td data-label="注册时间" class="px-6 py-4 text-xs text-slate-600 font-medium">${u.registeredAt ? new Date(u.registeredAt).toLocaleDateString() : '-'}</td>
-        <td data-label="最后活跃" class="px-6 py-4 text-xs">
-            <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-medium">
-                ${u.lastActive ? new Date(u.lastActive).toLocaleString() : 'Never'}
-            </span>
-        </td>
-        <td data-label="订阅源" class="px-6 py-4 text-center">
-            <button onclick="viewUserFeeds('${u.id}')" class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition" title="查看该用户订阅源">
-                ${u.feedCount ?? 0}
-            </button>
-        </td>
-        <td data-label="操作" class="px-6 py-4 text-right space-x-2">
-            <button onclick="viewUserSettings('${u.id}')" class="bg-slate-800 text-white hover:bg-slate-700 px-3 py-1.5 rounded-lg transition text-xs font-medium shadow-sm">
-                详情
-            </button>
-            <button onclick="deleteUser('${u.id}')" class="bg-red-600 text-white hover:bg-red-700 px-3 py-1.5 rounded-lg transition text-xs font-medium shadow-sm">
-                删除
-            </button>
-        </td>
-    </tr>
-`).join('');
+
+            <!-- Metadata Fields -->
+            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-900/30 p-3 rounded-xl border border-white/5">
+                <div>
+                    <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">联系邮箱</div>
+                    <div class="text-slate-300 truncate" title="${u.email || ''}">${escapeHtml(u.email || '无')}</div>
+                </div>
+                <div>
+                    <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">订阅源数</div>
+                    <button onclick="viewUserFeeds('${u.id}')" class="text-indigo-400 hover:underline font-bold text-left block">
+                        ${u.feedCount ?? 0} 个源
+                    </button>
+                </div>
+                <div>
+                    <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">注册时间</div>
+                    <div class="text-slate-300 truncate">${u.registeredAt ? new Date(u.registeredAt).toLocaleDateString() : '-'}</div>
+                </div>
+                <div>
+                    <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">最后活跃</div>
+                    <div class="text-slate-300 truncate">${u.lastActive ? new Date(u.lastActive).toLocaleDateString() : '从未'}</div>
+                </div>
+            </div>
+
+            <!-- Accordion Expandable JSON Area -->
+            <div id="user-details-${u.id}" class="user-card-details space-y-3">
+                <div class="border-t border-white/5 pt-3">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">用户配置同步数据 (JSON)</span>
+                        <span class="text-[9px] text-slate-500 font-mono">configSync</span>
+                    </div>
+                    <textarea id="user-json-${u.id}" rows="8" class="w-full bg-slate-950 text-emerald-400 font-mono text-[10px] p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-indigo-500 resize-none leading-relaxed"></textarea>
+                    <div class="flex justify-end mt-2">
+                        <button onclick="saveUserConfig('${u.id}')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm">
+                            保存修改
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+        showToast('加载用户列表失败', 'error');
+    }
 }
+
+window.toggleUserConfig = function (id) {
+    const detailEl = document.getElementById(`user-details-${id}`);
+    const textarea = document.getElementById(`user-json-${id}`);
+    if (!detailEl || !textarea) return;
+
+    const isOpen = detailEl.classList.contains('open');
+    // Close others
+    document.querySelectorAll('.user-card-details').forEach(el => el.classList.remove('open'));
+
+    if (!isOpen) {
+        const user = _loadedUsers.find(u => u.id === id);
+        if (user) {
+            const configSync = user?.config?.configSync || null;
+            textarea.value = JSON.stringify(configSync, null, 2);
+        }
+        detailEl.classList.add('open');
+    }
+};
+
+window.saveUserConfig = async function (id) {
+    const textarea = document.getElementById(`user-json-${id}`);
+    if (!textarea) return;
+    const user = _loadedUsers.find(u => u.id === id);
+    if (!user) return showToast('未找到该用户', 'error');
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(textarea.value);
+    } catch (err) {
+        return showToast('JSON 语法错误，请检查格式', 'error');
+    }
+
+    try {
+        const payload = {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            passwordHash: user.passwordHash,
+            registeredAt: user.registeredAt,
+            lastActive: user.lastActive,
+            config: {
+                configSync: parsed
+            }
+        };
+
+        const res = await fetch(`${API_BASE}/users`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Token': localStorage.getItem('adminToken') || ''
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            return showToast(data?.message || data?.error || '保存配置失败', 'error');
+        }
+
+        showToast('用户配置保存成功');
+        loadUsers();
+    } catch (e) {
+        console.error(e);
+        showToast('保存配置网络错误', 'error');
+    }
+};
 
 async function addUser() {
     const username = String(document.getElementById('user-name')?.value || '').trim();
     const email = String(document.getElementById('user-email')?.value || '').trim();
     const password = String(document.getElementById('user-password')?.value || '').trim();
-    if (!username || !email || !password) return;
+    if (!username || !email || !password) return showToast('请完整填写用户名、邮箱和密码', 'error');
+    
     const res = await fetch(`/api/auth/register`, {
         method: 'POST',
         headers: {
@@ -146,41 +240,7 @@ window.viewFeedSubscribers = async function (id) {
     }
 }
 
-// 6. User Settings Modal
-window.viewUserSettings = async function (id) {
-    const res = await fetch(`${API_BASE}/users`);
-    const users = await res.json();
-    const user = users.find(u => u.id === id);
-    if (!user) return;
-
-    document.getElementById('user-settings-title').textContent = user.username || 'User';
-    document.getElementById('user-settings-subtitle').textContent = user.id;
-    const configSync = user?.config?.configSync || null;
-    const merged =
-        configSync && typeof configSync === 'object'
-            ? (() => {
-                const { settings, ...rest } = configSync;
-                const s = settings && typeof settings === 'object' ? settings : {};
-                return { ...rest, ...s };
-            })()
-            : null;
-    document.getElementById('user-settings-json').textContent = JSON.stringify(merged, null, 2);
-
-    const meta = document.getElementById('user-settings-meta');
-    const item = (label, val) => `
-    <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">
-        <div class="text-xs font-bold text-slate-400 mb-1 uppercase">${label}</div>
-        <div class="font-semibold text-slate-800 text-sm truncate" title="${val}">${val}</div>
-    </div>
-`;
-    meta.innerHTML = `
-    ${item('用户 ID', user.id)}
-    ${item('电子邮箱', user.email || '-')}
-    ${item('注册时间', user.registeredAt ? new Date(user.registeredAt).toLocaleString() : '-')}
-    ${item('最后活跃', user.lastActive ? new Date(user.lastActive).toLocaleString() : '-')}
-`;
-    document.getElementById('user-settings-overlay').classList.remove('hidden');
-}
-
-window.closeUserSettings = () => document.getElementById('user-settings-overlay').classList.add('hidden');
-window.onUserSettingsOverlayClick = (ev) => { if (ev.target.id === 'user-settings-overlay') closeUserSettings(); };
+// Fallback compatibility link
+window.viewUserSettings = function (id) {
+    toggleUserConfig(id);
+};

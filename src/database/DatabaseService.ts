@@ -146,6 +146,7 @@ export class DatabaseService {
         { name: 'fetch_limit', sql: 'ALTER TABLE rss_sources ADD COLUMN fetch_limit INTEGER DEFAULT 50' },
         { name: 'retention_limit', sql: 'ALTER TABLE rss_sources ADD COLUMN retention_limit INTEGER DEFAULT 100' },
         { name: 'latest_published_at', sql: 'ALTER TABLE rss_sources ADD COLUMN latest_published_at TEXT' },
+        { name: 'uuid', sql: 'ALTER TABLE rss_sources ADD COLUMN uuid TEXT' },
       ];
 
       for (const column of columnsToAdd) {
@@ -169,6 +170,28 @@ export class DatabaseService {
             console.warn(`⚠️ Could not add ${column.name} column:`, error);
           }
         }
+      }
+
+      // 填充缺失的 UUID
+      try {
+        const rowsWithoutUuid = await this.db.getAllAsync('SELECT id FROM rss_sources WHERE uuid IS NULL OR uuid = ""');
+        if (rowsWithoutUuid.length > 0) {
+          console.log(`Populating UUIDs for ${rowsWithoutUuid.length} rss_sources...`);
+          const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              const v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+          };
+          for (const row of rowsWithoutUuid as any[]) {
+            const uuid = generateUUID();
+            await this.db.execAsync(`UPDATE rss_sources SET uuid = '${uuid}' WHERE id = ${row.id}`);
+          }
+          console.log('✅ UUIDs populated successfully');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not populate UUIDs for rss_sources:', error);
       }
 
       // 处理 articles 表

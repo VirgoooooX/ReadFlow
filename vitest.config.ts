@@ -6,12 +6,10 @@ export default defineConfig({
     environment: 'node',
     setupFiles: [],
     testTimeout: 30000,
+    exclude: ['**/node_modules/**', '**/dist/**', 'readflow-server/**'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
   },
   resolve: {
     alias: {

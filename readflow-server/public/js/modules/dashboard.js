@@ -5,10 +5,10 @@ async function loadStatus() {
         const skeletonCard = `
         <div class="glass-card p-6 rounded-xl flex items-center justify-between animate-pulse">
             <div>
-                <div class="h-4 bg-slate-200 rounded w-16 mb-3"></div>
-                <div class="h-8 bg-slate-200 rounded w-24"></div>
+                <div class="h-4 bg-slate-800 rounded w-16 mb-3"></div>
+                <div class="h-8 bg-slate-800 rounded w-24"></div>
             </div>
-            <div class="w-12 h-12 rounded-full bg-slate-100"></div>
+            <div class="w-12 h-12 rounded-full bg-slate-800"></div>
         </div>
         `;
         // Only show skeleton if empty to avoid flashing on auto-refresh
@@ -22,18 +22,17 @@ async function loadStatus() {
         const data = await res.json();
 
         document.getElementById('header-status').textContent = '系统正常';
-        document.getElementById('header-status').parentElement.classList.replace('text-red-600', 'text-emerald-600');
-        document.getElementById('header-status').parentElement.classList.replace('bg-red-50', 'bg-emerald-50/50');
-        document.getElementById('header-status').parentElement.classList.replace('border-red-100', 'border-emerald-100/50');
+        const statusBadge = document.getElementById('header-status').parentElement;
+        statusBadge.className = "hidden md:flex items-center px-3 py-1 rounded-full bg-emerald-500/10 backdrop-blur-sm text-emerald-400 border border-emerald-500/20 text-xs font-medium shadow-sm";
 
         const card = (title, value, icon, color) => `
 
         <div class="glass-card p-6 rounded-xl flex items-center justify-between card-hover transition duration-200">
             <div>
-                <p class="text-sm font-bold text-slate-600 mb-1">${title}</p>
-                <p class="text-2xl font-extrabold text-slate-800">${value}</p>
+                <p class="text-sm font-bold text-slate-400 mb-1">${title}</p>
+                <p class="text-2xl font-extrabold text-slate-100">${value}</p>
             </div>
-            <div class="w-12 h-12 rounded-full bg-${color}-50/80 flex items-center justify-center text-${color}-600 shadow-sm border border-${color}-100">
+            <div class="w-12 h-12 rounded-full bg-${color}-600/10 flex items-center justify-center text-${color}-400 shadow-sm border border-${color}-500/20">
                 <i class="${icon} text-xl"></i>
             </div>
         </div>
@@ -69,9 +68,7 @@ async function loadStatus() {
         console.error(e);
         document.getElementById('header-status').textContent = '连接断开';
         const statusBadge = document.getElementById('header-status').parentElement;
-        statusBadge.classList.replace('text-emerald-600', 'text-red-600');
-        statusBadge.classList.replace('bg-emerald-50/50', 'bg-red-50');
-        statusBadge.classList.replace('border-emerald-100/50', 'border-red-100');
+        statusBadge.className = "hidden md:flex items-center px-3 py-1 rounded-full bg-red-500/10 backdrop-blur-sm text-red-400 border border-red-500/20 text-xs font-medium shadow-sm";
     }
 }
 
