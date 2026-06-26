@@ -1,12 +1,13 @@
-// 应用版本信息
+﻿// 应用版本信息
 // 此文件由构建脚本自动更新，请勿手动修改
 
 export const APP_VERSION = {
-  version: '10.0.1',
-  buildNumber: 100001,
+  version: '10.0.2',
+  buildNumber: 100002,
   updateTime: '2026-06-26',
   changelog: [
-    '版本更新 (暂无 Git 提交记录)',
+    'feat: implement automated CI/CD release workflows for Android APK and Docker containers',
+    'chore: update README and ignore release.md in git',
   ],
 };
 
