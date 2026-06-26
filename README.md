@@ -17,7 +17,7 @@ ReadFlow 是一套「移动端阅读器 + 自建云端服务」产品：
 | ReadFlow App（React Native / Expo） | `./src`, `./android` | `app-*` tag 触发 GitHub Actions 构建 APK，并上传到 GitHub Release | 阅读、订阅、学习、离线存储、高性能渲染 |
 | ReadFlow Server（Node/Express + Prisma/Postgres） | `./readflow-server` | 语义版本 tag 触发 GitHub Actions 构建 GHCR 镜像：`ghcr.io/virgooooox/readflowserver` | 云端核心：认证与同步、图片代理、管理后台、LLM 网关、定时刷新 |
 
-当前客户端版本：`10.0.2` / Android `versionCode 100002`。当前服务端版本：`4.0.6`。
+当前客户端版本：`10.0.3` / Android `versionCode 100003`。当前服务端版本：`4.0.7`。
 
 ## 目录
 
@@ -145,7 +145,7 @@ docker compose up -d --build
 
 ```bash
 docker pull ghcr.io/virgooooox/readflowserver:latest
-docker pull ghcr.io/virgooooox/readflowserver:4.0.6
+docker pull ghcr.io/virgooooox/readflowserver:4.0.7
 ```
 
 #### 手动开发
