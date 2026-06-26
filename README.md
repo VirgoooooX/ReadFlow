@@ -1,4 +1,4 @@
-﻿# <img src="./assets/icon.png" width="38" align="center" style="border-radius: 8px;" /> ReadFlow
+# <img src="./assets/icon.png" width="38" align="center" style="border-radius: 8px;" /> ReadFlow
 
 ReadFlow 是一套「移动端阅读器 + 自建云端服务」产品：
 

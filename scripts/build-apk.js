@@ -368,7 +368,11 @@ try {
     console.log(`📱 目标架构: ${targetArch} (${buildArch})`);
   }
 
-  const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
+  let appJsonRaw = fs.readFileSync(appJsonPath, 'utf-8');
+  if (appJsonRaw.startsWith('\uFEFF')) {
+    appJsonRaw = appJsonRaw.slice(1);
+  }
+  const appJson = JSON.parse(appJsonRaw);
 
   // 【优化】尝试从现有的 appVersion.ts 中读取信息
   let existingVersionInfo = null;
