@@ -1,23 +1,23 @@
-# ReadFlow
+# <img src="./assets/icon.png" width="38" align="center" style="border-radius: 8px;" /> ReadFlow
 
 ReadFlow 是一套「移动端阅读器 + 自建云端服务」产品：
 
 - **ReadFlow App**：面向 Android 的 Expo / React Native RSS 阅读客户端，提供订阅管理、沉浸式阅读、划词翻译、词汇复习、离线缓存和云同步。
 - **ReadFlow Server**：面向自托管部署的 Node.js / Express 服务端，负责 RSS 定时抓取、文章同步、图片代理、每日 AI 摘要、LLM 网关和管理后台。
 
-[![React Native](https://img.shields.io/badge/React%20Native-0.79.6-blue?logo=react&logoColor=white)](https://reactnative.dev/)
-[![Expo](https://img.shields.io/badge/Expo-53.0.0-black?logo=expo&logoColor=white)](https://expo.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+<p align="left">
+  <a href="https://reactnative.dev/"><img src="https://img.shields.io/badge/React%20Native-0.79.6-blue?logo=react&logoColor=white" /></a>
+  <a href="https://expo.dev/"><img src="https://img.shields.io/badge/Expo-53.0.0-black?logo=expo&logoColor=white" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white" /></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18+-green?logo=nodedotjs&logoColor=white" /></a>
+</p>
 
 | 产物 | 路径 | 发布方式 | 作用 |
 | --- | --- | --- | --- |
 | ReadFlow App（React Native / Expo） | `./src`, `./android` | `app-*` tag 触发 GitHub Actions 构建 APK，并上传到 GitHub Release | 阅读、订阅、学习、离线存储、高性能渲染 |
 | ReadFlow Server（Node/Express + Prisma/Postgres） | `./readflow-server` | 语义版本 tag 触发 GitHub Actions 构建 GHCR 镜像：`ghcr.io/virgooooox/readflowserver` | 云端核心：认证与同步、图片代理、管理后台、LLM 网关、定时刷新 |
 
-当前客户端版本：`10.0.0` / Android `versionCode 100000`。当前服务端版本：`4.0.1`。
-
-![ReadFlow Icon](./assets/icon.png)
+当前客户端版本：`10.0.1` / Android `versionCode 100001`。当前服务端版本：`4.0.5`。
 
 ## 目录
 

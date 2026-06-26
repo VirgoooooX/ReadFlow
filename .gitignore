@@ -97,3 +97,4 @@ task_plan.md
 .kiro/specs/rss-refresh-timer-stops/design.md
 .kiro/specs/rss-refresh-timer-stops/tasks.md
 release.ps1
+release.md
