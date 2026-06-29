@@ -1,8 +1,7 @@
 # <img src="./assets/icon.png" width="38" align="center" style="border-radius: 8px;" /> ReadFlow
 
-ReadFlow 鏄竴濂椼€岀Щ鍔ㄧ闃呰鍣?+ 鑷缓浜戠鏈嶅姟銆嶄骇鍝侊細
-
-- **ReadFlow App**锛氶潰鍚?Android 鐨?Expo / React Native RSS 闃呰瀹㈡埛绔紝鎻愪緵璁㈤槄绠＄悊銆佹矇娴稿紡闃呰銆佸垝璇嶇炕璇戙€佽瘝姹囧涔犮€佺绾跨紦瀛樺拰浜戝悓姝ャ€?- **ReadFlow Server**锛氶潰鍚戣嚜鎵樼閮ㄧ讲鐨?Node.js / Express 鏈嶅姟绔紝璐熻矗 RSS 瀹氭椂鎶撳彇銆佹枃绔犲悓姝ャ€佸浘鐗囦唬鐞嗐€佹瘡鏃?AI 鎽樿銆丩LM 缃戝叧鍜岀鐞嗗悗鍙般€?
+ReadFlow 閺勵垯绔存總妞尖偓宀€些閸斻劎顏梼鍛邦嚢閸?+ 閼奉亜缂撴禍鎴狀伂閺堝秴濮熼妴宥勯獓閸濅緤绱?
+- **ReadFlow App**閿涙岸娼伴崥?Android 閻?Expo / React Native RSS 闂冨懓顕扮€广垺鍩涚粩顖ょ礉閹绘劒绶电拋銏ゆ缁狅紕鎮婇妴浣圭焽濞寸绱￠梼鍛邦嚢閵嗕礁鍨濈拠宥囩倳鐠囨垯鈧浇鐦濆Ч鍥ь槻娑旂姰鈧胶顬囩痪璺ㄧ处鐎涙ê鎷版禍鎴濇倱濮濄儯鈧?- **ReadFlow Server**閿涙岸娼伴崥鎴ｅ殰閹垫顓搁柈銊ц閻?Node.js / Express 閺堝秴濮熺粩顖ょ礉鐠愮喕鐭?RSS 鐎规碍妞傞幎鎾冲絿閵嗕焦鏋冪粩鐘叉倱濮濄儯鈧礁娴橀悧鍥﹀敩閻炲棎鈧焦鐦￠弮?AI 閹芥顩﹂妴涓㎜M 缂冩垵鍙ч崪宀€顓搁悶鍡楁倵閸欒埇鈧?
 <p align="left">
   <a href="https://reactnative.dev/"><img src="https://img.shields.io/badge/React%20Native-0.79.6-blue?logo=react&logoColor=white" /></a>
   <a href="https://expo.dev/"><img src="https://img.shields.io/badge/Expo-53.0.0-black?logo=expo&logoColor=white" /></a>
@@ -10,31 +9,29 @@ ReadFlow 鏄竴濂椼€岀Щ鍔ㄧ闃呰鍣?+ 鑷缓浜戠鏈嶅
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18+-green?logo=nodedotjs&logoColor=white" /></a>
 </p>
 
-| 浜х墿 | 璺緞 | 鍙戝竷鏂瑰紡 | 浣滅敤 |
+| 娴溠呭⒖ | 鐠侯垰绶?| 閸欐垵绔烽弬鐟扮础 | 娴ｆ粎鏁?|
 | --- | --- | --- | --- |
-| ReadFlow App锛圧eact Native / Expo锛?| `./src`, `./android` | `app-*` tag 瑙﹀彂 GitHub Actions 鏋勫缓 APK锛屽苟涓婁紶鍒?GitHub Release | 闃呰銆佽闃呫€佸涔犮€佺绾垮瓨鍌ㄣ€侀珮鎬ц兘娓叉煋 |
-| ReadFlow Server锛圢ode/Express + Prisma/Postgres锛?| `./readflow-server` | 璇箟鐗堟湰 tag 瑙﹀彂 GitHub Actions 鏋勫缓 GHCR 闀滃儚锛歚ghcr.io/virgooooox/readflowserver` | 浜戠鏍稿績锛氳璇佷笌鍚屾銆佸浘鐗囦唬鐞嗐€佺鐞嗗悗鍙般€丩LM 缃戝叧銆佸畾鏃跺埛鏂?|
+| ReadFlow App閿涘湩eact Native / Expo閿?| `./src`, `./android` | `app-*` tag 鐟欙箑褰?GitHub Actions 閺嬪嫬缂?APK閿涘苯鑻熸稉濠佺炊閸?GitHub Release | 闂冨懓顕伴妴浣筋吂闂冨懌鈧礁顒熸稊鐘偓浣侯瀲缁惧灝鐡ㄩ崒銊ｂ偓渚€鐝幀褑鍏樺〒鍙夌厠 |
+| ReadFlow Server閿涘湤ode/Express + Prisma/Postgres閿?| `./readflow-server` | 鐠囶厺绠熼悧鍫熸拱 tag 鐟欙箑褰?GitHub Actions 閺嬪嫬缂?GHCR 闂€婊冨剼閿涙瓪ghcr.io/virgooooox/readflowserver` | 娴滄垹顏弽绋跨妇閿涙俺顓荤拠浣风瑢閸氬本顒為妴浣告禈閻楀洣鍞悶鍡愨偓浣侯吀閻炲棗鎮楅崣鑸偓涓㎜M 缂冩垵鍙ч妴浣哥暰閺冭泛鍩涢弬?|
 
-褰撳墠瀹㈡埛绔増鏈細`10.0.4` / Android `versionCode 100004`銆傚綋鍓嶆湇鍔＄鐗堟湰锛歚4.0.8`銆?
-## 鐩綍
+瑜版挸澧犵€广垺鍩涚粩顖滃閺堫剨绱癭10.0.4` / Android `versionCode 100004`閵嗗倸缍嬮崜宥嗘箛閸旓紕顏悧鍫熸拱閿涙瓪4.0.8`閵?
+## 閻╊喖缍?
+- [閺嶇绺鹃崝鐔诲厴娴滎喚鍋(#閺嶇绺鹃崝鐔诲厴娴滎喚鍋?
+- [閺嬭埖鐎鏃囩箻](#閺嬭埖鐎鏃囩箻)
+- [閸忔娊鏁ù浣衡柤](#閸忔娊鏁ù浣衡柤)
+- [韫囶偊鈧喎绱戞慨濯?#韫囶偊鈧喎绱戞慨?
+- [閻╊喖缍嶇紒鎾寸€痌(#閻╊喖缍嶇紒鎾寸€?
+- [鐢瓕顫嗛梻顕€顣絔(#鐢瓕顫嗛梻顕€顣?
 
-- [鏍稿績鍔熻兘浜偣](#鏍稿績鍔熻兘浜偣)
-- [鏋舵瀯婕旇繘](#鏋舵瀯婕旇繘)
-- [鍏抽敭娴佺▼](#鍏抽敭娴佺▼)
-- [蹇€熷紑濮媇(#蹇€熷紑濮?
-- [鐩綍缁撴瀯](#鐩綍缁撴瀯)
-- [甯歌闂](#甯歌闂)
+## 閺嶇绺鹃崝鐔诲厴娴滎喚鍋?
+### 濞ｅ崬瀹抽梼鍛邦嚢娑撳骸顒熸稊?
+- **閺嬩胶鐣?UI**閿涙岸鎷＄€靛綊妲勭拠璇插隘閸╃喍绱崠鏍畱閻ｅ矂娼伴敍宀勫櫚閻劎骞囨禒锝呭閻?Clean 鐠佹崘顓哥拠顓♀枅閵?- **濮ｅ繑妫╅幎銉ユ啞 (Daily Report)**閿涙艾鍩勯悽?LLM 閼奉亜濮╅悽鐔稿灇閸忋劌銇夌拋銏ゆ閺傚洨鐝烽惃鍕粵閸氬牓妲勭拠缁樺Г閸涘绱濈敮顔煎И韫囶偊鈧喐宕熼幑澶嬬壋韫囧啩鐜崐绗衡偓?- **閸掓帟鐦濋弻銉ㄧ槤娑撳海鐐曠拠?*閿涙氨鍋ｉ崙璇插礋鐠囧秴宓嗛崙娲櫞娑斿绱欓弨顖涘瘮鐠囧秴鑸版潻妯哄斧閿涘绱濋崣灞藉毊缂堟槒鐦ч崣銉ョ摍閿涘本澧嶉張澶嬬叀鐠囥垻绮ㄩ弸婊冩綆閸︺劍婀伴崷棰佺瑢娴滄垹顏崥灞绢劄缂傛挸鐡ㄩ妴?- **妤傛ɑ鈧嗗厴閸掓銆?*閿涙岸娉﹂幋?`@shopify/flash-list`閿涘苯婀崡鍐獓鐠併垽妲勫┃鎰瑓娓氭繄鍔ф穱婵囧瘮娑撴繃绮﹀姘З閵?
+### 娴滄垹顏稉鈧担鎾冲 (ReadFlow Server)
 
-## 鏍稿績鍔熻兘浜偣
+- **娴滄垿鍘ょ純顔兼倱濮?*閿涙俺顓归梼鍛爱閵嗕礁鍨庣紒鍕┾偓浣界箖濠娿倛顫夐崚娆嶁偓渚€妲勭拠鏄忣啎缂冾喖婀幍鈧張澶岊伂閸楁洝鐨熼幒銊ㄧ箻閸氬本顒為敍鍫濈唨娴?`serverCursor` 鐠囶厺绠熼敍澶堚偓?- **LLM 缂冩垵鍙у▽鑽ゆ倞**閿涙碍婀囬崝锛勵伂缂佺喍绔寸拫鍐ㄥ LLM 閼宠棄濮忛敍灞炬暜閹镐胶鐛婇崣?閸掑棝鎸撶痪褔妾哄ù浣碘偓浣歌嫙閸欐垿妲﹂崚妤冾吀閻炲棔绗岀€孤ゎ吀閺冦儱绻旈妴?- **閸忣剙鍙￠崣鎴犲箛婢堆冨泛**閿涙艾鍞寸純?RSS 閸欐垹骞囬崝鐔诲厴閿涘苯褰插ù蹇氼潔楠炴湹绔撮柨顔款吂闂冨懎鍙曢崗杈ㄥ腹閼芥劗娈戞妯垮窛闁插繑绨妴?- **閸ュ墽澧栨禒锝囨倞娑撳酣顣╅悜?*閿涙岸鈧俺绻?`Sharp` 鏉╂稖顢戞妯烩偓褑鍏橀崶鍓у缂傗晜鏂侀妴浣圭壐瀵繗娴嗛幑顫礄WebP閿涘寮烽梼鑼磵闁炬儳鐓欓崥宥勫敩閻炲棎鈧?- **缁狅紕鎮婇崥搴″酱**閿涙氨娲跨憴鍌滄磧閹貉呴兇缂佺喓濮搁幀浣碘偓浣烘暏閹撮攱妞跨捄鍐ㄥ閸?LLM 濞戝牐鈧绮虹拋掳鈧?
+## 閺嬭埖鐎鏃囩箻
 
-### 娣卞害闃呰涓庡涔?
-- **鏋佺畝 UI**锛氶拡瀵归槄璇诲尯鍩熶紭鍖栫殑鐣岄潰锛岄噰鐢ㄧ幇浠ｅ寲鐨?Clean 璁捐璇█銆?- **姣忔棩鎶ュ憡 (Daily Report)**锛氬埄鐢?LLM 鑷姩鐢熸垚鍏ㄥぉ璁㈤槄鏂囩珷鐨勮仛鍚堥槄璇绘姤鍛婏紝甯姪蹇€熸崟鎹夋牳蹇冧环鍊笺€?- **鍒掕瘝鏌ヨ瘝涓庣炕璇?*锛氱偣鍑诲崟璇嶅嵆鍑洪噴涔夛紙鏀寔璇嶅舰杩樺師锛夛紝鍙屽嚮缈昏瘧鍙ュ瓙锛屾墍鏈夋煡璇㈢粨鏋滃潎鍦ㄦ湰鍦颁笌浜戠鍚屾缂撳瓨銆?- **楂樻€ц兘鍒楄〃**锛氶泦鎴?`@shopify/flash-list`锛屽湪鍗冪骇璁㈤槄婧愪笅渚濈劧淇濇寔涓濇粦婊氬姩銆?
-### 浜戠涓€浣撳寲 (ReadFlow Server)
-
-- **浜戦厤缃悓姝?*锛氳闃呮簮銆佸垎缁勩€佽繃婊よ鍒欍€侀槄璇昏缃湪鎵€鏈夌鍗曡皟鎺ㄨ繘鍚屾锛堝熀浜?`serverCursor` 璇箟锛夈€?- **LLM 缃戝叧娌荤悊**锛氭湇鍔＄缁熶竴璋冨害 LLM 鑳藉姏锛屾敮鎸佺獊鍙?鍒嗛挓绾ч檺娴併€佸苟鍙戦槦鍒楃鐞嗕笌瀹¤鏃ュ織銆?- **鍏叡鍙戠幇澶у巺**锛氬唴缃?RSS 鍙戠幇鍔熻兘锛屽彲娴忚骞朵竴閿闃呭叕鍏辨帹鑽愮殑楂樿川閲忔簮銆?- **鍥剧墖浠ｇ悊涓庨鐑?*锛氶€氳繃 `Sharp` 杩涜楂樻€ц兘鍥剧墖缂╂斁銆佹牸寮忚浆鎹紙WebP锛夊強闃茬洍閾惧煙鍚嶄唬鐞嗐€?- **绠＄悊鍚庡彴**锛氱洿瑙傜洃鎺х郴缁熺姸鎬併€佺敤鎴锋椿璺冨害鍙?LLM 娑堣€楃粺璁°€?
-## 鏋舵瀯婕旇繘
-
-椤圭洰宸蹭粠鈥滄湰鍦颁紭鍏堚€濊繘鍖栦负鈥滀簯绔祴鑳解€濇灦鏋勶紝绉婚櫎浜嗘瀬绠€浠ｇ悊锛屽己鍖栦簡鏈嶅姟绔湪閲嶅瀷浠诲姟锛堝埛鏂般€佽В鏋愩€丩LM銆佷唬鐞嗭級涓婄殑鏀拺銆?
+妞ゅ湱娲板韫矤閳ユ粍婀伴崷棰佺喘閸忓牃鈧繆绻橀崠鏍﹁礋閳ユ粈绨粩顖濈ゴ閼宠В鈧繃鐏﹂弸鍕剁礉缁夊娅庢禍鍡樼€粻鈧禒锝囨倞閿涘苯宸遍崠鏍︾啊閺堝秴濮熺粩顖氭躬闁插秴鐎锋禒璇插閿涘牆鍩涢弬鑸偓浣叫掗弸鎰┾偓涓㎜M閵嗕椒鍞悶鍡礆娑撳﹦娈戦弨顖涙嫼閵?
 ```mermaid
 flowchart TB
   subgraph App["Mobile App (Expo / RN 0.79.6)"]
@@ -66,10 +63,10 @@ flowchart TB
   SRV --> LLM_API
 ```
 
-## 鍏抽敭娴佺▼
+## 閸忔娊鏁ù浣衡柤
 
-### 1) 浜戠鍚屾锛堣闃?鍒嗙粍/杩囨护锛?
-绯荤粺閲囩敤鍗曡皟閫掑鐨?`lastAckedArticleId` 涓?`serverCursor` 纭繚鏁版嵁涓€鑷存€э紝閬垮厤瑕嗙洊寮忔洿鏂般€?
+### 1) 娴滄垹顏崥灞绢劄閿涘牐顓归梼?閸掑棛绮?鏉╁洦鎶ら敍?
+缁崵绮洪柌鍥╂暏閸楁洝鐨熼柅鎺戭杻閻?`lastAckedArticleId` 娑?`serverCursor` 绾喕绻氶弫鐗堝祦娑撯偓閼峰瓨鈧嶇礉闁灝鍘ょ憰鍡欐磰瀵繑娲块弬鑸偓?
 ```mermaid
 sequenceDiagram
   autonumber
@@ -78,14 +75,14 @@ sequenceDiagram
   participant P as Postgres
 
   A->>S: GET /api/config/preferences (Pull)
-  S->>P: 璇诲彇褰掍竴鍖栧亸濂?(鐧藉悕鍗曟牎楠?
-  S-->>A: 杩斿洖 Merge 鍚庣殑閰嶇疆
+  S->>P: 鐠囪褰囪ぐ鎺嶇閸栨牕浜告總?(閻ц棄鎮曢崡鏇熺墡妤?
+  S-->>A: 鏉╂柨娲?Merge 閸氬海娈戦柊宥囩枂
   A->>S: POST /api/rss/sync/config (Push)
-  S->>P: 鍗曞悜鎺ㄨ繘 UserSourceCursor
+  S->>P: 閸楁洖鎮滈幒銊ㄧ箻 UserSourceCursor
 ```
 
-### 2) LLM 瀹¤涓庨檺娴?
-鎵€鏈夋煡璇嶃€佺炕璇戙€佹姤鍛婄敓鎴愬潎缁忚繃鏈嶅姟绔綉鍏炽€?
+### 2) LLM 鐎孤ゎ吀娑撳酣妾哄ù?
+閹碘偓閺堝鐓＄拠宥冣偓浣虹倳鐠囨垯鈧焦濮ら崨濠勬晸閹存劕娼庣紒蹇氱箖閺堝秴濮熺粩顖滅秹閸忕偨鈧?
 ```mermaid
 sequenceDiagram
   autonumber
@@ -94,63 +91,56 @@ sequenceDiagram
   participant Q as Global Queue
   participant E as External LLM
 
-  A->>G: 璇锋眰鏌ヨ瘝/缈昏瘧
-  G->>G: 绐佸彂闄愭祦 & 骞跺彂涓婇檺妫€鏌?  G->>Q: 杩涘叆浼樺厛绾ч槦鍒?  Q->>E: 璋冪敤妯″瀷
-  E-->>G: 杩斿洖缁撴灉
-  G->>A: 缁撴灉 + 娑堣€楀璁?```
+  A->>G: 鐠囬攱鐪伴弻銉ㄧ槤/缂堟槒鐦?  G->>G: 缁愪礁褰傞梽鎰ウ & 楠炶泛褰傛稉濠囨濡偓閺?  G->>Q: 鏉╂稑鍙嗘导妯哄帥缁狙囨Е閸?  Q->>E: 鐠嬪啰鏁ゅΟ鈥崇€?  E-->>G: 鏉╂柨娲栫紒鎾寸亯
+  G->>A: 缂佹挻鐏?+ 濞戝牐鈧顓哥拋?```
 
-## 蹇€熷紑濮?
-### 1. 鍚姩绉诲姩绔?(App)
+## 韫囶偊鈧喎绱戞慨?
+### 1. 閸氼垰濮╃粔璇插З缁?(App)
 
-閫傚悎鏈湴璋冭瘯闃呰涓庢湰鍦版ā寮忎綋楠屻€?
+闁倸鎮庨張顒€婀寸拫鍐槸闂冨懓顕版稉搴㈡拱閸︾増膩瀵繋缍嬫灞烩偓?
 ```bash
 npm install
 npm run start
 ```
 
-### 2. 閮ㄧ讲鏈嶅姟绔?(readflow-server)
+### 2. 闁劎璁查張宥呭缁?(readflow-server)
 
-寮虹儓寤鸿鍚敤鏈嶅姟绔互鑾峰緱瀹屾暣鍔熻兘锛堝悓姝ャ€佹姤鍛娿€佷唬鐞嗭級銆?
-#### 浣跨敤 Docker (鎺ㄨ崘)
+瀵櫣鍎撳楦款唴閸氼垳鏁ら張宥呭缁旑垯浜掗懢宄扮繁鐎瑰本鏆ｉ崝鐔诲厴閿涘牆鎮撳銉ｂ偓浣瑰Г閸涘鈧椒鍞悶鍡礆閵?
+#### 娴ｈ法鏁?Docker (閹恒劏宕?
 ```bash
 cd readflow-server
 docker compose up -d --build
 ```
 
-鐢熶骇闀滃儚鍙戝竷鍒?GitHub Container Registry锛?
+閻㈢喍楠囬梹婊冨剼閸欐垵绔烽崚?GitHub Container Registry閿?
 ```bash
 docker pull ghcr.io/virgooooox/readflowserver:latest
-docker pull ghcr.io/virgooooox/readflowserver:4.0.9
+docker pull ghcr.io/virgooooox/readflowserver:4.1.0
 ```
 
-#### 鎵嬪姩寮€鍙?```bash
+#### 閹靛濮╁鈧崣?```bash
 cd readflow-server
 npm install
-npm run db:up      # 鍚姩 DB
-npm run db:migrate # 鍒濆鍖栬〃
-npm run dev        # 鍚姩鍚庣
+npm run db:up      # 閸氼垰濮?DB
+npm run db:migrate # 閸掓繂顫愰崠鏍€?npm run dev        # 閸氼垰濮╅崥搴ｎ伂
 ```
 
-鏈嶅姟绔湴鍧€榛樿锛歚http://localhost:3000`
+閺堝秴濮熺粩顖氭勾閸р偓姒涙顓婚敍姝歨ttp://localhost:3000`
 
-## 鍙戝竷
-
-- **鏈嶅姟绔暅鍍?*锛氭帹閫?`x.y.z` 鎴?`vx.y.z` tag 鍚庯紝`.github/workflows/docker-release.yml` 浼氭瀯寤哄苟鎺ㄩ€?`linux/amd64`銆乣linux/arm64` 闀滃儚鍒?GHCR銆?- **Android APK**锛氭帹閫?`app-x.y.z` tag 鍚庯紝`.github/workflows/android-release.yml` 浼氬湪 GitHub Actions 涓瀯寤?release APK锛屽苟鎶?APK 闄勫姞鍒板搴?GitHub Release銆?- **鏈湴鏋勫缓鑴氭湰**锛歚scripts/build-apk.js` 淇濇寔鏈湴鏋勫缓鍏ュ彛锛涗簯绔?APK 鍙戝竷鐢?GitHub Actions 璋冪敤锛屼笉闇€瑕佹敼鏈湴鑴氭湰銆?
-## 鐩綍缁撴瀯
-
+## 閸欐垵绔?
+- **閺堝秴濮熺粩顖炴殔閸?*閿涙碍甯归柅?`x.y.z` 閹?`vx.y.z` tag 閸氬函绱漙.github/workflows/docker-release.yml` 娴兼碍鐎鍝勮嫙閹恒劑鈧?`linux/amd64`閵嗕梗linux/arm64` 闂€婊冨剼閸?GHCR閵?- **Android APK**閿涙碍甯归柅?`app-x.y.z` tag 閸氬函绱漙.github/workflows/android-release.yml` 娴兼艾婀?GitHub Actions 娑擃厽鐎?release APK閿涘苯鑻熼幎?APK 闂勫嫬濮為崚鏉款嚠鎼?GitHub Release閵?- **閺堫剙婀撮弸鍕紦閼存碍婀?*閿涙瓪scripts/build-apk.js` 娣囨繃瀵旈張顒€婀撮弸鍕紦閸忋儱褰涢敍娑楃隘缁?APK 閸欐垵绔烽悽?GitHub Actions 鐠嬪啰鏁ら敍灞肩瑝闂団偓鐟曚焦鏁奸張顒€婀撮懘姘拱閵?
+## 閻╊喖缍嶇紒鎾寸€?
 ```text
 .
-鈹溾攢鈹€ android/            # Android 鍘熺敓閰嶇疆
-鈹溾攢鈹€ assets/             # 闈欐€佽祫婧?(Icon, Splash)
-鈹溾攢鈹€ readflow-server/    # 鏈嶅姟绔牳蹇?(Express, Prisma, Admin)
-鈹?  鈹溾攢鈹€ src/controllers/ # API 鎺у埗鍣?鈹?  鈹溾攢鈹€ src/services/    # 鏍稿績涓氬姟 (LLM, RSS, Sync)
-鈹?  鈹斺攢鈹€ public/          # 绠＄悊鍚庡彴闈欐€佽祫婧?鈹溾攢鈹€ src/                # 绉诲姩绔簮鐮?鈹?  鈹溾攢鈹€ components/      # UI 缁勪欢 (Clean UI)
-鈹?  鈹溾攢鈹€ contexts/        # 鐘舵€佷笂涓嬫枃
-鈹?  鈹溾攢鈹€ screens/         # 涓氬姟椤甸潰
-鈹?  鈹溾攢鈹€ services/        # 瀹㈡埛绔?API 鏈嶅姟
-鈹?  鈹斺攢鈹€ store/           # Redux 鐘舵€佺鐞?鈹斺攢鈹€ App.tsx             # 鍏ュ彛鏂囦欢
+閳规壕鏀㈤埞鈧?android/            # Android 閸樼喓鏁撻柊宥囩枂
+閳规壕鏀㈤埞鈧?assets/             # 闂堟瑦鈧浇绁┃?(Icon, Splash)
+閳规壕鏀㈤埞鈧?readflow-server/    # 閺堝秴濮熺粩顖涚壋韫?(Express, Prisma, Admin)
+閳?  閳规壕鏀㈤埞鈧?src/controllers/ # API 閹貉冨煑閸?閳?  閳规壕鏀㈤埞鈧?src/services/    # 閺嶇绺炬稉姘 (LLM, RSS, Sync)
+閳?  閳规柡鏀㈤埞鈧?public/          # 缁狅紕鎮婇崥搴″酱闂堟瑦鈧浇绁┃?閳规壕鏀㈤埞鈧?src/                # 缁夎濮╃粩顖涚爱閻?閳?  閳规壕鏀㈤埞鈧?components/      # UI 缂佸嫪娆?(Clean UI)
+閳?  閳规壕鏀㈤埞鈧?contexts/        # 閻樿埖鈧椒绗傛稉瀣瀮
+閳?  閳规壕鏀㈤埞鈧?screens/         # 娑撴艾濮熸い鐢告桨
+閳?  閳规壕鏀㈤埞鈧?services/        # 鐎广垺鍩涚粩?API 閺堝秴濮?閳?  閳规柡鏀㈤埞鈧?store/           # Redux 閻樿埖鈧胶顓搁悶?閳规柡鏀㈤埞鈧?App.tsx             # 閸忋儱褰涢弬鍥︽
 ```
 
-## 甯歌闂
-
-- **濡備綍寮€鍚浘鐗囦唬鐞嗭紵** 鍦ㄧЩ鍔ㄧ鈥滆缃?- 闃呰璁剧疆鈥濅腑濉叆鑷缓鏈嶅姟绔殑鍦板潃锛屽苟寮€鍚€滃浘鐗囦唬鐞嗏€濄€?- **濡備綍鐢熸垚姣忔棩鎶ュ憡锛?* 闇€鍦ㄦ湇鍔＄閰嶇疆鏈夋晥鐨?LLM API Key锛岀郴缁熶細鑷姩閫氳繃 Cron 浠诲姟鎴栨墜鍔ㄨЕ鍙戠敓鎴愩€?- **鏀寔鍝簺 RSS 鏍煎紡锛?* 鏀寔鏍囧噯 RSS 2.0, Atom, JSON Feed銆?
+## 鐢瓕顫嗛梻顕€顣?
+- **婵″倷缍嶅鈧崥顖氭禈閻楀洣鍞悶鍡吹** 閸︺劎些閸斻劎顏垾婊嗩啎缂?- 闂冨懓顕扮拋鍓х枂閳ユ繀鑵戞繅顐㈠弳閼奉亜缂撻張宥呭缁旑垳娈戦崷鏉挎絻閿涘苯鑻熷鈧崥顖椻偓婊冩禈閻楀洣鍞悶鍡忊偓婵勨偓?- **婵″倷缍嶉悽鐔稿灇濮ｅ繑妫╅幎銉ユ啞閿?* 闂団偓閸︺劍婀囬崝锛勵伂闁板秶鐤嗛張澶嬫櫏閻?LLM API Key閿涘瞼閮寸紒鐔剁窗閼奉亜濮╅柅姘崇箖 Cron 娴犺濮熼幋鏍ㄥ閸斻劏袝閸欐垹鏁撻幋鎰┾偓?- **閺€顖涘瘮閸濐亙绨?RSS 閺嶇厧绱￠敍?* 閺€顖涘瘮閺嶅洤鍣?RSS 2.0, Atom, JSON Feed閵?
