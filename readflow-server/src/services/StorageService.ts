@@ -1,21 +1,10 @@
-import { PrismaClient } from '.prisma/client';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { logger } from '../utils/Logger';
 import { Article } from '../types';
 import { decrypt, encrypt } from '../utils/encryption';
-
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-    }
-  },
-  log: ['warn', 'error'],
-});
-
-const prismaAny = prisma as any;
+import { prisma, prismaAny } from '../db/prisma';
 
 export interface ServerSettings {
   imageQuality: number;

@@ -9,6 +9,7 @@ import cronParser from 'cron-parser';
 import pLimit from 'p-limit';
 import { finished } from 'stream/promises';
 import { dailyReportService } from '../services/DailyReportService';
+import { ValidationError, validateString, validateInt, validateArray, validateUrl } from '../utils/validation';
 
 const router = express.Router();
 
@@ -17,14 +18,10 @@ import { rssFetchService } from '../services/RssFetchService';
 // GET /api/rss?url=...
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const url = req.query.url as string;
+    const url = validateUrl(req.query.url, 'url', { required: true, maxLength: 2048, allowRssHub: true });
     const imageCompression = req.query.imageCompression === 'true';
     const settings = storageService.getSettings();
     const imageQuality = settings.imageQuality ?? 80;
-
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
 
     const source: RSSSource = {
       id: 0,
@@ -53,24 +50,23 @@ router.get('/', async (req: Request, res: Response) => {
     );
     res.json(articles);
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
 
 router.get('/sync', async (req: Request, res: Response) => {
   try {
-    const url = req.query.url as string;
-    const mode = String(req.query.mode || '');
-    const since = req.query.since ? parseInt(req.query.since as string) : 0;
-    const maxBlocks = req.query.maxBlocks ? parseInt(req.query.maxBlocks as string) : 20;
-    const limitRaw = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const url = validateUrl(req.query.url, 'url', { required: true, maxLength: 2048, allowRssHub: true });
+    const mode = validateString(req.query.mode, 'mode', { maxLength: 50 });
+    const since = validateInt(req.query.since, 'since', { min: 0, defaultValue: 0 });
+    const maxBlocks = validateInt(req.query.maxBlocks, 'maxBlocks', { min: 1, max: 1000, defaultValue: 20 });
+    const limitRaw = req.query.limit ? validateInt(req.query.limit, 'limit', { min: 1, max: 5000 }) : undefined;
     const imageCompression = rssFetchService.coerceBool(req.query.imageCompression);
     const settings = storageService.getSettings();
     const imageQuality = settings.imageQuality ?? 80;
-
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
 
     const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
     const defaultLimit = settings.syncPageSizeDefault ?? 200;
@@ -202,6 +198,9 @@ router.get('/sync', async (req: Request, res: Response) => {
       hasMore,
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -213,10 +212,7 @@ router.post('/syncAck', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const deliveryId = String(req.body?.deliveryId || '');
-    if (!deliveryId) {
-      return res.status(400).json({ error: 'deliveryId is required' });
-    }
+    const deliveryId = validateString(req.body?.deliveryId, 'deliveryId', { required: true, maxLength: 255 });
 
     const result = await storageService.ackSyncDelivery(userId, deliveryId);
     if (!result.ok) {
@@ -224,6 +220,9 @@ router.post('/syncAck', async (req: Request, res: Response) => {
     }
     res.json({ ok: true, deliveryId, advancedTo: result.advancedTo });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -296,10 +295,7 @@ router.post('/clientSync', async (req: Request, res: Response) => {
 // POST /api/rss/refresh?url=... - Trigger manual refresh
 router.post('/refresh', async (req: Request, res: Response) => {
   try {
-    const url = req.query.url as string;
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
+    const url = validateUrl(req.query.url, 'url', { required: true, maxLength: 2048, allowRssHub: true });
 
     const settings = storageService.getSettings();
     const feeds = await storageService.getFeeds();
@@ -354,6 +350,9 @@ router.post('/refresh', async (req: Request, res: Response) => {
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error('[RSS Manual Refresh] Failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -361,20 +360,17 @@ router.post('/refresh', async (req: Request, res: Response) => {
 // POST /api/rss/syncState - Upload user article states (read/favorite)
 router.post('/syncState', async (req: Request, res: Response) => {
   try {
-    const { userId, states } = req.body;
+    const userId = validateString(req.body?.userId, 'userId', { required: true, maxLength: 255 });
+    const states = validateArray(req.body?.states, 'states', { required: true, maxLength: 10000 });
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-    if (!Array.isArray(states)) {
-      return res.status(400).json({ error: 'states must be an array' });
-    }
-
-    await storageService.updateUserArticleStates(String(userId), states);
+    await storageService.updateUserArticleStates(userId, states);
 
     res.json({ success: true, count: states.length });
   } catch (error) {
     logger.error('[SyncState] Failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -382,14 +378,10 @@ router.post('/syncState', async (req: Request, res: Response) => {
 // GET /api/rss/syncState - Download user article states
 router.get('/syncState', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId as string;
-    const since = req.query.since as string; // ISO string
+    const userId = validateString(req.query.userId, 'userId', { required: true, maxLength: 255 });
+    const since = validateString(req.query.since, 'since', { required: false, maxLength: 100 });
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-
-    const states = await storageService.getUserArticleStates(userId, since);
+    const states = await storageService.getUserArticleStates(userId, since || undefined);
 
     res.json({
       userId,
@@ -398,6 +390,9 @@ router.get('/syncState', async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('[GetSyncState] Failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -406,15 +401,17 @@ router.get('/syncState', async (req: Request, res: Response) => {
 router.post('/parse', async (req: Request, res: Response) => {
   try {
     const { source, filterRules } = req.body;
-    if (!source || !source.url) {
-      return res.status(400).json({ error: 'Source with URL is required' });
+    if (!source || typeof source !== 'object') {
+      return res.status(400).json({ error: 'Source is required' });
     }
+    const sourceUrl = validateUrl(source.url, 'source.url', { required: true, maxLength: 2048, allowRssHub: true });
+    const validatedRules = filterRules ? validateArray(filterRules, 'filterRules', { maxLength: 1000 }) : [];
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const settings = storageService.getSettings();
     const articles = await rssParserService.fetchAndParseArticles(
-      source,
-      filterRules || [],
+      { ...source, url: sourceUrl },
+      validatedRules,
       baseUrl,
       true,
       settings.imageQuality ?? 80,
@@ -424,6 +421,9 @@ router.post('/parse', async (req: Request, res: Response) => {
     );
     res.json({ articles });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -431,14 +431,14 @@ router.post('/parse', async (req: Request, res: Response) => {
 // GET /api/rss/validate?url=...
 router.get('/validate', async (req: Request, res: Response) => {
   try {
-    const url = req.query.url as string;
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
+    const url = validateUrl(req.query.url, 'url', { required: true, maxLength: 2048, allowRssHub: true });
 
     const metadata = await rssParserService.validateRSSFeed(url);
     res.json(metadata);
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     const message = (error as Error).message;
     // Handle validation errors as 400 Bad Request
     if (
@@ -578,14 +578,14 @@ router.get('/public', async (req: Request, res: Response) => {
 
 router.get('/public/lookup', async (req: Request, res: Response) => {
   try {
-    const url = req.query.url as string;
-    if (!url) {
-      return res.status(400).json({ ok: false, error: 'URL is required' });
-    }
+    const url = validateUrl(req.query.url, 'url', { required: true, maxLength: 2048, allowRssHub: true });
     const feed = await storageService.getPublicFeedByUrl(url);
     res.json({ ok: true, feed });
   } catch (error) {
     logger.error('[PublicFeeds] LOOKUP failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -600,13 +600,16 @@ router.get('/daily-reports', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 10, 1), 50);
-    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const limit = validateInt(req.query.limit, 'limit', { min: 1, max: 50, defaultValue: 10 });
+    const offset = validateInt(req.query.offset, 'offset', { min: 0, defaultValue: 0 });
 
     const reports = await dailyReportService.getReportsForUser(userId, limit, offset);
     res.json({ ok: true, reports });
   } catch (error) {
     logger.error('[DailyReport] GET list failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -639,10 +642,7 @@ router.get('/daily-reports/:id', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const reportId = parseInt(req.params.id);
-    if (isNaN(reportId)) {
-      return res.status(400).json({ error: 'Invalid report ID' });
-    }
+    const reportId = validateInt(req.params.id, 'id', { min: 1 });
 
     const report = await dailyReportService.getReportById(reportId, userId);
     if (!report) {
@@ -652,6 +652,9 @@ router.get('/daily-reports/:id', async (req: Request, res: Response) => {
     res.json({ ok: true, report });
   } catch (error) {
     logger.error('[DailyReport] GET by ID failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -684,10 +687,7 @@ router.post('/daily-reports/:id/read', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const reportId = parseInt(req.params.id);
-    if (isNaN(reportId)) {
-      return res.status(400).json({ error: 'Invalid report ID' });
-    }
+    const reportId = validateInt(req.params.id, 'id', { min: 1 });
 
     const success = await dailyReportService.markAsRead(reportId, userId);
     if (!success) {
@@ -697,6 +697,9 @@ router.post('/daily-reports/:id/read', async (req: Request, res: Response) => {
     res.json({ ok: true });
   } catch (error) {
     logger.error('[DailyReport] Mark read failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -713,20 +716,18 @@ router.get('/daily-reports/articles/cleaned', async (req: Request, res: Response
       return res.status(401).json({ error: 'Unauthorized: missing user token or target userId' });
     }
 
-    const { start, end } = req.query;
-    if (!start || !end) {
-      return res.status(400).json({ error: 'Missing required parameters: start, end (format: YYYY-MM-DD or ISO)' });
-    }
+    const startVal = validateString(req.query.start, 'start', { required: true, maxLength: 100 });
+    const endVal = validateString(req.query.end, 'end', { required: true, maxLength: 100 });
 
-    const startDate = new Date(start as string);
-    const endDate = new Date(end as string);
+    const startDate = new Date(startVal);
+    const endDate = new Date(endVal);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format for start or end' });
     }
 
     // Ensure end date covers the whole day if only date is provided
-    if ((end as string).length <= 10) {
+    if (endVal.length <= 10) {
       endDate.setHours(23, 59, 59, 999);
     }
 
@@ -739,6 +740,9 @@ router.get('/daily-reports/articles/cleaned', async (req: Request, res: Response
     res.json({ ok: true, articles });
   } catch (error) {
     logger.error('[DailyReport] GET cleaned articles failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -753,19 +757,17 @@ router.get('/daily-reports/articles/raw', async (req: Request, res: Response) =>
       return res.status(401).json({ error: 'Unauthorized: missing user token or target userId' });
     }
 
-    const { start, end } = req.query;
-    if (!start || !end) {
-      return res.status(400).json({ error: 'Missing required parameters: start, end (format: YYYY-MM-DD or ISO)' });
-    }
+    const startVal = validateString(req.query.start, 'start', { required: true, maxLength: 100 });
+    const endVal = validateString(req.query.end, 'end', { required: true, maxLength: 100 });
 
-    const startDate = new Date(start as string);
-    const endDate = new Date(end as string);
+    const startDate = new Date(startVal);
+    const endDate = new Date(endVal);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format for start or end' });
     }
 
-    if ((end as string).length <= 10) {
+    if (endVal.length <= 10) {
       endDate.setHours(23, 59, 59, 999);
     }
 
@@ -778,6 +780,9 @@ router.get('/daily-reports/articles/raw', async (req: Request, res: Response) =>
     res.json({ ok: true, articles });
   } catch (error) {
     logger.error('[DailyReport] GET raw articles failed:', error);
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: (error as Error).message });
   }
 });

@@ -145,6 +145,8 @@ model Article {
 
   @@index([publishedAt])
   @@index([sourceId])
+  @@index([sourceId, id])
+  @@index([sourceId, publishedAt])
   @@map("articles")
 }
 
@@ -170,6 +172,8 @@ model UserFeed {
   source RSSSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   group  UserRSSGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
+  @@index([userId, sortOrder])
+  @@index([userId, updatedAt])
   @@id([userId, sourceId])
   @@map("user_feeds")
 }
@@ -295,6 +299,7 @@ model Vocabulary {
   // Soft Delete
   isDeleted Boolean @default(false)
 
+  @@index([updatedAt])
   @@map("vocabulary")
 }
 

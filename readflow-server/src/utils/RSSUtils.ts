@@ -1,5 +1,6 @@
 import fetch, { RequestInit, Response, Headers } from 'node-fetch';
 import { logger as appLogger } from './Logger';
+import { assertSafeRemoteUrl } from './safeRemoteUrl';
 
 // =================== 类型定义 ===================
 
@@ -7,6 +8,8 @@ export interface FetchWithRetryOptions extends RequestInit {
   retries?: number;
   retryDelay?: number;
   timeout?: number;
+  maxRedirects?: number;
+  allowPrivateNetwork?: boolean;
 }
 
 // =================== 日志工具 ===================
@@ -48,6 +51,8 @@ export async function fetchWithRetry(
     retries = 3,
     retryDelay = 1000,
     timeout = 10000,
+    maxRedirects = 5,
+    allowPrivateNetwork = false,
     ...fetchOptions
   } = options;
 
@@ -86,7 +91,7 @@ export async function fetchWithRetry(
         timeoutId = setTimeout(() => controller.abort(new Error('Request timeout')), timeout);
       }
 
-      const response = await fetch(url, { ...finalOptions, signal: requestSignal } as any);
+      const response = await fetchWithSafeRedirects(url, { ...finalOptions, signal: requestSignal }, maxRedirects, allowPrivateNetwork);
       return response;
     } catch (error) {
       if (i === retries) {
@@ -108,6 +113,36 @@ export async function fetchWithRetry(
   }
   
   throw new Error('Unexpected error in fetchWithRetry');
+}
+
+async function fetchWithSafeRedirects(
+  startUrl: string,
+  init: RequestInit,
+  maxRedirects: number,
+  allowPrivateNetwork: boolean
+): Promise<Response> {
+  let current = startUrl;
+  const hops = Math.max(0, Math.min(10, Number.isFinite(maxRedirects) ? maxRedirects : 5));
+
+  for (let i = 0; i <= hops; i++) {
+    await assertSafeRemoteUrl(current, { allowPrivateNetwork });
+    const response = await fetch(current, { ...init, redirect: 'manual' } as any);
+    const status = response.status;
+    const isRedirect = status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+    if (!isRedirect) return response;
+
+    const location = String(response.headers.get('location') || '').trim();
+    try {
+      (response.body as any)?.destroy?.();
+    } catch {
+    }
+
+    if (!location) return response;
+    if (i >= hops) throw new Error('Too many redirects');
+    current = new URL(location, current).toString();
+  }
+
+  throw new Error('Too many redirects');
 }
 
 // =================== 文本处理 ===================

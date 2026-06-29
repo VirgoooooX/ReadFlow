@@ -1,4 +1,4 @@
-import * as rssParser from 'react-native-rss-parser';
+import { XMLParser } from 'fast-xml-parser';
 import { logger } from '../utils/Logger';
 
 // =================== 类型定义 ===================
@@ -57,38 +57,32 @@ export interface EnhancedRSSFeed {
   items: EnhancedRSSItem[];
 }
 
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+  cdataPropName: '#cdata',
+  trimValues: false,
+  parseTagValue: false,
+  parseAttributeValue: false,
+  htmlEntities: true,
+  removeNSPrefix: false,
+});
+
 /**
  * 解析RSS Feed并提取media:content信息
  * @param xmlText RSS XML内容
  * @returns 增强的RSS Feed对象
  */
 export async function parseEnhancedRSS(xmlText: string): Promise<EnhancedRSSFeed> {
-  // 首先使用原始解析器解析
-  // Note: react-native-rss-parser exports 'parse' method
-  const rss = await rssParser.parse(xmlText);
-  
-  // 优化：使用正则表达式提取 media 信息，移除 xmldom 依赖
-  // 这种方式比 DOMParser 快很多，且内存占用更低
-  
-  // 1. 提取所有 item 块
-  // 使用非贪婪匹配提取 <item>...</item> 内容
-  const itemRegex = /<item(?:\s+[^>]*)?>([\s\S]*?)<\/item>/gi;
-  const itemsRaw: string[] = [];
-  let match;
-  let matchCount = 0;
-  while ((match = itemRegex.exec(xmlText)) !== null) {
-    itemsRaw.push(match[1]);
-    matchCount++;
-    // 每匹配 50 个项目让出一次主线程 (Server 端适当放宽)
-    if (matchCount % 50 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-  }
-  
+  const parsed = xmlParser.parse(xmlText);
+  const rss = normalizeParsedFeed(parsed);
+  const itemsRaw = extractRawItemBlocks(xmlText);
+
   // 2. 遍历 item 并提取扩展信息
   for (let index = 0; index < rss.items.length; index++) {
     const item = rss.items[index];
-    
+
     // Server 端减少 yield 频率
     if (index % 20 === 0) {
       await new Promise(resolve => setTimeout(resolve, 0));
@@ -111,8 +105,150 @@ export async function parseEnhancedRSS(xmlText: string): Promise<EnhancedRSSFeed
       }
     }
   }
-  
-  return rss as unknown as EnhancedRSSFeed;
+
+  return rss;
+}
+
+function normalizeParsedFeed(parsed: any): EnhancedRSSFeed {
+  const channel = first(parsed?.rss?.channel);
+  if (channel) {
+    return {
+      title: readText(channel.title),
+      description: readText(channel.description),
+      links: buildLinks(channel.link),
+      items: asArray(channel.item).map(mapRssItem),
+    };
+  }
+
+  const feed = first(parsed?.feed);
+  if (feed) {
+    return {
+      title: readText(feed.title),
+      description: readText(feed.subtitle) || readText(feed.description),
+      links: buildLinks(feed.link),
+      items: asArray(feed.entry).map(mapAtomEntry),
+    };
+  }
+
+  return { items: [] };
+}
+
+function mapRssItem(item: any): EnhancedRSSItem {
+  return {
+    id: readText(item.guid) || readText(item.id),
+    title: readText(item.title),
+    description: readText(item.description),
+    content: readText(item['content:encoded']) || readText(item.content),
+    links: buildLinks(item.link),
+    published: readText(item.pubDate) || readText(item.published) || readText(item.updated) || readText(item['dc:date']),
+    authors: buildAuthors(item.author || item['dc:creator']),
+    enclosures: buildEnclosures(item.enclosure),
+  };
+}
+
+function mapAtomEntry(entry: any): EnhancedRSSItem {
+  return {
+    id: readText(entry.id),
+    title: readText(entry.title),
+    description: readText(entry.summary),
+    content: readText(entry.content),
+    links: buildLinks(entry.link),
+    published: readText(entry.published) || readText(entry.updated),
+    authors: buildAuthors(entry.author),
+    enclosures: buildAtomEnclosures(entry.link),
+  };
+}
+
+function extractRawItemBlocks(xmlText: string): string[] {
+  const blocks = collectBlocks(xmlText, 'item');
+  if (blocks.length > 0) return blocks;
+  return collectBlocks(xmlText, 'entry');
+}
+
+function collectBlocks(xmlText: string, tagName: string): string[] {
+  const regex = new RegExp(`<${tagName}(?:\\s+[^>]*)?>([\\s\\S]*?)<\\/${tagName}>`, 'gi');
+  const blocks: string[] = [];
+  let match;
+  while ((match = regex.exec(xmlText)) !== null) {
+    blocks.push(match[1]);
+  }
+  return blocks;
+}
+
+function asArray<T = any>(value: T | T[] | undefined | null): T[] {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function first<T = any>(value: T | T[] | undefined | null): T | undefined {
+  return asArray(value)[0];
+}
+
+function readText(value: any): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const text = String(value).trim();
+    return text || undefined;
+  }
+  if (Array.isArray(value)) {
+    const text = value.map(readText).filter(Boolean).join(' ').trim();
+    return text || undefined;
+  }
+  if (typeof value === 'object') {
+    const cdata = readText(value['#cdata']);
+    if (cdata) return cdata;
+    const text = readText(value['#text']);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function buildLinks(value: any): Array<{ url: string }> | undefined {
+  const links: Array<{ url: string }> = [];
+  for (const raw of asArray(value)) {
+    const href = typeof raw === 'object' && raw ? raw['@_href'] : undefined;
+    const text = readText(raw);
+    const url = String(href || text || '').trim();
+    if (url) links.push({ url });
+  }
+  return links.length > 0 ? links : undefined;
+}
+
+function buildAuthors(value: any): Array<{ name?: string }> | undefined {
+  const authors: Array<{ name?: string }> = [];
+  for (const raw of asArray(value)) {
+    const name = readText(raw?.name) || readText(raw);
+    if (name) authors.push({ name });
+  }
+  return authors.length > 0 ? authors : undefined;
+}
+
+function buildEnclosures(value: any): Array<{ url: string; mimeType?: string }> | undefined {
+  const enclosures: Array<{ url: string; mimeType?: string }> = [];
+  for (const raw of asArray(value)) {
+    const url = String(raw?.['@_url'] || '').trim();
+    if (!url) continue;
+    enclosures.push({
+      url,
+      mimeType: raw?.['@_type'] ? String(raw['@_type']) : undefined,
+    });
+  }
+  return enclosures.length > 0 ? enclosures : undefined;
+}
+
+function buildAtomEnclosures(value: any): Array<{ url: string; mimeType?: string }> | undefined {
+  const enclosures: Array<{ url: string; mimeType?: string }> = [];
+  for (const raw of asArray(value)) {
+    if (!raw || typeof raw !== 'object') continue;
+    if (String(raw['@_rel'] || '').trim() !== 'enclosure') continue;
+    const url = String(raw['@_href'] || '').trim();
+    if (!url) continue;
+    enclosures.push({
+      url,
+      mimeType: raw['@_type'] ? String(raw['@_type']) : undefined,
+    });
+  }
+  return enclosures.length > 0 ? enclosures : undefined;
 }
 
 /**
@@ -148,7 +284,7 @@ function extractMediaContentFromXml(itemXml: string): MediaContentInfo[] {
     
     // 2. 匹配所有 media:content 标签
     // 两种形式：<media:content ... /> 或 <media:content ...>...</media:content>
-    const mediaContentRegex = /<media:content([^>]*?)(?:\/>|>(.*?)<\/media:content>)/gi;
+    const mediaContentRegex = /<media:content([^>]*?)(?:\/>|>([\s\S]*?)<\/media:content>)/gi;
     
     let match;
     while ((match = mediaContentRegex.exec(itemXml)) !== null) {

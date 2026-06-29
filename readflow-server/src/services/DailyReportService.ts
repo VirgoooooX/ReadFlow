@@ -1,16 +1,8 @@
-import { PrismaClient } from '.prisma/client';
 import { logger } from '../utils/Logger';
 import { storageService } from './StorageService';
 import { llmGatewayService } from './LLMGatewayService';
 import { simpleHash } from '../utils/RSSUtils';
-
-const prisma = new PrismaClient({
-    datasources: { db: { url: process.env.DATABASE_URL } },
-    log: ['warn', 'error'],
-});
-
-// Cast to any for dailyReport model - types will be available after `prisma generate`
-const prismaAny = prisma as any;
+import { prisma, prismaAny } from '../db/prisma';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

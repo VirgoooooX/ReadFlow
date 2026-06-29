@@ -9,7 +9,7 @@ import rssRoutes from './routes/rss';
 import vocabRoutes from './routes/vocabulary';
 import imageRoutes from './routes/image';
 import adminRoutes from './routes/admin';
-import authRoutes, { verifyToken } from './routes/auth';
+import authRoutes, { verifyAdminToken, verifyToken } from './routes/auth';
 import configRoutes from './routes/config';
 import llmRoutes from './routes/llm';
 import { logger } from './utils/Logger';
@@ -159,10 +159,15 @@ const serverTokenMiddleware = (req: express.Request, res: express.Response, next
   const token = req.headers['x-server-token'];
   if (token !== process.env.SERVER_TOKEN) {
     if (req.path === '/register') {
-      const settings = storageService.getSettings();
-      const adminPassword = settings.adminPassword || 'admin';
-      const adminToken = req.headers['x-admin-token'];
-      if (adminToken === adminPassword) {
+      const adminTokenHeader = req.headers['x-admin-token'];
+      const adminToken = Array.isArray(adminTokenHeader)
+        ? String(adminTokenHeader[0] || '').trim()
+        : String(adminTokenHeader || '').trim();
+      const authHeader = String(req.headers.authorization || '').trim();
+      const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
+        ? authHeader.slice(7).trim()
+        : '';
+      if ((adminToken && verifyAdminToken(adminToken)) || (bearerToken && verifyAdminToken(bearerToken))) {
         return next();
       }
     }
@@ -216,11 +221,7 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
 app.use('/api/rss', authMiddleware, rssRoutes); // Protect RSS routes
 app.use('/api/vocab', authMiddleware, vocabRoutes); // Protect Vocabulary routes
 app.use('/api/image', imageRoutes); // Images might need to be public or protected depending on requirement. Usually public for <img> tags.
-app.use('/api/admin', adminRoutes); // Admin should be protected too, but maybe separately or with same middleware?
-// Let's protect Admin too for consistency with "Force Cloud Auth"
-// app.use('/api/admin', authMiddleware, adminRoutes); 
-// Note: Admin UI might not send Bearer token easily if it's a simple HTML. 
-// For now, let's strictly protect /api/rss as requested for sync.
+app.use('/api/admin', adminRoutes); // Admin routes issue and verify a separate short-lived admin JWT.
 
 app.use('/api/config', authMiddleware, configRoutes); // Config API protected by auth
 app.use('/api/llm', authMiddleware, llmRoutes);

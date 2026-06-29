@@ -1,8 +1,8 @@
 import express from 'express';
 import { storageService } from '../services/StorageService';
 import { logger } from '../utils/Logger';
-import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { hashPassword, verifyPassword } from '../utils/password';
 
 const router = express.Router();
 const JWT_SECRET = (() => {
@@ -15,14 +15,14 @@ const JWT_SECRET = (() => {
   return 'readflow_jwt_secret_default_key_change_me';
 })();
 
-// Helper to hash password
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password + 'readflow_salt').digest('hex');
-}
-
 // Helper to generate token (JWT implementation)
 function generateToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
+}
+
+export function generateAdminToken(): string {
+  const expiresIn = String(process.env.ADMIN_SESSION_TTL || '12h');
+  return jwt.sign({ userId: 'admin', scope: 'admin', admin: true }, JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
 
 // Helper to verify token
@@ -32,6 +32,19 @@ export function verifyToken(token: string): string | null {
     return payload.userId;
   } catch (err) {
     return null;
+  }
+}
+
+export function verifyAdminToken(token: string): boolean {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload & {
+      admin?: boolean;
+      scope?: string;
+      userId?: string;
+    };
+    return payload.admin === true && payload.scope === 'admin' && payload.userId === 'admin';
+  } catch {
+    return false;
   }
 }
 
@@ -88,16 +101,20 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await storageService.findUserByEmail(email);
-    if (!user || user.passwordHash !== hashPassword(password)) {
+    const passwordCheck = user ? verifyPassword(password, user.passwordHash) : { valid: false, needsRehash: false };
+    if (!user || !passwordCheck.valid) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
     const token = generateToken(user.id);
-    const { passwordHash, ...userSafe } = user;
 
-    // Update last active
+    if (passwordCheck.needsRehash) {
+      user.passwordHash = hashPassword(password);
+    }
     user.lastActive = new Date().toISOString();
     await storageService.saveUser(user);
+
+    const { passwordHash, ...userSafe } = user;
 
     logger.info(`[Auth] User logged in: ${email}`);
 

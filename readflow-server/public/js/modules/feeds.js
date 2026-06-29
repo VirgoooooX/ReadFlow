@@ -159,8 +159,7 @@ function _renderFeeds() {
             </span>
             ${f.lastRefreshError ? `<i class="fa-solid fa-circle-info text-red-400 ml-1 cursor-help text-xs" title="${escapeHtml(f.lastRefreshError)}"></i>` : ''}
         </td>
-        <td data-label="操作" class="px-4 py-4 text-right align-middle whitespace-nowrap">
-            <div class="flex justify-end space-x-1">
+    </tr>
 `}).join('');
 
     _setBulkBarVisible();

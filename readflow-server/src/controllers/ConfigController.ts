@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { encrypt, decrypt } from '../utils/encryption';
-import { verifyToken } from '../routes/auth';
-import { PrismaClient } from '@prisma/client';
+import { encrypt } from '../utils/encryption';
+import { prisma } from '../db/prisma';
+import { ValidationError, validateString, validateInt, validateArray, validateUrl } from '../utils/validation';
 
-const prisma = new PrismaClient();
 // Declare global Express Request to have user
 declare global {
     namespace Express {
@@ -102,6 +101,17 @@ export class ConfigController {
         if (code === 'P2021' || code === 'P2022') return true;
         const msg = String(error?.message || '');
         return msg.includes('does not exist in the current database') || msg.includes('does not exist in the current database.');
+    }
+
+    private static optionalInt(
+        value: any,
+        name: string,
+        options: { min?: number; max?: number } = {}
+    ): number | null {
+        if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+            return null;
+        }
+        return validateInt(value, name, options);
     }
 
     static async getPreferences(req: Request, res: Response) {
@@ -204,24 +214,32 @@ export class ConfigController {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
             const { uuid, url, name, category, description, groupId, groupName, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency } = req.body;
-            let effectiveGroupId =
-                typeof groupId === 'number'
-                    ? groupId
-                    : (Number.isFinite(parseInt(String(groupId ?? ''), 10)) ? parseInt(String(groupId ?? ''), 10) : undefined);
-            const gn = typeof groupName === 'string' ? groupName.trim() : '';
-            if ((!effectiveGroupId || !Number.isFinite(effectiveGroupId)) && gn) {
+            const cleanUuid = uuid ? validateString(uuid, 'uuid', { maxLength: 100 }) : '';
+            const cleanUrl = validateUrl(url, 'url', {
+                required: true,
+                maxLength: 2048,
+                stripTrailingSlash: true,
+                allowRssHub: true,
+            });
+            const cleanName = name ? validateString(name, 'name', { maxLength: 255 }) : 'Unknown';
+            const cleanCategory = category ? validateString(category, 'category', { maxLength: 100 }) : 'General';
+            const cleanDescription = description ? validateString(description, 'description', { maxLength: 1000 }) : '';
+            const cleanGroupName = groupName ? validateString(groupName, 'groupName', { maxLength: 100 }) : '';
+            const cleanContentType = contentType ? validateString(contentType, 'contentType', { maxLength: 50 }) : null;
+            const cleanSourceMode = sourceMode ? validateString(sourceMode, 'sourceMode', { maxLength: 50 }) : null;
+            const cleanFetchLimit = ConfigController.optionalInt(fetchLimit, 'fetchLimit', { min: 0, max: 10000 });
+            const cleanRetentionLimit = ConfigController.optionalInt(retentionLimit, 'retentionLimit', { min: 0, max: 100000 });
+            const cleanSortOrder = ConfigController.optionalInt(sortOrder, 'sortOrder');
+            const cleanUpdateFrequency = ConfigController.optionalInt(updateFrequency, 'updateFrequency', { min: 0 });
+            let effectiveGroupId = ConfigController.optionalInt(groupId, 'groupId', { min: 1 }) ?? undefined;
+            if ((!effectiveGroupId || !Number.isFinite(effectiveGroupId)) && cleanGroupName) {
                 const group = await (prisma as any).userRSSGroup.upsert({
-                    where: { userId_name: { userId: userUuid, name: gn } },
+                    where: { userId_name: { userId: userUuid, name: cleanGroupName } },
                     update: {},
-                    create: { userId: userUuid, name: gn, sortOrder: 0 }
+                    create: { userId: userUuid, name: cleanGroupName, sortOrder: 0 }
                 });
                 effectiveGroupId = group.id;
             }
-
-            // Find or create global source first (match by UUID first, fallback to URL)
-            const cleanUuid = uuid ? String(uuid).trim() : '';
-            const cleanUrl = url ? String(url).trim() : '';
-            if (!cleanUrl) return res.status(400).json({ success: false, message: 'URL is required' });
 
             let source = null;
             if (cleanUuid) {
@@ -238,19 +256,17 @@ export class ConfigController {
             }
 
             if (!source) {
-                const desc = typeof description === 'string' ? description.trim() : '';
                 source = await prisma.rSSSource.create({
                     data: {
                         uuid: cleanUuid || undefined,
                         url: cleanUrl,
-                        name: name || 'Unknown',
-                        category: category || 'General',
-                        description: desc || null,
+                        name: cleanName,
+                        category: cleanCategory,
+                        description: cleanDescription || null,
                     }
                 });
             } else {
-                const desc = typeof description === 'string' ? description.trim() : '';
-                const nextDesc = (desc && !String((source as any).description || '').trim()) ? desc : undefined;
+                const nextDesc = (cleanDescription && !String((source as any).description || '').trim()) ? cleanDescription : undefined;
                 const nextUrl = (source.url !== cleanUrl) ? cleanUrl : undefined;
                 
                 if (nextDesc || nextUrl) {
@@ -267,36 +283,39 @@ export class ConfigController {
             const userFeed = await (prisma as any).userFeed.upsert({
                 where: { userId_sourceId: { userId: userUuid, sourceId: source.id } },
                 update: {
-                    customName: name,
-                    customCategory: category,
+                    customName: cleanName,
+                    customCategory: cleanCategory,
                     groupId: effectiveGroupId,
                     isActive: isActive !== false,
-                    contentType: typeof contentType === 'string' ? contentType : null,
-                    sourceMode: typeof sourceMode === 'string' ? sourceMode : null,
-                    fetchLimit: typeof fetchLimit === 'number' ? fetchLimit : null,
-                    retentionLimit: typeof retentionLimit === 'number' ? retentionLimit : null,
-                    sortOrder: typeof sortOrder === 'number' ? sortOrder : null,
-                    updateFrequency: typeof updateFrequency === 'number' ? updateFrequency : null,
+                    contentType: cleanContentType,
+                    sourceMode: cleanSourceMode,
+                    fetchLimit: cleanFetchLimit,
+                    retentionLimit: cleanRetentionLimit,
+                    sortOrder: cleanSortOrder,
+                    updateFrequency: cleanUpdateFrequency,
                 },
                 create: {
                     userId: userUuid,
                     sourceId: source.id,
-                    customName: name,
-                    customCategory: category,
+                    customName: cleanName,
+                    customCategory: cleanCategory,
                     groupId: effectiveGroupId,
                     isActive: isActive !== false,
-                    contentType: typeof contentType === 'string' ? contentType : null,
-                    sourceMode: typeof sourceMode === 'string' ? sourceMode : null,
-                    fetchLimit: typeof fetchLimit === 'number' ? fetchLimit : null,
-                    retentionLimit: typeof retentionLimit === 'number' ? retentionLimit : null,
-                    sortOrder: typeof sortOrder === 'number' ? sortOrder : null,
-                    updateFrequency: typeof updateFrequency === 'number' ? updateFrequency : null,
+                    contentType: cleanContentType,
+                    sourceMode: cleanSourceMode,
+                    fetchLimit: cleanFetchLimit,
+                    retentionLimit: cleanRetentionLimit,
+                    sortOrder: cleanSortOrder,
+                    updateFrequency: cleanUpdateFrequency,
                 }
             });
 
             res.json({ success: true, data: userFeed });
         } catch (error) {
             console.error('[ConfigController] upsertSource error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             res.status(500).json({ success: false, message: 'Failed to upsert source' });
         }
     }
@@ -328,26 +347,33 @@ export class ConfigController {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
             const { name, icon, color, sortOrder } = req.body;
+            const cleanName = validateString(name, 'group name', { required: true, maxLength: 100 });
+            const cleanIcon = icon ? validateString(icon, 'icon', { maxLength: 100 }) : null;
+            const cleanColor = color ? validateString(color, 'color', { maxLength: 50 }) : null;
+            const cleanSortOrder = validateInt(sortOrder, 'sortOrder', { defaultValue: 0 });
 
             const group = await (prisma as any).userRSSGroup.upsert({
-                where: { userId_name: { userId: userUuid, name } },
+                where: { userId_name: { userId: userUuid, name: cleanName } },
                 update: {
-                    sortOrder,
-                    icon: typeof icon === 'string' ? icon : null,
-                    color: typeof color === 'string' ? color : null,
+                    sortOrder: cleanSortOrder,
+                    icon: cleanIcon,
+                    color: cleanColor,
                 },
                 create: {
                     userId: userUuid,
-                    name,
-                    sortOrder,
-                    icon: typeof icon === 'string' ? icon : null,
-                    color: typeof color === 'string' ? color : null,
+                    name: cleanName,
+                    sortOrder: cleanSortOrder,
+                    icon: cleanIcon,
+                    color: cleanColor,
                 }
             });
 
             res.json({ success: true, data: group });
         } catch (error) {
             console.error('[ConfigController] upsertGroup error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             res.status(500).json({ success: false, message: 'Failed to upsert group' });
         }
     }
@@ -393,7 +419,11 @@ export class ConfigController {
             const effectiveMode = mode === 'include' || mode === 'exclude' ? mode : 'exclude';
             const effectiveIsRegex = Boolean(isRegex);
             const urlsRaw = Array.isArray(sourceUrls) ? sourceUrls : (typeof sourceUrl === 'string' ? [sourceUrl] : []);
-            const urls = urlsRaw.map((u: any) => String(u || '').trim()).filter(Boolean);
+            const urls = urlsRaw.map((u: any) => validateUrl(u, 'sourceUrl', {
+                maxLength: 2048,
+                stripTrailingSlash: true,
+                allowRssHub: true,
+            })).filter(Boolean);
             const effectiveScope = scope === 'specific' || urls.length > 0 ? 'specific' : 'global';
             const effectiveTarget = typeof target === 'string' && target.trim() ? target.trim() : 'title_summary';
             const effectiveIsActive = isActive !== false;
@@ -430,6 +460,9 @@ export class ConfigController {
             res.json({ success: true, data: rule });
         } catch (error) {
             console.error('[ConfigController] upsertFilterRule error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             res.status(500).json({ success: false, message: 'Failed to upsert filter rule' });
         }
     }
@@ -439,134 +472,148 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const sources = req.body; // Array of { uuid?, url, name, category, description, contentType, sourceMode, isActive, fetchLimit, retentionLimit, sortOrder, updateFrequency, groupId?, groupName? }
+            const sources = validateArray(req.body, 'sources', { required: true, maxLength: 500 });
 
-            if (!Array.isArray(sources)) return res.status(400).json({ success: false, message: 'Body must be an array' });
+            const count = await prisma.$transaction(async (tx: any) => {
+                const db = tx as any;
+                const groups = await db.userRSSGroup.findMany({ where: { userId: userUuid } }).catch(() => []);
+                const groupNameToId = new Map<string, number>();
+                for (const g of groups) {
+                    if (g?.name && typeof g.id === 'number') groupNameToId.set(String(g.name).trim(), g.id);
+                }
 
-            const groups = await (prisma as any).userRSSGroup.findMany({ where: { userId: userUuid } }).catch(() => []);
-            const groupNameToId = new Map<string, number>();
-            for (const g of groups) {
-                if (g?.name && typeof g.id === 'number') groupNameToId.set(String(g.name).trim(), g.id);
-            }
+                const results = [];
+                for (const s of sources) {
+                    const uuid = s?.uuid ? validateString(s.uuid, 'uuid', { maxLength: 100 }) : '';
+                    const url = validateUrl(s?.url, 'url', {
+                        required: true,
+                        maxLength: 2048,
+                        stripTrailingSlash: true,
+                        allowRssHub: true,
+                    });
+                    const name = s?.name ? validateString(s.name, 'name', { maxLength: 255 }) : 'Unknown';
+                    const category = s?.category ? validateString(s.category, 'category', { maxLength: 100 }) : 'General';
+                    const desc = s?.description ? validateString(s.description, 'description', { maxLength: 1000 }) : '';
+                    const gn = s?.groupName ? validateString(s.groupName, 'groupName', { maxLength: 100 }) : '';
+                    const contentType = s?.contentType ? validateString(s.contentType, 'contentType', { maxLength: 50 }) : null;
+                    const sourceMode = s?.sourceMode ? validateString(s.sourceMode, 'sourceMode', { maxLength: 50 }) : null;
+                    const fetchLimit = ConfigController.optionalInt(s?.fetchLimit, 'fetchLimit', { min: 0, max: 10000 });
+                    const retentionLimit = ConfigController.optionalInt(s?.retentionLimit, 'retentionLimit', { min: 0, max: 100000 });
+                    const sortOrder = ConfigController.optionalInt(s?.sortOrder, 'sortOrder');
+                    const updateFrequency = ConfigController.optionalInt(s?.updateFrequency, 'updateFrequency', { min: 0 });
+                    let effectiveGroupId = ConfigController.optionalInt(s?.groupId, 'groupId', { min: 1 }) ?? undefined;
+                    if ((!effectiveGroupId || !Number.isFinite(effectiveGroupId)) && gn) {
+                        const existingId = groupNameToId.get(gn);
+                        if (typeof existingId === 'number') {
+                            effectiveGroupId = existingId;
+                        } else {
+                            const group = await db.userRSSGroup.upsert({
+                                where: { userId_name: { userId: userUuid, name: gn } },
+                                update: {},
+                                create: { userId: userUuid, name: gn, sortOrder: 0 }
+                            });
+                            if (typeof group?.id === 'number') groupNameToId.set(gn, group.id);
+                            effectiveGroupId = group.id;
+                        }
+                    }
 
-            const results = [];
-            for (const s of sources) {
-                const uuid = s?.uuid ? String(s.uuid).trim() : '';
-                const url = s?.url ? String(s.url).trim() : '';
-                if (!url) continue;
-                let effectiveGroupId =
-                    typeof s?.groupId === 'number'
-                        ? s.groupId
-                        : (Number.isFinite(parseInt(String(s?.groupId ?? ''), 10)) ? parseInt(String(s?.groupId ?? ''), 10) : undefined);
-                const gn = typeof s?.groupName === 'string' ? String(s.groupName).trim() : '';
-                if ((!effectiveGroupId || !Number.isFinite(effectiveGroupId)) && gn) {
-                    const existingId = groupNameToId.get(gn);
-                    if (typeof existingId === 'number') {
-                        effectiveGroupId = existingId;
+                    // Match by UUID first, fallback to URL
+                    let source = null;
+                    if (uuid) {
+                        source = await db.rSSSource.findUnique({ where: { uuid } });
+                    }
+                    if (!source) {
+                        source = await db.rSSSource.findUnique({ where: { url } });
+                        if (source && uuid && !source.uuid) {
+                            source = await db.rSSSource.update({
+                                where: { id: source.id },
+                                data: { uuid }
+                            });
+                        }
+                    }
+
+                    if (!source) {
+                        source = await db.rSSSource.create({
+                            data: {
+                                uuid: uuid || undefined,
+                                url,
+                                name: name,
+                                category: category,
+                                description: desc || null,
+                            }
+                        });
                     } else {
-                        const group = await (prisma as any).userRSSGroup.upsert({
-                            where: { userId_name: { userId: userUuid, name: gn } },
-                            update: {},
-                            create: { userId: userUuid, name: gn, sortOrder: 0 }
-                        });
-                        if (typeof group?.id === 'number') groupNameToId.set(gn, group.id);
-                        effectiveGroupId = group.id;
+                        const nextDesc = (desc && !String((source as any).description || '').trim()) ? desc : undefined;
+                        const nextUrl = (source.url !== url) ? url : undefined;
+
+                        if (nextDesc || nextUrl) {
+                            source = await db.rSSSource.update({
+                                where: { id: source.id },
+                                data: {
+                                    ...(nextDesc ? { description: nextDesc } : {}),
+                                    ...(nextUrl ? { url: nextUrl } : {})
+                                }
+                            });
+                        }
                     }
+                    const uf = await db.userFeed.upsert({
+                        where: { userId_sourceId: { userId: userUuid, sourceId: source.id } },
+                        update: {
+                            customName: name,
+                            customCategory: category,
+                            groupId: effectiveGroupId,
+                            isActive: s?.isActive !== false,
+                            contentType: contentType,
+                            sourceMode: sourceMode,
+                            fetchLimit,
+                            retentionLimit,
+                            sortOrder,
+                            updateFrequency,
+                        },
+                        create: {
+                            userId: userUuid,
+                            sourceId: source.id,
+                            customName: name,
+                            customCategory: category,
+                            groupId: effectiveGroupId,
+                            isActive: s?.isActive !== false,
+                            contentType: contentType,
+                            sourceMode: sourceMode,
+                            fetchLimit,
+                            retentionLimit,
+                            sortOrder,
+                            updateFrequency,
+                        }
+                    });
+                    results.push(uf);
                 }
 
-                // Match by UUID first, fallback to URL
-                let source = null;
-                if (uuid) {
-                    source = await prisma.rSSSource.findUnique({ where: { uuid } });
-                }
-                if (!source) {
-                    source = await prisma.rSSSource.findUnique({ where: { url } });
-                    if (source && uuid && !source.uuid) {
-                        source = await prisma.rSSSource.update({
-                            where: { id: source.id },
-                            data: { uuid }
-                        });
-                    }
-                }
-
-                if (!source) {
-                    const desc = typeof s?.description === 'string' ? String(s.description).trim() : '';
-                    source = await prisma.rSSSource.create({
-                        data: {
-                            uuid: uuid || undefined,
-                            url,
-                            name: s.name || 'Unknown',
-                            category: s.category || 'General',
-                            description: desc || null,
+                // Sync deletion: remove any UserFeed that is not in the pushed batch
+                const processedSourceIds = results.map(uf => uf.sourceId);
+                if (processedSourceIds.length > 0) {
+                    await db.userFeed.deleteMany({
+                        where: {
+                            userId: userUuid,
+                            sourceId: { notIn: processedSourceIds }
                         }
                     });
                 } else {
-                    const desc = typeof s?.description === 'string' ? String(s.description).trim() : '';
-                    const nextDesc = (desc && !String((source as any).description || '').trim()) ? desc : undefined;
-                    const nextUrl = (source.url !== url) ? url : undefined;
-                    
-                    if (nextDesc || nextUrl) {
-                        source = await prisma.rSSSource.update({
-                            where: { id: source.id },
-                            data: {
-                                ...(nextDesc ? { description: nextDesc } : {}),
-                                ...(nextUrl ? { url: nextUrl } : {})
-                            }
-                        });
-                    }
+                    await db.userFeed.deleteMany({
+                        where: {
+                            userId: userUuid
+                        }
+                    });
                 }
-                const uf = await (prisma as any).userFeed.upsert({
-                    where: { userId_sourceId: { userId: userUuid, sourceId: source.id } },
-                    update: {
-                        customName: s.name,
-                        customCategory: s.category,
-                        groupId: effectiveGroupId,
-                        isActive: s?.isActive !== false,
-                        contentType: typeof s?.contentType === 'string' ? s.contentType : null,
-                        sourceMode: typeof s?.sourceMode === 'string' ? s.sourceMode : null,
-                        fetchLimit: typeof s?.fetchLimit === 'number' ? s.fetchLimit : null,
-                        retentionLimit: typeof s?.retentionLimit === 'number' ? s.retentionLimit : null,
-                        sortOrder: typeof s?.sortOrder === 'number' ? s.sortOrder : null,
-                        updateFrequency: typeof s?.updateFrequency === 'number' ? s.updateFrequency : null,
-                    },
-                    create: {
-                        userId: userUuid,
-                        sourceId: source.id,
-                        customName: s.name,
-                        customCategory: s.category,
-                        groupId: effectiveGroupId,
-                        isActive: s?.isActive !== false,
-                        contentType: typeof s?.contentType === 'string' ? s.contentType : null,
-                        sourceMode: typeof s?.sourceMode === 'string' ? s.sourceMode : null,
-                        fetchLimit: typeof s?.fetchLimit === 'number' ? s.fetchLimit : null,
-                        retentionLimit: typeof s?.retentionLimit === 'number' ? s.retentionLimit : null,
-                        sortOrder: typeof s?.sortOrder === 'number' ? s.sortOrder : null,
-                        updateFrequency: typeof s?.updateFrequency === 'number' ? s.updateFrequency : null,
-                    }
-                });
-                results.push(uf);
-            }
 
-            // Sync deletion: remove any UserFeed that is not in the pushed batch
-            const processedSourceIds = results.map(uf => uf.sourceId);
-            if (processedSourceIds.length > 0) {
-                await (prisma as any).userFeed.deleteMany({
-                    where: {
-                        userId: userUuid,
-                        sourceId: { notIn: processedSourceIds }
-                    }
-                });
-            } else {
-                await (prisma as any).userFeed.deleteMany({
-                    where: {
-                        userId: userUuid
-                    }
-                });
-            }
+                return results.length;
+            });
 
-            res.json({ success: true, count: results.length });
+            res.json({ success: true, count });
         } catch (error) {
             console.error('[ConfigController] batchUpsertSources error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             if (ConfigController.isSchemaMissingError(error)) {
                 res.status(404).json({ success: false, message: 'Sources config not available' });
                 return;
@@ -579,33 +626,43 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const groups = req.body; // Array of { name, icon, color, sortOrder }
+            const groups = validateArray(req.body, 'groups', { required: true, maxLength: 500 });
 
-            if (!Array.isArray(groups)) return res.status(400).json({ success: false, message: 'Body must be an array' });
+            const count = await prisma.$transaction(async (tx: any) => {
+                const db = tx as any;
+                const results = [];
+                for (const g of groups) {
+                    const name = validateString(g?.name, 'group name', { required: true, maxLength: 100 });
+                    const icon = g?.icon ? validateString(g.icon, 'icon', { maxLength: 100 }) : null;
+                    const color = g?.color ? validateString(g.color, 'color', { maxLength: 50 }) : null;
+                    const sortOrder = validateInt(g?.sortOrder, 'sortOrder', { defaultValue: 0 });
 
-            const results = [];
-            for (const g of groups) {
-                const group = await (prisma as any).userRSSGroup.upsert({
-                    where: { userId_name: { userId: userUuid, name: g.name } },
-                    update: {
-                        sortOrder: g.sortOrder,
-                        icon: typeof g?.icon === 'string' ? g.icon : null,
-                        color: typeof g?.color === 'string' ? g.color : null,
-                    },
-                    create: {
-                        userId: userUuid,
-                        name: g.name,
-                        sortOrder: g.sortOrder,
-                        icon: typeof g?.icon === 'string' ? g.icon : null,
-                        color: typeof g?.color === 'string' ? g.color : null,
-                    }
-                });
-                results.push(group);
-            }
+                    const group = await db.userRSSGroup.upsert({
+                        where: { userId_name: { userId: userUuid, name } },
+                        update: {
+                            sortOrder,
+                            icon,
+                            color,
+                        },
+                        create: {
+                            userId: userUuid,
+                            name,
+                            sortOrder,
+                            icon,
+                            color,
+                        }
+                    });
+                    results.push(group);
+                }
+                return results.length;
+            });
 
-            res.json({ success: true, count: results.length });
+            res.json({ success: true, count });
         } catch (error) {
             console.error('[ConfigController] batchUpsertGroups error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             if (ConfigController.isSchemaMissingError(error)) {
                 res.status(404).json({ success: false, message: 'Groups config not available' });
                 return;
@@ -618,22 +675,22 @@ export class ConfigController {
         try {
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const rules = req.body; // Array of { keyword, mode, isRegex, scope, sourceUrls, target, isActive }
-
-            if (!Array.isArray(rules)) return res.status(400).json({ success: false, message: 'Body must be an array' });
-
-            await (prisma as any).userRSSFilterRule.deleteMany({ where: { userId: userUuid } });
+            const rules = validateArray(req.body, 'rules', { required: true, maxLength: 1000 });
 
             const data = rules
                 .map((r: any) => {
-                    const keyword = typeof r?.keyword === 'string' ? r.keyword.trim() : '';
+                    const keyword = validateString(r?.keyword ?? r?.pattern, 'keyword', { maxLength: 500 });
                     if (!keyword) return null;
                     const mode = r?.mode === 'include' ? 'include' : 'exclude';
                     const isRegex = Boolean(r?.isRegex ?? r?.is_regex);
                     const urlsRaw = Array.isArray(r?.sourceUrls) ? r.sourceUrls : (typeof r?.sourceUrl === 'string' ? [r.sourceUrl] : []);
-                    const urls = urlsRaw.map((u: any) => String(u || '').trim()).filter(Boolean);
+                    const urls = urlsRaw.map((u: any) => validateUrl(u, 'sourceUrl', {
+                        maxLength: 2048,
+                        stripTrailingSlash: true,
+                        allowRssHub: true,
+                    })).filter(Boolean);
                     const scope = r?.scope === 'specific' || urls.length > 0 ? 'specific' : 'global';
-                    const target = typeof r?.target === 'string' && r.target.trim() ? r.target.trim() : 'title_summary';
+                    const target = validateString(r?.target, 'target', { maxLength: 100, defaultValue: 'title_summary' });
                     const isActive = r?.isActive !== false;
                     return {
                         userId: userUuid,
@@ -648,11 +705,20 @@ export class ConfigController {
                 })
                 .filter(Boolean);
 
-            const created = await (prisma as any).userRSSFilterRule.createMany({ data });
+            const count = await prisma.$transaction(async (tx: any) => {
+                const db = tx as any;
+                await db.userRSSFilterRule.deleteMany({ where: { userId: userUuid } });
+                if (data.length === 0) return 0;
+                const created = await db.userRSSFilterRule.createMany({ data });
+                return created.count;
+            });
 
-            res.json({ success: true, count: created.count });
+            res.json({ success: true, count });
         } catch (error) {
             console.error('[ConfigController] batchUpsertFilterRules error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             if (ConfigController.isSchemaMissingError(error)) {
                 res.status(404).json({ success: false, message: 'Filter rules config not available' });
                 return;
@@ -766,28 +832,45 @@ export class ConfigController {
             }
             const userUuid = req.user?.id || req.user?.uuid;
             if (!userUuid) return res.status(401).json({ success: false, message: 'Unauthorized' });
-            const keys = req.body; // Array of profile objects
-
-            if (!Array.isArray(keys)) return res.status(400).json({ success: false, message: 'Body must be an array' });
+            const keys = validateArray(req.body, 'keys', { required: true, maxLength: 50 });
 
             const results = [];
             for (const k of keys) {
-                const encryptedApiKey = k.apiKey ? encrypt(k.apiKey) : undefined;
+                const name = validateString(k.name, 'name', { required: true, maxLength: 255 });
+                const provider = validateString(k.provider, 'provider', { required: true, maxLength: 100 });
+                const model = validateString(k.model, 'model', { required: true, maxLength: 100 });
+                const baseUrl = k.baseUrl ? validateUrl(k.baseUrl, 'baseUrl', { maxLength: 2048 }) : '';
+                const apiKey = k.apiKey ? validateString(k.apiKey, 'apiKey', { maxLength: 2048 }) : undefined;
+
+                const encryptedApiKey = apiKey ? encrypt(apiKey) : undefined;
+                const profileId = k.id || k.profileId;
+                if (!profileId) {
+                    throw new ValidationError('profileId or id is required');
+                }
+
                 const upserted = await prisma.userLLMKey.upsert({
-                    where: { userId_profileId: { userId: userUuid, profileId: k.id || k.profileId } },
+                    where: { userId_profileId: { userId: userUuid, profileId } },
                     update: {
-                        name: k.name, provider: k.provider, model: k.model, baseUrl: k.baseUrl,
-                        temperature: k.temperature, maxTokens: k.maxTokens, topP: k.topP,
-                        isActive: k.isActive, customModelName: k.customModelName,
+                        name, provider, model,
+                        baseUrl: baseUrl || undefined,
+                        temperature: typeof k.temperature === 'number' ? k.temperature : undefined,
+                        maxTokens: typeof k.maxTokens === 'number' ? k.maxTokens : undefined,
+                        topP: typeof k.topP === 'number' ? k.topP : undefined,
+                        isActive: k.isActive === true,
+                        customModelName: k.customModelName ? validateString(k.customModelName, 'customModelName', { maxLength: 100 }) : null,
                         ...(encryptedApiKey ? { encryptedApiKey } : {})
                     },
                     create: {
                         userId: userUuid,
-                        profileId: k.id || k.profileId,
-                        name: k.name, provider: k.provider, model: k.model,
+                        profileId,
+                        name, provider, model,
                         encryptedApiKey: encryptedApiKey || '',
-                        baseUrl: k.baseUrl, temperature: k.temperature, maxTokens: k.maxTokens,
-                        topP: k.topP, isActive: k.isActive, customModelName: k.customModelName
+                        baseUrl,
+                        temperature: typeof k.temperature === 'number' ? k.temperature : undefined,
+                        maxTokens: typeof k.maxTokens === 'number' ? k.maxTokens : undefined,
+                        topP: typeof k.topP === 'number' ? k.topP : undefined,
+                        isActive: k.isActive === true,
+                        customModelName: k.customModelName ? validateString(k.customModelName, 'customModelName', { maxLength: 100 }) : null,
                     }
                 });
                 results.push(upserted);
@@ -796,6 +879,9 @@ export class ConfigController {
             res.json({ success: true, count: results.length });
         } catch (error) {
             console.error('[ConfigController] batchUpsertLLMKeys error:', error);
+            if (error instanceof ValidationError) {
+                return res.status(400).json({ success: false, message: error.message });
+            }
             res.status(500).json({ success: false, message: 'Failed to batch upsert LLM keys' });
         }
     }
