@@ -598,4 +598,55 @@ html[data-theme="light"] .media-info-overlay a {
     background: var(--nav-hover-bg) !important;
 }
 
+/* ==========================================
+   Feeds Table Responsive Height & Freeze Row/Column
+   ========================================== */
+.feeds-table-container {
+    height: 40vw;
+    min-height: 350px;
+    max-height: 70vh;
+    position: relative;
+}
+
+/* Sticky Header (First Row) */
+.feeds-table-container table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: var(--bg-surface-elevated);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Sticky First Column (Checkbox) */
+.feeds-table-container table thead tr th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    background-color: var(--bg-surface-elevated);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid var(--border-color);
+}
+
+.feeds-table-container table tbody tr td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: var(--bg-surface-elevated);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid var(--border-color);
+}
+
+/* Hover highlights for sticky cell to match the row hover */
+.feeds-table-container table tbody tr:hover td:first-child {
+    background-color: #1e293b !important;
+}
+
+html[data-theme="light"] .feeds-table-container table tbody tr:hover td:first-child {
+    background-color: #f1f5f9 !important;
+}
+
+
 

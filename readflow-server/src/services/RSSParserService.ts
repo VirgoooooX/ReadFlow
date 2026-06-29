@@ -18,7 +18,7 @@ import {
   needsProxy,
   getProxyUrl,
 } from '../utils/RSSUtils';
-import { AppError } from '../utils/AppError';
+import { findSourceStrategy, SourceParseStrategy } from './sourceStrategies';
 
 export class RSSParserService {
   private static instance: RSSParserService;
@@ -226,6 +226,7 @@ export class RSSParserService {
         const itemLink = item.links?.[0]?.url || item.id || '';
 
         if (!item.title || !itemLink) continue;
+        const strategy = findSourceStrategy(itemLink, source);
 
         let rawContent = item.content || item.description || '';
         const fixedRawContent = fixRelativeImageUrls(rawContent, itemLink);
@@ -242,7 +243,9 @@ export class RSSParserService {
           itemLink,
           source.contentType || 'image_text',
           fulltextTimeoutMs,
-          metaOut
+          metaOut,
+          source,
+          strategy
         );
 
         if (applyImageProxy) {
@@ -257,8 +260,16 @@ export class RSSParserService {
         }
 
         let articleTitle = cleanTextContent(item.title);
-        if (itemLink.includes('dongqiudi.com')) {
-          articleTitle = articleTitle.split('|')[0].trim();
+        if (strategy) {
+          try {
+            const urlObj = new URL(itemLink);
+            articleTitle = strategy.normalizeTitle?.(articleTitle, {
+              source,
+              url: itemLink,
+              urlObj,
+              rawContent: fixedRawContent,
+            }) || articleTitle;
+          } catch { }
         }
 
         let articleAuthor = item.authors?.[0]?.name ? cleanTextContent(item.authors[0].name) : '';
@@ -287,12 +298,12 @@ export class RSSParserService {
 
         try {
           const urlObj = new URL(itemLink);
-          if (this.isXchuxingVideoUrl(urlObj)) {
-            const videoUrl = await this.resolveVideoUrl(itemLink);
-            if (videoUrl) {
-              article.videoUrl = videoUrl;
-            }
-          }
+          await strategy?.enrichArticle?.(article, {
+            source,
+            url: itemLink,
+            urlObj,
+            resolveVideoUrl: (url) => this.resolveVideoUrl(url),
+          });
         } catch { }
 
         if (shouldExtractImages) {
@@ -343,35 +354,35 @@ export class RSSParserService {
     url: string,
     contentType: 'text' | 'image_text' = 'image_text',
     fulltextTimeoutMs?: number,
-    metaOut?: { author?: string; title?: string }
+    metaOut?: { author?: string; title?: string },
+    source?: RSSSource,
+    strategy?: SourceParseStrategy
   ): Promise<string> {
     try {
+      let urlObj: URL | null = null;
       try {
-        const urlObj = new URL(url);
-        if (this.isXchuxingVideoUrl(urlObj)) {
+        urlObj = new URL(url);
+        if (source && strategy?.preserveRawContent?.({ source, url, urlObj, rawContent })) {
           return preserveHtmlContent(rawContent, contentType);
         }
       } catch { }
 
-      // Force fetch for xchuxing vote pages – RSS content is always insufficient
-      try {
-        const urlObj = new URL(url);
-        if (this.isXchuxingVoteUrl(urlObj)) {
-          const fullContent = await this.fetchFullContent(url, fulltextTimeoutMs, metaOut);
-          if (fullContent) {
-            return preserveHtmlContent(fixRelativeImageUrls(fullContent, url), contentType);
-          }
-          return preserveHtmlContent(rawContent, contentType);
+      if (source && strategy && urlObj) {
+        const strategyContext = { source, url, urlObj, rawContent };
+        const rssContent = strategy.extractFromRssDescription?.(strategyContext);
+        if (rssContent) {
+          return preserveHtmlContent(rssContent, contentType);
         }
-      } catch { }
+      }
 
       const shouldFetch = rawContent.length < 500 ||
         rawContent.includes('阅读全文') ||
         rawContent.includes('Read more') ||
-        rawContent.includes('查看全文');
+        rawContent.includes('查看全文') ||
+        !!(source && strategy && urlObj && strategy.shouldForceFullContent?.({ source, url, urlObj, rawContent }));
 
       if (shouldFetch && url) {
-        const fullContent = await this.fetchFullContent(url, fulltextTimeoutMs, metaOut);
+        const fullContent = await this.fetchFullContent(url, fulltextTimeoutMs, metaOut, source, strategy);
         if (fullContent) {
           rawContent = fullContent;
           rawContent = fixRelativeImageUrls(rawContent, url);
@@ -414,7 +425,7 @@ export class RSSParserService {
       const html = await response.text();
       const { document } = parseHTML(html);
 
-      if (this.isXchuxingVideoUrl(urlObj)) {
+      if (urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/video/')) {
         const videoEl = (document as any).querySelector?.('#video');
         const direct = videoEl?.getAttribute?.('data-src') || videoEl?.getAttribute?.('src');
         const picked = typeof direct === 'string' ? direct.trim() : '';
@@ -445,7 +456,9 @@ export class RSSParserService {
   private async fetchFullContent(
     url: string,
     fulltextTimeoutMs?: number,
-    metaOut?: { author?: string; title?: string }
+    metaOut?: { author?: string; title?: string },
+    source?: RSSSource,
+    strategy?: SourceParseStrategy
   ): Promise<string | null> {
     try {
       const urlObj = new URL(url);
@@ -491,40 +504,15 @@ export class RSSParserService {
         }
       });
 
-      if (this.isXchuxingVideoUrl(urlObj)) {
-        const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-        if (metaDesc && metaDesc.trim()) {
-          const escaped = this.escapeHtml(metaDesc.trim());
-          return `<article><p>${escaped}</p></article>`;
-        }
-        return null;
-      }
+      const activeStrategy = strategy;
+      const strategyDocumentContext = source && activeStrategy
+        ? { source, url, urlObj, document: document as unknown as Document, rawHtml: html, metaOut }
+        : null;
 
-      if (this.isXchuxingVoteUrl(urlObj)) {
-        const extracted = this.extractXchuxingVoteContent(document as unknown as Document, html);
+      if (strategyDocumentContext) {
+        const extracted = activeStrategy?.extractFromDocument?.(strategyDocumentContext);
         if (extracted) return extracted;
-        const voteMetaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-        if (voteMetaDesc.trim()) {
-          return `<article><p>${this.escapeHtml(voteMetaDesc.trim())}</p></article>`;
-        }
-        return null;
-      }
-
-      if (this.isXchuxingArticleUrl(urlObj)) {
-        const extracted = this.extractXchuxingArticleContent(document as unknown as Document);
-        if (extracted) return extracted;
-      }
-
-      // Optimize dongqiudi.com articles
-      if (hostname.includes('dongqiudi.com')) {
-        const authorSpan = document.querySelector('article h5 span');
-        if (authorSpan && metaOut) {
-          metaOut.author = authorSpan.textContent?.trim();
-        }
-        const h5El = document.querySelector('article h5');
-        if (h5El) {
-          h5El.remove();
-        }
+        activeStrategy?.beforeReadability?.(strategyDocumentContext);
       }
 
       const reader = new Readability(document as unknown as Document);
@@ -532,31 +520,8 @@ export class RSSParserService {
 
       let content = article?.content || null;
 
-      if (content && hostname.includes('dongqiudi.com')) {
-        try {
-          const match = url.match(/\/article\/(\d+)\.html/);
-          if (match) {
-            const articleId = match[1];
-            const commentsHtml = await this.getDongqiudiComments(articleId);
-            if (commentsHtml) {
-              if (content.endsWith('</div>')) {
-                content = content.substring(0, content.length - 6) + commentsHtml + '</div>';
-              } else {
-                content += commentsHtml;
-              }
-            }
-          }
-        } catch (e) {
-          logger.error('Failed to append dongqiudi comments:', e);
-        }
-      }
-
-      if (content && this.looksLikeOnlyPolicyLinks(content)) {
-        if (this.isXchuxingArticleUrl(urlObj)) {
-          const extracted = this.extractXchuxingArticleContent(document as unknown as Document);
-          if (extracted) return extracted;
-        }
-        return null;
+      if (content && strategyDocumentContext) {
+        content = await activeStrategy?.afterReadability?.(content, strategyDocumentContext) || content;
       }
 
       return content;
@@ -686,192 +651,6 @@ export class RSSParserService {
     return Math.floor(Math.random() * (maxInt - minInt + 1)) + minInt;
   }
 
-  private isXchuxingArticleUrl(urlObj: URL): boolean {
-    return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/article/');
-  }
-
-  private isXchuxingVideoUrl(urlObj: URL): boolean {
-    return urlObj.hostname === 'www.xchuxing.com' && urlObj.pathname.startsWith('/video/');
-  }
-
-  private isXchuxingVoteUrl(urlObj: URL): boolean {
-    return urlObj.hostname === 'www.xchuxing.com' && /^\/vote\/\d+/.test(urlObj.pathname);
-  }
-
-  private extractXchuxingArticleContent(document: Document): string | null {
-    const titleEl = document.querySelector('.acticle-bigtitle');
-    if (!titleEl) return null;
-
-    const titleText = (titleEl.textContent || '').replace(/\s+/g, ' ').trim();
-
-    const cateEl = document.querySelector('.cate-tags');
-    let node: Element | null = cateEl ? cateEl.nextElementSibling : titleEl.nextElementSibling;
-
-    let contentEl: Element | null = null;
-    while (node) {
-      if (node.tagName.toLowerCase() === 'div') {
-        const textLen = (node.textContent || '').replace(/\s+/g, '').trim().length;
-        const hasStructured = !!node.querySelector('p,figure,img');
-        if (hasStructured && textLen >= 80) {
-          contentEl = node;
-          break;
-        }
-      }
-      node = node.nextElementSibling;
-    }
-
-    if (!contentEl) return null;
-
-    const bodyHtml = (contentEl as HTMLElement).innerHTML?.trim() || '';
-    if (bodyHtml.length < 80) return null;
-
-    const escapedTitle = titleText ? this.escapeHtml(titleText) : '';
-    const titleHtml = escapedTitle ? `<h1>${escapedTitle}</h1>` : '';
-    return `<article>${titleHtml}${bodyHtml}</article>`;
-  }
-
-  /**
-   * Extract vote content from xchuxing.com /vote/ pages.
-   * Handles both text-only and image+text vote options.
-   */
-  private extractXchuxingVoteContent(document: Document, rawHtml: string): string | null {
-    // 1. Title: prefer <h2>, fallback to <title>
-    const h2 = document.querySelector('h2');
-    let title = h2 ? (h2.textContent || '').replace(/\s+/g, ' ').trim() : '';
-    if (!title) {
-      const titleEl = document.querySelector('title');
-      const titleText = titleEl ? (titleEl.textContent || '').trim() : '';
-      title = titleText.replace(/_投票_新出行$/, '').trim();
-    }
-    if (!title) return null;
-
-    // 2. Description: look for text near <h2>, fallback to meta description
-    const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content')?.trim() || '';
-    let descriptionText = '';
-    if (h2) {
-      let sibling = h2.nextElementSibling;
-      while (sibling) {
-        const tag = sibling.tagName.toLowerCase();
-        if (tag === 'ul' || tag === 'ol') break;
-        const cls = ((sibling as any).getAttribute?.('class') || '').toLowerCase();
-        if (cls.includes('vote')) break;
-        const text = (sibling.textContent || '').replace(/\s+/g, ' ').trim();
-        if (text.length > 10 && text.length < 500 && !text.includes('{{')) {
-          descriptionText = text;
-          break;
-        }
-        sibling = sibling.nextElementSibling;
-      }
-    }
-    const description = descriptionText || (metaDesc !== title ? metaDesc : '');
-
-    // 3. Extract vote options – try DOM first, then embedded scripts
-    const options: Array<{ text: string; imageUrl?: string }> = [];
-    this.extractVoteOptionsFromDom(document, options);
-    if (options.length === 0) {
-      this.extractVoteOptionsFromScripts(rawHtml, options);
-    }
-
-    // 4. Build structured HTML
-    const parts: string[] = ['<article>'];
-    parts.push(`<h1>${this.escapeHtml(title)}</h1>`);
-    if (description) {
-      parts.push(`<p>${this.escapeHtml(description)}</p>`);
-    }
-    if (options.length > 0) {
-      parts.push('<ul>');
-      for (const opt of options) {
-        if (opt.imageUrl) {
-          parts.push(`<li><img src="${opt.imageUrl}" alt="${this.escapeHtml(opt.text)}" /> ${this.escapeHtml(opt.text)}</li>`);
-        } else {
-          parts.push(`<li>${this.escapeHtml(opt.text)}</li>`);
-        }
-      }
-      parts.push('</ul>');
-    }
-    parts.push('</article>');
-    return parts.join('');
-  }
-
-  /** Try to extract vote options from rendered DOM elements. */
-  private extractVoteOptionsFromDom(
-    document: Document,
-    options: Array<{ text: string; imageUrl?: string }>
-  ): void {
-    const lists = document.querySelectorAll('ul, ol');
-    for (const list of Array.from(lists)) {
-      const items = list.querySelectorAll('li');
-      if (items.length < 2 || items.length > 15) continue;
-
-      const candidates: Array<{ text: string; imageUrl?: string }> = [];
-      let valid = true;
-      for (const li of Array.from(items)) {
-        const text = (li.textContent || '').replace(/\s+/g, ' ').trim();
-        if (text.length > 100 || text.length === 0 || text.includes('{{') || /https?:\/\//.test(text)) {
-          valid = false;
-          break;
-        }
-        const img = li.querySelector('img');
-        const imgSrc = img
-          ? ((img.getAttribute('data-src') || img.getAttribute('src') || '').trim() || undefined)
-          : undefined;
-        candidates.push({ text, imageUrl: imgSrc });
-      }
-      if (valid && candidates.length >= 2) {
-        options.push(...candidates);
-        break;
-      }
-    }
-  }
-
-  /** Try to extract vote options from embedded script data (e.g. __NUXT__ payload). */
-  private extractVoteOptionsFromScripts(
-    rawHtml: string,
-    options: Array<{ text: string; imageUrl?: string }>
-  ): void {
-    try {
-      const patterns = [
-        /"vote_item"\s*:\s*(\[[\s\S]*?\])/,
-        /"voteList"\s*:\s*(\[[\s\S]*?\])/,
-        /"vote_items"\s*:\s*(\[[\s\S]*?\])/,
-      ];
-      for (const pattern of patterns) {
-        const match = rawHtml.match(pattern);
-        if (match) {
-          try {
-            const items = JSON.parse(match[1]);
-            for (const item of items) {
-              const text = item.name || item.title || item.content || item.text || '';
-              const img = item.image || item.img || item.cover || item.pic || '';
-              if (text) {
-                options.push({ text: String(text).trim(), imageUrl: img || undefined });
-              }
-            }
-            if (options.length > 0) return;
-          } catch { }
-        }
-      }
-    } catch { }
-  }
-
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  private looksLikeOnlyPolicyLinks(html: string): boolean {
-    const text = cleanTextContent(html);
-    if (text.length >= 200) return false;
-    return (
-      (text.includes('用户协议') || text.includes('用户条款')) &&
-      (text.includes('隐私政策') || text.includes('隐私'))
-    );
-  }
-
   private applyFilterRules(
     articles: Omit<Article, 'id'>[],
     rules: FilterRule[]
@@ -909,114 +688,6 @@ export class RSSParserService {
     });
   }
 
-  private async getDongqiudiComments(articleId: string): Promise<string> {
-    try {
-      const apiUrl = `https://api.dongqiudi.com/v2/article/${articleId}/comment`;
-      
-      const response = await fetchWithRetry(apiUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-        },
-        timeout: 10000,
-        retries: 1,
-      });
-      
-      if (!response.ok) return '';
-      
-      const json = await response.json() as any;
-      if (json.errCode !== 0 || !json.data) return '';
-      
-      const data = json.data;
-      const commentList = data.comment_list || [];
-      const recommendList = data.recommend_list || [];
-      const userList = data.user_list || [];
-      
-      const userMap = new Map<string, { username: string; avatar?: string }>();
-      for (const user of userList) {
-        if (user && user.id) {
-          userMap.set(String(user.id), {
-            username: user.username || '神秘球迷',
-            avatar: user.avatar,
-          });
-        }
-      }
-      
-      const allComments = [...recommendList];
-      const recommendIds = new Set(recommendList.map((c: any) => String(c.id)));
-      
-      const otherComments = commentList
-        .filter((c: any) => !recommendIds.has(String(c.id)))
-        .sort((a: any, b: any) => {
-          const upA = parseInt(a.up) || 0;
-          const upB = parseInt(b.up) || 0;
-          return upB - upA;
-        });
-        
-      allComments.push(...otherComments);
-      
-      // Fetch up to 10 comments for the collapsible view
-      const topComments = allComments.slice(0, 10);
-      if (topComments.length === 0) return '';
-      
-      const visibleComments = topComments.slice(0, 3);
-      const collapsedComments = topComments.slice(3);
-      
-      const htmlParts: string[] = [];
-      htmlParts.push('<hr style="margin: 24px 0; border: none; border-top: 1px dashed var(--color-table-border);" />');
-      htmlParts.push('<div class="dongqiudi-comments" style="margin-top: 16px; font-family: -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: var(--color-text);">');
-      htmlParts.push('  <h3 style="font-size: 1.05em; font-weight: bold; margin-bottom: 12px; color: var(--color-text); border-left: 4px solid var(--color-link); padding-left: 8px;">💬 热门评论</h3>');
-      htmlParts.push('  <div style="display: flex; flex-direction: column; gap: 12px;">');
-      
-      const renderComment = (comment: any) => {
-        const userId = String(comment.user_id);
-        const user = userMap.get(userId);
-        const username = user?.username || '神秘球迷';
-        const avatar = user?.avatar || 'https://img1.dongqiudi.com/fastdfs1/M00/3B/EF/100x100/-/-/o4YBAFjM9lqAel9GAAAQrsgeQ3A103.jpg';
-        const upCount = comment.up || '0';
-        const createdAt = comment.created_at || '';
-        const text = (comment.content || '').replace(/\n/g, '<br />');
-        
-        return `    <div style="border-bottom: 1px solid var(--color-table-border); padding-bottom: 10px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <img src="${avatar}" style="width: 24px !important; height: 24px !important; border-radius: 50% !important; object-fit: cover !important; display: block !important; margin: 0 !important;" />
-          <span style="font-weight: 600; font-size: 0.9em; color: var(--color-text); line-height: 24px; display: inline-block;">${username}</span>
-        </div>
-        <span style="font-size: 0.8em; color: var(--color-secondary); background-color: var(--color-code-bg); padding: 2px 6px; border-radius: 10px;">👍 ${upCount}</span>
-      </div>
-      <div style="font-size: 0.9em; line-height: 1.4; color: var(--color-text); padding-left: 32px; word-break: break-word;">${text}</div>
-      <div style="font-size: 0.75em; color: var(--color-caption); padding-left: 32px; margin-top: 2px;">${createdAt}</div>
-    </div>`;
-      };
-
-      // Render visible ones
-      for (const comment of visibleComments) {
-        htmlParts.push(renderComment(comment));
-      }
-      
-      // Render collapsed ones if any
-      if (collapsedComments.length > 0) {
-        htmlParts.push(`    <div id="more-comments" style="display: none; flex-direction: column; gap: 12px;">`);
-        for (const comment of collapsedComments) {
-          htmlParts.push(renderComment(comment));
-        }
-        htmlParts.push(`    </div>`);
-        
-        // Add toggle button
-        htmlParts.push(`    <button id="toggle-comments-btn" data-count="${collapsedComments.length}" style="width: 100%; padding: 10px; margin-top: 8px; background: none; border: 1px solid var(--color-table-border); border-radius: 8px; font-size: 0.85em; color: var(--color-link); cursor: pointer; text-align: center; font-weight: 600; outline: none; -webkit-tap-highlight-color: transparent;">
-      展开更多评论 (${collapsedComments.length}条)
-    </button>`);
-      }
-      
-      htmlParts.push('  </div>');
-      htmlParts.push('</div>');
-      
-      return htmlParts.join('\n');
-    } catch (error) {
-      logger.error('Error fetching comments in RSSParserService:', error);
-      return '';
-    }
-  }
 }
 
 export const rssParserService = RSSParserService.getInstance();
