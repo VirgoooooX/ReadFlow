@@ -614,8 +614,8 @@ html[data-theme="light"] .media-info-overlay a {
     top: 0;
     z-index: 20;
     background-color: var(--bg-surface-elevated);
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
 }
 
 /* Sticky First Column (Checkbox) */
@@ -624,8 +624,8 @@ html[data-theme="light"] .media-info-overlay a {
     left: 0;
     z-index: 30;
     background-color: var(--bg-surface-elevated);
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     border-right: 1px solid var(--border-color);
 }
 
@@ -634,8 +634,8 @@ html[data-theme="light"] .media-info-overlay a {
     left: 0;
     z-index: 10;
     background-color: var(--bg-surface-elevated);
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     border-right: 1px solid var(--border-color);
 }
 
