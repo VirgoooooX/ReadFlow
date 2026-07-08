@@ -24,17 +24,28 @@
 
 ## 📸 应用预览
 
-### 1. 极简阅读列表与源管理
-*展示干净清爽的文章列表，自动同步已读/未读状态与自定义分组。*
-![ReadFlow 阅读列表](assets/icon.png)
-
-### 2. 每日 AI 摘要报告 (Daily Report)
-*利用大型语言模型（LLM）对全天抓取的订阅文章进行聚合分类，生成可单手划读的 AI 合约阅读简报。*
-![ReadFlow 每日报告](assets/icon.png)
-
-### 3. 单词划词翻译与生词本
-*阅读英文文章时，轻点单词弹出本地释义，双击翻译长句，并可一键加入生词本复习。*
-![ReadFlow 划词翻译](assets/icon.png)
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/images/app-screenshot-1.jpg" alt="文章列表页" width="240"><br>
+      <sub>文章列表页</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="assets/images/app-screenshot-2.jpg" alt="文章详情页" width="240"><br>
+      <sub>文章详情页</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="assets/images/app-screenshot-3.jpg" alt="订阅源管理" width="240"><br>
+      <sub>订阅源管理</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="assets/images/app-screenshot-4.jpg" alt="个人设置中心" width="240"><br>
+      <sub>个人设置中心</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
